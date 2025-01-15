@@ -1266,6 +1266,8 @@ dependencies = [
  "num-format",
  "once_cell",
  "serde",
+ "strum",
+ "strum_macros",
  "surrealdb",
  "thiserror 2.0.3",
  "uuid",

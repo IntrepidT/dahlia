@@ -28,6 +28,8 @@ num-format = "0.4.4"
 thiserror = "2.0.3"
 icondata = "0.4.0"
 leptos_icons = "0.3.1"
+strum = "0.26.3"
+strum_macros = "0.26.4"
 
 [features]
 csr = ["leptos/csr", "leptos_meta/csr", "leptos_router/csr"]

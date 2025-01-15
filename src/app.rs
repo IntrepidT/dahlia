@@ -1,6 +1,16 @@
 use leptos::*;
+pub mod db;
+pub mod errors;
+pub mod models;
+pub mod server_functions;
 use leptos_meta::*;
 use leptos_router::*;
+pub mod pages;
+use pages::{
+    Activities, AdministerTest, DataView, HomePage, LoginPage, MathTesting, MyAccount,
+    ReadingTesting, TestBuilder,
+};
+pub mod components;
 
 #[component]
 pub fn App() -> impl IntoView {
@@ -12,32 +22,64 @@ pub fn App() -> impl IntoView {
         // id=leptos means cargo-leptos will hot-reload this stylesheet
         <Stylesheet id="leptos" href="/pkg/dahlia.css"/>
         <link data-trunk rel="tailwind-css" href="/style/input.css" />
+        <link rel="icon" href="/assets/favicon.ico" />
         // sets the document title
-        <Title text="Dahlia Software"/>
+        <Title text="Dahlia"/>
 
         // content for this welcome page
         <Router>
             <main>
-                <Body class="bg-gray-900 overlow-x-hide" />
+                <Body />
                 <Routes>
-                    <Route path="/" view=HomePage/>
+                    <Route path="/" view=move || {
+                        view! {
+                            <HomePage />
+                        }
+                    }/>
+                    <Route path="/dataview" view=move || {
+                        view!{
+                            <DataView />
+                        }
+                    }/>
+                    <Route path="/admintest" view=move || {
+                        view!{
+                            <AdministerTest />
+                        }
+                    }/>
+                    <Route path="/activities" view=move || {
+                        view! {
+                            <Activities />
+                        }
+                    }/>
+                    <Route path="/myaccount" view=|| {
+                        view!{
+                            <MyAccount />
+                        }
+                    }/>
+                    <Route path="/login" view=|| {
+                        view!{
+                            <LoginPage />
+                        }
+                    }/>
+                    <Route path="/mathtesting" view=|| {
+                        view!{
+                            <MathTesting />
+                        }
+                    }/>
+                    <Route path="/readingtesting" view=|| {
+                        view!{
+                            <ReadingTesting />
+                        }
+                    }/>
+                    <Route path="/testbuilder" view=|| {
+                        view!{
+                            <TestBuilder />
+                        }
+                    }/>
                     <Route path="/*any" view=NotFound/>
                 </Routes>
             </main>
         </Router>
-    }
-}
-
-/// Renders the home page of your application.
-#[component]
-fn HomePage() -> impl IntoView {
-    // Creates a reactive value to update the button
-    let (count, set_count) = create_signal(0);
-    let on_click = move |_| set_count.update(|count| *count += 1);
-
-    view! {
-        <h1>"Dahlia Software"</h1>
-        <button on:click=on_click>"Click Me: " {count}</button>
     }
 }
 

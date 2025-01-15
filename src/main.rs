@@ -3,9 +3,9 @@
 async fn main() -> std::io::Result<()> {
     use actix_files::Files;
     use actix_web::*;
+    use dahlia::app::*;
     use leptos::*;
     use leptos_actix::{generate_route_list, LeptosRoutes};
-    use dahlia::app::*;
 
     let conf = get_configuration(None).await.unwrap();
     let addr = conf.leptos_options.site_addr;
@@ -24,6 +24,7 @@ async fn main() -> std::io::Result<()> {
             .service(Files::new("/assets", site_root))
             // serve the favicon from /favicon.ico
             .service(favicon)
+            .service(Files::new("/static", "./static").show_files_listing())
             .leptos_routes(leptos_options.to_owned(), routes.to_owned(), App)
             .app_data(web::Data::new(leptos_options.to_owned()))
         //.wrap(middleware::Compress::default())
