@@ -1,28 +1,108 @@
-use crate::app::models::{student::Student, AddStudentRequest, DeleteStudentRequest, EditStudentRequest};
 use crate::app::errors::student_errors::{ErrorMessage, ResponseErrorTrait};
+use crate::app::models::{
+    student::Student, AddStudentRequest, DeleteStudentRequest, UpdateStudentRequest,
+};
 use leptos::*;
-use serde::*;
+
+#[cfg(feature = "ssr")]
+use {
+    crate::app::db::database, crate::app::errors::StudentError, actix_web::web, chrono::Local,
+    sqlx::PgPool, std::error::Error, uuid::Uuid,
+};
 
 #[server(GetStudents, "/api")]
 pub async fn get_students() -> Result<Vec<Student>, ServerFnError> {
-    let students = retrieve_all_students().await;
-    Ok(students)
+    #[cfg(feature = "ssr")]
+    {
+        use actix_web::web;
+        use leptos_actix::extract;
+        let pool = extract::<web::Data<PgPool>>()
+            .await
+            .map_err(|e| ServerFnError::new(format!("Failed to extract pool: {}", e)))?;
+
+        log::info!("Attempting to retrieve all students from database");
+
+        match database::get_all_students(&pool).await {
+            Ok(students) => {
+                log::info!("Successfully retrieve_all_students from database");
+                Ok(students)
+            }
+            Err(e) => {
+                log::error!("Database error: {}", e);
+                Err(ServerFnError::new(format!("Database error: {}", e)))
+            }
+        }
+    }
+}
+
+#[server(GetStudentsSmart, "/api")]
+pub async fn get_students_smart(fragment: String) -> Result<Vec<Student>, ServerFnError> {
+    #[cfg(feature = "ssr")]
+    {
+        use actix_web::web;
+        use leptos_actix::extract;
+        let pool = extract::<web::Data<PgPool>>()
+            .await
+            .map_err(|e| ServerFnError::new(format!("Failed to extract pool: {}", e)))?;
+
+        log::info!("Attempting to retrieve all students from database (smartly)");
+
+        match database::get_all_students(&pool).await {
+            Ok(students) => {
+                log::info!("Successfully retrieve_all_students from database");
+                Ok(students)
+            }
+            Err(e) => {
+                log::error!("Database error: {}", e);
+                Err(ServerFnError::new(format!("Database error: {}", e)))
+            }
+        }
+    }
 }
 
 #[server(AddStudent, "/api")]
 pub async fn add_student(add_student_request: AddStudentRequest) -> Result<Student, ServerFnError> {
-    let new_student = add_new_student(
-        add_student_request.name, 
-        add_student_request.grade, 
-        add_student_request.student_id
-    )
-    .await;
+    #[cfg(feature = "ssr")]
+    {
+        use actix_web::web;
+        use leptos_actix::extract;
+        let pool = extract::<web::Data<PgPool>>()
+            .await
+            .map_err(|e| ServerFnError::new(format!("Failed to extract pool: {}", e)))?;
 
-    match new_student {
-        Some(created_student) => Ok(created_student),
-        None => Err(ServerFnError::Args(String::from(
-                    "Error in creating person!",
-        ))),
+        log::info!("Attempting to add new student to the database");
+        let bufferStudent = Student::new(
+            add_student_request.firstname,
+            add_student_request.lastname,
+            add_student_request.gender,
+            add_student_request.date_of_birth,
+            add_student_request.student_id,
+            add_student_request.ell,
+            add_student_request.grade,
+            add_student_request.teacher,
+            add_student_request.iep,
+            add_student_request.student_504,
+            add_student_request.readplan,
+            add_student_request.gt,
+            add_student_request.intervention,
+            add_student_request.eye_glasses,
+        );
+
+        match database::add_student(&bufferStudent, &pool).await {
+            Ok(created_student) => {
+                log::info!(
+                    "Successfully created student with ID: {}",
+                    created_student.student_id
+                );
+                Ok(created_student)
+            }
+            Err(e) => {
+                log::info!("Failed to create student: {:?}", e);
+                Err(ServerFnError::new(format!(
+                    "The object created was not a student...somehow?"
+                )))
+            }
+        }
     }
 }
 
@@ -30,96 +110,74 @@ pub async fn add_student(add_student_request: AddStudentRequest) -> Result<Stude
 pub async fn delete_student(
     delete_student_request: DeleteStudentRequest,
 ) -> Result<Student, ServerFnError> {
-    let deleted_results = delete_certain_student(delete_student_request.uuid).await;
-    match deleted_results {
-        Ok(deleted) => {
-            if let Some(deleted_student) = deleted {
-                Ok(deleted_student)
-            }
-            else {
-                Err(ServerFnError::Response(ErrorMessage::create(
-                            StudentError::StudentDeleteFailure,
-                )))
-            }
+    #[cfg(feature = "ssr")]
+    {
+        use actix_web::web;
+        use leptos_actix::extract;
+        let pool = extract::<web::Data<PgPool>>()
+            .await
+            .map_err(|e| ServerFnError::new(format!("Failed to extract pool: {}", e)))?;
+
+        log::info!("Attempting to delete student to the database");
+
+        match database::delete_student(
+            delete_student_request.firstname,
+            delete_student_request.lastname,
+            delete_student_request.student_id,
+            &pool,
+        )
+        .await
+        {
+            Ok(deleted) => Ok(deleted),
+            Err(_) => Err(ServerFnError::new(
+                "Failed to delete student from the database",
+            )),
         }
-        Err(student_error) => Err(ServerFnError::Response(ErrorMessage::create(student_error))),
     }
 }
 
 #[server(EditStudent, "/api")]
-pub async fn edit_student(edit_student_request: EditStudentRequest) -> Result<Student, ServerFnError> {
-    let updated = edit_certain_student(
-        edit_student_request.uuid, 
-        edit_student_request.name, 
-        edit_student_request.grade, 
-        edit_student_request.student_id
-    )
-    .await;
+pub async fn edit_student(
+    edit_student_request: UpdateStudentRequest,
+) -> Result<Student, ServerFnError> {
+    #[cfg(feature = "ssr")]
+    {
+        use actix_web::web;
+        use leptos_actix::extract;
 
-    match updated {
-        Ok(updated_result) => {
-            if let Some(updated_student) = updated_result {
-                Ok(updated_student)
-            }
-            else {
-                Err(ServerFnError::Args(ErrorMessage::create(
-                            StudentError::StudentUpdateFailure,
-                )))
-            }
-        }
-        Err(student_error) => Err(ServerFnError::Args(ErrorMessage::create(student_error))),
-    }
-}
+        let pool = extract::<web::Data<PgPool>>()
+            .await
+            .map_err(|e| ServerFnError::new(format!("Failed to extract pool: {}", e)))?;
 
-cfg_if::cfg_if! {
-    
-    if #[cfg(feature = "ssr")] {
+        log::info!("Attempting to update student in the database");
 
-        use crate::app::db::database;
-        use crate::app::errors::StudentError;
-        use chrono::{DateTime, Local};
-        use uuid::Uuid;
-
-        pub async fn retrieve_all_students() -> Vec<Student> {
-            
-            let get_all_students_result = database::get_all_students().await;
-            match get_all_students_result {
-                Some(found_student) => found_student,
-                None => Vec::new()
-            }
-        }
-
-        pub async fn add_new_student<T> (name: T, grade: T, student_id: i32) 
-
-            -> Option<Student> where T: Into<String> {
-            
-            let mut buffer = Uuid::encode_buffer();
-            let uuid = Uuid::new_v4().simple().encode_lower(&mut buffer);
-
-            let current_now = Local::now();
-            let current_formatted = current_now.to_string();
-
-            let new_student = Student::new(
-                String::from(uuid), 
-                name.into(), 
-                grade.into(), 
-                student_id,
-                current_formatted
-            );
-
-            database::add_student(new_student).await
-        }
-
-        pub async fn delete_certain_student<T>(uuid: T) -> 
-            Result<Option<Student>, StudentError> 
-            where T:Into<String> {
-            
-            database::delete_student(uuid.into()).await
-        }
-
-        pub async fn edit_certain_student<T>(uuid: T, name: T, grade: T, student_id: i32) -> Result<Option<Student>,StudentError> where T:Into<String> {
-
-            database::update_student(uuid.into(), name.into(), grade.into(), student_id).await
+        match database::update_student(
+            edit_student_request.firstname,
+            edit_student_request.lastname,
+            edit_student_request.gender,
+            edit_student_request.date_of_birth,
+            edit_student_request.student_id,
+            edit_student_request.ell,
+            edit_student_request.grade,
+            edit_student_request.teacher,
+            edit_student_request.iep,
+            edit_student_request.student_504,
+            edit_student_request.readplan,
+            edit_student_request.gt,
+            edit_student_request.intervention,
+            edit_student_request.eye_glasses,
+            &pool,
+        )
+        .await
+        {
+            Ok(Some(updated_student)) => Ok(updated_student),
+            Ok(None) => Err(ServerFnError::Args(ErrorMessage::create(
+                StudentError::StudentUpdateFailure,
+            ))),
+            Err(e) => Err(ServerFnError::new(format!(
+                "Failed to update student: {}",
+                e
+            ))),
         }
     }
 }

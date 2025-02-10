@@ -1,124 +1,173 @@
-use crate::app::errors::{ErrorMessageTest, ResponseErrorTraitTest};
-use crate::app::models::{
-    test::{test_type, Test},
-    CreateNewTestRequest, DeleteTestRequest, EditTestRequest,
-};
+use crate::app::models::TestType;
+use crate::app::models::{test::Test, CreateNewTestRequest, DeleteTestRequest, UpdateTestRequest};
 use leptos::*;
-use serde::*;
-
+#[cfg(feature = "ssr")]
+use {
+    crate::app::db::database, actix_web::web, chrono::Local, sqlx::PgPool, std::error::Error,
+    uuid::Uuid,
+};
+//this file contains a list of api functions that will be called on the server side
+//lowercase functions denot functions that are server side while upper/camel case functions
+//indicate Client side Objects/functions
+//
 #[server(GetTests, "/api")]
 pub async fn get_tests() -> Result<Vec<Test>, ServerFnError> {
-    let tests = retrieve_all_tests().await;
-    Ok(tests)
+    #[cfg(feature = "ssr")]
+    {
+        use actix_web::web;
+        use leptos_actix::extract;
+        let pool = extract::<web::Data<PgPool>>()
+            .await
+            .map_err(|e| ServerFnError::new(format!("Failed to extract pool: {}", e)))?;
+
+        log::info!("Attempting to retrieve all tests from database");
+
+        match database::get_all_tests(&pool).await {
+            Ok(tests) => {
+                log::info!("Successfully retrieved all tests from database");
+                Ok(tests)
+            }
+            Err(e) => {
+                log::error!("Database error: {}", e);
+                Err(ServerFnError::new(format!("Database error: {}", e)))
+            }
+        }
+    }
 }
 
 #[server(AddTest, "/api")]
 pub async fn add_test(add_test_request: CreateNewTestRequest) -> Result<Test, ServerFnError> {
-    let new_test = add_new_test(
-        add_test_request.name,
-        add_test_request.score,
-        add_test_request.comments,
-        add_test_request.test_area,
-        add_test_request.test_identifier,
-    )
-    .await;
+    #[cfg(feature = "ssr")]
+    {
+        use actix_web::web;
+        use leptos_actix::extract;
 
-    match new_test {
-        Some(created_test) => Ok(created_test),
-        None => Err(ServerFnError::Args(String::from(
-            "Error in creating the test!",
-        ))),
+        let pool = extract::<web::Data<PgPool>>()
+            .await
+            .map_err(|e| ServerFnError::new(format!("Failed to extract pool: {}", e)))?;
+
+        log::info!("Attempting to add new test to the database");
+
+        let ID = Uuid::new_v4().to_string();
+        let bufferTest = Test::new(
+            add_test_request.name,
+            add_test_request.score,
+            add_test_request.comments,
+            add_test_request.testarea,
+            ID,
+        );
+        database::add_test(&bufferTest, &pool).await.map_err(|e| {
+            log::error!("Database error while adding test: {}", e);
+            ServerFnError::new(format!("Database error: {}", e))
+        })
     }
 }
 
 #[server(DeleteTest, "/api")]
 pub async fn delete_test(delete_test_request: DeleteTestRequest) -> Result<Test, ServerFnError> {
-    let deleted_results = delete_certain_test(delete_test_request.test_identifier).await;
+    #[cfg(feature = "ssr")]
+    {
+        use actix_web::web;
+        use leptos_actix::extract;
+        let pool = extract::<web::Data<PgPool>>()
+            .await
+            .map_err(|e| ServerFnError::new(format!("Failed to extract pool: {}", e)))?;
 
-    match deleted_results {
-        Ok(deleted) => {
-            if let Some(deleted_test) = deleted {
-                Ok(deleted_test)
-            } else {
-                Err(ServerFnError::Response(ErrorMessageTest::create(
-                    TestError::TestDeleteFailure,
-                )))
-            }
+        log::info!("Attempting to delete test");
+
+        match database::delete_test(delete_test_request.test_id, &pool).await {
+            Ok(deleted) => Ok(deleted),
+            Err(_) => Err(ServerFnError::new("Error in deleting test")),
         }
-        Err(test_error) => Err(ServerFnError::Response(ErrorMessageTest::create(
-            test_error,
-        ))),
     }
 }
 
 #[server(EditTest, "/api")]
-pub async fn edit_test(edit_test_request: EditTestRequest) -> Result<Test, ServerFnError> {
-    let updated = edit_certain_test(
-        edit_test_request.name,
-        edit_test_request.score,
-        edit_test_request.comments,
-        edit_test_request.test_area,
-        edit_test_request.test_identifier,
-    )
-    .await;
+pub async fn update_test(update_test_request: UpdateTestRequest) -> Result<Test, ServerFnError> {
+    #[cfg(feature = "ssr")]
+    {
+        use actix_web::web;
+        use leptos_actix::extract;
 
-    match updated {
-        Ok(updated_result) => {
-            if let Some(updated_test) = updated_result {
-                Ok(updated_test)
-            } else {
-                Err(ServerFnError::Args(ErrorMessageTest::create(
-                    TestError::TestUpdateFailure,
-                )))
-            }
+        let pool = extract::<web::Data<PgPool>>()
+            .await
+            .map_err(|e| ServerFnError::new(format!("Failed to extract pool: {}", e)))?;
+
+        log::info!("Attempting to update test");
+
+        let buffer_test = Test::new(
+            update_test_request.name,
+            update_test_request.score,
+            update_test_request.comments,
+            update_test_request.testarea,
+            update_test_request.test_id,
+        );
+
+        match database::update_test(&buffer_test, &pool).await {
+            Ok(Some(updated_test)) => Ok(updated_test),
+            Ok(None) => Err(ServerFnError::new(format!(
+                "A None value was returned instead of an updated test"
+            ))),
+            Err(e) => Err(ServerFnError::new(format!(
+                "Failed to update student: {}",
+                e
+            ))),
         }
-        Err(test_error) => Err(ServerFnError::Args(ErrorMessageTest::create(test_error))),
     }
 }
 
-cfg_if::cfg_if! {
+/*cfg_if::cfg_if! {
     if #[cfg(feature = "ssr")] {
 
-        use crate::app::db::database;
         use crate::app::errors::TestError;
-        use chrono::{DateTime, Local};
 
         pub async fn retrieve_all_tests() -> Vec<Test> {
+            let pool = use_context::<PgPool>().expect("Server could not find pool");
 
-            let get_all_tests_result = database::get_all_tests().await;
-            match get_all_tests_result {
-                Some(found_test) => found_test,
-                None => Vec::new()
-            }
+            let get_all_tests_result = database::get_all_tests(&pool).await.unwrap();
+
+            get_all_tests_result
         }
 
-        pub async fn add_new_test<T> (name: T, score: i32, comments: T, test_area: test_type, test_identifier: i64) -> Option<Test> where T: Into<String> {
+        pub async fn add_new_test<T> (name: T, score: i32, comments: T, testarea: TestType) -> Option<Test> where T: Into<String> {
 
-            let current_now = Local::now();
-            let current_formatted = current_now.to_string();
+            let mut buffer = Uuid::encode_buffer();
+            let uuid = Uuid::new_v4().simple().encode_lower(&mut buffer);
+
+            let pool = use_context::<PgPool>().expect("Server could not find pool");
 
             let new_test = Test::new(
                 name.into(),
                 score,
                 comments.into(),
-                test_area,
-                test_identifier,
-                current_formatted,
+                testarea,
+                String::from(uuid),
             );
 
-            database::add_test(new_test).await
+            let added_test = database::add_test(&new_test, &pool).await.unwrap();
+            Some(added_test)
         }
 
-        pub async fn delete_certain_test(test_identifier: i64) ->
-            Result<Option<Test>, TestError> {
+        pub async fn delete_certain_test<T> (test_id: T) ->
+            Result<(), ServerFnError> where T: Into<String> {
+            let pool = use_context::<PgPool>().expect("Server could not find the pool");
 
-                database::delete_test(test_identifier).await
+                database::delete_test(test_id.into(), &pool).await
         }
 
-        pub async fn edit_certain_test<T>(name: T, score: i32, comments: T, test_area: test_type, test_identifier: i64) -> Result<Option<Test>, TestError> where T:Into<String> {
+        pub async fn update_certain_test<T>(name: T, score: i32, comments: T, testarea: TestType, test_id: T) -> Result<Option<Test>, sqlx::Error> where T:Into<String> {
+            let pool = use_context::<PgPool>().expect("Server could not connect to pool");
 
-            database::update_test(name.into(), score, comments.into(), test_area, test_identifier).await
+            let updated_test = Test::new(
+                name.into(),
+                score,
+                comments.into(),
+                testarea,
+                test_id.into(),
+            );
+
+            database::update_test(&updated_test, &pool).await
         }
 
     }
-}
+}*/

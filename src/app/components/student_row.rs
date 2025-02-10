@@ -13,6 +13,7 @@ pub fn StudentRow(
     student_resource: Resource<(), Result<Vec<Student>, ServerFnError>>,
     set_if_show_toast: WriteSignal<bool>,
     set_toast_message: WriteSignal<ToastMessage>,
+    refresh_students: RwSignal<()>,
 ) -> impl IntoView {
     let (if_show_info_modal, set_if_show_info_modal) = create_signal(false);
     let (if_show_edit_modal, set_if_show_edit_modal) = create_signal(false);
@@ -51,8 +52,8 @@ pub fn StudentRow(
         </Show>
         <div class=ROW_STYLE>
             <div class="flex flex-col w-full max-w-[45rem] bg-[#00356B]">
-                <p class="font-bold text-white">{&student.name}</p>
-                <p class="text-sm text-white">{&student.grade}</p>
+                <p class="font-bold text-white">{&student.firstname}{" "}{&student.lastname}</p>
+                <p class="text-sm text-white">{&student.grade.to_string()}</p>
             </div>
 
             <div class="flex flex-row">

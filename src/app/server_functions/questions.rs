@@ -1,39 +1,77 @@
-use crate::app::errors::{ErrorMessageQuestion, ResponseErrorTraitQuestion};
+use crate::app::errors::{question_errors, ErrorMessageQuestion, ResponseErrorTraitQuestion};
 use crate::app::models::{
     question::{Question, QuestionType},
-    CreateNewQuestionRequest, DeleteQuestionRequest, EditQuestionRequest,
+    CreateNewQuestionRequest, DeleteQuestionRequest, UpdateQuestionRequest,
 };
 use leptos::*;
-use serde::*;
+use log::{debug, info, warn};
+#[cfg(feature = "ssr")]
+use {crate::app::db::database, actix_web::web, sqlx::PgPool, std::error::Error, uuid::Uuid};
 
 #[server(GetQuestions, "/api")]
-pub async fn get_questions(test_identifier: i64) -> Result<Vec<Question>, ServerFnError> {
-    let questions = retrieve_all_questions(test_identifier.clone()).await;
-    Ok(questions)
+pub async fn get_questions(test_id: String) -> Result<Vec<Question>, ServerFnError> {
+    #[cfg(feature = "ssr")]
+    {
+        use actix_web::web;
+        use leptos_actix::extract;
+        let pool = extract::<web::Data<PgPool>>()
+            .await
+            .map_err(|e| ServerFnError::new(format!("Failed to extract pool: {}", e)))?;
+        log::info!("Attempting to retrieve all tests from database");
+
+        match database::get_all_questions(test_id, &pool).await {
+            Ok(questions) => {
+                log::info!("Successfully retrieved all tests from database");
+                Ok(questions)
+            }
+            Err(e) => {
+                log::error!("Database error: {}", e);
+                Err(ServerFnError::new(format!("Database error: {}", e)))
+            }
+        }
+    }
 }
 
 #[server(AddQuestion, "/api")]
 pub async fn add_question(
-    question_id: i64,
+    test_id: String,
     add_question_request: CreateNewQuestionRequest,
 ) -> Result<Question, ServerFnError> {
-    let new_question = add_new_question(
-        question_id,
-        add_question_request.word_problem,
-        add_question_request.point_value,
-        add_question_request.qtype,
-        add_question_request.options,
-        add_question_request.correct_answer,
-        add_question_request.comments,
-        add_question_request.qnumber,
-    )
-    .await;
+    #[cfg(feature = "ssr")]
+    {
+        use actix_web::web;
+        use leptos_actix::extract;
+        let pool = extract::<web::Data<PgPool>>()
+            .await
+            .map_err(|e| ServerFnError::new(format!("Failed to extract pool: {}", e)))?;
 
-    match new_question {
-        Some(created_question) => Ok(created_question),
-        None => Err(ServerFnError::Args(String::from(
-            "Error in creating the question!",
-        ))),
+        log::info!("Attempting to add new question to the database");
+
+        let buffer_question = Question::new(
+            add_question_request.word_problem,
+            add_question_request.point_value,
+            add_question_request.question_type,
+            add_question_request.options,
+            add_question_request.correct_answer,
+            0, //this value is technically the qnumber but qnumber is determined by the backend
+            test_id.clone(),
+        );
+
+        match database::add_question(&buffer_question, &pool).await {
+            Ok(created_question) => {
+                log::info!(
+                    "Successfully created question with ID: {}",
+                    created_question.testlinker
+                );
+                Ok(created_question)
+            }
+            Err(e) => {
+                log::info!("Failed to create question: {:?}", e);
+                Err(ServerFnError::new(format!(
+                    "The question created was not a question"
+                )))
+            }
+        }
     }
 }
 
@@ -41,91 +79,111 @@ pub async fn add_question(
 pub async fn delete_question(
     delete_question_request: DeleteQuestionRequest,
 ) -> Result<Question, ServerFnError> {
-    let deleted_results = delete_certain_question(delete_question_request.qnumber).await;
+    #[cfg(feature = "ssr")]
+    {
+        use actix_web::web;
+        use leptos_actix::extract;
+        let pool = extract::<web::Data<PgPool>>()
+            .await
+            .map_err(|e| ServerFnError::new(format!("Failed to extract pool: {}", e)))?;
 
-    match deleted_results {
-        Ok(deleted) => {
-            if let Some(deleted_test) = deleted {
-                Ok(deleted_test)
-            } else {
-                Err(ServerFnError::Response(ErrorMessageQuestion::create(
-                    QuestionError::QuestionDeleteFailure,
-                )))
-            }
+        log::info!("Attempting to delete question from the database");
+
+        match database::delete_question(
+            delete_question_request.qnumber,
+            delete_question_request.testlinker,
+            &pool,
+        )
+        .await
+        {
+            Ok(deleted) => Ok(deleted),
+            Err(_) => Err(ServerFnError::new(
+                "Failed to delete question from the database",
+            )),
         }
-        Err(question_error) => Err(ServerFnError::Response(ErrorMessageQuestion::create(
-            question_error,
-        ))),
     }
 }
 
 #[server(EditQuestion, "/api")]
 pub async fn edit_question(
-    test_id: i64,
-    edit_question_request: EditQuestionRequest,
+    test_id: String,
+    edit_question_request: UpdateQuestionRequest,
 ) -> Result<Question, ServerFnError> {
-    let updated = edit_certain_question(
-        test_id,
-        edit_question_request.word_problem,
-        edit_question_request.point_value,
-        edit_question_request.qtype,
-        edit_question_request.options,
-        edit_question_request.correct_answer,
-        edit_question_request.comments,
-        edit_question_request.qnumber,
-    )
-    .await;
+    #[cfg(feature = "ssr")]
+    {
+        use actix_web::web;
+        use leptos_actix::extract;
+        let pool = extract::<web::Data<PgPool>>()
+            .await
+            .map_err(|e| ServerFnError::new(format!("Failed to extract pool: {}", e)))?;
 
-    match updated {
-        Ok(updated_result) => {
-            if let Some(updated_question) = updated_result {
-                Ok(updated_question)
-            } else {
-                Err(ServerFnError::Args(ErrorMessageQuestion::create(
-                    QuestionError::QuestionUpdateFailure,
-                )))
-            }
+        log::info!("Attempting to update question from the database");
+
+        let buffer_question = Question::new(
+            edit_question_request.word_problem,
+            edit_question_request.point_value,
+            edit_question_request.question_type,
+            edit_question_request.options,
+            edit_question_request.correct_answer,
+            edit_question_request.qnumber,
+            edit_question_request.testlinker,
+        );
+
+        match database::update_question(&buffer_question, &pool).await {
+            Ok(Some(updated_student)) => Ok(updated_student),
+            Ok(None) => Err(ServerFnError::new(format!(
+                "Failed to correctly existing student in the database"
+            ))),
+            Err(e) => Err(ServerFnError::new(format!(
+                "Failed to update student: {}",
+                e
+            ))),
         }
-        Err(question_error) => Err(ServerFnError::Args(ErrorMessageQuestion::create(
-            question_error,
-        ))),
     }
 }
 
-cfg_if::cfg_if! {
+/*cfg_if::cfg_if! {
     if #[cfg(feature = "ssr")] {
 
         use crate::app::db::database;
         use crate::app::errors::QuestionError;
+        use sqlx::PgPool;
 
-        pub async fn retrieve_all_questions(test_identifier: i64) -> Vec<Question> {
+        pub async fn retrieve_all_questions(test_id: String, pool: &sqlx::PgPool) -> Vec<Question> {
 
-            let get_all_question_results = database::get_all_test_questions(test_identifier.clone()).await;
-            match get_all_question_results {
-                Some(found_question) => found_question,
-                None => Vec::new()
-            }
+            let get_all_question_results = database::get_all_questions(test_id.clone(), pool).await;
+
+            get_all_question_results.expect("There was a problem gathering all the questions for this test.")
         }
 
-        pub async fn add_new_question<T> (test_id: i64, word_problem: T, point_value: i32, qtype: QuestionType, options: Vec<String>, correct_answer: T, comments: T, qnumber: i64) -> Option<Question> where T: Into<String> {
+        pub async fn add_new_question<T> (word_problem: T, point_value: i32, question_type: QuestionType, options: Vec<String>, correct_answer: T, qnumber: i64, test_id: T, pool: &sqlx::PgPool) -> Result<Question, ServerFnErro> where T: Into<String> {
             let new_question = Question::new(
                 word_problem.into(),
                 point_value,
-                qtype,
+                question_type,
                 options,
                 correct_answer.into(),
-                comments.into(),
                 qnumber,
+                test_id.into(),
             );
 
-            database::add_question_test(test_id, new_question).await
+            database::add_question(&new_question, pool).await
         }
-        pub async fn delete_certain_question(qnumber: i64) -> Result<Option<Question>, QuestionError> {
-            database::delete_question(qnumber).await
+        pub async fn delete_certain_question(qnumber: i64, test_id: String, pool: &sqlx::PgPool) -> Result<(), sqlx::Error> {
+            database::delete_question(qnumber, test_id, pool).await
         }
 
-        pub async fn edit_certain_question<T>(test_id: i64, word_problem: T, point_value: i32, qtype: QuestionType, options:Vec<String>, correct_answer: T, comments: T, qnumber: i64) -> Result<Option<Question>, QuestionError> where T: Into<String> {
-            database::update_question(test_id, word_problem.into(), point_value, qtype, options, correct_answer.into(), comments.into(), qnumber).await
+        pub async fn edit_certain_question<T>(word_problem: T, point_value: i32, question_type: QuestionType, options:Vec<String>, correct_answer: T, qnumber: i64, test_id: T, pool: &sqlx::PgPool) -> Result<Option<Question>, sqlx::Error> where T: Into<String> {
+            let updated_question = Question::new(
+                word_problem.into(),
+                point_value,
+                question_type,
+                options,
+                correct_answer.into(),
+                qnumber,
+                test_id.into(),
+            );
+            database::update_question(&updated_question, pool).await
         }
     }
-}
+}*/

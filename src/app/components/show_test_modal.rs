@@ -22,8 +22,8 @@ pub fn ShowTestModal(
     set_if_show_deleted: WriteSignal<bool>,
     test_resource: Resource<(), Result<Vec<Test>, ServerFnError>>,
     set_toast_message: WriteSignal<ToastMessage>,
-)-> impl IntoView {
-    let mimic_test = test.clone();  
+) -> impl IntoView {
+    let mimic_test = test.clone();
     //to close the MODAL_STYLE
     let on_close = move |_| {
         set_if_show_modal(false);
@@ -31,11 +31,9 @@ pub fn ShowTestModal(
 
     //to perform deletion
     let on_click_delete = move |_| {
-        
-        let delete_test_request = DeleteTestRequest::new(mimic_test.test_identifier);
+        let delete_test_request = DeleteTestRequest::new(mimic_test.test_id.clone());
 
         let _ = spawn_local(async move {
-
             let delete_result = delete_test(delete_test_request).await;
 
             match delete_result {
@@ -53,12 +51,12 @@ pub fn ShowTestModal(
         });
     };
 
-    view!{
+    view! {
         <div class="flex flex-col w-full h-full z-49 bg-[#222222/[.06]] rounded-2xl absolute">
-            
+
             <div class="flex flex-col w-full h-full z-50 mx-auto items-center align-center">
                 <div class=MODAL_STYLE>
-                    
+
                     <p class="text-white pt-2 text-4xl mt-2">
                         {&test.name}
                     </p>
@@ -72,15 +70,15 @@ pub fn ShowTestModal(
                         <div class=INFO_TITLE_STYLE>"Comments"</div>
                         <div class=INFO_VALUE_STYLE>{&test.comments}</div>
                     </div>
- 
+
                     <div class=INFO_STYLE>
                         <div class=INFO_TITLE_STYLE>"Test Identifier"</div>
-                        <div class=INFO_VALUE_STYLE>{format!("#{:?}", &test.test_identifier)}</div>
+                        <div class=INFO_VALUE_STYLE>{format!("#{:?}", &test.test_id)}</div>
                     </div>
 
                     <div class=INFO_STYLE>
                         <div class=INFO_TITLE_STYLE>"Test Type"</div>
-                        <div class=INFO_VALUE_STYLE>{format!("{:?}", &test.test_area)}</div>
+                        <div class=INFO_VALUE_STYLE>{format!("{:?}", &test.testarea)}</div>
                     </div>
 
                     <div class="flex flex-row w-full items-right justify-right mt-1">

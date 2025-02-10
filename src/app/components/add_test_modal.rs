@@ -1,10 +1,14 @@
 use crate::app::components::{Toast, ToastMessage, ToastMessageType};
-use crate::app::models::test::{test_type, CreateNewTestRequest};
+use crate::app::models::test::{CreateNewTestRequest, TestType};
 use crate::app::server_functions::tests::add_test;
 use leptos::*;
 use leptos_router::*;
 use std::str::FromStr;
 use validator::Validate;
+
+//these are purely for testing purposes
+use crate::app::models::question::{CreateNewQuestionRequest, QuestionType};
+use crate::app::server_functions::questions::add_question;
 
 #[component]
 pub fn AddTestModal(
@@ -26,8 +30,6 @@ pub fn AddTestModal(
     let (test_score, set_test_score) = create_signal(String::new());
     let (test_comments, set_test_comments) = create_signal(String::new());
     let (test_area, set_test_area) = create_signal(String::new());
-    let (test_identifier, set_test_identifier) = create_signal(String::new());
-
     //
     //create and send signals for error messages
     let (error_message, set_error_message) = create_signal(String::new());
@@ -38,27 +40,36 @@ pub fn AddTestModal(
     };
     //add a new person to the modal
     let on_click = move |_| {
-        let converting_to_test_type = test_type::from_str(&test_area()).clone().unwrap();
+        let converting_to_test_type = match TestType::from_str(&test_area()) {
+            Ok(test_type) => test_type,
+            Err(_) => {
+                set_if_error(true);
+                set_error_message(String::from("Invalid test area selected"));
+                return;
+            }
+        };
         let navigate = leptos_router::use_navigate();
 
-        let add_test_request = CreateNewTestRequest::new(
-            test_name(),
-            test_score().parse::<i32>().expect("Numbers only"),
-            test_comments(),
-            converting_to_test_type,
-            test_identifier().parse::<i64>().expect("Numbers only"),
-        );
+        let score = match test_score().parse::<i32>() {
+            Ok(num) => num,
+            Err(_) => {
+                set_if_error(true);
+                set_error_message(String::from("Score must be a valid number"));
+                return;
+            }
+        };
 
-        let is_valid = add_test_request.validate();
+        let add_test_request =
+            CreateNewTestRequest::new(test_name(), score, test_comments(), converting_to_test_type);
 
-        match is_valid {
+        match add_test_request.validate() {
             Ok(_) => {
                 spawn_local(async move {
                     let add_result = add_test(add_test_request).await;
 
                     //we get the result back and do something with it
                     match add_result {
-                        Ok(_added_test) => {
+                        Ok(added_test) => {
                             set_if_show_modal(false);
 
                             set_toast_message(ToastMessage::create(ToastMessageType::NewTestAdded));
@@ -66,15 +77,35 @@ pub fn AddTestModal(
                             //setting this to true will make the Toast
                             //"new member added" appear
                             set_if_show_added(true);
-                            navigate("/testbuilder", Default::default());
+                            let test_question = CreateNewQuestionRequest::new(
+                                "What Letter is this: A".to_string(),
+                                1,
+                                QuestionType::TrueFalse,
+                                vec!["true".to_string(), "false".to_string()],
+                                "true".to_string(),
+                                1,
+                                added_test.test_id.clone(),
+                            );
+                            match add_question(added_test.test_id.clone(), test_question).await {
+                                Ok(_) => {}
+                                Err(e) => {}
+                            }
+                            navigate(
+                                &format!("/testbuilder/{}", added_test.test_id),
+                                Default::default(),
+                            );
                         }
-                        Err(e) => println!("Error adding: {:?}", e),
+                        Err(e) => {
+                            set_if_error(true);
+                            set_error_message(format!("Failed to add test: {}", e));
+                            log::error!("Error adding test: {:?}", e);
+                        }
                     };
                 });
             }
-            Err(_) => {
+            Err(e) => {
                 set_if_error(true);
-                set_error_message(String::from("All fields are required"))
+                set_error_message(format!("Validation error: {}", e));
             }
         }
     };
@@ -122,14 +153,7 @@ pub fn AddTestModal(
                     <option value="Reading">"Reading"</option>
                     <option value="Math">"Math"</option>
                 </select>
-               <input type="text" placeholder="Test ID"
-                    class=INPUT_STYLE
-                    value=test_identifier
-                    on:input=move |event| {
-                        set_test_identifier(event_target_value(&event));
-                    }
-               />
-               <div class="flex flex-row w-full items-right justify-right">
+                <div class="flex flex-row w-full items-right justify-right">
                     <button on:click=on_close class=CANCEL_BUTTON_STYLE>
                         "Cancel"
                     </button>

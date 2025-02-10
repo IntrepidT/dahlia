@@ -1,6 +1,6 @@
 use crate::app::components::{Toast, ToastMessage, ToastMessageType};
-use crate::app::models::{test_type, DeleteTestRequest, EditTestRequest, Test};
-use crate::app::server_functions::tests::{delete_test, edit_test};
+use crate::app::models::{DeleteTestRequest, Test, TestType, UpdateTestRequest};
+use crate::app::server_functions::tests::{delete_test, update_test};
 use leptos::*;
 use leptos_router::*;
 use std::rc::Rc;
@@ -36,13 +36,13 @@ pub fn EditTestModal(
     test_resource: Resource<(), Result<Vec<Test>, ServerFnError>>,
     set_toast_message: WriteSignal<ToastMessage>,
 ) -> impl IntoView {
-    let mimic_test = test.clone();
+    let _mimic_test = test.clone();
 
     let (test_name, set_test_name) = create_signal(test.name.clone());
     let (test_score, set_test_score) = create_signal(format!("{}", test.score.clone()));
     let (test_comments, set_test_comments) = create_signal(test.comments.clone());
-    let (test_area, set_test_area) = create_signal(test.test_area.to_string());
-    let (test_identifier, set_test_identifier) = create_signal(format!("{}", test.test_identifier));
+    let (test_area, set_test_area) = create_signal(test.testarea.to_string());
+    let (test_identifier, set_test_identifier) = create_signal(test.test_id.to_string());
     // for errors
     let (error_message, set_error_message) = create_signal(String::new());
     let (if_error, set_if_error) = create_signal(false);
@@ -53,13 +53,13 @@ pub fn EditTestModal(
 
     //to perform deletion
     let on_click_delete = move |_| {
-        let delete_test_request = DeleteTestRequest::new(mimic_test.test_identifier);
+        let delete_test_request = DeleteTestRequest::new(test.test_id.clone());
 
-        let _ = spawn_local(async move {
+        spawn_local(async move {
             let delete_result = delete_test(delete_test_request).await;
 
             match delete_result {
-                Ok(_deleted_test) => {
+                Ok(deleted_test) => {
                     test_resource.refetch();
 
                     set_toast_message(ToastMessage::create(ToastMessageType::TestDeleted));
@@ -74,57 +74,63 @@ pub fn EditTestModal(
     };
     //to perform an edit/modification
     let on_click_update = move |_| {
-        let test_id = test.test_identifier.clone();
-        let test_score_validated = test_score().parse::<i32>();
-        let convert_test_area_to_enum = test_type::from_str(&test_area()).clone().unwrap();
-
-        let validated_test_id = test_identifier().parse::<i64>();
-
-        if let Ok(ok_test_id) = validated_test_id {
-            let edit_test_request = EditTestRequest::new(
-                test_name(),
-                test_score_validated.expect("Reason"),
-                test_comments(),
-                convert_test_area_to_enum,
-                validated_test_id.expect("Reason"),
-            );
-
-            let is_valid = edit_test_request.validate();
-
-            match is_valid {
-                Ok(_) => {
-                    let _ = spawn_local(async move {
-                        let edit_result = edit_test(edit_test_request).await;
-
-                        match edit_result {
-                            Ok(_edited_test) => {
-                                test_resource.refetch();
-
-                                set_if_show_modal(false);
-
-                                set_toast_message(ToastMessage::create(
-                                    ToastMessageType::TestUpdated,
-                                ));
-
-                                set_if_show_toast(true);
-                            }
-                            Err(_e) => {
-                                set_if_error(true);
-                                set_error_message(String::from(
-                                    "Error Updating Test. Please try again later",
-                                ))
-                            }
-                        };
-                    });
-                }
-                Err(_e) => {
-                    set_if_error(true);
-                    set_error_message(String::from("All fields are required"))
-                }
+        //let test_id = test.test_id.clone();
+        let test_score_validated = match test_score().parse::<i32>() {
+            Ok(score) => score,
+            Err(_) => {
+                set_if_error(true);
+                set_error_message(String::from("Score must be a valid number"));
+                return;
             }
-        } else {
-            set_if_error(true);
-            set_error_message(String::from("test_id should be numeric"))
+        };
+        let convert_test_area_to_enum = match TestType::from_str(&test_area()) {
+            Ok(test_type) => test_type,
+            Err(_) => {
+                set_if_error(true);
+                set_error_message(String::from("Invalid test area selected"));
+                return;
+            }
+        };
+
+        let edit_test_request = UpdateTestRequest::new(
+            test_name(),
+            test_score_validated,
+            test_comments(),
+            convert_test_area_to_enum,
+            test_identifier(),
+        );
+
+        let is_valid = edit_test_request.validate();
+
+        match is_valid {
+            Ok(_) => {
+                spawn_local(async move {
+                    let edit_result = update_test(edit_test_request).await;
+
+                    match edit_result {
+                        Ok(edited_test) => {
+                            test_resource.refetch();
+
+                            set_if_show_modal(false);
+
+                            set_toast_message(ToastMessage::create(ToastMessageType::TestUpdated));
+
+                            set_if_show_toast(true);
+                        }
+                        Err(e) => {
+                            set_if_error(true);
+                            set_error_message(format!(
+                                "Error Updating Test. Please try again later: {}",
+                                e
+                            ))
+                        }
+                    };
+                });
+            }
+            Err(e) => {
+                set_if_error(true);
+                set_error_message(format!("Validation error: {}", e));
+            }
         }
     };
 
@@ -192,8 +198,9 @@ pub fn EditTestModal(
                     <input type="text" placeholder="Test Identifier" class=INPUT_STYLE
                         value=test_identifier
                         on:input=move |event| {
-                            set_test_identifier(event_target_value(&event));
+                            set_test_identifier(test_identifier());
                         }
+                        readonly
                     />
                 </div>
 

@@ -1,7 +1,6 @@
 use crate::app::components::{AddTestModal, Header, MathTestDisplay, Toast, ToastMessage};
 use crate::app::server_functions::get_tests;
 use leptos::*;
-use leptos_router::*;
 use std::rc::Rc;
 
 #[component]

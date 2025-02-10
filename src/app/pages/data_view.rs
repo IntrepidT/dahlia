@@ -11,10 +11,18 @@ pub fn DataView() -> impl IntoView {
 
     let (if_show_toast, set_if_show_toast) = create_signal(false);
     let (toast_message, set_toast_message) = create_signal(ToastMessage::new());
-    let get_students_info = create_resource(|| (), |_| async move { get_students().await });
+
+    let refresh_trigger = create_rw_signal(());
+
+    let students = create_resource(
+        move || refresh_trigger.get(),
+        |_| async move { get_students().await },
+    );
+
     let on_click = move |_| {
         set_if_show_modal(!if_show_modal());
     };
+
     view! {
          <Header />
         <div class="text-white w-full max-w-[64rem] mx-auto items-center justify-center align-center">
@@ -31,6 +39,7 @@ pub fn DataView() -> impl IntoView {
                             set_if_show_modal
                             set_if_show_added=set_if_show_toast
                             set_toast_message
+                            refresh_students=refresh_trigger
                         />
                     </Show>
 
@@ -49,16 +58,17 @@ pub fn DataView() -> impl IntoView {
                         <div class="flex flex-col w-full max-w-[52rem] mt-6">
                             {
                                 move || {
-                                    get_students_info.get().map(|data| {
+                                    students.get().map(|result| {
 
-                                        match data {
+                                        match result {
                                             Ok(students_data) => {
                                                 students_data.iter().map(|each_student| view!{
                                                     <StudentRow
                                                         student=Rc::new(each_student.clone())
-                                                        student_resource=get_students_info
+                                                        student_resource=students
                                                         set_if_show_toast
                                                         set_toast_message
+                                                        refresh_students=refresh_trigger
                                                     />
                                                 }).collect_view()
                                             },

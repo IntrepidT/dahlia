@@ -14,7 +14,7 @@ const CLOSE_BUTTON_STYLE: &str = "mt-10 bg-[#555555] px-8 py-2 rounded text-whit
 
 const DELETE_BUTTON_STYLE: &str = "mt-10 bg-red-800 px-8 py-2 rounded text-white transition-all duration-1000 ease-in-out hover:bg-red-600";
 
-const MODAL_STYLE: &str = "flex flex-col bg-[#222222] border-t-8 border-[#00356B] px-6 pt-5 h-[28rem] w-full max-w-[36rem] z-50 -mt-2 fixed top-20 z-50";
+const MODAL_STYLE: &str = "flex flex-col ml-10 bg-[#222222] border-t-8 border-[#00356B] px-10 pt-5 h-[40rem] w-full max-w-[80rem] z-50 -mt-2 fixed px-10 top-20 z-50 rounded-xl";
 
 #[component]
 pub fn ShowStudentModal(
@@ -33,12 +33,13 @@ pub fn ShowStudentModal(
 
     //to perform the deletion
     let on_click_delete = move |_| {
-        let to_delete_uuid = format!("{}", &this_student.uuid);
+        let delete_student_request = DeleteStudentRequest::new(
+            this_student.firstname.clone(),
+            this_student.lastname.clone(),
+            this_student.student_id,
+        );
 
-        let delete_student_request = DeleteStudentRequest::new(to_delete_uuid);
-
-        let _ = spawn_local(async move {
-
+        spawn_local(async move {
             let delete_result = delete_student(delete_student_request).await;
 
             match delete_result {
@@ -56,25 +57,79 @@ pub fn ShowStudentModal(
         });
     };
 
-    view!{
+    view! {
         <div class="flex flex-col w-full h-full z-49 bag-[#222222/[.06]] rounded-2xl">
 
             <div class="flex flex-col w-full h-full z-50 mx-auto items-center align-center">
-                
+
                 <div class=MODAL_STYLE>
 
-                    <p class="text-white pt-5 text-4xl mb-2 mt-2">
-                        {&student.name}
+                    <p class="text-white pt-5 text-4xl font-bold mb-2 mt-2">
+                        {&student.firstname}
+                        {" "}
+                        {&student.lastname}
                     </p>
 
-                    <div class=INFO_STYLE>
-                        <div class=INFO_TITLE_STYLE>"Grade"</div>
-                        <div class=INFO_VALUE_STYLE>{&student.grade}</div>
-                    </div>
+                    <div class="grid grid-cols-3 gap-x-4 gap-y-4">
+                        <div class=INFO_STYLE>
+                            <div class=INFO_TITLE_STYLE>"Gender"</div>
+                            <div class=INFO_VALUE_STYLE>{&student.gender.to_string()}</div>
+                        </div>
 
-                    <div class=INFO_STYLE>
-                        <div class=INFO_TITLE_STYLE>"Student ID"</div>
-                        <div class=INFO_VALUE_STYLE>{format!("#{:?}", &student.student_id)}
+                        <div class=INFO_STYLE>
+                            <div class=INFO_TITLE_STYLE>"Date of Birth"</div>
+                            <div class=INFO_VALUE_STYLE>{format!("{:?}", &student.date_of_birth)}
+                            </div>
+                        </div>
+                        <div class=INFO_STYLE>
+                            <div class=INFO_TITLE_STYLE>"Student ID"</div>
+                            <div class=INFO_VALUE_STYLE>{format!("#{:?}", &student.student_id)}
+                            </div>
+                        </div>
+                        <div class=INFO_STYLE>
+                            <div class=INFO_TITLE_STYLE>"ELL Status"</div>
+                            <div class=INFO_VALUE_STYLE>{format!("{}", &student.ell.to_string())}
+                            </div>
+                        </div>
+                        <div class=INFO_STYLE>
+                            <div class=INFO_TITLE_STYLE>"Grade"</div>
+                            <div class=INFO_VALUE_STYLE>{format!("{}", &student.grade.to_string())}
+                            </div>
+                        </div>
+                        <div class=INFO_STYLE>
+                            <div class=INFO_TITLE_STYLE>"Teacher"</div>
+                            <div class=INFO_VALUE_STYLE>{format!("{}", &student.teacher)}
+                            </div>
+                        </div>
+                        <div class=INFO_STYLE>
+                            <div class=INFO_TITLE_STYLE>"IEP Status"</div>
+                            <div class=INFO_VALUE_STYLE>{format!("{:?}", &student.iep)}
+                            </div>
+                        </div>
+                        <div class=INFO_STYLE>
+                            <div class=INFO_TITLE_STYLE>"Student 504 Status"</div>
+                            <div class=INFO_VALUE_STYLE>{format!("{:?}", &student.student_504)}
+                            </div>
+                        </div>
+                        <div class=INFO_STYLE>
+                            <div class=INFO_TITLE_STYLE>"Student Readplan Status"</div>
+                            <div class=INFO_VALUE_STYLE>{format!("{:?}", &student.readplan)}
+                            </div>
+                        </div>
+                        <div class=INFO_STYLE>
+                            <div class=INFO_TITLE_STYLE>"GT Status"</div>
+                            <div class=INFO_VALUE_STYLE>{format!("{:?}", &student.gt)}
+                            </div>
+                        </div>
+                        <div class=INFO_STYLE>
+                            <div class=INFO_TITLE_STYLE>"Intervention Status"</div>
+                            <div class=INFO_VALUE_STYLE>{format!("{:?}", &student.intervention)}
+                            </div>
+                        </div>
+                        <div class=INFO_STYLE>
+                            <div class=INFO_TITLE_STYLE>"Eye Glasses"</div>
+                            <div class=INFO_VALUE_STYLE>{format!("{:?}", &student.eye_glasses)}
+                            </div>
                         </div>
                     </div>
 

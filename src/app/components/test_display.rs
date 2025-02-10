@@ -18,7 +18,7 @@ pub fn MathTestDisplay(
     set_toast_message: WriteSignal<ToastMessage>,
     editing_mode: ReadSignal<bool>,
 ) -> impl IntoView {
-    let page_source: Vec<String> = Vec::new();
+    let _page_source: Vec<String> = Vec::new();
     let (if_show_info_modal, set_if_show_info_modal) = create_signal(false);
 
     let on_show_info = move |_| {
@@ -39,15 +39,6 @@ pub fn MathTestDisplay(
     let test_info = test.clone();
 
     view! {
-        //<Show when=move || {if_show_info_modal()}>
-        //    <ShowTestModal
-        //        test=test_info.clone()
-        //        set_if_show_modal=set_if_show_info_modal
-        //        set_if_show_deleted=set_if_show_toast
-        //        test_resource
-        //        set_toast_message
-        //    />
-        //</Show>
         <Show when=move || {if_show_info_modal()}>
             <EditTestModal
                 test=test_info.clone()
