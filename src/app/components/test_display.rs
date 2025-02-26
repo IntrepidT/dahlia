@@ -1,6 +1,7 @@
 use crate::app::components::{EditTestModal, ShowTestModal, ToastMessage};
 use crate::app::models::Test;
 use leptos::*;
+use leptos_router::*;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -18,12 +19,21 @@ pub fn MathTestDisplay(
     set_toast_message: WriteSignal<ToastMessage>,
     editing_mode: ReadSignal<bool>,
 ) -> impl IntoView {
+    let edit_test = test.clone();
+    let test_info = test.clone();
+
     let _page_source: Vec<String> = Vec::new();
     let (if_show_info_modal, set_if_show_info_modal) = create_signal(false);
 
     let on_show_info = move |_| {
         if editing_mode() {
             set_if_show_info_modal(!if_show_info_modal());
+        } else {
+            let navigate = leptos_router::use_navigate();
+            navigate(
+                &format!("/assessment/{}", edit_test.test_id),
+                Default::default(),
+            );
         }
     };
 
@@ -34,9 +44,6 @@ pub fn MathTestDisplay(
             DISPLAY_TEST_STYLE
         }
     };
-
-    let edit_test = test.clone();
-    let test_info = test.clone();
 
     view! {
         <Show when=move || {if_show_info_modal()}>

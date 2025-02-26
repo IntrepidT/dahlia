@@ -3,8 +3,8 @@ use crate::app::models::{test::Test, CreateNewTestRequest, DeleteTestRequest, Up
 use leptos::*;
 #[cfg(feature = "ssr")]
 use {
-    crate::app::db::database, actix_web::web, chrono::Local, sqlx::PgPool, std::error::Error,
-    uuid::Uuid,
+    crate::app::db::database, crate::app::db::test_database, actix_web::web, chrono::Local,
+    sqlx::PgPool, std::error::Error, uuid::Uuid,
 };
 //this file contains a list of api functions that will be called on the server side
 //lowercase functions denot functions that are server side while upper/camel case functions
@@ -22,7 +22,7 @@ pub async fn get_tests() -> Result<Vec<Test>, ServerFnError> {
 
         log::info!("Attempting to retrieve all tests from database");
 
-        match database::get_all_tests(&pool).await {
+        match test_database::get_all_tests(&pool).await {
             Ok(tests) => {
                 log::info!("Successfully retrieved all tests from database");
                 Ok(tests)
@@ -56,10 +56,12 @@ pub async fn add_test(add_test_request: CreateNewTestRequest) -> Result<Test, Se
             add_test_request.testarea,
             ID,
         );
-        database::add_test(&bufferTest, &pool).await.map_err(|e| {
-            log::error!("Database error while adding test: {}", e);
-            ServerFnError::new(format!("Database error: {}", e))
-        })
+        test_database::add_test(&bufferTest, &pool)
+            .await
+            .map_err(|e| {
+                log::error!("Database error while adding test: {}", e);
+                ServerFnError::new(format!("Database error: {}", e))
+            })
     }
 }
 
@@ -75,7 +77,7 @@ pub async fn delete_test(delete_test_request: DeleteTestRequest) -> Result<Test,
 
         log::info!("Attempting to delete test");
 
-        match database::delete_test(delete_test_request.test_id, &pool).await {
+        match test_database::delete_test(delete_test_request.test_id, &pool).await {
             Ok(deleted) => Ok(deleted),
             Err(_) => Err(ServerFnError::new("Error in deleting test")),
         }
@@ -103,7 +105,7 @@ pub async fn update_test(update_test_request: UpdateTestRequest) -> Result<Test,
             update_test_request.test_id,
         );
 
-        match database::update_test(&buffer_test, &pool).await {
+        match test_database::update_test(&buffer_test, &pool).await {
             Ok(Some(updated_test)) => Ok(updated_test),
             Ok(None) => Err(ServerFnError::new(format!(
                 "A None value was returned instead of an updated test"

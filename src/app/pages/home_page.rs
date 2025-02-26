@@ -1,10 +1,9 @@
+use crate::app::components::Header;
 use leptos::*;
 use leptos_router::*;
-use crate::app::components::Header;
 
 #[component]
 pub fn HomePage() -> impl IntoView {
-
     view! {
         <Header />
         <main id="main-content" role="main" class="h-dvh">

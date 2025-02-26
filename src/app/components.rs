@@ -35,3 +35,14 @@ pub use edit_test_modal::EditTestModal;
 
 pub mod question_builder;
 pub use question_builder::BuildingQuestion;
+
+pub mod teacher_page;
+pub use teacher_page::*;
+
+pub mod student_page;
+pub use student_page::*;
+
+/* to wire up the student table when i eventually break student_view into components
+ pub mod student_table;
+pub use student_table::StudentTable;
+*/

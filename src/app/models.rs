@@ -15,3 +15,19 @@ pub use question::CreateNewQuestionRequest;
 pub use question::DeleteQuestionRequest;
 pub use question::UpdateQuestionRequest;
 pub use question::{Question, QuestionType};
+
+pub mod score;
+pub use score::CreateScoreRequest;
+pub use score::DeleteScoreRequest;
+pub use score::Score;
+pub use score::UpdateScoreRequest;
+
+pub mod teacher;
+pub use teacher::AddNewTeacherRequest;
+pub use teacher::DeleteTeacherRequest;
+pub use teacher::UpdateTeacherRequest;
+
+pub mod employee;
+pub use employee::Employee;
+pub use employee::EmployeeRole;
+pub use employee::StatusEnum;

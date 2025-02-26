@@ -6,8 +6,8 @@ use leptos::*;
 
 #[cfg(feature = "ssr")]
 use {
-    crate::app::db::database, crate::app::errors::StudentError, actix_web::web, chrono::Local,
-    sqlx::PgPool, std::error::Error, uuid::Uuid,
+    crate::app::db::database, crate::app::db::student_database, crate::app::errors::StudentError,
+    actix_web::web, chrono::Local, sqlx::PgPool, std::error::Error, uuid::Uuid,
 };
 
 #[server(GetStudents, "/api")]
@@ -22,7 +22,7 @@ pub async fn get_students() -> Result<Vec<Student>, ServerFnError> {
 
         log::info!("Attempting to retrieve all students from database");
 
-        match database::get_all_students(&pool).await {
+        match student_database::get_all_students(&pool).await {
             Ok(students) => {
                 log::info!("Successfully retrieve_all_students from database");
                 Ok(students)
@@ -47,7 +47,7 @@ pub async fn get_students_smart(fragment: String) -> Result<Vec<Student>, Server
 
         log::info!("Attempting to retrieve all students from database (smartly)");
 
-        match database::get_all_students(&pool).await {
+        match student_database::get_all_students(&pool).await {
             Ok(students) => {
                 log::info!("Successfully retrieve_all_students from database");
                 Ok(students)
@@ -88,7 +88,7 @@ pub async fn add_student(add_student_request: AddStudentRequest) -> Result<Stude
             add_student_request.eye_glasses,
         );
 
-        match database::add_student(&bufferStudent, &pool).await {
+        match student_database::add_student(&bufferStudent, &pool).await {
             Ok(created_student) => {
                 log::info!(
                     "Successfully created student with ID: {}",
@@ -120,7 +120,7 @@ pub async fn delete_student(
 
         log::info!("Attempting to delete student to the database");
 
-        match database::delete_student(
+        match student_database::delete_student(
             delete_student_request.firstname,
             delete_student_request.lastname,
             delete_student_request.student_id,
@@ -151,7 +151,7 @@ pub async fn edit_student(
 
         log::info!("Attempting to update student in the database");
 
-        match database::update_student(
+        match student_database::update_student(
             edit_student_request.firstname,
             edit_student_request.lastname,
             edit_student_request.gender,

@@ -1,10 +1,10 @@
+use crate::app::db::question_database;
 use crate::app::errors::{question_errors, ErrorMessageQuestion, ResponseErrorTraitQuestion};
 use crate::app::models::{
     question::{Question, QuestionType},
     CreateNewQuestionRequest, DeleteQuestionRequest, UpdateQuestionRequest,
 };
 use leptos::*;
-use log::{debug, info, warn};
 #[cfg(feature = "ssr")]
 use {crate::app::db::database, actix_web::web, sqlx::PgPool, std::error::Error, uuid::Uuid};
 
@@ -19,7 +19,7 @@ pub async fn get_questions(test_id: String) -> Result<Vec<Question>, ServerFnErr
             .map_err(|e| ServerFnError::new(format!("Failed to extract pool: {}", e)))?;
         log::info!("Attempting to retrieve all tests from database");
 
-        match database::get_all_questions(test_id, &pool).await {
+        match question_database::get_all_questions(test_id, &pool).await {
             Ok(questions) => {
                 log::info!("Successfully retrieved all tests from database");
                 Ok(questions)
@@ -57,7 +57,7 @@ pub async fn add_question(
             test_id.clone(),
         );
 
-        match database::add_question(&buffer_question, &pool).await {
+        match question_database::add_question(&buffer_question, &pool).await {
             Ok(created_question) => {
                 log::info!(
                     "Successfully created question with ID: {}",
@@ -89,7 +89,7 @@ pub async fn delete_question(
 
         log::info!("Attempting to delete question from the database");
 
-        match database::delete_question(
+        match question_database::delete_question(
             delete_question_request.qnumber,
             delete_question_request.testlinker,
             &pool,
@@ -129,7 +129,7 @@ pub async fn edit_question(
             edit_question_request.testlinker,
         );
 
-        match database::update_question(&buffer_question, &pool).await {
+        match question_database::update_question(&buffer_question, &pool).await {
             Ok(Some(updated_student)) => Ok(updated_student),
             Ok(None) => Err(ServerFnError::new(format!(
                 "Failed to correctly existing student in the database"

@@ -175,7 +175,7 @@ pub fn AddStudentModal(
                             set_student_ell(event_target_value(&event));
                         }
                     >
-                        <option value="">"Select A Value for EEL"</option>
+                        <option value="">"Select A Value for ESL"</option>
                         {ELLEnum::iter().map(|lang| view! {
                             <option value=format!("{}", lang)>
                                 {format!("{}", lang)}

@@ -18,7 +18,9 @@ pub fn MathTesting() -> impl IntoView {
 
     let get_tests_info = create_resource(|| (), |_| async move { get_tests().await });
     let on_click_add = move |_| {
-        set_if_show_modal(!if_show_modal());
+        if !if_show_edit() {
+            set_if_show_modal(!if_show_modal());
+        }
     };
     let on_click_edit = move |_| {
         set_if_show_edit(!if_show_edit());

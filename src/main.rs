@@ -4,14 +4,10 @@ async fn main() -> std::io::Result<()> {
     use actix_files::Files;
     use actix_web::{web, App, HttpServer};
     use dahlia::app::db::database;
-    use dahlia::app::models::Student;
     use dahlia::app::*;
-    use dotenvy::dotenv;
     use leptos::*;
-    use leptos_actix::{generate_route_list, handle_server_fns, LeptosRoutes};
-    use sqlx::PgPool;
+    use leptos_actix::{generate_route_list, LeptosRoutes};
     use std::env;
-    use uuid::Uuid;
 
     let conf = get_configuration(None).await.unwrap();
     let addr = conf.leptos_options.site_addr;

@@ -46,6 +46,49 @@ CREATE TABLE IF NOT EXISTS students (
   eye_glasses BOOLEAN NOT NULL DEFAULT FALSE
 );
 
+CREATE TABLE IF NOT EXISTS scores (
+  student_id INT NOT NULL,
+  date_administered TIMESTAMP DEFAULT now(),
+  test_id UUID NOT NULL,
+  test_scores INT [],
+  comments TEXT [],
+  test_variant INT NOT NULL,
+  evaluator TEXT NOT NULL,
+  CONSTRAINT fk_testlinker
+    FOREIGN KEY (test_id)
+    REFERENCES tests (test_id)
+    ON DELETE CASCADE
+);
+
+CREATE TYPE status_enum AS ENUM (
+  'Active',
+  'On Leave',
+  'Part-time',
+  'Not Applicable'
+);
+
+CREATE TYPE employee_role AS ENUM (
+  'Teacher',
+  'Assistant Principal',
+  'Principal',
+  'Interventionist',
+  'Integrated Services',
+  'Speech',
+  'O/T',
+  'Psychologist',
+  'Para-Professional',
+  'Assessment Coordinator',
+  'Other'
+);
+
+CREATE TABLE employees (
+  id SERIAL PRIMARY KEY,
+  firstname VARCHAR(255) NOT NULL,
+  lastname VARCHAR(255) NOT NULL,
+  status status_enum NOT NULL,
+  role employee_role NOT NULL,
+  grade grade_enum
+);
 /*CREATE EXTENSION IF NOT EXISTS pg_trgm;*/
 
 /*CREATE TABLE IF NOT EXISTS students (

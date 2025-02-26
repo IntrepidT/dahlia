@@ -1,0 +1,673 @@
+use crate::app::components::header::Header;
+use crate::app::models::employee::{AddNewEmployeeRequest, Employee, EmployeeRole, StatusEnum};
+use crate::app::models::student::GradeEnum;
+use crate::app::models::teacher::DeleteTeacherRequest;
+use crate::app::server_functions::employees::{add_employee, delete_employee};
+use crate::app::server_functions::teachers::{get_employees, get_teachers};
+use leptos::ev::SubmitEvent;
+use leptos::*;
+use std::rc::Rc;
+use std::str::FromStr;
+use strum::IntoEnumIterator;
+use validator::Validate;
+
+// Side panel styles
+const SIDE_PANEL_STYLE: &str = "w-1/3 h-[calc(100vh-5rem)] fixed right-0 top-0 mt-20 p-8";
+const INFO_CONTAINER_STYLE: &str =
+    "h-full p-6 border-t-8 border-[#00356B] shadow-lg rounded-lg flex flex-col";
+const INFO_CONTENT_STYLE: &str = "flex-grow overflow-y-auto";
+const INFO_TITLE_STYLE: &str = "text-stone-400 text-xs";
+const INFO_VALUE_STYLE: &str = "mt-1";
+const INFO_GROUP_STYLE: &str = "mb-2";
+const BUTTON_CONTAINER_STYLE: &str =
+    "mt-4 pt-4 flex border-t gap-2 justify-end sticky bottom-0 bg-white w-full";
+const BUTTON_CONTAINER_STYLE_FLOAT: &str =
+    "mt-2 flex gap-2 justify-end sticky bottom-0 bg-white w-full";
+
+// Table styles
+const TABLE_CONTAINER_STYLE: &str = "mb-4 border-b-2";
+const TABLE_WRAPPER_STYLE: &str = "overflow-x-auto rounded-lg shadow h-[33rem]"; // Fixed height with overflow
+const SEARCH_CONTAINER_STYLE: &str = "mb-4 flex gap-4 items-center mt-10";
+const SELECTED_EMPLOYEE_STYLE: &str = "border-b bg-[#FDFBD4] cursor-pointer";
+const MAIN_CONTAINER_STYLE: &str = "flex flex-col h-[calc(100vh-5rem)] overflow-hidden max-h-full";
+const TAB_BUTTON_ACTIVE: &str =
+    "px-4 py-2 font-medium rounded-t-l bgg-white text-[#00356B] border border-b-0";
+const TAB_BUTTON_INACTIVE: &str =
+    "px-4 py-2 font-medium rounded-t-lg bg-gray-100 text-gray-600 hover:bg-gray-200";
+
+#[component]
+pub fn Teachers() -> impl IntoView {
+    // Create resource for all employees
+    let (refresh_trigger, set_refresh_trigger) = create_signal(0);
+    let employees = create_resource(
+        move || refresh_trigger(),
+        |_| async move {
+            match get_employees().await {
+                Ok(employees) => Some(employees),
+                Err(e) => {
+                    log::error!("Failed to fetch employees: {}", e);
+                    Some(vec![])
+                }
+            }
+        },
+    );
+
+    // Create resource for teachers only
+    let teachers = create_resource(
+        move || refresh_trigger(),
+        |_| async move {
+            match get_teachers().await {
+                Ok(teachers) => Some(teachers),
+                Err(e) => {
+                    log::error!("Failed to fetch teachers: {}", e);
+                    Some(vec![])
+                }
+            }
+        },
+    );
+
+    // Signal for active view tab
+    let (active_view, set_active_view) = create_signal(String::from("employees"));
+
+    //signals for employee selection
+    let (selected_employee, set_selected_employee) = create_signal(None::<Rc<Employee>>);
+    let (search_term, set_search_term) = create_signal(String::new());
+    let (role_filter, set_role_filter) = create_signal(String::new());
+    let (adding_employee, set_adding_employee) = create_signal(false);
+
+    //signals for error messaging
+    let (error_message, set_error_message) = create_signal(String::new());
+    let (if_error, set_if_error) = create_signal(false);
+
+    //signals for deleting an employee
+    let (confirm_delete_one, set_confirm_delete_one) = create_signal(false);
+    let (confirm_delete_two, set_confirm_delete_two) = create_signal(String::new());
+
+    //these are the signals collected and modified by the add employee modal
+    let (new_firstname, set_new_firstname) = create_signal(String::new());
+    let (new_lastname, set_new_lastname) = create_signal(String::new());
+    let (new_status, set_new_status) = create_signal(String::from("Not Applicable"));
+    let (new_role, set_new_role) = create_signal(String::new());
+    let (yes_no_grade, set_yes_no_grade) = create_signal(false);
+    let (new_grade, set_new_grade) = create_signal(String::from("None"));
+
+    // Filtered employees based on search and role filter
+    let filtered_employees = create_memo(move |_| {
+        let search = search_term().trim().to_lowercase();
+        let role = role_filter();
+
+        employees
+            .get()
+            .unwrap_or(None)
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|employee| {
+                // Filter by search term
+                let matches_search = search.is_empty()
+                    || employee.firstname.to_lowercase().contains(&search)
+                    || employee.lastname.to_lowercase().contains(&search);
+
+                // Filter by role
+                let matches_role = role.is_empty() || employee.role.to_string().contains(&role);
+
+                matches_search && matches_role
+            })
+            .collect::<Vec<_>>()
+    });
+
+    // Filtered teachers based on search and role filter
+    let filtered_teachers = create_memo(move |_| {
+        let search = search_term().trim().to_lowercase();
+        let role = role_filter();
+
+        teachers
+            .get()
+            .unwrap_or(None)
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|teacher| {
+                // For teachers, only filter by search term since they're already filtered by role
+                let matches_search = search.is_empty()
+                    || teacher.firstname.to_lowercase().contains(&search)
+                    || teacher.lastname.to_lowercase().contains(&search);
+
+                // If role filter is set to something other than Teacher, don't show any teachers
+                let matches_role = role.is_empty() || role == "Teacher";
+
+                matches_search && matches_role
+            })
+            .collect::<Vec<_>>()
+    });
+
+    let handle_submit_new_employee = move |ev: SubmitEvent| {
+        ev.prevent_default();
+
+        let convert_status_to_enum = match StatusEnum::from_str(&new_status()) {
+            Ok(employee_status) => employee_status,
+            Err(_) => {
+                log::error!("Invalid employee status submitted for new employee");
+                return;
+            }
+        };
+
+        let convert_role_to_enum = if new_role() == "Teacher" {
+            let grade_enum = match GradeEnum::from_str(&new_grade()) {
+                Ok(grade) => Some(grade),
+                Err(_) => None,
+            };
+            EmployeeRole::Teacher { grade: grade_enum }
+        } else {
+            match EmployeeRole::from_str(&new_role()) {
+                Ok(role) => role,
+                Err(_) => {
+                    log::error!("Invalid employee role submitted for new employee");
+                    return;
+                }
+            }
+        };
+
+        let convert_grade_to_enum: Option<GradeEnum> = match GradeEnum::from_str(&new_grade()) {
+            Ok(grade_enum) => Some(grade_enum),
+            Err(_) => None,
+        };
+
+        let add_employee_request = AddNewEmployeeRequest {
+            firstname: new_firstname(),
+            lastname: new_lastname(),
+            status: convert_status_to_enum,
+            role: convert_role_to_enum,
+            grade: convert_grade_to_enum,
+        };
+
+        let is_valid = add_employee_request.validate();
+
+        match is_valid {
+            Ok(_) => {
+                spawn_local(async move {
+                    let add_result = add_employee(add_employee_request).await;
+
+                    match add_result {
+                        Ok(_added_result) => {
+                            set_adding_employee(false);
+                            set_refresh_trigger.update(|count| *count += 1);
+                            log::info!("Employee added successfully");
+                        }
+                        Err(e) => println!("Error adding: {:?}", e),
+                    };
+                });
+            }
+            Err(_) => {
+                set_if_error(true);
+                set_error_message(String::from("All fields required"))
+            }
+        }
+    };
+    //the handler for deleting an employee
+    let handle_delete_student = move |ev: SubmitEvent| {
+        ev.prevent_default();
+        let employee_to_be_deleted = selected_employee().unwrap();
+        let binding = confirm_delete_two().clone();
+        let mut validated_delete_two = binding.split_whitespace();
+        let firstname: String = validated_delete_two.next().unwrap_or_default().to_string();
+
+        let lastname: String = validated_delete_two.next().unwrap_or_default().to_string();
+
+        if firstname.to_lowercase() == employee_to_be_deleted.firstname.to_lowercase()
+            && lastname.to_lowercase() == employee_to_be_deleted.lastname.to_lowercase()
+        {
+            let delete_employee_request = DeleteTeacherRequest::new(firstname, lastname);
+
+            spawn_local(async move {
+                let delete_result = delete_employee(delete_employee_request).await;
+
+                match delete_result {
+                    Ok(_deleted_student) => {
+                        set_refresh_trigger.update(|count| *count += 1);
+                        set_confirm_delete_one(false);
+                    }
+                    Err(e) => {
+                        println!("Error deleting = {:?}", e);
+                        set_confirm_delete_one(false);
+                    }
+                };
+            });
+        } else {
+            set_confirm_delete_one(false);
+            log::info!("Delete was cancelled");
+        }
+    };
+
+    // Clear filters function
+    let clear_filters = move |_| {
+        set_search_term(String::new());
+        set_role_filter(String::new());
+        set_refresh_trigger.update(|count| *count += 1);
+    };
+
+    // Tab view selection handlers
+    let select_teachers_view = move |_| set_active_view(String::from("teachers"));
+    let select_employees_view = move |_| set_active_view(String::from("employees"));
+
+    view! {
+        <div class="min-h-screen flex">
+            <Header/>
+            <Show when=move || confirm_delete_one() && selected_employee().is_some()>
+                <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div class="bg-white p-6 rounded-lg shadow-xl max-w-md w-full">
+                        <h3 class="text-xl font-bold mb-4">"Confirm Delete"</h3>
+                        <p class="mb-4">
+                            "To confirm deletion, please enter the employee's full name: "
+                                {selected_employee().unwrap().firstname.clone()}
+                                {" "}
+                                {selected_employee().unwrap().lastname.clone()}
+                        </p>
+                        <form on:submit=handle_delete_student>
+                            <input
+                                type="text"
+                                class="w-full p-2 border rounded mb-4"
+                                placeholder="Enter student ID"
+                                on:input=move |ev| set_confirm_delete_two(event_target_value(&ev))
+                                required
+                            />
+                            <div class="flex justify-end gap-2">
+                                <button
+                                    type="button"
+                                    class="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+                                    on:click=move |_| set_confirm_delete_one(false)
+                                >
+                                    "Cancel"
+                                </button>
+                                <button
+                                    type="submit"
+                                    class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
+                                >
+                                    "Delete"
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </Show>
+            <div class="w-2/3 mt-20 px-8">
+                // Search and Filter Controls
+                <div class=SEARCH_CONTAINER_STYLE>
+                    <div class="flex-1">
+                        <label for="search" class="block text-sm font-medium text-gray-700 mb-1">"Search Employees"</label>
+                        <div class="relative rounded-md shadow-sm">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <span class="text-gray-500 sm:text-sm">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
+                                    </svg>
+                                </span>
+                            </div>
+                            <input
+                                type="text"
+                                name="search"
+                                id="search"
+                                class="focus:ring-indigo-500 focus:border-indigo-500 block w-full pl-10 pr-12 sm:text-sm border-gray-300 rounded-md h-10 border"
+                                placeholder="Search by name..."
+                                prop:value={search_term}
+                                on:input=move |ev| set_search_term(event_target_value(&ev))
+                            />
+                        </div>
+                    </div>
+
+                    <div class="w-64">
+                        <label for="role-filter" class="block text-sm font-medium text-gray-700 mb-1">"Filter by Role"</label>
+                        <select
+                            id="role-filter"
+                            class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md h-10 border"
+                            prop:value={role_filter}
+                            on:change=move |ev| set_role_filter(event_target_value(&ev))
+                        >
+                            <option value="">"All Roles"</option>
+                            {EmployeeRole::iter().map(|role| view! {
+                                <option value=format!("{}", role)>
+                                    {format!("{}", role)}
+                                </option>
+                            }).collect::<Vec<_>>()}
+                        </select>
+                    </div>
+
+                    <div class="flex items-end mt-6">
+                        <button
+                            type="button"
+                            class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 h-10"
+                            on:click=clear_filters
+                        >
+                            "Clear Filters"
+                        </button>
+                    </div>
+                </div>
+
+                // View selection tabs
+                <div class="flex border-b mb-4">
+                    <button
+                        class=move ||if active_view() == "employees" { TAB_BUTTON_ACTIVE } else { TAB_BUTTON_INACTIVE }
+                        on:click=select_employees_view
+                    >
+                        "All Employees"
+                    </button>
+                    <button
+                        class=move || if active_view() == "teachers" { TAB_BUTTON_ACTIVE } else { TAB_BUTTON_INACTIVE }
+                        on:click=select_teachers_view
+                    >
+                        "Teachers"
+                    </button>
+                </div>
+
+                // Teachers Table Section
+                <Show when=move || { active_view() == "teachers"}>
+                    <div class=TABLE_CONTAINER_STYLE>
+                        <div class="min-w-0 flex-1 mb-6 flex justify-between items-center">
+                            <h1 class="text-2xl font-bold leading-7 text-[#00356b] sm:truncate sm:text-3xl sm:tracking-tight">
+                                "Teachers"
+                            </h1>
+                        </div>
+                        <div class=TABLE_WRAPPER_STYLE>
+                            <div class="overflow-y-auto max-h-full">
+                                <table class="min-w-full divide-y divide-gray-200">
+                                    <thead class="bg-[#00356b] sticky top-0 z-10">
+                                        <tr>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">"ID"</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">"First Name"</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">"Last Name"</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">"Status"</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">"Grade"</th>
+                                        </tr>
+                                    </thead>
+                                    <Suspense fallback=move || view! { <tr><td colspan="6" class="text-center p-4">"Loading"</td></tr>}>
+                                        <tbody class="bg-white divide-y divide-gray-200">
+                                            {move || {
+                                                let teachers = filtered_teachers();
+                                                if teachers.is_empty() {
+                                                    view! { <tr><td colspan="6" class="px-6 py-4 text-center text-sm text-gray-500">"No teachers match your search criteria"</td></tr> }.into_view()
+                                                } else {
+                                                    teachers.into_iter().map(|teacher| {
+                                                        let teacher_rc = Rc::new(teacher.clone());
+                                                        let teacher_cmp = Rc::new(teacher.clone());
+                                                        let is_selected = move || selected_employee() == Some(teacher_cmp.clone());
+                                                        view! {
+                                                            <tr
+                                                                class=move || if is_selected() {SELECTED_EMPLOYEE_STYLE} else { "hover:bg-gray-50 cursor-pointer"}
+                                                                on:click=move |_| set_selected_employee(Some(teacher_rc.clone()))
+                                                            >
+                                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{teacher.id}</td>
+                                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{&teacher.firstname}</td>
+                                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{&teacher.lastname}</td>
+                                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{teacher.status.to_string()}</td>
+                                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                                    {match &teacher.role {
+                                                                        EmployeeRole::Teacher { grade } =>
+                                                                            grade.as_ref().map_or("Not Assigned".to_string(), |g| g.to_string()),
+                                                                        _ => "N/A".to_string()
+                                                                    }}
+                                                                </td>
+                                                            </tr>
+                                                        }
+                                                    }).collect_view()
+                                                }
+                                            }}
+                                        </tbody>
+                                    </Suspense>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </Show>
+
+                // All Employees Table Section
+                <Show when=move || { active_view() == "employees"}>
+                    <div class=TABLE_CONTAINER_STYLE>
+                        <div class="min-w-0 flex-1 mb-6 flex justify-between items-center">
+                            <h2 class="text-2xl font-bold leading-7 text-[#00356b] sm:truncate sm:text-3xl sm:tracking-tight">
+                                "All Employees"
+                            </h2>
+                        </div>
+                        <div class=TABLE_WRAPPER_STYLE>
+                            <div class="overflow-y-auto max-h-full">
+                                <table class="min-w-full divide-y divide-gray-200">
+                                    <thead class="bg-[#00356b] sticky top-0 z-10">
+                                        <tr>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">"ID"</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">"First Name"</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">"Last Name"</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">"Status"</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">"Role"</th>
+                                        </tr>
+                                    </thead>
+                                    <Suspense fallback=move || view! { <tr><td colspan="6" class="text-center p-4">"Loading"</td></tr>}>
+                                        <tbody class="bg-white divide-y divide-gray-200">
+                                            {move || {
+                                                let employees = filtered_employees();
+                                                if employees.is_empty() {
+                                                    view! { <tr><td colspan="6" class="px-6 py-4 text-center text-sm text-gray-500">"No employees match your search criteria"</td></tr> }.into_view()
+                                                } else {
+                                                    employees.into_iter().map(|employee| {
+                                                        let employee_rc = Rc::new(employee.clone());
+                                                        let employee_cmp = Rc::new(employee.clone());
+                                                        let is_selected = move || selected_employee() == Some(employee_cmp.clone());
+                                                        view! {
+                                                            <tr
+                                                                class=move || if is_selected() {SELECTED_EMPLOYEE_STYLE} else {"hover:bg-gray-50 cursor-pointer"}
+                                                                on:click=move |_| set_selected_employee(Some(employee_rc.clone()))
+
+                                                            >
+                                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{employee.id}</td>
+                                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{&employee.firstname}</td>
+                                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{&employee.lastname}</td>
+                                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{employee.status.to_string()}</td>
+                                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{employee.role.to_string()}</td>
+                                                            </tr>
+                                                        }
+                                                    }).collect_view()
+                                                }
+                                            }}
+                                        </tbody>
+                                    </Suspense>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </Show>
+                <div class=BUTTON_CONTAINER_STYLE_FLOAT>
+                    <button
+                        class="inline-flex justify-items-end items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-500 hover:bg-green-400"
+                        on:click=move |_| {
+                            set_adding_employee(true);
+                            set_selected_employee(None);
+                        }
+                    >
+                        "Add Employee"
+                    </button>
+                    <button
+                        class="inline-flex justify-items-end items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-500 hover:bg-red-400"
+                        on:click=move |_| set_confirm_delete_one(true)
+                    >
+                        "Delete"
+                    </button>
+                </div>
+
+
+                // Side Panel
+                <div class=SIDE_PANEL_STYLE>
+                    {move || {
+                        if adding_employee() {
+                            view! {
+                                <div class=INFO_CONTAINER_STYLE>
+                                    <Show when=move || {if_error()}>
+                                        <p class="text-red-500 font-semibold">"There was an error with one or more of the entered fields"</p>
+                                        <p class="text-red-500 rounded w-full h-12 px-5 -y-3">{error_message()}</p>
+                                    </Show>
+                                    <h2 class="text-xl font-bold mb-4">"Add New Employee"</h2>
+                                    <form on:submit=handle_submit_new_employee class=INFO_CONTENT_STYLE>
+                                        <div class="grid grid-cols-2 gap-4">
+                                            // Basic Information Section
+                                            <div class="col-span-2">
+                                                <h3 class="text-sm font-semibold text-gray-600 mb-2">"Information"</h3>
+                                                <div class="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg">
+                                                    <div class=INFO_GROUP_STYLE>
+                                                        <label class=INFO_TITLE_STYLE for="firstname">"First Name"</label>
+                                                        <input
+                                                            id="firstname"
+                                                            type="text"
+                                                            class="mt-1 w-full rounded-md border p-2"
+                                                            on:input=move |ev| set_new_firstname(event_target_value(&ev))
+                                                            required
+                                                        />
+                                                    </div>
+                                                    <div class=INFO_GROUP_STYLE>
+                                                        <label class=INFO_TITLE_STYLE for="lastname">"Last Name"</label>
+                                                        <input
+                                                            id="lastname"
+                                                            type="text"
+                                                            class="mt-1 w-full rounded-md border p-2"
+                                                            on:input=move |ev| set_new_lastname(event_target_value(&ev))
+                                                            required
+                                                        />
+                                                    </div>
+                                                    <div class=INFO_GROUP_STYLE>
+                                                        <label class=INFO_TITLE_STYLE for="status">"Status"</label>
+                                                        <select
+                                                            required
+                                                            id="status"
+                                                            class="mt-1 w-full rounded-md border p-2"
+                                                            on:change=move |ev| set_new_status(event_target_value(&ev))
+                                                        >
+                                                            <option value="">"Please select a value"</option>
+                                                            {StatusEnum::iter().map(|status| view! {
+                                                                <option value=format!("{}", status)>
+                                                                    {format!("{}", status)}
+                                                                </option>
+                                                            }).collect::<Vec<_>>()}
+                                                        </select>
+                                                    </div>
+                                                    <div class=INFO_GROUP_STYLE>
+                                                        <label class=INFO_TITLE_STYLE for="role">"Role"</label>
+                                                        <select
+                                                            required
+                                                            id="role"
+                                                            class="mt-1 w-full rounded-md border p-2"
+                                                            on:change=move |ev| {
+                                                                let value = event_target_value(&ev);
+                                                                set_new_role(value.clone());
+                                                                set_yes_no_grade(value == "Teacher");
+                                                            }
+                                                        >
+                                                            <option value="">"Please select a value"</option>
+                                                            {EmployeeRole::iter().map(|role| view! {
+                                                                <option value=format!("{}", role)>
+                                                                    {format!("{}", role)}
+                                                                </option>
+                                                            }).collect::<Vec<_>>()}
+                                                        </select>
+                                                        <Show when=move || {yes_no_grade()}>
+                                                            <label class=INFO_TITLE_STYLE for="grade">"Grade Level"</label>
+                                                            <select
+                                                                id="grade"
+                                                                class="mt-1 w-full rounded-md border p-2"
+                                                                required
+                                                                on:change=move |event| {
+                                                                    set_new_grade(event_target_value(&event))
+                                                                }
+                                                            >
+                                                                <option value="">"Please Select Grade"</option>
+                                                                {GradeEnum::iter().map(|grade| view! {
+                                                                    <option value=format!("{}", grade)>
+                                                                        {format!("{}", grade)}
+                                                                    </option>
+                                                                }).collect::<Vec<_>>()}
+                                                            </select>
+                                                        </Show>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class=BUTTON_CONTAINER_STYLE>
+                                            <button
+                                                type="button"
+                                                class="px-4 py-2 bg-gray-200 rounded-lg font-bold hover:bg-gray-300"
+                                                on:click=move |_| set_adding_employee(false)
+                                            >
+                                                "Cancel"
+                                            </button>
+                                            <button
+                                                type="submit"
+                                                class="px-4 py-2 bg-green-500 text-white font-bold rounded-lg hover:bg-[#A8DCAB]"
+                                            >
+                                                "Save Employee"
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            }
+                        } else if let Some(employee) = selected_employee() {
+                            view! {
+                                <div class=INFO_CONTAINER_STYLE>
+                                    <h2 class="text-xl font-bold mb-4">
+                                        {&employee.firstname}
+                                        {" "} {&employee.lastname}
+                                    </h2>
+
+                                    <div class=INFO_CONTENT_STYLE>
+                                        <div class="grid grid-cols-2 gap-4">
+                                            // Basic Information Section
+                                            <div class="col-span-2">
+                                                <h3 class="text-sm font-semibold text-gray-600 mb-2">"Basic Information"</h3>
+                                                <div class="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg">
+                                                    <div class=INFO_GROUP_STYLE>
+                                                        <div class=INFO_TITLE_STYLE>"Employee ID"</div>
+                                                        <div class=INFO_VALUE_STYLE>{format!("{}", &employee.id)}</div>
+                                                    </div>
+                                                    <div class=INFO_GROUP_STYLE>
+                                                        <div class=INFO_TITLE_STYLE>"Status"</div>
+                                                        <div class=INFO_VALUE_STYLE>{&employee.status.to_string()}</div>
+                                                    </div>
+                                                    <div class=INFO_GROUP_STYLE>
+                                                        <div class=INFO_TITLE_STYLE>"Role"</div>
+                                                        <div class=INFO_VALUE_STYLE>{&employee.role.to_string()}</div>
+                                                    </div>
+                                                    {move || match &employee.role {
+                                                        EmployeeRole::Teacher { grade } => {
+                                                            view! {
+                                                                <div class=INFO_GROUP_STYLE>
+                                                                    <div class=INFO_TITLE_STYLE>"Assigned Grade"</div>
+                                                                    <div class=INFO_VALUE_STYLE>
+                                                                        {grade.as_ref().map_or("Not Assigned".to_string(), |g| g.to_string())}
+                                                                    </div>
+                                                                </div>
+                                                            }.into_view()
+                                                        }
+                                                        _ => view! {}.into_view()
+                                                    }}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class=BUTTON_CONTAINER_STYLE>
+                                        <button
+                                            type="button"
+                                            class="px-4 py-2 bg-gray-200 rounded-lg font-bold hover:bg-gray-300"
+                                            on:click=move |_| set_selected_employee(None)
+                                        >
+                                            "Close"
+                                        </button>
+                                    </div>
+                                </div>
+                            }
+                        } else {
+                            view! {
+                                <div class=INFO_CONTAINER_STYLE>
+                                    <div class="flex items-center justify-center h-full text-gray-500">
+                                        "Select an employee to view their details"
+                                    </div>
+                                </div>
+                            }
+                        }
+                    }}
+                </div>
+            </div>
+        </div>
+    }
+}

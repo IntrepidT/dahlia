@@ -31,8 +31,8 @@ pub fn Header() -> impl IntoView {
 
     view! {
         <header class="flex z-50 bg-white">
-            <div class="py-6 item-center ml-10">
-                <nav class="fixed relativerounded max-w-8xl mx-auto flex items-center justify-between px-2 sm:px-6">
+            <div class="py-6 item-center">
+                <nav class="fixed relativerounded max-w-8xl mx-auto flex items-center justify-between px-2 sm:px-6 ml-10">
                     <div class="flex items-center flex-1">
                         <div class="flex items-center justify-between w-full md:w-auto bg-[#00356b] rounded pl-1 pr-2">
                             <A href="/" class="flex items-center space-x-2 font-semibold tracking-tight leading-none">
@@ -46,9 +46,9 @@ pub fn Header() -> impl IntoView {
                             </A>
                             <div class="-mr-2 flex items-center md:hidden"></div>
                         </div>
-                        <div class="hidden space-x-[4rem] md:flex md:ml-[30rem]">
+                        <div class="hidden space-x-[4rem] md:flex md:ml-[28rem]">
                             <A href="/" class=basic_head_style>"Home Page"</A>
-                            <A href="/dataview" class=basic_head_style>"DataView"</A>
+                            <A href="/studentview" class=basic_head_style>"Student View"</A>
                             <button class="text-base font-medium text-black" on:click=on_click>
                                 <div>
                                     "Administer Test"
@@ -60,9 +60,9 @@ pub fn Header() -> impl IntoView {
                                     </Show>
                                 </div>
                             </button>
-                            <A href="/activities" class=basic_head_style>"Activities"</A>
+                            <A href="/teachers" class=basic_head_style>"Teacher View"</A>
                         </div>
-                        <div class="flex items-end md:ml-[30rem]  md:flex rounded bg-[#00356B] px-2">
+                        <div class="flex items-end md:ml-[28rem]  md:flex rounded bg-[#00356B] px-2">
                                 <A href="/myaccount" class="text-base font-semibold text-white">
                                     My Account
                                     <img src="/assets/user.png" alt="user icon" class="rounded-2xl bg-[#00356b] h-6 w-6 ml-1 inline"/>

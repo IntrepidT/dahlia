@@ -1,14 +1,14 @@
 pub mod home_page;
 pub use home_page::HomePage;
 
-pub mod data_view;
-pub use data_view::DataView;
+pub mod student_view;
+pub use student_view::StudentView;
 
 pub mod admin_test;
 pub use admin_test::AdministerTest;
 
-pub mod activities;
-pub use activities::Activities;
+pub mod teacher_view;
+pub use teacher_view::Teachers;
 
 pub mod my_account;
 pub use my_account::MyAccount;
@@ -24,3 +24,6 @@ pub use math_testing::MathTesting;
 
 pub mod test_builder;
 pub use test_builder::TestBuilder;
+
+pub mod assessment;
+pub use assessment::Assessment;
