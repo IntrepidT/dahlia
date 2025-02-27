@@ -35,6 +35,10 @@ dotenvy = "0.15.7"
 log = "0.4.25"
 env_logger = "0.11.6"
 futures = "0.3.31"
+jsonwebtoken = "9.3.1"
+time = "0.3.37"
+argon2 = "0.5.3"
+reqwest = "0.12.12"
 
 [features]
 csr = ["leptos/csr", "leptos_meta/csr", "leptos_router/csr"]

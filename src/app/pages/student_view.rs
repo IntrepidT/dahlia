@@ -1,18 +1,16 @@
 use crate::app::components::header::Header;
-use crate::app::components::student_page::student_search_filter::{FilterState, SearchFilter}; // Import the new component
-use crate::app::models::student::{
-    AddStudentRequest, DeleteStudentRequest, ELLEnum, GenderEnum, GradeEnum, Student,
+use crate::app::components::student_page::student_search_filter::SearchFilter; // Import the new component
+use crate::app::components::student_page::update_student_form::UpdateStudent;
+use crate::app::components::student_page::{
+    add_student_form::AddStudentForm, student_details::StudentDetails,
 };
-use crate::app::models::EmployeeRole;
-use crate::app::server_functions::get_teachers;
-use crate::app::server_functions::students::{add_student, delete_student, get_students};
-use chrono::NaiveDate;
+use crate::app::models::student::{DeleteStudentRequest, ELLEnum, Student};
+use crate::app::server_functions::students::{delete_student, get_students};
+use crate::app::server_functions::teachers::get_teachers;
 use leptos::ev::SubmitEvent;
+use log::{error, info, debug};
 use leptos::*;
 use std::rc::Rc;
-use std::str::FromStr;
-use strum::IntoEnumIterator;
-use validator::Validate;
 
 // Styles
 const TABLE_CONTAINER_STYLE: &str =
@@ -49,7 +47,10 @@ pub fn StudentView() -> impl IntoView {
         move || refresh_trigger(),
         |_| async move {
             match get_teachers().await {
-                Ok(teachers) => Some(teachers),
+                Ok(teachers) => {
+                    log::info!("Teachers fetched successfully: {} teachers", teachers.len());
+                    Some(teachers)
+                },
                 Err(e) => {
                     log::error!("Failed to fetch teachers: {}", e);
                     Some(vec![])
@@ -60,6 +61,9 @@ pub fn StudentView() -> impl IntoView {
 
     let (selected_student, set_selected_student) = create_signal(None::<Rc<Student>>);
 
+    //editing signals
+    let (editing, set_editing) = create_signal(false);
+
     // Filter state signals
     let (search_term, set_search_term) = create_signal(String::new());
     let (grade_filter, set_grade_filter) = create_signal(String::from("all"));
@@ -67,32 +71,8 @@ pub fn StudentView() -> impl IntoView {
     let (ell_filter, set_ell_filter) = create_signal(false);
     let (teacher_filter, set_teacher_filter) = create_signal(String::from("all"));
 
-    //Signals for error messaging
-    let (error_message, set_error_message) = create_signal(String::new());
-    let (if_error, set_if_error) = create_signal(false);
-
     //Signals for getting a new student
     let (adding_student, set_adding_student) = create_signal(false);
-
-    let (new_firstname, set_new_firstname) = create_signal(String::new());
-    let (new_lastname, set_new_lastname) = create_signal(String::new());
-    let (new_student_gender, set_student_gender) = create_signal(String::new());
-    let (new_student_dob, set_student_dob) = create_signal(String::new());
-    let (new_student_id, set_new_student_id) = create_signal(String::new());
-    let (new_grade, set_new_grade) = create_signal(String::new());
-    let (new_teacher, set_new_teacher) = create_signal(String::new());
-    let (new_iep, set_new_iep) = create_signal(false);
-    let (new_504, set_new_504) = create_signal(false);
-    let (yes_no_ell, set_yes_no_ell) = create_signal(false);
-    let (new_ell, set_new_ell) = create_signal(String::from("Not Applicable"));
-    let (new_gt, set_new_gt) = create_signal(false);
-    let (new_readplan, set_new_readplan) = create_signal(false);
-    let (new_intervention, set_new_intervention) = create_signal(false);
-    let (new_eye_glasses, set_new_eye_glasses) = create_signal(false);
-
-    //Add edit mode signal
-    let (show_form_modal, set_show_form_modal) = create_signal(false);
-    let (is_editing, set_is_editing) = create_signal(false);
 
     //Delete Student Signal
     let (confirm_delete_one, set_confirm_delete_one) = create_signal(false);
@@ -100,14 +80,15 @@ pub fn StudentView() -> impl IntoView {
 
     // Extract teacher names for the filter dropdown
     let teacher_names = create_memo(move |_| {
-        teachers
-            .get()
-            .unwrap_or(Some(vec![]))
-            .unwrap_or_default()
-            .iter()
-            .map(|teacher| teacher.lastname.clone())
-            .collect::<Vec<_>>()
+        if let Some(Some(teacher_list)) = teachers.get() {
+            teacher_list.iter()
+                .map(|teacher| teacher.lastname.clone())
+                .collect::<Vec<_>>()
+        } else {
+            vec![]
+        }
     });
+
 
     let filtered_students = move || {
         students.get().map(|result| {
@@ -140,35 +121,6 @@ pub fn StudentView() -> impl IntoView {
             })
         })
     };
-
-    // Create a derived signal for filtered teachers based on selected grade
-    let filtered_teachers = create_memo(move |_| {
-        let grade_str = new_grade();
-        if grade_str.is_empty() {
-            return Vec::new(); // Return empty if no grade selected yet
-        }
-
-        // Convert the selected grade string to GradeEnum
-        let selected_grade = match GradeEnum::from_str(&grade_str) {
-            Ok(grade) => grade,
-            Err(_) => return Vec::new(), // Return empty on error
-        };
-
-        // Filter teachers to only include those matching the selected grade
-        teachers
-            .get()
-            .unwrap_or(Some(Vec::new()))
-            .unwrap_or_default()
-            .into_iter()
-            .filter(|teacher| {
-                // Check if teacher has EmployeeRole::Teacher{grade} matching selected_grade
-                match &teacher.role {
-                    EmployeeRole::Teacher { grade } => *grade == Some(selected_grade.clone()),
-                    _ => false,
-                }
-            })
-            .collect::<Vec<_>>()
-    });
 
     //to perform the deletion
     let handle_delete_student = move |ev: SubmitEvent| {
@@ -207,71 +159,6 @@ pub fn StudentView() -> impl IntoView {
     let handle_add_student = move |_| {
         set_selected_student(None);
         set_adding_student(true);
-    };
-
-    let handle_submit_new_student = move |ev: SubmitEvent| {
-        ev.prevent_default();
-
-        let validated_student_id = new_student_id().parse::<i32>();
-        let validated_dob: NaiveDate = NaiveDate::parse_from_str(&new_student_dob(), "%Y-%m-%d")
-            .expect("Issue gathering date");
-
-        let convert_gender_to_enum = match GenderEnum::from_str(&new_student_gender()) {
-            Ok(gender_enum) => gender_enum,
-            Err(_) => {
-                log::error!("Invalid gender value submitted for new student");
-                return;
-            }
-        };
-        let convert_grade_to_enum = match GradeEnum::from_str(&new_grade()) {
-            Ok(grade_enum) => grade_enum,
-            Err(_) => {
-                log::error!("Invalid grade value submitted for new student");
-                return;
-            }
-        };
-        let convert_ell_to_enum = ELLEnum::from_str(&new_ell()).clone().unwrap();
-
-        let add_student_request = AddStudentRequest {
-            firstname: new_firstname(),
-            lastname: new_lastname(),
-            gender: convert_gender_to_enum,
-            date_of_birth: validated_dob,
-            student_id: validated_student_id.expect("Student ID was not processed correctly"),
-            ell: convert_ell_to_enum,
-            grade: convert_grade_to_enum,
-            teacher: new_teacher(),
-            iep: new_iep(),
-            student_504: new_504(),
-            readplan: new_readplan(),
-            gt: new_gt(),
-            intervention: new_intervention(),
-            eye_glasses: new_eye_glasses(),
-        };
-
-        let is_valid = add_student_request.validate();
-
-        match is_valid {
-            Ok(_) => {
-                spawn_local(async move {
-                    let add_result = add_student(add_student_request).await;
-
-                    //we get the result back and do something with it
-                    match add_result {
-                        Ok(_added_result) => {
-                            set_adding_student(false);
-                            set_refresh_trigger.update(|count| *count += 1);
-                            log::info!("Student added successfully");
-                        }
-                        Err(e) => println!("Error adding: {:?}", e),
-                    };
-                });
-            }
-            Err(_) => {
-                set_if_error(true);
-                set_error_message(String::from("All fields required"))
-            }
-        }
     };
 
     view! {
@@ -321,7 +208,16 @@ pub fn StudentView() -> impl IntoView {
                     set_teacher_filter=set_teacher_filter
                     set_iep_filter=set_iep_filter
                     set_ell_filter=set_ell_filter
-                    teachers=teacher_names()
+                    teachers=Signal::derive(move || {
+                        if let Some(data) = teachers.get() {
+                            if let Some(teacher_list) = data {
+                                return teacher_list.iter()
+                                    .map(|teacher| teacher.lastname.clone())
+                                    .collect::<Vec<_>>();
+                            }
+                        }
+                        vec![]
+                    })
                 />
 
                 <div class="h-[calc(100vh-10rem)] overflow-auto rounded-lg border-b">
@@ -389,7 +285,7 @@ pub fn StudentView() -> impl IntoView {
             // Student Detail Side Panel
             <div class=SIDE_PANEL_STYLE>
                 <Show
-                    when=move || selected_student().is_some() || adding_student()
+                    when=move || selected_student().is_some() || adding_student() || editing()
                     fallback=|| view! {
                         <div class="flex items-center justify-center border-t-8 border-[#00356b] h-full text-gray-500 rounded-lg shadow-lg">
                             "Select a student to view details"
@@ -399,328 +295,42 @@ pub fn StudentView() -> impl IntoView {
                     {move || {
                         if adding_student() {
                             view! {
-                                <div class=INFO_CONTAINER_STYLE>
-                                    <Show when=move || {if_error()}>
-                                        <p class="text-red-500 font-semibold">"There was an error with one or more of the entered fields"</p>
-                                        <p class="text-red-500 rounded w-full h-12 px-5 -y-3">{error_message()}</p>
-                                    </Show>
-                                    <h2 class="text-xl font-bold mb-4">"Add New Student"</h2>
-                                    <form on:submit=handle_submit_new_student class=INFO_CONTENT_STYLE>
-                                        <div class="grid grid-cols-2 gap-4">
-                                            // Basic Information Section
-                                            <div class="col-span-2">
-                                                <h3 class="text-sm font-semibold text-gray-600 mb-2">"Basic Information"</h3>
-                                                <div class="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg">
-                                                    <div class=INFO_GROUP_STYLE>
-                                                        <label class=INFO_TITLE_STYLE for="firstname">"First Name"</label>
-                                                        <input
-                                                            id="firstname"
-                                                            type="text"
-                                                            class="mt-1 w-full rounded-md border p-2"
-                                                            on:input=move |ev| set_new_firstname(event_target_value(&ev))
-                                                            required
-                                                        />
-                                                    </div>
-                                                    <div class=INFO_GROUP_STYLE>
-                                                        <label class=INFO_TITLE_STYLE for="lastname">"Last Name"</label>
-                                                        <input
-                                                            id="lastname"
-                                                            type="text"
-                                                            class="mt-1 w-full rounded-md border p-2"
-                                                            on:input=move |ev| set_new_lastname(event_target_value(&ev))
-                                                            required
-                                                        />
-                                                    </div>
-                                                    <div class=INFO_GROUP_STYLE>
-                                                        <label class=INFO_TITLE_STYLE for="student-id">"Student ID"</label>
-                                                        <input
-                                                            required
-                                                            id="student-id"
-                                                            type="text"
-                                                            class="mt-1 w-full rounded-md border p-2"
-                                                            on:input=move |ev| set_new_student_id(event_target_value(&ev))
-                                                        />
-                                                    </div>
-                                                    <div class=INFO_GROUP_STYLE>
-                                                        <label class=INFO_TITLE_STYLE for="gender">"Gender"</label>
-                                                        <select
-                                                            required
-                                                            id="gender"
-                                                            class="mt-1 w-full rounded-md border p-2"
-                                                            on:change=move |ev| set_student_gender(event_target_value(&ev))
-                                                        >
-                                                            <option value="">"Please select a value"</option>
-                                                            {GenderEnum::iter().map(|grade| view! {
-                                                                <option value=format!("{}", grade)>
-                                                                    {format!("{}", grade)}
-                                                                </option>
-                                                            }).collect::<Vec<_>>()}
-                                                        </select>
-                                                    </div>
-
-                                                    <div class=INFO_GROUP_STYLE>
-                                                        <label class=INFO_TITLE_STYLE for="grade">"Grade"</label>
-                                                        <select
-                                                            required
-                                                            id="grade"
-                                                            class="mt-1 w-full rounded-md border p-2"
-                                                            on:change=move |ev| set_new_grade(event_target_value(&ev))
-                                                        >
-                                                            <option value="">"Please select a value"</option>
-                                                            {GradeEnum::iter().map(|grade| view! {
-                                                                <option value=format!("{}", grade)>
-                                                                    {format!("{}", grade)}
-                                                                </option>
-                                                            }).collect::<Vec<_>>()}
-                                                        </select>
-                                                    </div>
-                                                    <div class=INFO_GROUP_STYLE>
-                                                        <label class=INFO_TITLE_STYLE for="birthdate">"Birthdate"</label>
-                                                        <input
-                                                            type="date"
-                                                            required
-                                                            id="birthdate"
-                                                            class="mt-1 w-full rounded-md border p-2"
-                                                            on:change=move |ev| set_student_dob(event_target_value(&ev))
-                                                        />
-                                                    </div>
-                                                    <div class=INFO_GROUP_STYLE>
-                                                        <label class=INFO_TITLE_STYLE for="teacher">"Teacher"</label>
-                                                        <select
-                                                            required
-                                                            id="teacher"
-                                                            class="mt-1 w-full rounded-md border p-2"
-                                                            on:change=move |ev| set_new_teacher(event_target_value(&ev))
-                                                        >
-                                                            <option value="">"Please select a value"</option>
-                                                            {move || {
-                                                                if new_grade().is_empty() {
-                                                                    vec![view! { <option disabled>"First select a grade"</option> }].into_iter().collect_view()
-                                                                } else {
-                                                                    let filtered = filtered_teachers();
-                                                                    if filtered.is_empty() {
-                                                                        vec![view! { <option disabled>"No teachers available for this grade"</option> }].into_iter().collect_view()
-                                                                    } else {
-                                                                        filtered.iter().map(|teacher| view! {
-                                                                            <option value=teacher.lastname.clone()>{teacher.lastname.clone()}</option>
-                                                                        }).collect_view()
-                                                                    }
-                                                                }
-                                                            }}
-                                                        </select>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            // Support Services Section
-                                            <div class="col-span-2">
-                                                <h3 class="text-sm font-semibold text-gray-600 mb-2">"Support Services"</h3>
-                                                <div class="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg">
-                                                    <div class=INFO_GROUP_STYLE>
-                                                        <label class="flex items-center gap-2">
-                                                            <input
-                                                                type="checkbox"
-                                                                class="form-checkbox h-5 w-5"
-                                                                on:change=move |ev| set_new_iep(event_target_checked(&ev))
-                                                            />
-                                                            <span class=INFO_TITLE_STYLE>"IEP"</span>
-                                                        </label>
-                                                    </div>
-                                                    <div class=INFO_GROUP_STYLE>
-                                                        <label class="flex items-center gap-2">
-                                                            <input
-                                                                type="checkbox"
-                                                                class="form-checkbox h-5 w-5"
-                                                                on:change=move |ev| set_new_504(event_target_checked(&ev))
-                                                            />
-                                                            <span class=INFO_TITLE_STYLE>"504"</span>
-                                                        </label>
-                                                    </div>
-                                                    <div class=INFO_GROUP_STYLE>
-                                                        <label class="flex items-center gap-2">
-                                                            <input
-                                                                type="checkbox"
-                                                                class="form-checkbox h-5 w-5"
-                                                                on:change=move |ev| set_yes_no_ell(event_target_checked(&ev))
-                                                            />
-                                                            <span class=INFO_TITLE_STYLE>"ELL"</span>
-                                                        </label>
-                                                        <Show when=move || {yes_no_ell()}>
-                                                            <select class="p-3 rounded-lg"
-                                                                required
-                                                                value=new_ell
-                                                                on:change=move |event| {
-                                                                    set_new_ell(event_target_value(&event))
-                                                                }
-                                                            >
-                                                                <option value="">"Please Select"</option>
-                                                                {ELLEnum::iter().map(|lang| view! {
-                                                                    <option vallue=format!("{}", lang)>
-                                                                        {format!("{}", lang)}
-                                                                    </option>
-                                                                }).collect::<Vec<_>>()}
-                                                            </select>
-                                                        </Show>
-                                                    </div>
-                                                    <div class=INFO_GROUP_STYLE>
-                                                        <label class="flex items-center gap-2">
-                                                            <input
-                                                                type="checkbox"
-                                                                class="form-checkbox h-5 w-5"
-                                                                on:change=move |ev| set_new_readplan(event_target_checked(&ev))
-                                                            />
-                                                            <span class=INFO_TITLE_STYLE>"Read Plan"</span>
-                                                        </label>
-                                                    </div>
-                                                    <div class=INFO_GROUP_STYLE>
-                                                        <label class="flex items-center gap-2">
-                                                            <input
-                                                                type="checkbox"
-                                                                class="form-checkbox h-5 w-5"
-                                                                on:change=move |ev| set_new_gt(event_target_checked(&ev))
-                                                            />
-                                                            <span class=INFO_TITLE_STYLE>"GT Status"</span>
-                                                        </label>
-                                                    </div>
-                                                    <div class=INFO_GROUP_STYLE>
-                                                        <label class="flex items-center gap-2">
-                                                            <input
-                                                                type="checkbox"
-                                                                class="form-checkbox h-5 w-5"
-                                                                on:change=move |ev| set_new_intervention(event_target_checked(&ev))
-                                                            />
-                                                            <span class=INFO_TITLE_STYLE>"Intervention"</span>
-                                                        </label>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            //Additional Services
-                                            <div class="col-span-2">
-                                                <h3 class="text-sm font-semibold text-gray-600 mb-2">"Additional Services"</h3>
-                                                <div class="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg">
-                                                    <div class=INFO_GROUP_STYLE>
-                                                        <label class="flex items-center gap-2">
-                                                            <input
-                                                                type="checkbox"
-                                                                class="form-checkbox h-5 w-5"
-                                                                on:change=move |ev| set_new_eye_glasses(event_target_checked(&ev))
-                                                            />
-                                                            <span class=INFO_TITLE_STYLE>"Glasses"</span>
-                                                        </label>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class=BUTTON_CONTAINER_STYLE>
-                                            <button
-                                                type="button"
-                                                class="px-4 py-2 bg-gray-200 rounded-lg font-bold hover:bg-gray-300"
-                                                on:click=move |_| set_adding_student(false)
-                                            >
-                                                "Cancel"
-                                            </button>
-                                            <button
-                                                type="submit"
-                                                class="px-4 py-2 bg-green-500 text-white font-bold rounded-lg hover:bg-[#A8DCAB]"
-                                            >
-                                                "Save Student"
-                                            </button>
-                                        </div>
-                                    </form>
+                                <div class="h-full">
+                                    <AddStudentForm
+                                        set_adding_student=set_adding_student
+                                        set_refresh_trigger=set_refresh_trigger
+                                    />
+                                </div>
+                            }
+                        } else if editing() {
+                            view!{
+                                <div class="h-full">
+                                    <UpdateStudent
+                                        student=selected_student().expect("A student struct")
+                                        on_cancel=Callback::new(move |_| set_editing(false))
+                                        on_update_success=Callback::new(move |updated| {
+                                            set_selected_student(Some(Rc::new(updated)));
+                                            set_editing(false);
+                                            set_refresh_trigger.update(|count| *count +=1);
+                                        })
+                                    />
+                                </div>
+                            }
+                        } else if let Some(student) = selected_student() {
+                            view! {
+                                <div class="h-full">
+                                    <StudentDetails
+                                        student=student
+                                        on_edit_student=Callback::new(move |_| {
+                                            set_adding_student(false);
+                                            set_editing(true);
+                                        })
+                                    />
                                 </div>
                             }
                         } else {
-                            let student = selected_student().unwrap();
                             view! {
-                                <div class=INFO_CONTAINER_STYLE>
-                                    <h2 class="text-xl font-bold mb-4">
-                                        {&student.firstname}
-                                        {" "}
-                                        {&student.lastname}
-                                    </h2>
-
-                                    <div class=INFO_CONTENT_STYLE>
-                                        <div class="grid grid-cols-2 gap-4">
-                                            // Basic Information Section
-                                            <div class="col-span-2">
-                                                <h3 class="text-sm font-semibold text-gray-600 mb-2">"Basic Information"</h3>
-                                                <div class="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg">
-                                                    <div class=INFO_GROUP_STYLE>
-                                                        <div class=INFO_TITLE_STYLE>"Student ID"</div>
-                                                        <div class=INFO_VALUE_STYLE>{format!("{}", &student.student_id)}</div>
-                                                    </div>
-                                                    <div class=INFO_GROUP_STYLE>
-                                                        <div class=INFO_TITLE_STYLE>"Grade"</div>
-                                                        <div class=INFO_VALUE_STYLE>{&student.grade.to_string()}</div>
-                                                    </div>
-                                                    <div class=INFO_GROUP_STYLE>
-                                                        <div class=INFO_TITLE_STYLE>"Teacher"</div>
-                                                        <div class=INFO_VALUE_STYLE>{&student.teacher}</div>
-                                                    </div>
-                                                    <div class=INFO_GROUP_STYLE>
-                                                        <div class=INFO_TITLE_STYLE>"Date of Birth"</div>
-                                                        <div class=INFO_VALUE_STYLE>{format!("{:?}", &student.date_of_birth)}</div>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            // Support Services Section
-                                            <div class="col-span-2">
-                                                <h3 class="text-sm font-semibold text-gray-600 mb-2">"Support Services"</h3>
-                                                <div class="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg">
-                                                    <div class=INFO_GROUP_STYLE>
-                                                        <div class=INFO_TITLE_STYLE>"IEP Status"</div>
-                                                        <div class=INFO_VALUE_STYLE>{&student.iep.to_string()}</div>
-                                                    </div>
-                                                    <div class=INFO_GROUP_STYLE>
-                                                        <div class=INFO_TITLE_STYLE>"504 Status"</div>
-                                                        <div class=INFO_VALUE_STYLE>{&student.student_504.to_string()}</div>
-                                                    </div>
-                                                    <div class=INFO_GROUP_STYLE>
-                                                        <div class=INFO_TITLE_STYLE>"ELL Status"</div>
-                                                        <div class=INFO_VALUE_STYLE>{&student.ell.to_string()}</div>
-                                                    </div>
-                                                    <div class=INFO_GROUP_STYLE>
-                                                        <div class=INFO_TITLE_STYLE>"GT Status"</div>
-                                                        <div class=INFO_VALUE_STYLE>{&student.gt.to_string()}</div>
-                                                    </div>
-                                                    <div class=INFO_GROUP_STYLE>
-                                                        <div class=INFO_TITLE_STYLE>"Readplan"</div>
-                                                        <div class=INFO_VALUE_STYLE>{&student.readplan.to_string()}</div>
-                                                    </div>
-                                                    <div class=INFO_GROUP_STYLE>
-                                                        <div class=INFO_TITLE_STYLE>"Intervention"</div>
-                                                        <div class=INFO_VALUE_STYLE>{&student.intervention.to_string()}</div>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            // Additional Information Section
-                                            <div class="col-span-2">
-                                                <h3 class="text-sm font-semibold text-gray-600 mb-2">"Additional Information"</h3>
-                                                <div class="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg">
-                                                    <div class=INFO_GROUP_STYLE>
-                                                        <div class=INFO_TITLE_STYLE>"Eye Glasses"</div>
-                                                        <div class=INFO_VALUE_STYLE>{&student.eye_glasses.to_string()}</div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    // Button container at the bottom
-                                    <div class=BUTTON_CONTAINER_STYLE>
-                                        <button class="px-4 py-2 bg-[#00356b] text-white rounded-lg font-bold hover:bg-[#7F9AB5]">
-                                            "Test Results"
-                                        </button>
-                                        <button class="px-4 py-2 bg-[#FDF8D4] text-black rounded-lg border-2 border-gray-50 font-bold hover:bg-[#FCFDD4] hover:border-2 hover:border-gray-50">
-                                            "Edit Student"
-                                        </button>
-                                        <button class="px-4 py-2 bg-gray-200 border rounded-lg font-bold hover:bg-gray-100">
-                                            "Next Student"
-                                        </button>
-                                    </div>
-                                </div>
+                                <div>"An error has occurred"</div>
                             }
                         }
                     }}

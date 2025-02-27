@@ -1,13 +1,12 @@
-use crate::app::models::student::{AddStudentRequest, ELLEnum, GenderEnum, GradeEnum};
-use crate::app::models::EmployeeRole;
-use chrono::NaiveDate;
-use leptos::ev::SubmitEvent;
+use crate::app::models::student::{ELLEnum, GenderEnum, GradeEnum, Student};
+use crate::app::models::UpdateStudentRequest;
+use crate::app::server_functions::students::edit_student;
 use leptos::*;
+use std::rc::Rc;
 use std::str::FromStr;
 use strum::IntoEnumIterator;
-use validator::Validate;
 
-// Styles
+// Styles - matching add form for consistency
 const INFO_CONTAINER_STYLE: &str =
     "h-full p-6 border-t-8 border-[#00356B] shadow-lg rounded-lg flex flex-col";
 const INFO_CONTENT_STYLE: &str = "flex-grow overflow-y-auto";
@@ -17,32 +16,42 @@ const BUTTON_CONTAINER_STYLE: &str =
     "mt-4 pt-4 flex border-t gap-2 justify-end sticky bottom-0 bg-white";
 
 #[component]
-pub fn AddStudentForm(
-    #[prop(into)] set_adding_student: Callback<bool>,
-    #[prop(into)] set_refresh_trigger: WriteSignal<i32>,
+pub fn UpdateStudent(
+    #[prop()] student: Rc<Student>,
+    #[prop(optional)] on_cancel: Option<Callback<()>>,
+    #[prop(optional)] on_update_success: Option<Callback<Student>>,
 ) -> impl IntoView {
-    //Signals for error messaging
+    // Create signals for each field
+    let (firstname, set_firstname) = create_signal(student.firstname.clone());
+    let (lastname, set_lastname) = create_signal(student.lastname.clone());
+    let (gender, set_gender) = create_signal(student.gender.clone().to_string());
+    let (date_of_birth, set_date_of_birth) = create_signal(student.date_of_birth);
+    let (student_id, set_student_id) = create_signal(student.student_id.clone().to_string());
+    let (grade, set_grade) = create_signal(student.grade.clone().to_string());
+    let (teacher, set_teacher) = create_signal(student.teacher.clone());
+    let (yes_no_ell, set_yes_no_ell) = if student.ell.to_string() == "Not Applicable" {
+        create_signal(false)
+    } else {
+        create_signal(true)
+    };
+
+    let (ell, set_ell) = create_signal(student.ell.to_string());
+
+    let (iep, set_iep) = create_signal(student.iep);
+    let (student_504, set_student_504) = create_signal(student.student_504);
+    let (readplan, set_readplan) = create_signal(student.readplan);
+    let (gt, set_gt) = create_signal(student.gt);
+    let (intervention, set_intervention) = create_signal(student.intervention);
+
+    // Additional information
+    let (eye_glasses, set_eye_glasses) = create_signal(student.eye_glasses);
+
+    // For handling form submission
+    let (is_submitting, set_is_submitting) = create_signal(false);
     let (error_message, set_error_message) = create_signal(String::new());
     let (if_error, set_if_error) = create_signal(false);
 
-    //Signals for getting a new student
-    let (new_firstname, set_new_firstname) = create_signal(String::new());
-    let (new_lastname, set_new_lastname) = create_signal(String::new());
-    let (new_student_gender, set_student_gender) = create_signal(String::new());
-    let (new_student_dob, set_student_dob) = create_signal(String::new());
-    let (new_student_id, set_new_student_id) = create_signal(String::new());
-    let (new_grade, set_new_grade) = create_signal(String::new());
-    let (new_teacher, set_new_teacher) = create_signal(String::new());
-    let (new_iep, set_new_iep) = create_signal(false);
-    let (new_504, set_new_504) = create_signal(false);
-    let (yes_no_ell, set_yes_no_ell) = create_signal(false);
-    let (new_ell, set_new_ell) = create_signal(String::from("Not Applicable"));
-    let (new_gt, set_new_gt) = create_signal(false);
-    let (new_readplan, set_new_readplan) = create_signal(false);
-    let (new_intervention, set_new_intervention) = create_signal(false);
-    let (new_eye_glasses, set_new_eye_glasses) = create_signal(false);
-
-    // Create a resource to fetch teachers
+    // Create a resource to fetch teachers (similar to add form)
     let teachers = create_resource(
         || (),
         |_| async move {
@@ -58,7 +67,7 @@ pub fn AddStudentForm(
 
     // Create a derived signal for filtered teachers based on selected grade
     let filtered_teachers = create_memo(move |_| {
-        let grade_str = new_grade();
+        let grade_str = grade();
         if grade_str.is_empty() {
             return Vec::new(); // Return empty if no grade selected yet
         }
@@ -78,109 +87,106 @@ pub fn AddStudentForm(
             .filter(|teacher| {
                 // Check if teacher has EmployeeRole::Teacher{grade} matching selected_grade
                 match &teacher.role {
-                    EmployeeRole::Teacher { grade } => *grade == Some(selected_grade.clone()),
+                    crate::app::models::EmployeeRole::Teacher { grade } => {
+                        *grade == Some(selected_grade.clone())
+                    }
                     _ => false,
                 }
             })
             .collect::<Vec<_>>()
     });
 
-    let handle_submit_new_student = move |ev: SubmitEvent| {
+    // Handle form submission
+    let on_submit = move |ev: leptos::ev::SubmitEvent| {
         ev.prevent_default();
+        set_is_submitting(true);
+        set_error_message(String::new());
+        set_if_error(false);
 
-        let validated_student_id = new_student_id().parse::<i32>();
-        let validated_dob = match NaiveDate::parse_from_str(&new_student_dob(), "%Y-%m-%d") {
-            Ok(date) => date,
-            Err(e) => {
-                log::error!("Error parsing date: {}", e);
+        // Parse and validate student ID
+        let validated_student_id = match student_id().parse::<i32>() {
+            Ok(id) => id,
+            Err(_) => {
                 set_if_error(true);
-                set_error_message(String::from("Invalid date format"));
+                set_error_message(String::from("Invalid student ID"));
+                set_is_submitting(false);
                 return;
             }
         };
 
-        let convert_gender_to_enum = match GenderEnum::from_str(&new_student_gender()) {
+        // Convert gender string to enum
+        let convert_gender_to_enum = match GenderEnum::from_str(&gender()) {
             Ok(gender_enum) => gender_enum,
             Err(_) => {
-                log::error!("Invalid gender value submitted for new student");
+                log::error!("Invalid gender value submitted for update");
                 set_if_error(true);
                 set_error_message(String::from("Invalid gender selection"));
+                set_is_submitting(false);
                 return;
             }
         };
 
-        let convert_grade_to_enum = match GradeEnum::from_str(&new_grade()) {
+        // Convert grade string to enum
+        let convert_grade_to_enum = match GradeEnum::from_str(&grade()) {
             Ok(grade_enum) => grade_enum,
             Err(_) => {
-                log::error!("Invalid grade value submitted for new student");
+                log::error!("Invalid grade value submitted for update");
                 set_if_error(true);
                 set_error_message(String::from("Invalid grade selection"));
+                set_is_submitting(false);
                 return;
             }
         };
 
-        let convert_ell_to_enum = match ELLEnum::from_str(&new_ell()) {
+        // Convert ELL string to enum
+        let convert_ell_to_enum = match ELLEnum::from_str(&ell()) {
             Ok(ell_enum) => ell_enum,
             Err(_) => {
-                log::error!("Invalid ELL value submitted for new student");
+                log::error!("Invalid ELL value submitted for update");
                 set_if_error(true);
                 set_error_message(String::from("Invalid ELL selection"));
+                set_is_submitting(false);
                 return;
             }
         };
 
-        let add_student_request = AddStudentRequest {
-            firstname: new_firstname(),
-            lastname: new_lastname(),
+        let update_data = UpdateStudentRequest {
+            firstname: firstname(),
+            lastname: lastname(),
             gender: convert_gender_to_enum,
-            date_of_birth: validated_dob,
-            student_id: match validated_student_id {
-                Ok(id) => id,
-                Err(_) => {
-                    set_if_error(true);
-                    set_error_message(String::from("Invalid student ID"));
-                    return;
-                }
-            },
+            date_of_birth: date_of_birth(),
+            student_id: validated_student_id,
             ell: convert_ell_to_enum,
             grade: convert_grade_to_enum,
-            teacher: new_teacher(),
-            iep: new_iep(),
-            student_504: new_504(),
-            readplan: new_readplan(),
-            gt: new_gt(),
-            intervention: new_intervention(),
-            eye_glasses: new_eye_glasses(),
+            teacher: teacher(),
+            iep: iep(),
+            student_504: student_504(),
+            readplan: readplan(),
+            gt: gt(),
+            intervention: intervention(),
+            eye_glasses: eye_glasses(),
         };
 
-        let is_valid = add_student_request.validate();
-
-        match is_valid {
-            Ok(_) => {
-                spawn_local(async move {
-                    let add_result =
-                        crate::app::server_functions::students::add_student(add_student_request)
-                            .await;
-
-                    //we get the result back and do something with it
-                    match add_result {
-                        Ok(_added_result) => {
-                            set_adding_student(false);
-                            set_refresh_trigger.update(|count| *count += 1);
-                            log::info!("Student added successfully");
-                        }
-                        Err(e) => {
-                            log::error!("Error adding student: {:?}", e);
-                            set_if_error(true);
-                            set_error_message(format!("Error adding student: {}", e));
-                        }
-                    };
-                });
+        spawn_local(async move {
+            match edit_student(update_data).await {
+                Ok(updated_student) => {
+                    set_is_submitting(false);
+                    if let Some(callback) = on_update_success {
+                        callback.call(updated_student);
+                    }
+                }
+                Err(e) => {
+                    set_is_submitting(false);
+                    set_if_error(true);
+                    set_error_message(format!("Failed to update student: {}", e));
+                }
             }
-            Err(e) => {
-                set_if_error(true);
-                set_error_message(format!("Validation error: {:?}", e));
-            }
+        });
+    };
+
+    let handle_cancel = move |_| {
+        if let Some(callback) = on_cancel {
+            callback.call(());
         }
     };
 
@@ -190,8 +196,10 @@ pub fn AddStudentForm(
                 <p class="text-red-500 font-semibold">"There was an error with one or more of the entered fields"</p>
                 <p class="text-red-500 rounded w-full h-12 px-5 -y-3">{error_message()}</p>
             </Show>
-            <h2 class="text-xl font-bold mb-4">"Add New Student"</h2>
-            <form on:submit=handle_submit_new_student class=INFO_CONTENT_STYLE>
+            <h2 class="text-xl font-bold mb-4">
+                "Edit Student: " {move || firstname()} " " {move || lastname()}
+            </h2>
+            <form on:submit=on_submit class=INFO_CONTENT_STYLE>
                 <div class="grid grid-cols-2 gap-4">
                     // Basic Information Section
                     <div class="col-span-2">
@@ -203,7 +211,8 @@ pub fn AddStudentForm(
                                     id="firstname"
                                     type="text"
                                     class="mt-1 w-full rounded-md border p-2"
-                                    on:input=move |ev| set_new_firstname(event_target_value(&ev))
+                                    value={firstname}
+                                    on:input=move |ev| set_firstname(event_target_value(&ev))
                                     required
                                 />
                             </div>
@@ -213,7 +222,8 @@ pub fn AddStudentForm(
                                     id="lastname"
                                     type="text"
                                     class="mt-1 w-full rounded-md border p-2"
-                                    on:input=move |ev| set_new_lastname(event_target_value(&ev))
+                                    value={lastname}
+                                    on:input=move |ev| set_lastname(event_target_value(&ev))
                                     required
                                 />
                             </div>
@@ -224,7 +234,8 @@ pub fn AddStudentForm(
                                     id="student-id"
                                     type="text"
                                     class="mt-1 w-full rounded-md border p-2"
-                                    on:input=move |ev| set_new_student_id(event_target_value(&ev))
+                                    value={student_id}
+                                    on:input=move |ev| set_student_id(event_target_value(&ev))
                                 />
                             </div>
                             <div class=INFO_GROUP_STYLE>
@@ -233,12 +244,12 @@ pub fn AddStudentForm(
                                     required
                                     id="gender"
                                     class="mt-1 w-full rounded-md border p-2"
-                                    on:change=move |ev| set_student_gender(event_target_value(&ev))
+                                    on:change=move |ev| set_gender(event_target_value(&ev))
                                 >
                                     <option value="">"Please select a value"</option>
-                                    {GenderEnum::iter().map(|gender| view! {
-                                        <option value=format!("{}", gender)>
-                                            {format!("{}", gender)}
+                                    {GenderEnum::iter().map(|g| view! {
+                                        <option value=format!("{}", g) selected=g.to_string() == gender()>
+                                            {format!("{}", g)}
                                         </option>
                                     }).collect::<Vec<_>>()}
                                 </select>
@@ -250,12 +261,12 @@ pub fn AddStudentForm(
                                     required
                                     id="grade"
                                     class="mt-1 w-full rounded-md border p-2"
-                                    on:change=move |ev| set_new_grade(event_target_value(&ev))
+                                    on:change=move |ev| set_grade(event_target_value(&ev))
                                 >
                                     <option value="">"Please select a value"</option>
-                                    {GradeEnum::iter().map(|grade| view! {
-                                        <option value=format!("{}", grade)>
-                                            {format!("{}", grade)}
+                                    {GradeEnum::iter().map(|g| view! {
+                                        <option value=format!("{}", g) selected=g.to_string() == grade()>
+                                            {format!("{}", g)}
                                         </option>
                                     }).collect::<Vec<_>>()}
                                 </select>
@@ -267,7 +278,17 @@ pub fn AddStudentForm(
                                     required
                                     id="birthdate"
                                     class="mt-1 w-full rounded-md border p-2"
-                                    on:change=move |ev| set_student_dob(event_target_value(&ev))
+                                    value={move || date_of_birth().format("%Y-%m-%d").to_string()}
+                                    on:change=move |ev| {
+                                        let date_str = event_target_value(&ev);
+                                        match chrono::NaiveDate::parse_from_str(&date_str, "%Y-%m-%d") {
+                                            Ok(parsed_date) => set_date_of_birth(parsed_date),
+                                            Err(e) => {
+                                                log::error!("Error parsing date: {}", e);
+                                                // Keep the original date on error
+                                            }
+                                        }
+                                    }
                                 />
                             </div>
                             <div class=INFO_GROUP_STYLE>
@@ -276,19 +297,22 @@ pub fn AddStudentForm(
                                     required
                                     id="teacher"
                                     class="mt-1 w-full rounded-md border p-2"
-                                    on:change=move |ev| set_new_teacher(event_target_value(&ev))
+                                    on:change=move |ev| set_teacher(event_target_value(&ev))
                                 >
                                     <option value="">"Please select a value"</option>
                                     {move || {
-                                        if new_grade().is_empty() {
+                                        if grade().is_empty() {
                                             vec![view! { <option disabled>"First select a grade"</option> }].into_iter().collect_view()
                                         } else {
                                             let filtered = filtered_teachers();
                                             if filtered.is_empty() {
                                                 vec![view! { <option disabled>"No teachers available for this grade"</option> }].into_iter().collect_view()
                                             } else {
-                                                filtered.iter().map(|teacher| view! {
-                                                    <option value=teacher.lastname.clone()>{teacher.lastname.clone()}</option>
+                                                let current_teacher = teacher();
+                                                filtered.iter().map(|t| view! {
+                                                    <option value=t.lastname.clone() selected=t.lastname == current_teacher>
+                                                        {t.lastname.clone()}
+                                                    </option>
                                                 }).collect_view()
                                             }
                                         }
@@ -307,7 +331,8 @@ pub fn AddStudentForm(
                                     <input
                                         type="checkbox"
                                         class="form-checkbox h-5 w-5"
-                                        on:change=move |ev| set_new_iep(event_target_checked(&ev))
+                                        checked={move || iep()}
+                                        on:change=move |ev| set_iep(event_target_checked(&ev))
                                     />
                                     <span class=INFO_TITLE_STYLE>"IEP"</span>
                                 </label>
@@ -317,7 +342,8 @@ pub fn AddStudentForm(
                                     <input
                                         type="checkbox"
                                         class="form-checkbox h-5 w-5"
-                                        on:change=move |ev| set_new_504(event_target_checked(&ev))
+                                        checked={move || student_504()}
+                                        on:change=move |ev| set_student_504(event_target_checked(&ev))
                                     />
                                     <span class=INFO_TITLE_STYLE>"504"</span>
                                 </label>
@@ -327,6 +353,7 @@ pub fn AddStudentForm(
                                     <input
                                         type="checkbox"
                                         class="form-checkbox h-5 w-5"
+                                        checked={move || yes_no_ell()}
                                         on:change=move |ev| set_yes_no_ell(event_target_checked(&ev))
                                     />
                                     <span class=INFO_TITLE_STYLE>"ELL"</span>
@@ -334,14 +361,13 @@ pub fn AddStudentForm(
                                 <Show when=move || yes_no_ell()>
                                     <select class="p-3 rounded-lg mt-2 w-full"
                                         required
-                                        value=new_ell
                                         on:change=move |event| {
-                                            set_new_ell(event_target_value(&event))
+                                            set_ell(event_target_value(&event))
                                         }
                                     >
                                         <option value="">"Please Select"</option>
                                         {ELLEnum::iter().map(|lang| view! {
-                                            <option value=format!("{}", lang)>
+                                            <option value=format!("{}", lang) selected=lang.to_string() == ell()>
                                                 {format!("{}", lang)}
                                             </option>
                                         }).collect::<Vec<_>>()}
@@ -353,7 +379,8 @@ pub fn AddStudentForm(
                                     <input
                                         type="checkbox"
                                         class="form-checkbox h-5 w-5"
-                                        on:change=move |ev| set_new_readplan(event_target_checked(&ev))
+                                        checked={move || readplan()}
+                                        on:change=move |ev| set_readplan(event_target_checked(&ev))
                                     />
                                     <span class=INFO_TITLE_STYLE>"Read Plan"</span>
                                 </label>
@@ -363,7 +390,8 @@ pub fn AddStudentForm(
                                     <input
                                         type="checkbox"
                                         class="form-checkbox h-5 w-5"
-                                        on:change=move |ev| set_new_gt(event_target_checked(&ev))
+                                        checked={move || gt()}
+                                        on:change=move |ev| set_gt(event_target_checked(&ev))
                                     />
                                     <span class=INFO_TITLE_STYLE>"GT Status"</span>
                                 </label>
@@ -373,13 +401,15 @@ pub fn AddStudentForm(
                                     <input
                                         type="checkbox"
                                         class="form-checkbox h-5 w-5"
-                                        on:change=move |ev| set_new_intervention(event_target_checked(&ev))
+                                        checked={move || intervention()}
+                                        on:change=move |ev| set_intervention(event_target_checked(&ev))
                                     />
                                     <span class=INFO_TITLE_STYLE>"Intervention"</span>
                                 </label>
                             </div>
                         </div>
                     </div>
+
                     //Additional Services
                     <div class="col-span-2">
                         <h3 class="text-sm font-semibold text-gray-600 mb-2">"Additional Services"</h3>
@@ -389,7 +419,8 @@ pub fn AddStudentForm(
                                     <input
                                         type="checkbox"
                                         class="form-checkbox h-5 w-5"
-                                        on:change=move |ev| set_new_eye_glasses(event_target_checked(&ev))
+                                        checked={move || eye_glasses()}
+                                        on:change=move |ev| set_eye_glasses(event_target_checked(&ev))
                                     />
                                     <span class=INFO_TITLE_STYLE>"Glasses"</span>
                                 </label>
@@ -401,15 +432,17 @@ pub fn AddStudentForm(
                     <button
                         type="button"
                         class="px-4 py-2 bg-gray-200 rounded-lg font-bold hover:bg-gray-300"
-                        on:click=move |_| set_adding_student(false)
+                        on:click=handle_cancel
+                        disabled=move || is_submitting()
                     >
                         "Cancel"
                     </button>
                     <button
                         type="submit"
                         class="px-4 py-2 bg-green-500 text-white font-bold rounded-lg hover:bg-[#A8DCAB]"
+                        disabled=move || is_submitting()
                     >
-                        "Save Student"
+                        {move || if is_submitting() { "Updating..." } else { "Update Student" }}
                     </button>
                 </div>
             </form>

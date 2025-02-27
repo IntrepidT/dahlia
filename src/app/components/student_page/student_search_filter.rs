@@ -21,7 +21,7 @@ pub fn SearchFilter(
     #[prop(into)] set_teacher_filter: Callback<String>,
     #[prop(into)] set_iep_filter: Callback<bool>,
     #[prop(into)] set_ell_filter: Callback<bool>,
-    #[prop(optional)] teachers: Option<Vec<String>>,
+    #[prop(into)] teachers: Signal<Vec<String>>,
 ) -> impl IntoView {
     view! {
         <div class="bg-[#00356b] rounded-lg p-6 mb-6">
@@ -64,9 +64,12 @@ pub fn SearchFilter(
                     class="p-3 rounded-lg"
                     on:change=move |ev| set_teacher_filter(event_target_value(&ev))
                 >
-                    <option value="all">"Teacher"</option>
+                    <option value="all">"All Teachers"</option>
                     {move || {
-                        teachers.clone().unwrap_or_default().into_iter().map(|teacher| {
+                        let teacher_list = teachers.get();
+                        log::info!("Rendering teacher dropdown with {} teachers", teacher_list.len());
+                        
+                        teacher_list.into_iter().map(|teacher| {
                             view! {
                                 <option value={teacher.clone()}>{teacher}</option>
                             }
