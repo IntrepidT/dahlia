@@ -120,6 +120,7 @@ pub fn AddEmployeeForm(
                         class=FORM_SELECT_STYLE
                         on:change=move |ev| set_new_status(event_target_value(&ev))
                     >
+                        <option value="" disabled selected>"Select Employee Status"</option>
                         {StatusEnum::iter().map(|status| view! {
                             <option>{format!("{}", status)}</option>
                         }).collect::<Vec<_>>()}
@@ -150,6 +151,7 @@ pub fn AddEmployeeForm(
                             class=FORM_SELECT_STYLE
                             on:change=move |ev| set_new_grade(event_target_value(&ev))
                         >
+                            <option value="" disabled selected>"Select Grade"</option>
                             {GradeEnum::iter().map(|grade| view! {
                                 <option>{format!("{}", grade)}</option>
                             }).collect::<Vec<_>>()}

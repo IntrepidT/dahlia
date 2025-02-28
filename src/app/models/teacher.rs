@@ -37,15 +37,13 @@ impl AddNewTeacherRequest {
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct DeleteTeacherRequest {
-    pub firstname: String,
-    pub lastname: String,
+    pub id: i32,
 }
 
 impl DeleteTeacherRequest {
-    pub fn new(firstname: String, lastname: String) -> DeleteTeacherRequest {
+    pub fn new(id: i32) -> DeleteTeacherRequest {
         DeleteTeacherRequest {
-            firstname,
-            lastname,
+            id
         }
     }
 }

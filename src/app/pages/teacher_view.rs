@@ -91,11 +91,12 @@ pub fn Teachers() -> impl IntoView {
             <Show when=move || confirm_delete() && selected_employee().is_some()>
                 <DeleteConfirmation
                     selected_employee=selected_employee
-                    on_cancel=move |_| set_confirm_delete(false)
-                    on_delete=move |_| {
-                        set_confirm_delete(false);
+                    on_cancel=Callback::new(move |_| set_confirm_delete(false))
+                    on_delete=Callback::new(move |_| {
+                        set_selected_employee(None::<Rc::<Employee>>);
                         set_refresh_trigger.update(|count| *count += 1);
-                    }
+                        set_confirm_delete(false);
+                    })
                 />
             </Show>
 
@@ -160,8 +161,11 @@ pub fn Teachers() -> impl IntoView {
                     </button>
                     <button
                         class="inline-flex justify-items-end items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-500 hover:bg-red-400"
-                        on:click=move |_| set_confirm_delete(true)
-                        disabled=move || selected_employee().is_none()
+                        on:click=move |_| {
+                            if selected_employee().is_some() {
+                                set_confirm_delete(true)
+                            }
+                        }
                     >
                         "Delete"
                     </button>

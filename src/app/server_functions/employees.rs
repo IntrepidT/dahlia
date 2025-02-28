@@ -112,13 +112,7 @@ pub async fn delete_employee(
 
         log::info!("Attempting to delete teacher from the database");
 
-        match database::delete_employee(
-            delete_teacher_request.firstname,
-            delete_teacher_request.lastname,
-            &pool,
-        )
-        .await
-        {
+        match database::delete_employee(delete_teacher_request.id, &pool).await {
             Ok(deleted) => Ok(deleted),
             Err(_) => Err(ServerFnError::new(
                 "Failed to delete teacher from the database",

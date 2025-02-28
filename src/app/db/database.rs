@@ -177,25 +177,39 @@ cfg_if::cfg_if! {
            Ok(Some(updated_employee))
         }
 
-        pub async fn delete_employee(firstname: String, lastname: String, pool: &PgPool) -> Result<Employee, ServerFnError> {
+        pub async fn delete_employee(employee_id: i32, pool: &PgPool) -> Result<Employee, ServerFnError> {
             let row = sqlx::query(
                 "DELETE FROM employees
-                 WHERE firstname = $1 AND lastname = $2 
-                 RETURNING id, firstname, lastname, status, role"
+                 WHERE id = $1
+                 RETURNING id, firstname, lastname, status, role, grade"
             )
-            .bind(firstname)
-            .bind(lastname)
+            .bind(employee_id)
             .fetch_one(pool)
             .await
             .map_err(|e| ServerFnError::new(format!("Database error: {}", e)))?;
+
+            log::debug!("Deleted row: {:?}", row);
 
             let id: i32 = row.get("id");
             let firstname: String = row.get("firstname");
             let lastname: String = row.get("lastname");
             let status: StatusEnum = row.get("status");
             let role: EmployeeRole = row.get("role");
+            let grade: Option<GradeEnum> = row.get("grade");
 
-            Ok(Employee::new(id, firstname, lastname, status, role))
+            // Fix the role for Teacher to include grade
+            let role = match role {
+                EmployeeRole::Teacher { grade: _ } => EmployeeRole::Teacher { grade },
+                other => other,
+            };
+
+            Ok(Employee {
+                id,
+                firstname,
+                lastname,
+                status,
+                role,
+            })
         }
     }
 }
