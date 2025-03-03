@@ -4,6 +4,7 @@ on:
   push: 
     branches: 
       - master
+  workflow_dispatch:
 
 env: 
   SQLX_OFFLINE: true
@@ -22,6 +23,7 @@ jobs:
         with:
           profile: minimal
           toolchain: stable
+          components: rustfmt, clippy
 
       - name: Set up environment
         run: |
