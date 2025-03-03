@@ -49,6 +49,7 @@ pub fn Header() -> impl IntoView {
                         <div class="hidden space-x-[4rem] md:flex md:ml-[28rem]">
                             <A href="/" class=basic_head_style>"Home Page"</A>
                             <A href="/studentview" class=basic_head_style>"Student View"</A>
+                            <A href="/teachers" class=basic_head_style>"Teacher View"</A>
                             <button class="text-base font-medium text-black" on:click=on_click>
                                 <div>
                                     "Administer Test"
@@ -60,7 +61,6 @@ pub fn Header() -> impl IntoView {
                                     </Show>
                                 </div>
                             </button>
-                            <A href="/teachers" class=basic_head_style>"Teacher View"</A>
                         </div>
                         <div class="flex items-end md:ml-[28rem]  md:flex rounded bg-[#00356B] px-2">
                                 <A href="/myaccount" class="text-base font-semibold text-white">
