@@ -10,7 +10,7 @@ async fn main() -> std::io::Result<()> {
     use std::env;
 
     let conf = get_configuration(None).await.unwrap();
-    let addr = "0.0.0.0:3000".to_string();
+    let addr = conf.leptos_options.site_addr.clone();
 
     //Initialize the logger for reading log messages
     env::set_var("RUST_LOG", "info");
@@ -21,7 +21,7 @@ async fn main() -> std::io::Result<()> {
     let pool = web::Data::new(pool_one);
     // Generate the list of routes in your Leptos App
     let routes = generate_route_list(App);
-    //    println!("listening on http://{}", &addr);
+    println!("listening on http://{}", &addr);
 
     HttpServer::new(move || {
         let leptos_options = &conf.leptos_options;
@@ -43,7 +43,7 @@ async fn main() -> std::io::Result<()> {
 
         //.wrap(middleware::Compress::default())
     })
-    .bind("0.0.0.0:3000")?
+    .bind(&addr)?
     .run()
     .await
 }
