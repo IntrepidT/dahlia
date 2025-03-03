@@ -7,7 +7,7 @@ services:
     ports: 
       - "3000:3000"
     environment: 
-      - DATABASE_URL=postgres://postgres:${secret.POSTGRES_PASSWORD}@localhost:5432/localhost
+      - DATABASE_URL=postgres://postgres:${secret.POSTGRES_PASSWORD}@localhost:5432/dahlia
     depends_on:
       - db
     restart: unless-stopped
