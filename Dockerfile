@@ -6,8 +6,6 @@ RUN apt-get update && apt-get install -y \
     pkg-config \
     libssl-dev \
     libpq-dev \
-    nodejs \
-    npm \
     gcc \
     g++ \
     && rm -rf /var/lib/apt/lists/*
@@ -35,7 +33,6 @@ COPY --from=builder /dahlia/target/release/dahlia .
 ENV LEPTOS_OUTPUT_NAME=dahlia
 ENV LEPTOS_SITE_ROOT=/dahlia
 ENV LEPTOS_SITE_PKG_DIR=/dahlia
-ENV DATABASE_URL=postgres://postgres:${POSTGRES_PASSWORD}@db:5432/dahlia
 
 
 #copy static files needed at runtime
