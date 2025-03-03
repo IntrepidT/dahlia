@@ -10,7 +10,7 @@ async fn main() -> std::io::Result<()> {
     use std::env;
 
     let conf = get_configuration(None).await.unwrap();
-    let addr = conf.leptos_options.site_addr;
+    let addr = "0.0.0.0:3000".to_string();
 
     //Initialize the logger for reading log messages
     env::set_var("RUST_LOG", "info");
