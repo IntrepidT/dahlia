@@ -4,7 +4,7 @@ group "default" {
 
 target "dahlia" {
   context = "."
-  dockerfile = "./dahlia/Dockerfile"
+  dockerfile = "Dockerfile"
   tags = ["intrepidt/dahlia:latest"]
   output = ["type=image"]
 }
