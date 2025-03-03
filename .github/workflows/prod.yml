@@ -1,3 +1,4 @@
+//the main workflow to be used
 name: Build, Test and Deploy to Prod
 
 on: 
@@ -8,7 +9,7 @@ on:
 
 env: 
   SQLX_OFFLINE: true
-  DATABASE_URL: postgresql://postgres:${{ secrets.POSTGRES_PASSWORD }}@dahlia:5432/dahlia
+  DATABASE_URL: postgresql://postgres:${{ secrets.DATABASE_URL }}@dahlia:5432/dahlia
 
 jobs:
   build:
