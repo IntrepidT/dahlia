@@ -1,4 +1,3 @@
-//the main workflow to be used
 name: Build, Test and Deploy to Prod
 
 on: 
