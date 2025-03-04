@@ -1,11 +1,13 @@
 version: '3.8'
 services: 
-  app: 
+  leptos-app: 
     image: intrepidt/dahlia:latest
     ports: 
       - "3000:3000"
     environment: 
       - DATABASE_URL=postgres://postgres:${POSTGRES_PASSWORD}@db:5432/dahlia
+      - LEPTOS_ENV=production
+      - LEPTOS_SITE_ADDR: "0.0.0.0:3000"
     depends_on:
       - db
     restart: unless-stopped
