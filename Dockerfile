@@ -6,6 +6,8 @@ ENV SQLX_OFFLINE=true
 RUN apt-get update && apt-get install -y --no-install-recommends clang \
     pkg-config libssl-dev libpq-dev gcc g++ \
     && rm -rf /var/lib/apt/lists/* \
+    && rustup install nightly && rustup default nightly \
+    && rustup target add x86_64-unknown-linux-gnu --toolchain nightly \
     && cargo install cargo-leptos \
     && rustup target add wasm32-unknown-unknown
 
@@ -21,7 +23,7 @@ COPY . .
 RUN cargo leptos build --release && strip target/release/dahlia
 
 # Runtime stage
-FROM debian:bullseye-slim as runtime
+FROM debian:bookworm-slim as runtime
 
 # Create a non-root user to run the application
 RUN apt-get update && apt-get install -y --no-install-recommends \
