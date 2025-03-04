@@ -30,8 +30,8 @@ RUN apt-get update && apt-get install -y \
   libssl-dev \
   && rm -rf /var/lib/apt/lists/*
 
-  COPY --from=builder /dahlia/target/release/dahlia /app/dahlia
-  COPY --from=builder /dahlia/target/site /app/site
+  COPY --from=builder /app/target/release/dahlia /app/
+  COPY --from=builder /app/target/site /app/site
 
   EXPOSE 3000
 
