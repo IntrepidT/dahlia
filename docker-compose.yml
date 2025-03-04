@@ -6,7 +6,9 @@ services:
       - "3000:3000"
     environment: 
       - DATABASE_URL=postgres://postgres:${POSTGRES_PASSWORD}@db:5432/dahlia
-      - LEPTOS_SITE_ADDR: "0.0.0.0:3000"
+      - LEPTOS_SITE_ADDR=0.0.0.0:3000
+      - LEPTOS_SITE_ROOT=/app/LEPTOS_SITE_ADDR
+      - LEPTOS_SITE_PKG_DIR=/app/site/pkg
     depends_on:
       - db
     restart: unless-stopped

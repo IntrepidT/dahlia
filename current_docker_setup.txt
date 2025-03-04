@@ -1,5 +1,4 @@
-# Build stage
-FROM rustlang/rust:nightly-slim AS builder
+ROM rustlang/rust:nightly-slim AS builder
 ENV SQLX_OFFLINE=true
 
 RUN apt-get update && apt-get install -y \
@@ -14,7 +13,7 @@ RUN apt-get update && apt-get install -y \
 
 RUN rustup target add wasm32-unknown-unknown
 
-WORKDIR /app
+WORKDIR /dahlia
 
 COPY . .
 
@@ -30,14 +29,12 @@ RUN apt-get update && apt-get install -y \
   libssl-dev \
   && rm -rf /var/lib/apt/lists/*
 
-  COPY --from=builder /dahlia/target/release/dahlia /app/dahlia
-  COPY --from=builder /dahlia/target/site /app/site
+  COPY --from=builder /dahlia/target/release/dahlia /dahlia/dahlia
+  COPY --from=builder /dahlia/target/site /dahlia/site
 
   EXPOSE 3000
 
   ENV LEPTOS_OUTPUT_NAME=dahlia
   ENV RUST_LOG=info
-  ENV LEPTOS_SITE_ROOT=/app/site
-  ENV LEPTOS_SITE_PKG_DIR=/app/site/pkg
 
-  CMD ["/app/dahlia"]
+  CMD ["dahlia"]

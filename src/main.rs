@@ -12,6 +12,9 @@ async fn main() -> std::io::Result<()> {
     let conf = get_configuration(None).await.unwrap();
     let addr = conf.leptos_options.site_addr.clone();
 
+    println!("Site Root: {}", conf.leptos_options.site_root);
+    println!("Site PKG Dir: {}", conf.leptos_options.site_pkg_dir);
+
     //Initialize the logger for reading log messages
     env::set_var("RUST_LOG", "info");
     env_logger::init();
