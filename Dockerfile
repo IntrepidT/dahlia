@@ -32,7 +32,7 @@ RUN apt-get update && apt-get install -y \
 
   COPY --from=builder /app/target/release/dahlia /app/
   COPY --from=builder /app/target/site /app/site
-  COPY --from builder /app/Cargo.toml /app/
+  COPY --from=builder /app/Cargo.toml /app/
 
   WORKDIR /app
 
