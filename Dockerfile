@@ -22,7 +22,7 @@ RUN cargo install cargo-leptos
 
 RUN cargo leptos build --release
 
-FROM debian:bookworm-slim
+FROM debian:bookworm-slim as runner
 
 RUN apt-get update && apt-get install -y \
   ca-certificates \
@@ -32,7 +32,9 @@ RUN apt-get update && apt-get install -y \
 
   COPY --from=builder /app/target/release/dahlia /app/
   COPY --from=builder /app/target/site /app/site
+  COPY --from builder /app/Cargo.toml /dahlia.
 
+  WORKDIR /app
 
   ENV LEPTOS_OUTPUT_NAME=dahlia
   ENV APP_ENVIRONMENT=production
