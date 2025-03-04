@@ -14,8 +14,8 @@ RUN apt-get update && apt-get install -y \
 
 RUN rustup target add wasm32-unknown-unknown
 
+RUN mkdir -p /app
 WORKDIR /app
-
 COPY . .
 
 RUN cargo install cargo-leptos
@@ -37,7 +37,6 @@ RUN apt-get update && apt-get install -y \
 
   ENV LEPTOS_OUTPUT_NAME=dahlia
   ENV RUST_LOG=info
-  ENV LEPTOS_SITE_ROOT=/app/site
-  ENV LEPTOS_SITE_PKG_DIR=/app/site/pkg
+  ENV LEPTOS_SITE_ROOT="site"
 
   CMD ["/app/dahlia"]
