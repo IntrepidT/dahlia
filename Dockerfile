@@ -33,10 +33,13 @@ RUN apt-get update && apt-get install -y \
   COPY --from=builder /app/target/release/dahlia /app/
   COPY --from=builder /app/target/site /app/site
 
-  EXPOSE 3000
 
   ENV LEPTOS_OUTPUT_NAME=dahlia
+  ENV APP_ENVIRONMENT=production
   ENV RUST_LOG=info
-  ENV LEPTOS_SITE_ROOT="site"
+  ENV LEPTOS_SITE_ROOT=site
+  ENV LEPTOS_SITE_ADDR=0.0.0.0:300 
+
+  EXPOSE 3000
 
   CMD ["/app/dahlia"]
