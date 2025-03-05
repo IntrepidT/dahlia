@@ -1,38 +1,32 @@
-FROM rust:alpine3.20 AS builder
-WORKDIR /build
+# Get started with a build env with Rust nightly
+FROM rustlang/rust:nightly-alpine as builder
 
 RUN apk update && \
-	apk upgrade && \
-	apk add pkgconfig libressl-dev musl-dev npm --no-cache
+    apk add --no-cache bash curl npm libc-dev binaryen
 
-COPY rust-toolchain.toml .
+RUN npm install -g sass
 
-RUN rustup update && \
-    rustup target add wasm32-unknown-unknown && \
-    cargo install --locked --version=0.2.20 cargo-leptos && \
-    npm install tailwindcss -g
+RUN curl --proto '=https' --tlsv1.2 -LsSf https://github.com/leptos-rs/cargo-leptos/releases/latest/download/cargo-leptos-installer.sh | sh
 
+# Add the WASM target
+RUN rustup target add wasm32-unknown-unknown
+
+WORKDIR /work
 COPY . .
 
 RUN cargo leptos build --release -vv
 
+FROM rustlang/rust:nightly-alpine as runner
 
-FROM alpine:3.20 AS runner
-WORKDIR /var/www/app
+WORKDIR /app
 
-RUN addgroup -S server && \
-	adduser -S www-data -G server && \
-	chown -R www-data:server /var/www/app
-
-COPY --chown=www-data:server --from=builder /build/target/release/dahlia ./dahlia
-COPY --chown=www-data:server --from=builder /build/target/site ./site
-
-USER www-data
+COPY --from=builder /work/target/release/dahlia /app/
+COPY --from=builder /work/target/site /app/site
+COPY --from=builder /work/Cargo.toml /app/
 
 ENV RUST_LOG="info"
 ENV LEPTOS_SITE_ADDR="0.0.0.0:3000"
-ENV LEPTOS_SITE_ROOT="/var/www/app/site"
-
+ENV LEPTOS_SITE_ROOT=./site
 EXPOSE 3000
 
-CMD ["./dahlia"]
+CMD ["/app/dahlia"]
