@@ -12,7 +12,7 @@ ARG APP_NAME=dahlia
 ################################################################################
 # Create a stage for building the application.
 
-FROM rust:${RUST_VERSION}-alpine AS build
+FROM rust:${RUST_VERSION}-slim AS build
 ARG APP_NAME
 WORKDIR /app
 
