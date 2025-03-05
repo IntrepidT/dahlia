@@ -38,7 +38,7 @@ COPY --from=builder /app/target/release/dahlia ./dahlia
 RUN mkdir -p /app/pkg /app/site /app/static /app/assets /app/style
 
 COPY --from=builder /app/target/site /app/site
-COPY --from=builder /app/target/pkg /app/site/pkg
+COPY --from=builder /app/target/site/pkg /app/site/pkg
 COPY --from=builder /app/static /app/static
 COPY --from=builder /app/assets /app/assets
 
