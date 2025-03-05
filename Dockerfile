@@ -14,8 +14,7 @@ RUN rustup update && \
 
 COPY . .
 
-RUN npx tailwindcss -i style/input.css -o style/output/output.css --minify && \
-    cargo leptos build --release -vv
+RUN cargo leptos build --release -vv
 
 
 FROM alpine:3.20 AS runner
