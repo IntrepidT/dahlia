@@ -12,13 +12,14 @@ RUN apt-get update && apt-get install -y \
   pkg-config \
   sass
 
+
+RUN cargo install cargo-leptos
 RUN rustup target add wasm32-unknown-unknown
 
 WORKDIR /app
 
 COPY . .
 
-RUN cargo install cargo-leptos
 
 RUN cargo leptos build --release
 
@@ -32,18 +33,21 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-COPY --from=builder /app/target/release/dahlia /app/
+COPY --from=builder /app/target/release/dahlia ./dahlia
+
+RUN mkdir -p /app/pkg /app/site /app/static /app/assets /app/style
+
 COPY --from=builder /app/target/site /app/site
-COPY --from=builder /app/assets ./assets/
-COPY --from=builder /app/style/ ./style/
+COPY --from=builder /app/target/pkg /app/site/pkg
+COPY --from=builder /app/static /app/static
+COPY --from=builder /app/assets /app/assets
+COPY --from=builder /app/favicon.ico /app/site/favicon.ico
 
 
-ENV LEPTOS_OUTPUT_NAME="dahlia"
-ENV APP_ENVIRONMENT="production"
-ENV RUST_LOG="info"
-ENV LEPTOS_SITE_ROOT="site"
+ENV RUST_LOG=debug
 ENV LEPTOS_SITE_ADDR="0.0.0.0:3000" 
+ENV LEPTOS_SITE_ROOT=/app/site
 
 EXPOSE 3000
 
-CMD ["/app/dahlia"]
+CMD ["./dahlia"]
