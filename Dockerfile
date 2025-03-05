@@ -3,7 +3,7 @@ WORKDIR /build
 
 RUN apk update && \
 	apk upgrade && \
-	apk add pkgconfig libressl-dev musl-dev npm --no-cache 
+	apk add pkgconfig libressl-dev musl-dev npm --no-cache
 
 COPY rust-toolchain.toml .
 
