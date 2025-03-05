@@ -1,47 +1,39 @@
-# Get started with a build env with Rust nightly
-FROM rust:1.79.0-alpine3.20 as builder
+FROM rust:alpine3.20 AS builder
+WORKDIR /build
 
-# If you’re using stable, use this instead
-# FROM rust:1.74-bullseye as builder
-
-# Install cargo-binstall, which makes it easier to install other
-# cargo extensions like cargo-leptos
 RUN apk update && \
-    apk add --no-cache bash curl npm libc-dev binaryen && \
-    npm install -g sass
+	apk upgrade && \
+	apk add pkgconfig libressl-dev musl-dev npm --no-cache
 
-# Install required tools
-RUN curl --proto '=https' --tlsv1.2 -LsSf https://github.com/leptos-rs/cargo-leptos/releases/download/v0.2.20/cargo-leptos-installer.sh | sh
+COPY rust-toolchain.toml .
 
-RUN rustup target add wasm32-unknown-unknown
+RUN rustup update && \
+    rustup target add wasm32-unknown-unknown && \
+    cargo install --locked --version=0.2.20 cargo-leptos && \
+    npm install tailwindcss -g
 
-WORKDIR /app
+COPY . .
 
-# Build the app
-RUN cargo leptos build --release -vv
+RUN npx tailwindcss -i style/tailwind.css -o style/generated.css --minify && \
+    cargo leptos build --release -vv
 
-FROM alpine:3.20.2 as runtime
-WORKDIR /usr/bin
-RUN apk add --no-cache ca-certificates tini wget
 
-WORKDIR /app
+FROM alpine:3.20 AS runner
+WORKDIR /var/www/app
 
-# -- NB: update binary name from "leptos_start" to match your app name in Cargo.toml --
-# Copy the server binary to the /app directory
-COPY --from=builder /app/target/release/dahlia ./
+RUN addgroup -S server && \
+	adduser -S www-data -G server && \
+	chown -R www-data:server /var/www/app
 
-# /target/site contains our JS/WASM/CSS, etc.
-COPY --from=builder /app/target/site ./site
+COPY --chown=www-data:server --from=builder /build/target/release/dahlia ./dahlia
+COPY --chown=www-data:server --from=builder /build/target/site ./site
 
-# Copy Cargo.toml if it’s needed at runtime
-COPY --from=builder /app/Cargo.toml .
+USER www-data
 
-# Set any required env variables and
 ENV RUST_LOG="info"
-ENV LEPTOS_SITE_ADDR="0.0.0.0:8080"
-ENV LEPTOS_SITE_ROOT="site"
+ENV LEPTOS_SITE_ADDR="0.0.0.0:3000"
+ENV LEPTOS_SITE_ROOT="/var/www/app/site"
 
+EXPOSE 3000
 
-# -- NB: update binary name from "leptos_start" to match your app name in Cargo.toml --
-# Run the server
-CMD ["tini", "/app/dahlia"]
+CMD ["./dahlia"]
