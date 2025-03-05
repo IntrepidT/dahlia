@@ -3,8 +3,7 @@ WORKDIR /build
 
 RUN apk update && \
 	apk upgrade && \
-	apk add pkgconfig libressl-dev musl-dev npm --no-cache && \
-    npm install -g npm@latest
+	apk add pkgconfig libressl-dev musl-dev npm --no-cache 
 
 COPY rust-toolchain.toml .
 
@@ -15,7 +14,7 @@ RUN rustup update && \
 
 COPY . .
 
-RUN npx tailwindcss -i style/tailwind.css -o style/generated.css --minify && \
+RUN npx tailwindcss -i style/input.css -o style/output/output.css --minify && \
     cargo leptos build --release -vv
 
 
