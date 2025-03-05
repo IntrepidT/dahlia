@@ -13,7 +13,6 @@ RUN apt-get update && apt-get install -y \
   sass
 
 
-RUN npm install
 RUN cargo install cargo-leptos
 RUN rustup target add wasm32-unknown-unknown
 
