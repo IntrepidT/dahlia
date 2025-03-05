@@ -31,9 +31,9 @@ RUN apt-get update && apt-get install -y \
   && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /app/target/release/dahlia /app/
-COPY --from=builder /app/target/site /app/site/
+COPY --from=builder /app/target/site /app/site
 COPY --from=builder /app/assets ./assets/
-COPY --from=builder /app/style/ ./style.
+COPY --from=builder /app/style/ ./style/
 
 WORKDIR /app
 
