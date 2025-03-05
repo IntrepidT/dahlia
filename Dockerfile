@@ -6,13 +6,13 @@
 
 # Want to help us make this template better? Share your feedback here: https://forms.gle/ybq9Krt8jtBL3iCk7
 
-ARG RUST_VERSION=1.85.0
+ARG RUST_VERSION=1.85.0-slim-bullseye
 ARG APP_NAME=dahlia
 
 ################################################################################
 # Create a stage for building the application.
 
-FROM rust:${RUST_VERSION}-slim AS build
+FROM rust:${RUST_VERSION}-alpine AS build
 ARG APP_NAME
 WORKDIR /app
 
