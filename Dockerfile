@@ -37,6 +37,7 @@ FROM alpine:3.20.6
 # Install runtime dependencies
 RUN apk add --no-cache \
     bzip2-dev \
+    curl \
     libgcc \
     libstdc++ \
     openssl \
