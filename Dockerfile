@@ -48,7 +48,7 @@ USER appuser
 WORKDIR /app
 
 # Copy the built application from the build stage
-COPY --from=build /app/target/release/${APP_NAME} /app/server
+COPY --from=build /app/target/release/dahlia /app/server
 
 # Expose the application port
 EXPOSE 3000
