@@ -23,7 +23,7 @@ RUN apk add --no-cache \
 WORKDIR /app
 
 # Install trunk for building Leptos frontend
-RUN cargo install trunk wasm-bindgen-cli
+RUN cargo install wasm-bindgen-cli npm
 
 # Copy project files
 COPY . .
