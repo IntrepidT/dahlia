@@ -14,8 +14,8 @@ RUN apt-get update && apt-get install -y \
 
 RUN rustup target add wasm32-unknown-unknown
 
-RUN mkdir -p /app
 WORKDIR /app
+
 COPY . .
 
 RUN cargo install cargo-leptos
@@ -30,20 +30,19 @@ RUN apt-get update && apt-get install -y \
   libssl-dev \
   && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /app/target/release/dahlia ./app
-COPY --from=builder /app/target/site ./site
-COPY ./site ./site
-COPY ./assets ./assets
-COPY ./pkg ./pkg
+COPY --from=builder /app/target/release/dahlia /app/
+COPY --from=builder /app/target/site /app/site/
+COPY --from=builder /app/assets ./assets/
+COPY --from=builder /app/style/ ./style.
 
 WORKDIR /app
 
-ENV LEPTOS_OUTPUT_NAME=dahlia
-ENV APP_ENVIRONMENT=production
-ENV RUST_LOG=info
-ENV LEPTOS_SITE_ROOT=site
-ENV LEPTOS_SITE_ADDR=0.0.0.0:300 
+ENV LEPTOS_OUTPUT_NAME="dahlia"
+ENV APP_ENVIRONMENT="production"
+ENV RUST_LOG="info"
+ENV LEPTOS_SITE_ROOT="site"
+ENV LEPTOS_SITE_ADDR="0.0.0.0:3000" 
 
 EXPOSE 3000
 
-CMD ["/app"]
+CMD ["/app/dahlia"]
