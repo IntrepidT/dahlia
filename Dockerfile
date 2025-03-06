@@ -22,6 +22,8 @@ WORKDIR /app
 
 COPY --from=builder /work/target/release/dahlia /app/
 COPY --from=builder /work/target/site /app/site
+COPY --from=builder /work/assets /app/assets
+COPY --from=builder /work/style/output /app/style/output
 COPY --from=builder /work/Cargo.toml /app/
 
 ENV RUST_LOG="info"
