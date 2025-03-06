@@ -10,6 +10,7 @@
 version: '3.8'
 services:
   app:
+    build: .
     image: intrepidt/dahlia:latest
     ports:
       - "3000:3000"
@@ -35,6 +36,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+volumes:
+  postgres-data:
 # The commented out section below is an example of how to define a PostgreSQL
 # database that your application can use. `depends_on` tells Docker Compose to
 # start the database before your application. The `db-data` volume persists the
