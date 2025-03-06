@@ -10,7 +10,7 @@
 version: '3.8'
 services:
   app:
-  image: intrepidt/dahlia:latest
+    image: intrepidt/dahlia:latest
     ports:
       - "3000:3000"
     environment:
