@@ -37,7 +37,7 @@ const BUTTON_CONTAINER_STYLE: &str =
 pub fn Teachers() -> impl IntoView {
     // Create resource for refreshing data
     let (refresh_trigger, set_refresh_trigger) = create_signal(0);
-
+    //
     // Create resources for employees and teachers
     let employees = create_resource(
         move || refresh_trigger(),
