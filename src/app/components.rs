@@ -42,7 +42,11 @@ pub use teacher_page::*;
 pub mod student_page;
 pub use student_page::*;
 
-/* to wire up the student table when i eventually break student_view into components
- pub mod student_table;
-pub use student_table::StudentTable;
-*/
+pub mod body;
+pub use body::*;
+
+pub mod nav;
+pub use nav::NavBar;
+
+pub mod auth;
+pub use auth::*;

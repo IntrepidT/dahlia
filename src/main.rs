@@ -3,7 +3,9 @@
 async fn main() -> std::io::Result<()> {
     use actix_files::Files;
     use actix_web::{web, App, HttpServer};
+    use argon2::password_hash;
     use dahlia::app::db::database;
+    use dahlia::app::middleware::authentication::Authentication;
     use dahlia::app::*;
     use leptos::*;
     use leptos_actix::{generate_route_list, LeptosRoutes};
@@ -18,21 +20,37 @@ async fn main() -> std::io::Result<()> {
     //Initialize the logger for reading log messages
     env::set_var("RUST_LOG", "info");
     env_logger::init();
+
     //Create and make a database connection pool setup
     let pool_one = database::create_pool().await;
     println!("Database connection pool created successfully");
-    let pool = web::Data::new(pool_one);
+    let pool = web::Data::new(pool_one.clone());
+
     // Generate the list of routes in your Leptos App
     let routes = generate_route_list(App);
+    println!("Generated routes: {:?}", routes);
     println!("listening on http://{}", &addr);
+
+    // Create a secret key for cookie encryption
+    let secret_key = env::var("SECRET_KEY").unwrap_or_else(|_| {
+        println!("WARNING: Using default secret key. Set the SECRET_KEY environment variable in production.");
+        "this_is_a_default_key_and_should_be_changed_in_production".to_string()
+    });
 
     HttpServer::new(move || {
         let leptos_options = &conf.leptos_options;
         let site_root = &leptos_options.site_root;
-        //wire up the database pool
+
+        // We make the pool available to Leptos server functions
+        let pool_clone = pool_one.clone();
+        let leptos_options_clone = leptos_options.clone();
+
         App::new()
-            //I am putting these first to see if they have any effect on the order
+            // Make DB pool available to the app
             .app_data(pool.clone())
+            // Authentication middleware
+            .wrap(Authentication::new(secret_key.clone()))
+            // Provide db pool to leptos via context
             // serve JS/WASM/CSS from `pkg`
             .service(Files::new("/pkg", format!("{site_root}/pkg")))
             // serve other assets from the `assets` directory
@@ -40,11 +58,8 @@ async fn main() -> std::io::Result<()> {
             // serve the favicon from /favicon.ico
             .service(favicon)
             .service(Files::new("/static", "/app/static").show_files_listing())
-            //.app_data(web::Data::new(pool.clone()))
-            //.leptos_routes(leptos_options.to_owned(), routes.to_owned(), App)
-            .leptos_routes(leptos_options.to_owned(), routes.to_owned(), App)
-
-        //.wrap(middleware::Compress::default())
+            // Leptos routes (this must be last)
+            .leptos_routes(leptos_options_clone.to_owned(), routes.to_owned(), App)
     })
     .bind(&addr)?
     .run()

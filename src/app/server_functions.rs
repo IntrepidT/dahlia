@@ -15,3 +15,5 @@ pub use teachers::get_teachers;
 
 pub mod employees;
 pub use employees::get_employees;
+
+pub mod auth;

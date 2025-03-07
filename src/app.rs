@@ -11,6 +11,8 @@ use pages::{
     StudentView, Teachers, TestBuilder,
 };
 pub mod components;
+use components::auth::*;
+pub mod middleware;
 
 #[component]
 pub fn App() -> impl IntoView {
@@ -25,65 +27,84 @@ pub fn App() -> impl IntoView {
         // sets the document title
         <Title text="Dahlia"/>
 
-        // content for this welcome page
-        <Router>
-            <main>
-                <Body />
-                <Routes>
-                    <Route path="/" view=move || {
-                        view! {
-                            <HomePage />
-                        }
-                    }/>
-                    <Route path="/studentview" view=move || {
-                        view!{
-                            <StudentView />
-                        }
-                    }/>
-                    <Route path="/admintest" view=move || {
-                        view!{
-                            <AdministerTest />
-                        }
-                    }/>
-                    <Route path="/teachers" view=move || {
-                        view! {
-                            <Teachers />
-                        }
-                    }/>
-                    <Route path="/myaccount" view=|| {
-                        view!{
-                            <MyAccount />
-                        }
-                    }/>
-                    <Route path="/login" view=|| {
-                        view!{
-                            <LoginPage />
-                        }
-                    }/>
-                    <Route path="/mathtesting" view=|| {
-                        view!{
-                            <MathTesting />
-                        }
-                    }/>
-                    <Route path="/readingtesting" view=|| {
-                        view!{
-                            <ReadingTesting />
-                        }
-                    }/>
-                    <Route path="/testbuilder/:test_id" view=|| {
-                        view!{
-                            <TestBuilder />
-                        }
-                    }/>
-                    <Route path="/assessment/:test_id" view=|| {
-                        view!{
-                            <Assessment />
-                        }
-                    }/>
-                    <Route path="/*any" view=NotFound/>
-                </Routes>
-            </main>
-        </Router>
+        // Wrap everything in the AuthProvider
+        <AuthProvider>
+            // content for this welcome page
+            <Router>
+                <main>
+                    <Body />
+                    <Routes>
+                        <Route path="/" view=move || {
+                            view! {
+                                <HomePage />
+                            }
+                        }/>
+                        <Route path="/studentview" view=move || {
+                            view!{
+                                <RequireRole role="admin".to_string()>
+                                    <StudentView />
+                                </RequireRole>
+                            }
+                        }/>
+                        <Route path="/admintest" view=move || {
+                            view!{
+                                <RequireRole role="teacher".to_string()>
+                                    <AdministerTest />
+                                </RequireRole>
+                            }
+                        }/>
+                        <Route path="/teachers" view=move || {
+                            view! {
+                                <RequireRole role="admin".to_string()>
+                                    <Teachers />
+                                </RequireRole>
+                            }
+                        }/>
+                        <Route path="/myaccount" view=|| {
+                            view!{
+                                <RequireAuth>
+                                    <MyAccount />
+                                </RequireAuth>
+                            }
+                        }/>
+                        <Route path="/login" view=|| {
+                            view!{
+                                <LoginPage />
+                            }
+                        }/>
+                        <Route path="/mathtesting" view=|| {
+                            view!{
+                                <RequireAuth>
+                                    <MathTesting />
+                                </RequireAuth>
+                            }
+                        }/>
+                        <Route path="/readingtesting" view=|| {
+                            view!{
+                                <RequireAuth>
+                                    <ReadingTesting />
+                                </RequireAuth>
+                            }
+                        }/>
+                        <Route path="/testbuilder/:test_id" view=|| {
+                            view!{
+                                <RequireRole role="teacher".to_string()>
+                                    <TestBuilder />
+                                </RequireRole>
+                            }
+                        }/>
+                        <Route path="/assessment/:test_id" view=|| {
+                            view!{
+                                <RequireAuth>
+                                    <Assessment />
+                                </RequireAuth>
+                            }
+                        }/>
+                        <Route path="/*any" view=NotFound/>
+                    </Routes>
+                </main>
+            </Router>
+        </AuthProvider>
     }
 }
 

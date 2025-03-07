@@ -31,3 +31,6 @@ pub mod employee;
 pub use employee::Employee;
 pub use employee::EmployeeRole;
 pub use employee::StatusEnum;
+
+pub mod user;
+pub use user::User;
