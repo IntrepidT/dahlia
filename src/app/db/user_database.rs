@@ -121,7 +121,7 @@ cfg_if::cfg_if! {
             // Insert the session into the database
             sqlx::query("INSERT INTO sessions (user_id, token, expires_at) VALUES ($1, $2, NOW() + INTERVAL '7 days')")
                 .bind(user_id)
-                .bind(session_token)
+                .bind(&session_token)
                 .execute(pool)
                 .await
                 .map_err(|e| ServerFnError::new(format!("Error Inserting into sessions: {}", e)))?;
