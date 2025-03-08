@@ -2,7 +2,7 @@
 FROM rustlang/rust:nightly-alpine as builder
 
 RUN apk update && \
-    apk add --no-cache build-base bash curl nodejs pkgconfig openssl-dev musl-dev build-base npm clang libc-dev binaryen
+    apk add --no-cache bash curl nodejs pkgconfig openssl-dev musl-dev build-base npm clang libc-dev binaryen
 
 RUN npm install -g sass
 
@@ -16,10 +16,6 @@ RUN rustup target add wasm32-unknown-unknown
 
 WORKDIR /work
 COPY . .
-
-RUN cargo update
-
-RUN cargo sqlx migrate run
 
 RUN cargo leptos build --release -vv
 
