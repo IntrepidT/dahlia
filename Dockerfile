@@ -28,6 +28,8 @@ COPY --from=builder /work/target/site /app/site
 COPY --from=builder /work/assets /app/assets
 COPY --from=builder /work/style/output /app/style/output
 COPY --from=builder /work/Cargo.toml /app/
+COPY --from=builder /usr/local/cargo/bin/sqlx /usr/local/bin/
+COPY --from=builder /work/migrations /app/migrations
 
 ENV RUST_LOG="info"
 ENV LEPTOS_SITE_ADDR="0.0.0.0:3000"
