@@ -119,17 +119,12 @@ cfg_if::cfg_if! {
             let session_token = uuid::Uuid::new_v4().to_string();
 
             // Insert the session into the database
-            sqlx::query!(
-                r#"
-                INSERT INTO sessions (user_id, token, expires_at)
-                VALUES ($1, $2, NOW() + INTERVAL '7 days')
-                "#,
-                user_id,
-                session_token
-            )
-            .execute(pool)
-            .await
-            .map_err(|e| ServerFnError::new(format!("Error Inserting into sessions: {}", e)))?;
+            sqlx::query("INSERT INTO sessions (user_id, token, expires_at) VALUES ($1, $2, NOW() + INTERVAL '7 days')")
+                .bind(user_id),
+                .bind(session_token)
+                .execute(pool)
+                .await
+                .map_err(|e| ServerFnError::new(format!("Error Inserting into sessions: {}", e)))?;
 
             Ok(session_token)
         }
