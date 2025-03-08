@@ -6,6 +6,8 @@ RUN apk update && \
 
 RUN npm install -g sass
 
+RUN cargo sqlx prepare
+
 RUN curl --proto '=https' --tlsv1.2 -LsSf https://github.com/leptos-rs/cargo-leptos/releases/latest/download/cargo-leptos-installer.sh | sh
 
 # Add the WASM target
