@@ -17,7 +17,7 @@ RUN rustup target add wasm32-unknown-unknown
 WORKDIR /work
 COPY . .
 
-RUN cargo install sqlx-cli
+RUN cargo update
 
 RUN cargo sqlx migrate run
 
