@@ -17,6 +17,10 @@ RUN rustup target add wasm32-unknown-unknown
 WORKDIR /work
 COPY . .
 
+RUN cargo install sqlx-cli
+
+RUN cargo sqlx migrate run
+
 RUN cargo leptos build --release -vv
 
 FROM rustlang/rust:nightly-alpine as runner
