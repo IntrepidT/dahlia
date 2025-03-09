@@ -8,7 +8,6 @@ RUN npm install -g sass
 
 RUN cargo install sqlx-cli --no-default-features --features postgres
 
-
 RUN curl --proto '=https' --tlsv1.2 -LsSf https://github.com/leptos-rs/cargo-leptos/releases/latest/download/cargo-leptos-installer.sh | sh
 
 # Add the WASM target
@@ -20,6 +19,10 @@ COPY . .
 RUN cargo leptos build --release -vv
 
 FROM rustlang/rust:nightly-alpine as runner
+
+# Add dependencies for Google Cloud SQL connectivity
+RUN apk update && \
+    apk add --no-cache ca-certificates libpq-dev curl
 
 WORKDIR /app
 

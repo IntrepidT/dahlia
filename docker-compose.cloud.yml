@@ -1,0 +1,26 @@
+version: '3.8'
+services:
+  app:
+    build: .
+    image: intrepidt/dahlia:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgres://postgres:${POSTGRES_PASSWORD}@cloudsql-proxy:5432/dahlia
+      - LEPTOS_SITE_ADDR=0.0.0.0:3000
+      - LEPTOS_SITE_ROOT=./site
+      - RUST_LOG=info
+    depends_on:
+      - cloudsql-proxy
+    restart: unless-stopped
+    command: sh -c "sqlx migrate run && /app/dahlia"
+
+  cloudsql-proxy:
+    image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.6.1
+    command:
+      - "--port=5432"
+      - "--credentials-file=/secrets/service-account.json"
+      - "${CLOUD_SQL_CONNECTION_NAME}"
+    volumes:
+      - ./service-account.json:/secrets/service-account.json
+    restart: always

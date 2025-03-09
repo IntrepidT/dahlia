@@ -1,0 +1,115 @@
+name: Build, Test and Deploy to Gcloud
+
+on: 
+  push: 
+    branches: 
+      - main
+  workflow_dispatch:
+
+env: 
+  SQLX_OFFLINE: true
+  # Updated to use Cloud SQL Proxy during build/test
+  DATABASE_URL: postgresql://postgres:${{ secrets.POSTGRES_PASSWORD }}@localhost:5432/dahlia
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    services:
+      # Local PostgreSQL for build/test
+      postgres:
+        image: postgres:latest
+        env:
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_USER: postgres
+          POSTGRES_DB: dahlia
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          components: rustfmt, clippy
+
+      - name: Set up POSTGRES environment
+        run: |
+          echo "POSTGRES_PASSWORD=${{secrets.POSTGRES_PASSWORD }}" >> $GITHUB_ENV
+
+      - name: Build and Test code
+        run: |
+          cargo build
+          cargo test
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with: 
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and Push Docker Images
+        uses: docker/bake-action@v6
+        with: 
+          push: true
+          files: docker-bake.hcl
+
+  deploy: 
+    needs: build
+    runs-on: ubuntu-latest
+    env:
+      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+      CLOUD_SQL_CONNECTION_NAME: ${{ secrets.CLOUD_SQL_CONNECTION_NAME }}
+
+    steps: 
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with: 
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Install sshpass
+        run: sudo apt-get install sshpass
+
+      - name: Set up GCP Authentication
+        uses: google-github-actions/auth@v1
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Setup GCloud CLI
+        uses: google-github-actions/setup-gcloud@v1
+
+      - name: Copy deployment files to droplet
+        run: |
+          sshpass -v -p ${{ secrets.DROPLET_PASSWORD }} scp -o StrictHostKeyChecking=no docker-compose.cloud.yml root@${{ vars.DROPLET_IP }}:~/docker-compose.yml
+          echo '${{ secrets.GCP_SA_KEY }}' > service-account.json
+          sshpass -v -p ${{ secrets.DROPLET_PASSWORD }} scp -o StrictHostKeyChecking=no service-account.json root@${{ vars.DROPLET_IP }}:~/service-account.json
+
+      - name: Deploy
+        uses: appleboy/ssh-action@master
+        with: 
+          host: ${{ vars.DROPLET_IP }}
+          username: root
+          password: ${{ secrets.DROPLET_PASSWORD }}
+          script: |
+            cd ~
+            export POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+            export CLOUD_SQL_CONNECTION_NAME=${{ secrets.CLOUD_SQL_CONNECTION_NAME }}
+            docker compose down
+            docker compose pull
+            docker compose up -d
