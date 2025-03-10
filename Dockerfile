@@ -8,6 +8,8 @@ RUN npm install -g sass
 
 RUN cargo install sqlx-cli --no-default-features --features postgres
 
+RUN cargo install cargo-leptos
+
 RUN curl --proto '=https' --tlsv1.2 -LsSf https://github.com/leptos-rs/cargo-leptos/releases/latest/download/cargo-leptos-installer.sh | sh
 
 # Add the WASM target
