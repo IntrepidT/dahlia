@@ -1,4 +1,4 @@
-# Get started with a build env with Rust nightly
+ Get started with a build env with Rust nightly
 FROM rustlang/rust:nightly-alpine as builder
 
 RUN apk update && \

@@ -1,4 +1,4 @@
-name: Build and Deploy to Google Cloud
+ame: Build and Deploy to Google Cloud
 
 on:
   push:
@@ -14,7 +14,7 @@ env:
   SERVICE: dahlia
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     services:
@@ -37,19 +37,24 @@ jobs:
         uses: actions/checkout@v3
       
       - name: Install Rust
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@stable
         with:
-          profile: minimal
-          toolchain: stable
           components: rustfmt, clippy
+          targets: wasm32-unknown-unknown
 
-      - name: Build and Test code
-        run: |
-          cargo build
-          cargo test
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+      - name: Run tests
+        run: cargo test
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v1
@@ -59,13 +64,12 @@ jobs:
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v1
         with: 
-          service_account_key: ${{ secrets.GCP_SA_KEY}}
           project_id: e-analogy-453217-e1
           export_default_credentials: true
 
-      - name: Build and Push Docker image
+      - name: Build and Push Docker image with Cloud Build
         run: |
-          gcloud builds submit --tag gcr.io/$PROJECT_ID/$SERVICE
+          gcloud builds submit --tag gcr.io/$PROJECT_ID/$SERVICE --timeout=30m
 
       - name: Deploy to Cloud Run
         run: |
