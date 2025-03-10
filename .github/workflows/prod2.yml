@@ -9,7 +9,7 @@ on:
 env:
   SQLX_OFFLINE: true
   DATABASE_URL: postgresql://postgres:${{ secrets.POSTGRES_PASSWORD }}@localhost:5432/dahlia
-  PROJECT_ID: your-gcp-project-id
+  PROJECT_ID: e-analogy-453217-e1
   REGION: us-central1
   SERVICE: dahlia
 
@@ -58,6 +58,10 @@ jobs:
 
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v1
+        with: 
+          service_account_key: ${{ secrets.GCP_SA_KEY}}
+          project_id: e-analogy-453217-e1
+          export_default_credentials: true
 
       - name: Build and Push Docker image
         run: |
