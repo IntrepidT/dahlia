@@ -1,0 +1,13 @@
+version: '3.8'
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgres://postgres:${POSTGRES_PASSWORD}@127.0.0.1:5432/dahlia
+      - LEPTOS_SITE_ADDR=0.0.0.0:3000
+      - LEPTOS_SITE_ROOT=./site
+      - RUST_LOG=info
+    restart: unless-stopped
+    command: sh -c "sqlx migrate run && /app/dahlia"

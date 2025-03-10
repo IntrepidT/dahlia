@@ -1,22 +1,23 @@
-name: Build, Test and Deploy to Gcloud
+name: Build and Deploy to Google Cloud
 
-on: 
-  push: 
-    branches: 
+on:
+  push:
+    branches:
       - main
   workflow_dispatch:
 
-env: 
+env:
   SQLX_OFFLINE: true
-  # Updated to use Cloud SQL Proxy during build/test
   DATABASE_URL: postgresql://postgres:${{ secrets.POSTGRES_PASSWORD }}@localhost:5432/dahlia
+  PROJECT_ID: your-gcp-project-id
+  REGION: us-central1
+  SERVICE: dahlia
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     services:
-      # Local PostgreSQL for build/test
       postgres:
         image: postgres:latest
         env:
@@ -42,10 +43,6 @@ jobs:
           toolchain: stable
           components: rustfmt, clippy
 
-      - name: Set up POSTGRES environment
-        run: |
-          echo "POSTGRES_PASSWORD=${{secrets.POSTGRES_PASSWORD }}" >> $GITHUB_ENV
-
       - name: Build and Test code
         run: |
           cargo build
@@ -54,62 +51,24 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v2
-        with: 
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-
-      - name: Build and Push Docker Images
-        uses: docker/bake-action@v6
-        with: 
-          push: true
-          files: docker-bake.hcl
-
-  deploy: 
-    needs: build
-    runs-on: ubuntu-latest
-    env:
-      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-      CLOUD_SQL_CONNECTION_NAME: ${{ secrets.CLOUD_SQL_CONNECTION_NAME }}
-
-    steps: 
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v2
-        with: 
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-
-      - name: Install sshpass
-        run: sudo apt-get install sshpass
-
-      - name: Set up GCP Authentication
+      - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v1
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
-      - name: Setup GCloud CLI
+      - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v1
 
-      - name: Copy deployment files to droplet
+      - name: Build and Push Docker image
         run: |
-          sshpass -v -p ${{ secrets.DROPLET_PASSWORD }} scp -o StrictHostKeyChecking=no docker-compose.cloud.yml root@${{ vars.DROPLET_IP }}:~/docker-compose.yml
-          echo '${{ secrets.GCP_SA_KEY }}' > service-account.json
-          sshpass -v -p ${{ secrets.DROPLET_PASSWORD }} scp -o StrictHostKeyChecking=no service-account.json root@${{ vars.DROPLET_IP }}:~/service-account.json
+          gcloud builds submit --tag gcr.io/$PROJECT_ID/$SERVICE
 
-      - name: Deploy
-        uses: appleboy/ssh-action@master
-        with: 
-          host: ${{ vars.DROPLET_IP }}
-          username: root
-          password: ${{ secrets.DROPLET_PASSWORD }}
-          script: |
-            cd ~
-            export POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
-            export CLOUD_SQL_CONNECTION_NAME=${{ secrets.CLOUD_SQL_CONNECTION_NAME }}
-            docker compose down
-            docker compose pull
-            docker compose up -d
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy $SERVICE \
+            --image gcr.io/$PROJECT_ID/$SERVICE \
+            --platform managed \
+            --region $REGION \
+            --allow-unauthenticated \
+            --add-cloudsql-instances=${{ secrets.CLOUD_SQL_CONNECTION_NAME }} \
+            --set-env-vars="DATABASE_URL=postgres://postgres:${{ secrets.POSTGRES_PASSWORD }}@127.0.0.1:5432/dahlia,LEPTOS_SITE_ADDR=0.0.0.0:8080,LEPTOS_SITE_ROOT=./site,RUST_LOG=info"
