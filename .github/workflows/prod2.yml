@@ -37,10 +37,19 @@ jobs:
         uses: actions/checkout@v3
       
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@nightly
         with:
           components: rustfmt, clippy
           targets: wasm32-unknown-unknown
+
+      - name: Install cargo-leptos
+        run: cargo install cargo-leptos --locked
+
+      - name: Install required packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y nodejs npm pkg-config libssl-dev
+          npm install -g sass
 
       - name: Cache dependencies
         uses: actions/cache@v3
@@ -53,8 +62,8 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
 
-      - name: Run tests
-        run: cargo test
+      - name: Create .docker/ directory for build cache
+        run: mkdir -p .docker
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v1
@@ -69,7 +78,10 @@ jobs:
 
       - name: Build and Push Docker image with Cloud Build
         run: |
-          gcloud builds submit --tag gcr.io/$PROJECT_ID/$SERVICE --timeout=30m
+          gcloud builds submit \
+            --tag gcr.io/$PROJECT_ID/$SERVICE \
+            --timeout=60m \
+            --machine-type=e2-highcpu-8
 
       - name: Deploy to Cloud Run
         run: |

@@ -14,3 +14,9 @@ playwright/.cache/
 
 # Sass cache dir
 .sass-cache/
+
+target/
+.git/
+.github/
+.gitignore
+**/.DS_Store
