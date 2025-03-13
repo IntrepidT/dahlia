@@ -8,6 +8,7 @@ RUN apt-get update && \
     libssl-dev \
     nodejs \
     npm \
+    clang \
     curl \
     ca-certificates \
     build-essential \
