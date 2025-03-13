@@ -1,5 +1,5 @@
 # Stage 1: Build the application
-FROM rustlang/rust:nightly-slim as builder
+FROM ubuntu:25.04 as builder
 
 # Install dependencies
 RUN apt-get update && \
@@ -33,13 +33,14 @@ COPY . .
 RUN cargo leptos build --release
 
 # Stage 2: Create the runtime image
-FROM debian:bullseye-slim as runtime
+FROM ubuntu:25.04 as runtime
 
 # Install runtime dependencies
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     ca-certificates \
     libpq5 \
+    libc6 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
