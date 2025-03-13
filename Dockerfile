@@ -1,5 +1,5 @@
 # Stage 1: Build the application
-FROM ubuntu:25.04 as builder
+FROM ubuntu:24.04 as builder
 
 # Install dependencies
 RUN apt-get update && \
@@ -16,15 +16,17 @@ RUN apt-get update && \
     && rm -rf /var/lib/apt/lists/*
 
 # Install tools
-RUN npm install -g sass
-RUN cargo install sqlx-cli --no-default-features --features postgres
-RUN curl --proto '=https' --tlsv1.2 -LsSf https://github.com/leptos-rs/cargo-leptos/releases/latest/download/cargo-leptos-installer.sh | sh
-RUN rustup target add wasm32-unknown-unknown
+RUN npm install -g sass && \
+    cargo install sqlx-cli --no-default-features --features postgres && \
+    curl --proto '=https' --tlsv1.2 -LsSf https://github.com/leptos-rs/cargo-leptos/releases/latest/download/cargo-leptos-installer.sh -o installer.sh && \
+    chmod +x installer.sh && \
+    ./installer.sh && \
+    rm installer.sh && \
+    rustup target add wasm32-unknown-unknown
+
 
 WORKDIR /app
 
-# Copy only files needed for dependency resolution
-COPY Cargo.toml Cargo.lock ./
 
 # Copy the rest of the source code
 COPY . .
@@ -33,7 +35,7 @@ COPY . .
 RUN cargo leptos build --release
 
 # Stage 2: Create the runtime image
-FROM ubuntu:25.04 as runtime
+FROM ubuntu:24.04 as runtime
 
 # Install runtime dependencies
 RUN apt-get update && \
@@ -54,10 +56,14 @@ COPY --from=builder /app/Cargo.toml /app/
 COPY --from=builder /usr/local/cargo/bin/sqlx /usr/local/bin/
 COPY --from=builder /app/migrations /app/migrations
 
+#Ensure binary executable
+RUN chmod +x /app/dahlia
+
 # Set environment variables
 ENV RUST_LOG="info"
 ENV LEPTOS_SITE_ADDR="0.0.0.0:8080"
 ENV LEPTOS_SITE_ROOT="./site"
+ENV PATH="/usr/local/bin:$PATH"
 
 # Expose the application port
 EXPOSE 8080
