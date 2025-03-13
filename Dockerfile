@@ -24,6 +24,8 @@ RUN npm install -g sass && \
     chmod +x installer.sh && \
     ./installer.sh && \
     rm installer.sh && \
+    rustup update stable && \
+    rustup default stable \
     rustup target add wasm32-unknown-unknown
 
 
