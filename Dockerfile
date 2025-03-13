@@ -10,6 +10,7 @@ RUN apt-get update && \
     npm \
     clang \
     curl \
+    bash \
     ca-certificates \
     build-essential \
     git \
@@ -38,11 +39,7 @@ RUN cargo leptos build --release
 FROM ubuntu:24.04 as runtime
 
 # Install runtime dependencies
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-    ca-certificates \
-    libpq5 \
-    libc6 \
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates libpq5 libc6 &&update-ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
