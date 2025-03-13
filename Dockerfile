@@ -7,6 +7,7 @@ RUN apt-get update && \
     pkg-config \
     libssl-dev \
     nodejs \
+    cargo \
     npm \
     clang \
     curl \
