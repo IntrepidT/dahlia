@@ -18,16 +18,17 @@ RUN apt-get update && \
     && rm -rf /var/lib/apt/lists/*
 
 # Install tools
-RUN npm install -g sass && \
+RUN rustup update stable && \
+    rustup default stable \
+    rustc update \
+    rustup target add wasm32-unknown-unknown &&\
+    npm install -g sass && \
     cargo install sqlx-cli --no-default-features --features postgres && \
     curl --proto '=https' --tlsv1.2 -LsSf https://github.com/leptos-rs/cargo-leptos/releases/latest/download/cargo-leptos-installer.sh -o installer.sh && \
     chmod +x installer.sh && \
     ./installer.sh && \
-    rm installer.sh && \
-    rustup update stable && \
-    rustup default stable \
-    rustup target add wasm32-unknown-unknown
-
+    rm installer.sh
+    
 
 WORKDIR /app
 
