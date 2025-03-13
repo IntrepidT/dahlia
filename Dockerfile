@@ -25,11 +25,6 @@ WORKDIR /app
 # Copy only files needed for dependency resolution
 COPY Cargo.toml Cargo.lock ./
 
-# Create a dummy main.rs to compile dependencies
-RUN mkdir -p src && \
-    echo "fn main() {}" > src/main.rs && \
-    cargo fetch
-
 # Copy the rest of the source code
 COPY . .
 
