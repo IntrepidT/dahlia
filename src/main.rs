@@ -54,10 +54,10 @@ async fn main() -> std::io::Result<()> {
             // serve JS/WASM/CSS from `pkg`
             .service(Files::new("/pkg", format!("{site_root}/pkg")))
             // serve other assets from the `assets` directory
-            .service(Files::new("/assets", "/app/assets"))
+            .service(Files::new("/assets", site_root))
             // serve the favicon from /favicon.ico
             .service(favicon)
-            .service(Files::new("/static", "/app/static").show_files_listing())
+            .service(Files::new("/static", "./static").show_files_listing())
             // Leptos routes (this must be last)
             .leptos_routes(leptos_options_clone.to_owned(), routes.to_owned(), App)
     })
