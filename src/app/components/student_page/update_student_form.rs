@@ -1,4 +1,4 @@
-use crate::app::models::student::{ELLEnum, GenderEnum, GradeEnum, Student};
+use crate::app::models::student::{ESLEnum, GenderEnum, GradeEnum, Student};
 use crate::app::models::UpdateStudentRequest;
 use crate::app::server_functions::students::edit_student;
 use leptos::*;
@@ -24,20 +24,22 @@ pub fn UpdateStudent(
     // Create signals for each field
     let (firstname, set_firstname) = create_signal(student.firstname.clone());
     let (lastname, set_lastname) = create_signal(student.lastname.clone());
+    let (preferred, set_preferred) = create_signal(student.preferred.clone());
     let (gender, set_gender) = create_signal(student.gender.clone().to_string());
     let (date_of_birth, set_date_of_birth) = create_signal(student.date_of_birth);
     let (student_id, set_student_id) = create_signal(student.student_id.clone().to_string());
     let (grade, set_grade) = create_signal(student.grade.clone().to_string());
     let (teacher, set_teacher) = create_signal(student.teacher.clone());
-    let (yes_no_ell, set_yes_no_ell) = if student.ell.to_string() == "Not Applicable" {
+    let (yes_no_esl, set_yes_no_esl) = if student.esl.to_string() == "Not Applicable" {
         create_signal(false)
     } else {
         create_signal(true)
     };
 
-    let (ell, set_ell) = create_signal(student.ell.to_string());
+    let (esl, set_esl) = create_signal(student.esl.to_string());
 
     let (iep, set_iep) = create_signal(student.iep);
+    let (bip, set_bip) = create_signal(student.bip);
     let (student_504, set_student_504) = create_signal(student.student_504);
     let (readplan, set_readplan) = create_signal(student.readplan);
     let (gt, set_gt) = create_signal(student.gt);
@@ -45,7 +47,7 @@ pub fn UpdateStudent(
 
     // Additional information
     let (eye_glasses, set_eye_glasses) = create_signal(student.eye_glasses);
-
+    let (notes, set_notes) = create_signal(student.notes.clone());
     // For handling form submission
     let (is_submitting, set_is_submitting) = create_signal(false);
     let (error_message, set_error_message) = create_signal(String::new());
@@ -139,8 +141,8 @@ pub fn UpdateStudent(
         };
 
         // Convert ELL string to enum
-        let convert_ell_to_enum = match ELLEnum::from_str(&ell()) {
-            Ok(ell_enum) => ell_enum,
+        let convert_esl_to_enum = match ESLEnum::from_str(&esl()) {
+            Ok(esl_enum) => esl_enum,
             Err(_) => {
                 log::error!("Invalid ELL value submitted for update");
                 set_if_error(true);
@@ -153,18 +155,21 @@ pub fn UpdateStudent(
         let update_data = UpdateStudentRequest {
             firstname: firstname(),
             lastname: lastname(),
+            preferred: preferred(),
             gender: convert_gender_to_enum,
             date_of_birth: date_of_birth(),
             student_id: validated_student_id,
-            ell: convert_ell_to_enum,
+            esl: convert_esl_to_enum,
             grade: convert_grade_to_enum,
             teacher: teacher(),
             iep: iep(),
+            bip: bip(),
             student_504: student_504(),
             readplan: readplan(),
             gt: gt(),
             intervention: intervention(),
             eye_glasses: eye_glasses(),
+            notes: notes(),
         };
 
         spawn_local(async move {
@@ -228,6 +233,16 @@ pub fn UpdateStudent(
                                 />
                             </div>
                             <div class=INFO_GROUP_STYLE>
+                                <label class=INFO_TITLE_STYLE for="preferred">"Preferred Name"</label>
+                                <input
+                                    id="preferred"
+                                    type="text"
+                                    class="mt-1 w-full rounded-md border p-2"
+                                    value={preferred}
+                                    on:input=move |ev| set_preferred(event_target_value(&ev))
+                                />
+                            </div>
+                            <div class=INFO_GROUP_STYLE>
                                 <label class=INFO_TITLE_STYLE for="student-id">"Student ID"</label>
                                 <input
                                     required
@@ -236,6 +251,7 @@ pub fn UpdateStudent(
                                     class="mt-1 w-full rounded-md border p-2"
                                     value={student_id}
                                     on:input=move |ev| set_student_id(event_target_value(&ev))
+                                    readonly
                                 />
                             </div>
                             <div class=INFO_GROUP_STYLE>
@@ -342,6 +358,18 @@ pub fn UpdateStudent(
                                     <input
                                         type="checkbox"
                                         class="form-checkbox h-5 w-5"
+                                        checked={move || bip()}
+                                        on:change=move |ev| set_bip(event_target_checked(&ev))
+                                    />
+                                    <span class=INFO_TITLE_STYLE>"BIP"</span>
+                                </label>
+                            </div>
+
+                            <div class=INFO_GROUP_STYLE>
+                                <label class="flex items-center gap-2">
+                                    <input
+                                        type="checkbox"
+                                        class="form-checkbox h-5 w-5"
                                         checked={move || student_504()}
                                         on:change=move |ev| set_student_504(event_target_checked(&ev))
                                     />
@@ -353,21 +381,21 @@ pub fn UpdateStudent(
                                     <input
                                         type="checkbox"
                                         class="form-checkbox h-5 w-5"
-                                        checked={move || yes_no_ell()}
-                                        on:change=move |ev| set_yes_no_ell(event_target_checked(&ev))
+                                        checked={move || yes_no_esl()}
+                                        on:change=move |ev| set_yes_no_esl(event_target_checked(&ev))
                                     />
-                                    <span class=INFO_TITLE_STYLE>"ELL"</span>
+                                    <span class=INFO_TITLE_STYLE>"ESL"</span>
                                 </label>
-                                <Show when=move || yes_no_ell()>
+                                <Show when=move || yes_no_esl()>
                                     <select class="p-3 rounded-lg mt-2 w-full"
                                         required
                                         on:change=move |event| {
-                                            set_ell(event_target_value(&event))
+                                            set_esl(event_target_value(&event))
                                         }
                                     >
                                         <option value="">"Please Select"</option>
-                                        {ELLEnum::iter().map(|lang| view! {
-                                            <option value=format!("{}", lang) selected=lang.to_string() == ell()>
+                                        {ESLEnum::iter().map(|lang| view! {
+                                            <option value=format!("{}", lang) selected=lang.to_string() == esl()>
                                                 {format!("{}", lang)}
                                             </option>
                                         }).collect::<Vec<_>>()}
@@ -424,6 +452,20 @@ pub fn UpdateStudent(
                                     />
                                     <span class=INFO_TITLE_STYLE>"Glasses"</span>
                                 </label>
+                            </div>
+                        </div>
+
+                        <h3 class="text-sm font-semibold text-gray-600 mb-2">"Student Notes"</h3>
+                        <div class="grid grid-cols-1 gap-4 bg-gray-50 p-4 rounded-lg">
+                            <div class=INFO_GROUP_STYLE>
+                                <label class=INFO_TITLE_STYLE for="notes">"Notes"</label>
+                                <textarea
+                                    id="notes"
+                                    class="mt-1 w-full rounded-md border p-2 h-32"
+                                    prop:value={move || notes()}
+                                    on:input=move |ev| set_notes(event_target_value(&ev))
+                                    placeholder="Enter any additional notes about the student..."
+                                />
                             </div>
                         </div>
                     </div>

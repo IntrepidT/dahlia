@@ -39,7 +39,7 @@ impl FromStr for GenderEnum {
     }
 }
 #[derive(Debug, Deserialize, Serialize, PartialEq, Eq, Clone, EnumIter)]
-pub enum ELLEnum {
+pub enum ESLEnum {
     NotApplicable,
     Spanish,
     Arabic,
@@ -56,52 +56,52 @@ pub enum ELLEnum {
     Tamil,
     Other,
 }
-impl fmt::Display for ELLEnum {
+impl fmt::Display for ESLEnum {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
             "{}",
             match self {
-                ELLEnum::NotApplicable => "Not Applicable".to_string(),
-                ELLEnum::Spanish => "Spanish".to_string(),
-                ELLEnum::Arabic => "Arabic".to_string(),
-                ELLEnum::Mandarin => "Mandarin".to_string(),
-                ELLEnum::Cantonese => "Cantonese".to_string(),
-                ELLEnum::Vietnamese => "Vietnamese".to_string(),
-                ELLEnum::Nepali => "Nepali".to_string(),
-                ELLEnum::French => "French".to_string(),
-                ELLEnum::Russian => "Russian".to_string(),
-                ELLEnum::Somali => "Somali".to_string(),
-                ELLEnum::Amharic => "Amharic".to_string(),
-                ELLEnum::Hindi => "Hindi".to_string(),
-                ELLEnum::Telugu => "Telugu".to_string(),
-                ELLEnum::Tamil => "Tamil".to_string(),
-                ELLEnum::Other => "Other".to_string(),
+                ESLEnum::NotApplicable => "Not Applicable".to_string(),
+                ESLEnum::Spanish => "Spanish".to_string(),
+                ESLEnum::Arabic => "Arabic".to_string(),
+                ESLEnum::Mandarin => "Mandarin".to_string(),
+                ESLEnum::Cantonese => "Cantonese".to_string(),
+                ESLEnum::Vietnamese => "Vietnamese".to_string(),
+                ESLEnum::Nepali => "Nepali".to_string(),
+                ESLEnum::French => "French".to_string(),
+                ESLEnum::Russian => "Russian".to_string(),
+                ESLEnum::Somali => "Somali".to_string(),
+                ESLEnum::Amharic => "Amharic".to_string(),
+                ESLEnum::Hindi => "Hindi".to_string(),
+                ESLEnum::Telugu => "Telugu".to_string(),
+                ESLEnum::Tamil => "Tamil".to_string(),
+                ESLEnum::Other => "Other".to_string(),
             }
         )
     }
 }
-impl FromStr for ELLEnum {
+impl FromStr for ESLEnum {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "Not Applicable" => Ok(ELLEnum::NotApplicable),
-            "Spanish" => Ok(ELLEnum::Spanish),
-            "Arabic" => Ok(ELLEnum::Arabic),
-            "Mandarin" => Ok(ELLEnum::Mandarin),
-            "Cantonese" => Ok(ELLEnum::Cantonese),
-            "Vietnamese" => Ok(ELLEnum::Vietnamese),
-            "Nepali" => Ok(ELLEnum::Nepali),
-            "French" => Ok(ELLEnum::French),
-            "Russian" => Ok(ELLEnum::Russian),
-            "Somali" => Ok(ELLEnum::Somali),
-            "Amharic" => Ok(ELLEnum::Amharic),
-            "Hindi" => Ok(ELLEnum::Hindi),
-            "Telugu" => Ok(ELLEnum::Telugu),
-            "Tamil" => Ok(ELLEnum::Tamil),
-            "Other" => Ok(ELLEnum::Other),
-            _ => Err(format!("Invalid ELL value: {}", s)),
+            "Not Applicable" => Ok(ESLEnum::NotApplicable),
+            "Spanish" => Ok(ESLEnum::Spanish),
+            "Arabic" => Ok(ESLEnum::Arabic),
+            "Mandarin" => Ok(ESLEnum::Mandarin),
+            "Cantonese" => Ok(ESLEnum::Cantonese),
+            "Vietnamese" => Ok(ESLEnum::Vietnamese),
+            "Nepali" => Ok(ESLEnum::Nepali),
+            "French" => Ok(ESLEnum::French),
+            "Russian" => Ok(ESLEnum::Russian),
+            "Somali" => Ok(ESLEnum::Somali),
+            "Amharic" => Ok(ESLEnum::Amharic),
+            "Hindi" => Ok(ESLEnum::Hindi),
+            "Telugu" => Ok(ESLEnum::Telugu),
+            "Tamil" => Ok(ESLEnum::Tamil),
+            "Other" => Ok(ESLEnum::Other),
+            _ => Err(format!("Invalid ESL value: {}", s)),
         }
     }
 }
@@ -174,53 +174,62 @@ pub struct Student {
     pub firstname: String,
     #[validate(length(min = 1, message = "name is required"))]
     pub lastname: String,
+    pub preferred: String,
     pub gender: GenderEnum,
     pub date_of_birth: NaiveDate,
     #[validate(range(min = 0, max = 2000000000))]
     pub student_id: i32,
-    pub ell: ELLEnum,
+    pub esl: ESLEnum,
     pub grade: GradeEnum,
     pub teacher: String,
     pub iep: bool,
+    pub bip: bool,
     pub student_504: bool,
     pub readplan: bool,
     pub gt: bool,
     pub intervention: bool,
     pub eye_glasses: bool,
+    pub notes: String,
 }
 
 impl Student {
     pub fn new(
         firstname: String,
         lastname: String,
+        preferred: String,
         gender: GenderEnum,
         date_of_birth: NaiveDate,
         student_id: i32,
-        ell: ELLEnum,
+        esl: ESLEnum,
         grade: GradeEnum,
         teacher: String,
         iep: bool,
+        bip: bool,
         student_504: bool,
         readplan: bool,
         gt: bool,
         intervention: bool,
         eye_glasses: bool,
+        notes: String,
     ) -> Student {
         Student {
             firstname,
             lastname,
+            preferred,
             gender,
             date_of_birth,
             student_id,
-            ell,
+            esl,
             grade,
             teacher,
             iep,
+            bip,
             student_504,
             readplan,
             gt,
             intervention,
             eye_glasses,
+            notes,
         }
     }
 }
@@ -232,53 +241,62 @@ pub struct AddStudentRequest {
     pub firstname: String,
     #[validate(length(min = 1, message = "name is required"))]
     pub lastname: String,
+    pub preferred: String,
     pub gender: GenderEnum,
     pub date_of_birth: NaiveDate,
     #[validate(range(min = 0, max = 2000000000))]
     pub student_id: i32,
-    pub ell: ELLEnum,
+    pub esl: ESLEnum,
     pub grade: GradeEnum,
     pub teacher: String,
     pub iep: bool,
+    pub bip: bool,
     pub student_504: bool,
     pub readplan: bool,
     pub gt: bool,
     pub intervention: bool,
     pub eye_glasses: bool,
+    pub notes: String,
 }
 
 impl AddStudentRequest {
     pub fn new(
         firstname: String,
         lastname: String,
+        preferred: String,
         gender: GenderEnum,
         date_of_birth: NaiveDate,
         student_id: i32,
-        ell: ELLEnum,
+        esl: ESLEnum,
         grade: GradeEnum,
         teacher: String,
         iep: bool,
+        bip: bool,
         student_504: bool,
         readplan: bool,
         gt: bool,
         intervention: bool,
         eye_glasses: bool,
+        notes: String,
     ) -> AddStudentRequest {
         AddStudentRequest {
             firstname,
             lastname,
+            preferred,
             gender,
             date_of_birth,
             student_id,
-            ell,
+            esl,
             grade,
             teacher,
             iep,
+            bip,
             student_504,
             readplan,
             gt,
             intervention,
             eye_glasses,
+            notes,
         }
     }
 }
@@ -289,53 +307,62 @@ pub struct UpdateStudentRequest {
     pub firstname: String,
     #[validate(length(min = 1, message = "name is required"))]
     pub lastname: String,
+    pub preferred: String,
     pub gender: GenderEnum,
     pub date_of_birth: NaiveDate,
     #[validate(range(min = 0, max = 2000000000))]
     pub student_id: i32,
-    pub ell: ELLEnum,
+    pub esl: ESLEnum,
     pub grade: GradeEnum,
     pub teacher: String,
     pub iep: bool,
+    pub bip: bool,
     pub student_504: bool,
     pub readplan: bool,
     pub gt: bool,
     pub intervention: bool,
     pub eye_glasses: bool,
+    pub notes: String,
 }
 
 impl UpdateStudentRequest {
     pub fn new(
         firstname: String,
         lastname: String,
+        preferred: String,
         gender: GenderEnum,
         date_of_birth: NaiveDate,
         student_id: i32,
-        ell: ELLEnum,
+        esl: ESLEnum,
         grade: GradeEnum,
         teacher: String,
         iep: bool,
+        bip: bool,
         student_504: bool,
         readplan: bool,
         gt: bool,
         intervention: bool,
         eye_glasses: bool,
+        notes: String,
     ) -> UpdateStudentRequest {
         UpdateStudentRequest {
             firstname,
             lastname,
+            preferred,
             gender,
             date_of_birth,
             student_id,
-            ell,
+            esl,
             grade,
             teacher,
             iep,
+            bip,
             student_504,
             readplan,
             gt,
             intervention,
             eye_glasses,
+            notes,
         }
     }
 }
@@ -381,21 +408,21 @@ cfg_if::cfg_if! {
                 sqlx::postgres::PgTypeInfo::with_name("gender_enum")
             }
         }
-        impl<'q> sqlx::encode::Encode<'q, sqlx::Postgres> for ELLEnum {
+        impl<'q> sqlx::encode::Encode<'q, sqlx::Postgres> for ESLEnum {
             fn encode_by_ref(&self, buf: &mut PgArgumentBuffer) -> Result<IsNull, Box<dyn std::error::Error + Send + Sync>> {
                 let s = self.to_string();
                 <&str as Encode<Postgres>>::encode(&s.as_str(), buf)
             }
         }
-        impl <'r> sqlx::decode::Decode<'r, sqlx::Postgres> for ELLEnum {
+        impl <'r> sqlx::decode::Decode<'r, sqlx::Postgres> for ESLEnum {
             fn decode(value: sqlx::postgres::PgValueRef<'r>) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
                 let s: &str = Decode::<sqlx::Postgres>::decode(value)?;
-                ELLEnum::from_str(s).map_err(|_| format!("Invalid ELLEnum: {:?}", s).into())
+                ESLEnum::from_str(s).map_err(|_| format!("Invalid ESLEnum: {:?}", s).into())
             }
         }
-        impl Type<Postgres> for ELLEnum {
+        impl Type<Postgres> for ESLEnum {
             fn type_info() -> sqlx::postgres::PgTypeInfo {
-                sqlx::postgres::PgTypeInfo::with_name("ell_enum")
+                sqlx::postgres::PgTypeInfo::with_name("esl_enum")
             }
         }
         impl<'q> sqlx::encode::Encode<'q, sqlx::Postgres> for GradeEnum {

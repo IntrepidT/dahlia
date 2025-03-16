@@ -1,4 +1,3 @@
-use crate::app::models::student::GradeEnum;
 use leptos::*;
 
 // Styles
@@ -9,7 +8,7 @@ pub struct FilterState {
     pub search_term: String,
     pub grade_filter: String,
     pub iep_filter: bool,
-    pub ell_filter: bool,
+    pub esl_filter: bool,
     pub teacher_filter: String,
 }
 
@@ -20,7 +19,7 @@ pub fn SearchFilter(
     #[prop(into)] set_grade_filter: Callback<String>,
     #[prop(into)] set_teacher_filter: Callback<String>,
     #[prop(into)] set_iep_filter: Callback<bool>,
-    #[prop(into)] set_ell_filter: Callback<bool>,
+    #[prop(into)] set_esl_filter: Callback<bool>,
     #[prop(into)] teachers: Signal<Vec<String>>,
 ) -> impl IntoView {
     view! {
@@ -68,7 +67,7 @@ pub fn SearchFilter(
                     {move || {
                         let teacher_list = teachers.get();
                         log::info!("Rendering teacher dropdown with {} teachers", teacher_list.len());
-                        
+
                         teacher_list.into_iter().map(|teacher| {
                             view! {
                                 <option value={teacher.clone()}>{teacher}</option>
@@ -94,9 +93,9 @@ pub fn SearchFilter(
                         type="checkbox"
                         id="ell-filter"
                         class="form-checkbox h-5 w-5 text-[#00356b]"
-                        on:change=move |ev| set_ell_filter(event_target_checked(&ev))
+                        on:change=move |ev| set_esl_filter(event_target_checked(&ev))
                     />
-                    <label for="ell-filter">"Show ELL Students"</label>
+                    <label for="esl-filter">"Show ESL Students"</label>
                 </div>
             </div>
         </div>

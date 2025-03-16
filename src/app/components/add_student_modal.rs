@@ -1,5 +1,5 @@
 use crate::app::components::{Toast, ToastMessage, ToastMessageType};
-use crate::app::models::student::{AddStudentRequest, ELLEnum, GenderEnum, GradeEnum};
+use crate::app::models::student::{AddStudentRequest, ESLEnum, GenderEnum, GradeEnum};
 use crate::app::server_functions::students::add_student;
 use chrono::NaiveDate;
 use leptos::*;
@@ -30,7 +30,7 @@ pub fn AddStudentModal(
     let (student_gender, set_student_gender) = create_signal(String::new());
     let (student_dob, set_student_dob) = create_signal(String::new());
     let (student_id, set_student_id) = create_signal(String::new());
-    let (student_ell, set_student_ell) = create_signal(String::new());
+    let (student_esl, set_student_esl) = create_signal(String::new());
     let (student_grade, set_student_grade) = create_signal(String::new());
     let (student_teacher, set_student_teacher) = create_signal(String::new());
     let (student_iep, set_student_iep) = create_signal(String::new());
@@ -68,7 +68,7 @@ pub fn AddStudentModal(
                 return;
             }
         };
-        let convert_ell_to_enum = ELLEnum::from_str(&student_ell()).clone().unwrap();
+        let convert_esl_to_enum = ESLEnum::from_str(&student_esl()).clone().unwrap();
 
         let add_student_request = AddStudentRequest::new(
             student_firstname(),
@@ -76,7 +76,7 @@ pub fn AddStudentModal(
             convert_gender_to_enum,
             validated_dob,
             validated_student_id.expect("Student ID was not processed correctly"),
-            convert_ell_to_enum,
+            convert_esl_to_enum,
             convert_grade_to_enum,
             student_teacher(),
             student_iep().parse().unwrap(),
@@ -170,13 +170,13 @@ pub fn AddStudentModal(
                         }
                     />
                     <select required class=INPUT_STYLE
-                        value=student_ell
+                        value=student_esl
                         on:change=move |event| {
-                            set_student_ell(event_target_value(&event));
+                            set_student_esl(event_target_value(&event));
                         }
                     >
                         <option value="">"Select A Value for ESL"</option>
-                        {ELLEnum::iter().map(|lang| view! {
+                        {ESLEnum::iter().map(|lang| view! {
                             <option value=format!("{}", lang)>
                                 {format!("{}", lang)}
                             </option>

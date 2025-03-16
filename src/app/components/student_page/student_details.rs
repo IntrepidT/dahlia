@@ -32,6 +32,11 @@ pub fn StudentDetails(
                         <h3 class="text-sm font-semibold text-gray-600 mb-2">"Basic Information"</h3>
                         <div class="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg">
                             <div class=INFO_GROUP_STYLE>
+                                <div class=INFO_TITLE_STYLE>"Preferred Name"</div>
+                                <div class=INFO_VALUE_STYLE>{format!("{}", &student.preferred)}</div>
+                            </div>
+
+                            <div class=INFO_GROUP_STYLE>
                                 <div class=INFO_TITLE_STYLE>"Student ID"</div>
                                 <div class=INFO_VALUE_STYLE>{format!("{}", &student.student_id)}</div>
                             </div>
@@ -59,12 +64,16 @@ pub fn StudentDetails(
                                 <div class=INFO_VALUE_STYLE>{&student.iep.to_string()}</div>
                             </div>
                             <div class=INFO_GROUP_STYLE>
+                                <div class=INFO_TITLE_STYLE>"BIP Status"</div>
+                                <div class=INFO_VALUE_STYLE>{&student.bip.to_string()}</div>
+                            </div>
+                            <div class=INFO_GROUP_STYLE>
                                 <div class=INFO_TITLE_STYLE>"504 Status"</div>
                                 <div class=INFO_VALUE_STYLE>{&student.student_504.to_string()}</div>
                             </div>
                             <div class=INFO_GROUP_STYLE>
-                                <div class=INFO_TITLE_STYLE>"ELL Status"</div>
-                                <div class=INFO_VALUE_STYLE>{&student.ell.to_string()}</div>
+                                <div class=INFO_TITLE_STYLE>"ESL Status"</div>
+                                <div class=INFO_VALUE_STYLE>{&student.esl.to_string()}</div>
                             </div>
                             <div class=INFO_GROUP_STYLE>
                                 <div class=INFO_TITLE_STYLE>"GT Status"</div>
@@ -88,6 +97,10 @@ pub fn StudentDetails(
                             <div class=INFO_GROUP_STYLE>
                                 <div class=INFO_TITLE_STYLE>"Eye Glasses"</div>
                                 <div class=INFO_VALUE_STYLE>{&student.eye_glasses.to_string()}</div>
+                            </div>
+                            <div class=INFO_GROUP_STYLE>
+                                <div class=INFO_TITLE_STYLE>"Student Notes"</div>
+                                <div class="mt-1 whitespace-pre-wrap">{&student.notes}</div>
                             </div>
                         </div>
                     </div>

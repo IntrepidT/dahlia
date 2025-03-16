@@ -4,12 +4,12 @@ use crate::app::components::student_page::update_student_form::UpdateStudent;
 use crate::app::components::student_page::{
     add_student_form::AddStudentForm, student_details::StudentDetails,
 };
-use crate::app::models::student::{DeleteStudentRequest, ELLEnum, Student};
+use crate::app::models::student::{DeleteStudentRequest, ESLEnum, Student};
 use crate::app::server_functions::students::{delete_student, get_students};
 use crate::app::server_functions::teachers::get_teachers;
 use leptos::ev::SubmitEvent;
-use log::{error, info, debug};
 use leptos::*;
+use log::{debug, error, info};
 use std::rc::Rc;
 
 // Styles
@@ -50,7 +50,7 @@ pub fn StudentView() -> impl IntoView {
                 Ok(teachers) => {
                     log::info!("Teachers fetched successfully: {} teachers", teachers.len());
                     Some(teachers)
-                },
+                }
                 Err(e) => {
                     log::error!("Failed to fetch teachers: {}", e);
                     Some(vec![])
@@ -68,7 +68,7 @@ pub fn StudentView() -> impl IntoView {
     let (search_term, set_search_term) = create_signal(String::new());
     let (grade_filter, set_grade_filter) = create_signal(String::from("all"));
     let (iep_filter, set_iep_filter) = create_signal(false);
-    let (ell_filter, set_ell_filter) = create_signal(false);
+    let (esl_filter, set_esl_filter) = create_signal(false);
     let (teacher_filter, set_teacher_filter) = create_signal(String::from("all"));
 
     //Signals for getting a new student
@@ -81,14 +81,14 @@ pub fn StudentView() -> impl IntoView {
     // Extract teacher names for the filter dropdown
     let teacher_names = create_memo(move |_| {
         if let Some(Some(teacher_list)) = teachers.get() {
-            teacher_list.iter()
+            teacher_list
+                .iter()
                 .map(|teacher| teacher.lastname.clone())
                 .collect::<Vec<_>>()
         } else {
             vec![]
         }
     });
-
 
     let filtered_students = move || {
         students.get().map(|result| {
@@ -106,7 +106,7 @@ pub fn StudentView() -> impl IntoView {
 
                         let matches_iep = !iep_filter() || student.iep;
 
-                        let matches_ell = !ell_filter() || student.ell != ELLEnum::NotApplicable;
+                        let matches_esl = !esl_filter() || student.esl != ESLEnum::NotApplicable;
 
                         let matches_teacher =
                             teacher_filter() == "all" || student.teacher == teacher_filter();
@@ -114,7 +114,7 @@ pub fn StudentView() -> impl IntoView {
                         matches_search
                             && matches_grade
                             && matches_iep
-                            && matches_ell
+                            && matches_esl
                             && matches_teacher
                     })
                     .collect::<Vec<_>>()
@@ -207,7 +207,7 @@ pub fn StudentView() -> impl IntoView {
                     set_grade_filter=set_grade_filter
                     set_teacher_filter=set_teacher_filter
                     set_iep_filter=set_iep_filter
-                    set_ell_filter=set_ell_filter
+                    set_esl_filter=set_esl_filter
                     teachers=Signal::derive(move || {
                         if let Some(data) = teachers.get() {
                             if let Some(teacher_list) = data {

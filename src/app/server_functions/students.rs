@@ -1,4 +1,4 @@
-use crate::app::errors::student_errors::{ErrorMessage, ResponseErrorTrait};
+use crate::app::errors::ErrorMessage;
 use crate::app::models::{
     student::Student, AddStudentRequest, DeleteStudentRequest, UpdateStudentRequest,
 };
@@ -74,18 +74,21 @@ pub async fn add_student(add_student_request: AddStudentRequest) -> Result<Stude
         let bufferStudent = Student::new(
             add_student_request.firstname,
             add_student_request.lastname,
+            add_student_request.preferred,
             add_student_request.gender,
             add_student_request.date_of_birth,
             add_student_request.student_id,
-            add_student_request.ell,
+            add_student_request.esl,
             add_student_request.grade,
             add_student_request.teacher,
             add_student_request.iep,
+            add_student_request.bip,
             add_student_request.student_504,
             add_student_request.readplan,
             add_student_request.gt,
             add_student_request.intervention,
             add_student_request.eye_glasses,
+            add_student_request.notes,
         );
 
         match student_database::add_student(&bufferStudent, &pool).await {
@@ -154,25 +157,28 @@ pub async fn edit_student(
         match student_database::update_student(
             edit_student_request.firstname,
             edit_student_request.lastname,
+            edit_student_request.preferred,
             edit_student_request.gender,
             edit_student_request.date_of_birth,
             edit_student_request.student_id,
-            edit_student_request.ell,
+            edit_student_request.esl,
             edit_student_request.grade,
             edit_student_request.teacher,
             edit_student_request.iep,
+            edit_student_request.bip,
             edit_student_request.student_504,
             edit_student_request.readplan,
             edit_student_request.gt,
             edit_student_request.intervention,
             edit_student_request.eye_glasses,
+            edit_student_request.notes,
             &pool,
         )
         .await
         {
             Ok(Some(updated_student)) => Ok(updated_student),
-            Ok(None) => Err(ServerFnError::Args(ErrorMessage::create(
-                StudentError::StudentUpdateFailure,
+            Ok(None) => Err(ServerFnError::new(format!(
+                "An None Value was returned instead of an updated student"
             ))),
             Err(e) => Err(ServerFnError::new(format!(
                 "Failed to update student: {}",

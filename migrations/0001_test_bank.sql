@@ -2,7 +2,7 @@
 CREATE TYPE testarea_enum AS ENUM ('Reading', 'Math');
 CREATE TYPE questiontype_enum AS ENUM ('Multiple choice', 'Written', 'Selection', 'True False');
 CREATE TYPE gender_enum AS ENUM ('Male', 'Female', 'Non-binary');
-CREATE TYPE ell_enum AS ENUM ('Not Applicable', 'Spanish', 'Arabic', 'Mandarin', 'Cantonese', 'Vietnamese', 'Nepali', 'French', 'Russian', 'Somali', 'Amharic', 'Hindi', 'Telugu', 'Tamil', 'Other');
+CREATE TYPE esl_enum AS ENUM ('Not Applicable', 'Spanish', 'Arabic', 'Mandarin', 'Cantonese', 'Vietnamese', 'Nepali', 'French', 'Russian', 'Somali', 'Amharic', 'Hindi', 'Telugu', 'Tamil', 'Other');
 CREATE TYPE grade_enum AS ENUM ('Kindergarten', '1st Grade', '2nd Grade', '3rd Grade', '4th Grade', '5th Grade', '6th Grade', '7th Grade', '8th Grade', '9th Grade', '10th Grade', '11th Grade', '12th Grade');
 /*We define the tables after so that they can utilize the Types */
 CREATE TABLE IF NOT EXISTS tests (
@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS students (
   gender gender_enum NOT NULL,
   date_of_birth DATE NOT NULL,
   student_id INT PRIMARY KEY NOT NULL,
-  ell ell_enum DEFAULT 'Not Applicable', 
+  esl esl_enum DEFAULT 'Not Applicable', 
   grade grade_enum NOT NULL,
   teacher TEXT NOT NULL,
   iep BOOLEAN NOT NULL DEFAULT FALSE,
