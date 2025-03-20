@@ -2,90 +2,134 @@ use crate::app::components::ShowAdministerTestModal;
 use leptos::*;
 use leptos_router::*;
 
-const INPUT_STYLE: &str = "hover:bg-pink-100 flex-initial flex-row border-b-0 border-[#5D4954] rounded font-sans hover:border-b-2 py-2 px-2";
-const INPUT_STYLE_SELECTED: &str = "border-b-2 flex-inital hover:bg-pink-100 flex-row border-[#C28CAE] font-sans hover:border-b-2 py-2 px-2";
-
-const basic_head_style: &str = "text-base font-medium text-black underline-offset-8";
 #[component]
 pub fn Header() -> impl IntoView {
-    let (if_show_administer_modal, set_if_show_modal) = create_signal(false);
-    //let (toast_message, set_toast_message) = create_signal(ToastMessage::new());
-    let on_click = move |_| {
-        set_if_show_modal(!if_show_administer_modal());
-    };
+    // State for modal and hover effects
+    let (show_administer_modal, set_show_administer_modal) = create_signal(false);
 
+    // Handle current route for active styling
     let (current_path, set_current_path) = create_signal(String::new());
 
+    // Effect to track current route
     create_effect(move |_| {
-        let router_context = use_context::<RouterContext>();
-        match router_context {
-            Some(route_context) => {
-                let path = route_context.pathname().get();
-                set_current_path(path);
-            }
-            None => {
-                set_current_path(String::from("/"));
-            }
+        if let Some(route_context) = use_context::<RouterContext>() {
+            set_current_path(route_context.pathname().get());
+        } else {
+            set_current_path(String::from("/"));
         }
     });
 
+    // Determine if a nav link is active
+    let is_active = move |path: &str| current_path().starts_with(path);
+
     view! {
-        <header class="flex z-50 bg-white">
-            <div class="py-6 item-center">
-                <nav class="fixed relativerounded max-w-8xl mx-auto flex items-center justify-between px-2 sm:px-6 ml-10">
-                    <div class="flex items-center flex-1">
-                        <div class="flex items-center justify-between w-full md:w-auto bg-[#00356b] rounded pl-1 pr-2">
-                            <A href="/" class="flex items-center space-x-2 font-semibold tracking-tight leading-none">
-                                <div class="w-10">
-                                    <img src="/assets/dahliano.png" alt="dahlia main page" class="justify-start h-12 w-14 rounded-2xl"/>
-                                </div>
-                                <div class="text-white">
-                                    <div>"Dahlia Software"</div>
-                                    <div class="text-base font-light">for Connie Le</div>
-                                </div>
-                            </A>
-                            <div class="-mr-2 flex items-center md:hidden"></div>
-                        </div>
-                        <div class="hidden space-x-[4rem] md:flex md:ml-[28rem]">
-                            <A href="/" class=basic_head_style>"Home Page"</A>
-                            <A href="/studentview" class=basic_head_style>"Student View"</A>
-                            <A href="/teachers" class=basic_head_style>"Teacher View"</A>
-                            <button class="text-base font-medium text-black" on:click=on_click>
-                                <div>
-                                    "Administer Test"
-                                    <Show when=move ||{!if_show_administer_modal()}>
-                                        <img src="/assets/arrow_down.png" class="inline h-4 w-4"/>
+        <header class="sticky top-0 z-50 w-full bg-white shadow-sm">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between items-center h-16">
+                    {/* Logo and brand name */}
+                    <div class="flex items-center">
+                        <A href="/dashboard" class="flex items-center space-x-3">
+                            <div class="bg-[#00356b] p-1.5 rounded-lg">
+                                <img
+                                    src="/assets/dahliano.png"
+                                    alt="Dahlia Software"
+                                    class="h-10 w-10 object-contain"
+                                />
+                            </div>
+                            <div>
+                                <div class="text-lg font-semibold text-[#00356b]">"Dahlia Software"</div>
+                                <div class="text-xs text-gray-500">"for Connie Le"</div>
+                            </div>
+                        </A>
+                    </div>
+
+                    {/* Main Navigation */}
+                    <nav class="md:flex items-center space-x-6">
+                        <A
+                            href="/dashboard"
+                            class=move || {
+                                if is_active("/dashboard") {
+                                    "text-[#00356b] font-medium border-b-2 border-[#00356b] pb-1"
+                                } else {
+                                    "text-gray-600 hover:text-[#00356b] hover:border-b-2 hover:border-gray-600 pb-1 transition-colors"
+                                }
+                            }
+                        >
+                            "Dashboard"
+                        </A>
+                        <A
+                            href="/studentview"
+                            class=move || {
+                                if is_active("/studentview") {
+                                    "text-[#00356b] font-medium border-b-2 border-[#00356b] pb-1"
+                                } else {
+                                    "text-gray-600 hover:text-[#00356b] hover:border-b-2 hover:border-gray-600 pb-1 transition-colors"
+                                }
+                            }
+                        >
+                            "Student View"
+                        </A>
+                        <A
+                            href="/teachers"
+                            class=move || {
+                                if is_active("/teachers") {
+                                    "text-[#00356b] font-medium border-b-2 border-[#00356b] pb-1"
+                                } else {
+                                    "text-gray-600 hover:text-[#00356b] hover:border-b-2 hover:border-gray-600 pb-1 transition-colors"
+                                }
+                            }
+                        >
+                            "Teacher View"
+                        </A>
+
+                        {/* Administer Test Dropdown */}
+                        <div class="relative">
+                            <button
+                                on:click=move |_| set_show_administer_modal.update(|v| *v = !*v)
+                                on:blur=move |_| set_show_administer_modal.set(false)
+                                class="flex items-center text-gray-600 hover:text-[#00356b] hover:border-gray-600 pb-1 transition-colors"
+                            >
+                                <span>"Administer Test"</span>
+                                <span class="ml-1">
+                                    <Show when=move || show_administer_modal()>
+                                        <img src="/assets/arrow_up.png" class="h-4 w-4" />
                                     </Show>
-                                    <Show when=move || {if_show_administer_modal()}>
-                                        <img src="/assets/arrow_up.png" class="inline h-4 w-4" />
+                                    <Show when=move || !show_administer_modal()>
+                                        <img src="/assets/arrow_down.png" class="h-4 w-4" />
                                     </Show>
-                                </div>
+                                </span>
                             </button>
+
+                            {/* Modal Dropdown */}
+                            <Show when=move || show_administer_modal()>
+                                <div class="absolute right-0 mt-2 rounded-md shadow-lg z-50">
+                                    <ShowAdministerTestModal set_if_show_modal=set_show_administer_modal />
+                                </div>
+                            </Show>
                         </div>
-                        <div class="flex items-end md:ml-[28rem]  md:flex rounded bg-[#00356B] px-2">
-                                <A href="/myaccount" class="text-base font-semibold text-white">
-                                    My Account
-                                    <img src="/assets/user.png" alt="user icon" class="rounded-2xl bg-[#00356b] h-6 w-6 ml-1 inline"/>
-                                </A>
-                        </div>
+                    </nav>
+
+                    {/* User Account */}
+                    <div class="flex items-center">
+                        <A
+                            href="/myaccount"
+                            class="flex items-center space-x-2 bg-[#00356B] hover:bg-[#00457b] text-white px-4 py-2 rounded-lg transition-colors"
+                        >
+                            <span>"My Account"</span>
+                            <img src="/assets/user.png" alt="User account" class="h-5 w-5" />
+                        </A>
                     </div>
-                </nav>
-                <Show when=move || {if_show_administer_modal()}>
-                    <div class="w-full flex items-center fixed mt-20">
-                        <ShowAdministerTestModal
-                            set_if_show_modal
-                        />
+
+                    {/* Mobile menu button - hidden on desktop */}
+                    <div class="md:hidden flex items-center">
+                        <button class="text-gray-600 hover:text-[#00356b] focus:outline-none">
+                            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"></path>
+                            </svg>
+                        </button>
                     </div>
-                </Show>
+                </div>
             </div>
         </header>
-    }
-}
-
-fn get_style_from_url<'a, 'b>(url: &'a str, match_url: &'a str) -> &'b str {
-    if url == match_url {
-        INPUT_STYLE_SELECTED
-    } else {
-        INPUT_STYLE
     }
 }

@@ -27,3 +27,6 @@ pub use test_builder::TestBuilder;
 
 pub mod assessment;
 pub use assessment::Assessment;
+
+pub mod dashboard;
+pub use dashboard::Dashboard;

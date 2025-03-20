@@ -7,8 +7,8 @@ use leptos_meta::*;
 use leptos_router::*;
 pub mod pages;
 use pages::{
-    AdministerTest, Assessment, HomePage, LoginPage, MathTesting, MyAccount, ReadingTesting,
-    StudentView, Teachers, TestBuilder,
+    AdministerTest, Assessment, Dashboard, HomePage, LoginPage, MathTesting, MyAccount,
+    ReadingTesting, StudentView, Teachers, TestBuilder,
 };
 pub mod components;
 use components::auth::*;
@@ -37,6 +37,11 @@ pub fn App() -> impl IntoView {
                         <Route path="/" view=move || {
                             view! {
                                 <HomePage />
+                            }
+                        }/>
+                        <Route path="/dashboard" view=move || {
+                            view! {
+                                <Dashboard />
                             }
                         }/>
                         <Route path="/studentview" view=move || {

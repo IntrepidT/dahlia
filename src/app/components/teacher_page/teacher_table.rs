@@ -2,9 +2,16 @@ use crate::app::models::employee::{Employee, EmployeeRole};
 use leptos::*;
 use std::rc::Rc;
 
-const TABLE_CONTAINER_STYLE: &str = "mb-4 border-b-2";
-const TABLE_WRAPPER_STYLE: &str = "overflow-x-auto rounded-lg shadow h-[33rem]";
-const SELECTED_EMPLOYEE_STYLE: &str = "border-b bg-[#FDFBD4] cursor-pointer";
+const TABLE_CONTAINER_STYLE: &str =
+    "bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden";
+const TABLE_HEADER_STYLE: &str =
+    "py-5 px-6 flex justify-between items-center border-b border-gray-100 bg-[#00356b]";
+const TABLE_WRAPPER_STYLE: &str = "overflow-x-auto h-[33rem]";
+const TABLE_STYLE: &str = "min-w-full divide-y divide-gray-100";
+const HEADER_CELL_STYLE: &str =
+    "px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider";
+const CELL_STYLE: &str = "px-6 py-4 whitespace-nowrap text-sm";
+const SELECTED_ROW_STYLE: &str = "bg-blue-50 border-l-4 border-blue-500";
 
 #[component]
 pub fn TeacherTable(
@@ -14,7 +21,6 @@ pub fn TeacherTable(
     #[prop(into)] selected_employee: Signal<Option<Rc<Employee>>>,
     #[prop(into)] set_selected_employee: WriteSignal<Option<Rc<Employee>>>,
 ) -> impl IntoView {
-
     let filtered_teachers = create_memo(move |_| {
         let search = search_term().trim().to_lowercase();
         let role = role_filter();
@@ -40,29 +46,47 @@ pub fn TeacherTable(
 
     view! {
         <div class=TABLE_CONTAINER_STYLE>
-            <div class="min-w-0 flex-1 mb-6 flex justify-between items-center">
-                <h1 class="text-2xl font-bold leading-7 text-[#00356b] sm:truncate sm:text-3xl sm:tracking-tight">
+            <div class=TABLE_HEADER_STYLE>
+                <h2 class="text-xl font-medium text-white">
                     "Teachers"
-                </h1>
+                </h2>
+                <span class="text-sm text-white">
+                    {move || {
+                        let count = filtered_teachers().len();
+                        format!("{} {}", count, if count == 1 { "teacher" } else { "teachers" })
+                    }}
+                </span>
             </div>
             <div class=TABLE_WRAPPER_STYLE>
                 <div class="overflow-y-auto max-h-full">
-                    <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-[#00356b] sticky top-0 z-10">
+                    <table class=TABLE_STYLE>
+                        <thead class="bg-gray-50 sticky top-0 z-10">
                             <tr>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">"ID"</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">"First Name"</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">"Last Name"</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">"Status"</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">"Grade"</th>
+                                <th class=HEADER_CELL_STYLE>"ID"</th>
+                                <th class=HEADER_CELL_STYLE>"First Name"</th>
+                                <th class=HEADER_CELL_STYLE>"Last Name"</th>
+                                <th class=HEADER_CELL_STYLE>"Status"</th>
+                                <th class=HEADER_CELL_STYLE>"Grade"</th>
                             </tr>
                         </thead>
-                        <Suspense fallback=move || view! { <tr><td colspan="6" class="text-center p-4">"Loading"</td></tr>}>
-                            <tbody class="bg-white divide-y divide-gray-200">
+                        <Suspense fallback=move || view! {
+                            <tr>
+                                <td colspan="6" class="text-center p-8">
+                                    <div class="inline-block h-6 w-6 animate-spin rounded-full border-2 border-gray-300 border-t-gray-600"></div>
+                                </td>
+                            </tr>
+                        }>
+                            <tbody>
                                 {move || {
                                     let teachers = filtered_teachers();
                                     if teachers.is_empty() {
-                                        view! { <tr><td colspan="6" class="px-6 py-4 text-center text-sm text-gray-500">"No teachers match your search criteria"</td></tr> }.into_view()
+                                        view! {
+                                            <tr>
+                                                <td colspan="6" class="px-6 py-12 text-center text-sm text-gray-500">
+                                                    "No teachers match your search criteria"
+                                                </td>
+                                            </tr>
+                                        }.into_view()
                                     } else {
                                         teachers.into_iter().map(|teacher| {
                                             let teacher_rc = Rc::new(teacher.clone());
@@ -70,14 +94,27 @@ pub fn TeacherTable(
                                             let is_selected = move || selected_employee() == Some(teacher_cmp.clone());
                                             view! {
                                                 <tr
-                                                    class=move || if is_selected() {SELECTED_EMPLOYEE_STYLE} else { "hover:bg-gray-50 cursor-pointer"}
+                                                    class=move || if is_selected() {
+                                                        format!("{} {}", SELECTED_ROW_STYLE, "cursor-pointer")
+                                                    } else {
+                                                        "hover:bg-gray-50 cursor-pointer border-b border-gray-100".to_string()
+                                                    }
                                                     on:click=move |_| set_selected_employee(Some(teacher_rc.clone()))
                                                 >
-                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{teacher.id}</td>
-                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{&teacher.firstname}</td>
-                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{&teacher.lastname}</td>
-                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{teacher.status.to_string()}</td>
-                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                    <td class=format!("{} {}", CELL_STYLE, "text-gray-600")>{teacher.id}</td>
+                                                    <td class=format!("{} {}", CELL_STYLE, "font-medium text-gray-900")>{&teacher.firstname}</td>
+                                                    <td class=format!("{} {}", CELL_STYLE, "text-gray-900 font-medium")>{&teacher.lastname}</td>
+                                                    <td class=CELL_STYLE>
+                                                        <span class=format!("px-2 py-1 text-xs font-medium rounded-full {}",
+                                                            if teacher.status.to_string() == "Active" {
+                                                                "bg-green-200 text-green-800"
+                                                            } else {
+                                                                "bg-gray-200 text-gray-700"
+                                                            })>
+                                                            {teacher.status.to_string()}
+                                                        </span>
+                                                    </td>
+                                                    <td class=format!("{} {}", CELL_STYLE, "text-gray-500")>
                                                         {match &teacher.role {
                                                             EmployeeRole::Teacher { grade } =>
                                                                 grade.as_ref().map_or("Not Assigned".to_string(), |g| g.to_string()),

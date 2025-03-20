@@ -385,6 +385,7 @@ impl DeleteStudentRequest {
         }
     }
 }
+
 //the following functions are all gated behind the ssr feature but they allow for the encoding and decoding of the different enums inside of student
 cfg_if::cfg_if! {
     if #[cfg(feature = "ssr")] {

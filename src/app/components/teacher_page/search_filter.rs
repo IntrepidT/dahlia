@@ -2,7 +2,10 @@ use crate::app::models::employee::EmployeeRole;
 use leptos::*;
 use strum::IntoEnumIterator;
 
-const SEARCH_CONTAINER_STYLE: &str = "mb-4 flex gap-4 items-center mt-10";
+const SEARCH_CONTAINER_STYLE: &str = "flex flex-wrap gap-4 items-end mb-8";
+const INPUT_STYLE: &str = "w-full px-4 py-2 bg-white border border-gray-200 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-200 transition-all duration-200";
+const LABEL_STYLE: &str = "block text-sm font-medium text-gray-700 mb-1";
+const BUTTON_STYLE: &str = "px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-md shadow-sm hover:bg-gray-50 transition-all duration-200";
 
 #[component]
 pub fn SearchFilter(
@@ -14,21 +17,19 @@ pub fn SearchFilter(
 ) -> impl IntoView {
     view! {
         <div class=SEARCH_CONTAINER_STYLE>
-            <div class="flex-1">
-                <label for="search" class="block text-sm font-medium text-gray-700 mb-1">"Search Employees"</label>
-                <div class="relative rounded-md shadow-sm">
-                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <span class="text-gray-500 sm:text-sm">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
-                            </svg>
-                        </span>
+            <div class="flex-1 min-w-64">
+                <label for="search" class=LABEL_STYLE>"Search Employees"</label>
+                <div class="relative">
+                    <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-400">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
+                        </svg>
                     </div>
                     <input
                         type="text"
                         name="search"
                         id="search"
-                        class="focus:ring-indigo-500 focus:border-indigo-500 block w-full pl-10 pr-12 sm:text-sm border-gray-300 rounded-md h-10 border"
+                        class=format!("{} pl-10", INPUT_STYLE)
                         placeholder="Search by name..."
                         prop:value={search_term}
                         on:input=move |ev| set_search_term(event_target_value(&ev))
@@ -37,10 +38,10 @@ pub fn SearchFilter(
             </div>
 
             <div class="w-64">
-                <label for="role-filter" class="block text-sm font-medium text-gray-700 mb-1">"Filter by Role"</label>
+                <label for="role-filter" class=LABEL_STYLE>"Filter by Role"</label>
                 <select
                     id="role-filter"
-                    class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md h-10 border"
+                    class=INPUT_STYLE
                     prop:value={role_filter}
                     on:change=move |ev| set_role_filter(event_target_value(&ev))
                 >
@@ -53,10 +54,10 @@ pub fn SearchFilter(
                 </select>
             </div>
 
-            <div class="flex items-end mt-6">
+            <div>
                 <button
                     type="button"
-                    class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 h-10"
+                    class=BUTTON_STYLE
                     on:click=move |_| on_clear_filters.call(())
                 >
                     "Clear Filters"

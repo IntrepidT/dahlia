@@ -3,14 +3,25 @@ use crate::app::models::employee::{Employee, EmployeeRole};
 use leptos::*;
 use std::rc::Rc;
 
-const INFO_CONTAINER_STYLE: &str =
-    "h-full p-6 border-t-8 border-[#00356B] shadow-lg rounded-lg flex flex-col";
-const INFO_CONTENT_STYLE: &str = "flex-grow overflow-y-auto";
-const INFO_TITLE_STYLE: &str = "text-stone-400 text-xs";
-const INFO_VALUE_STYLE: &str = "mt-1";
-const INFO_GROUP_STYLE: &str = "mb-2";
-const BUTTON_CONTAINER_STYLE: &str =
-    "mt-4 pt-4 flex border-t gap-2 justify-end sticky bottom-0 bg-white w-full";
+// Updated consistent color scheme and styling
+const THEME_PRIMARY: &str = "#003366";
+const THEME_PRIMARY_LIGHT: &str = "#5D7A9E";
+const THEME_GRAY_BG: &str = "#F0F2F5";
+
+// Improved consistent styling with better naming
+const CARD_CONTAINER: &str = "h-full bg-white p-6 border-t-4 border-l border-r border-b border-gray-200 shadow-md rounded-lg flex flex-col";
+const SECTION_CONTAINER: &str = "bg-gray-50 p-5 rounded-lg border border-gray-100 shadow-sm";
+const SECTION_TITLE: &str =
+    "text-sm font-semibold text-gray-700 mb-3 pb-2 border-b border-gray-200";
+const INFO_TITLE: &str = "text-xs text-gray-600 font-medium";
+const INFO_VALUE: &str = "text-gray-800 mt-1";
+const INFO_GROUP: &str = "mb-4";
+const BUTTON_CONTAINER: &str =
+    "mt-6 pt-4 flex gap-3 justify-end sticky bottom-0 bg-white border-t border-gray-200";
+const BUTTON_PRIMARY: &str =
+    "px-4 py-2 bg-[#00356B] rounded-md font-medium text-white hover:bg-[#002548] transition-colors";
+const BUTTON_SECONDARY: &str = "px-4 py-2 bg-gray-200 rounded-md font-medium text-gray-800 hover:bg-gray-200 transition-colors border border-gray-300";
+const BUTTON_ACCENT: &str = "px-4 py-2 bg-[#FCEDA0] rounded-md font-medium text-gray-900 hover:bg-[#F5E080] transition-colors border border-gray-300";
 
 #[component]
 pub fn EmployeeDetails(
@@ -42,38 +53,42 @@ pub fn EmployeeDetails(
             />
         </Show>
         <Show when=move || !updating_employee()>
-            <div class=INFO_CONTAINER_STYLE>
-                <h2 class="text-xl font-bold mb-4">
-                    {move || format!("{} {}", employee_memo().firstname, employee_memo().lastname)}
-                </h2>
+            <div class=CARD_CONTAINER>
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="text-xl font-bold text-gray-800">
+                        {move || format!("{} {}", employee_memo().firstname, employee_memo().lastname)}
+                    </h2>
+                    <div class="px-3 py-1 rounded-full bg-blue-100 text-blue-800 text-xs font-medium">
+                        {move || employee_memo().status.to_string()}
+                    </div>
+                </div>
 
-                <div class=INFO_CONTENT_STYLE>
-                    <div class="grid grid-cols-2 gap-4">
-                        // Basic Information Section
-                        <div class="col-span-2">
-                            <h3 class="text-sm font-semibold text-gray-600 mb-2">"Basic Information"</h3>
-                            <div class="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg">
-                                <div class=INFO_GROUP_STYLE>
-                                    <div class=INFO_TITLE_STYLE>"Employee ID"</div>
-                                    <div class=INFO_VALUE_STYLE>{move || format!("{}", employee_memo().id)}</div>
+                <div class="flex-grow overflow-y-auto space-y-6">
+                    // Basic Information Section
+                    <div>
+                        <h3 class=SECTION_TITLE>"Employee Information"</h3>
+                        <div class=SECTION_CONTAINER>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div class=INFO_GROUP>
+                                    <div class=INFO_TITLE>"Employee ID"</div>
+                                    <div class=INFO_VALUE>{move || format!("#{}", employee_memo().id)}</div>
                                 </div>
-                                <div class=INFO_GROUP_STYLE>
-                                    <div class=INFO_TITLE_STYLE>"Status"</div>
-                                    <div class=INFO_VALUE_STYLE>{move || employee_memo().status.to_string()}</div>
-                                </div>
-                                <div class=INFO_GROUP_STYLE>
-                                    <div class=INFO_TITLE_STYLE>"Role"</div>
-                                    <div class=INFO_VALUE_STYLE>{move || employee_memo().role.to_string()}</div>
+                                <div class=INFO_GROUP>
+                                    <div class=INFO_TITLE>"Role"</div>
+                                    <div class=INFO_VALUE>{move || employee_memo().role.to_string()}</div>
                                 </div>
                                 {move || {
                                     let employee = employee_memo();
                                     match &employee.role {
                                         EmployeeRole::Teacher { grade } => {
                                             view! {
-                                                <div class=INFO_GROUP_STYLE>
-                                                    <div class=INFO_TITLE_STYLE>"Assigned Grade"</div>
-                                                    <div class=INFO_VALUE_STYLE>
-                                                        {grade.as_ref().map_or("Not Assigned".to_string(), |g| g.to_string())}
+                                                <div class=INFO_GROUP>
+                                                    <div class=INFO_TITLE>"Assigned Grade"</div>
+                                                    <div class=INFO_VALUE>
+                                                        {grade.as_ref().map_or(
+                                                            view! { <span class="text-gray-400">"Not Assigned"</span> },
+                                                            |g| view! { <span class="font-medium">{g.to_string()}</span> }
+                                                        )}
                                                     </div>
                                                 </div>
                                             }.into_view()
@@ -85,17 +100,17 @@ pub fn EmployeeDetails(
                         </div>
                     </div>
                 </div>
-                <div class=BUTTON_CONTAINER_STYLE>
+                <div class=BUTTON_CONTAINER>
                     <button
                         type="button"
-                        class="px-4 py-2 bg-gray-200 rounded-lg font-bold hover:bg-gray-300"
+                        class=BUTTON_SECONDARY
                         on:click=move |_| on_close.call(())
                     >
                         "Close"
                     </button>
                     <button
                         type="button"
-                        class="px-4 py-2 bg-[#00356b] rounded-lg font-bold text-white hover:bg-[#7F9AB5]"
+                        class=BUTTON_PRIMARY
                         on:click=move |_| set_updating_employee(true)
                     >
                         "Edit Employee"

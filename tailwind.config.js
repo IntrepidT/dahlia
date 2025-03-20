@@ -4,6 +4,29 @@ module.exports = {
   theme: {
     extend: {},
   },
-  plugins: [],
+  plugins: [
+    function({ addBase }) {
+      addBase({
+        '::-webkit-scrollbar': {
+          width: '6px',
+          height: '6px',
+        },
+        '::-webkit-scrollbar-track': {
+          background: 'transparent',
+        },
+        '::-webkit-scrollbar-thumb': {
+          backgroundColor: 'rgba(203, 213, 225, 0.5)',
+          borderRadius: '20px',
+        },
+        '::-webkit-scrollbar-thumb:hover': {
+          backgroundColor: 'rgba(148, 163, 184, 0.7)',
+        },
+        '*': {
+          scrollbarWidth: 'thin',
+          scrollbarColor: 'rgba(203, 213, 225, 0.5) transparent',
+        },
+      });
+    },
+  ],
 }
 

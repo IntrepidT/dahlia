@@ -84,7 +84,7 @@ pub fn Teachers() -> impl IntoView {
     };
 
     view! {
-        <div class="min-h-screen flex">
+        <div class="min-h-screen flex flex-col">
             <Header/>
 
             // Delete confirmation modal
@@ -100,7 +100,7 @@ pub fn Teachers() -> impl IntoView {
                 />
             </Show>
 
-            <div class="w-2/3 mt-20 px-8">
+            <div class="w-2/3 mt-12 px-6 ml-5">
                 // Search and Filters
                 <SearchFilter
                     search_term=search_term
@@ -151,7 +151,7 @@ pub fn Teachers() -> impl IntoView {
                 // Action Buttons
                 <div class=BUTTON_CONTAINER_STYLE_FLOAT>
                     <button
-                        class="inline-flex justify-items-end items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-500 hover:bg-green-400"
+                        class="inline-flex justify-items-end items-center px-4 py-2 border border-transparent rounded-md shadow-sm font-bold text-white bg-green-500 hover:bg-green-400"
                         on:click=move |_| {
                             set_adding_employee(true);
                             set_selected_employee(None);
@@ -160,7 +160,7 @@ pub fn Teachers() -> impl IntoView {
                         "Add Employee"
                     </button>
                     <button
-                        class="inline-flex justify-items-end items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-500 hover:bg-red-400"
+                        class="inline-flex justify-items-end items-center px-4 py-2 border border-transparent rounded-md shadow-sm font-bold text-white bg-red-500 hover:bg-red-400"
                         on:click=move |_| {
                             if selected_employee().is_some() {
                                 set_confirm_delete(true)

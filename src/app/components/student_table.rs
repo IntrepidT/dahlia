@@ -3,49 +3,63 @@ use leptos::*;
 use std::rc::Rc;
 #[component]
 pub fn StudentTable(
-    students: Resource<i32, Result<Vec<Student>, ServerFnError>>,
-    selected_student: ReadSignal<Option<Rc<Student>>>,
-    set_selected_student: WriteSignal<Option<Rc<Student>>>,
-    search_term: ReadSignal<String>,
-    grade_filter: ReadSignal<String>,
-    teacher_filter: ReadSignal<String>,
-    iep_filter: ReadSignal<bool>,
-    ell_filter: ReadSignal<bool>,
-    set_confirm_delete_one: WriteSignal<bool>,
-    set_adding_student: WriteSignal<bool>,
+    #[prop(into)] students: Resource<i32, Option<Vec<Student>>>,
+    #[prop(into)] search_term: Signal<String>,
+    #[prop(into)] grade_filter: Signal<String>,
+    #[prop(into)] teacher_filter: Signal<String>,
+    #[prop(into)] iep_filter: Signal<bool>,
+    #[prop(into)] esl_filter: Signal<bool>,
+    #[prop(into)] bip_filter: Signal<bool>,
+    #[prop(into)] selected_student: Signal<Option<Rc<Student>>>,
+    #[prop(into)] set_selected_student: WriteSignal<Option<Rc<Student>>>,
 ) -> impl IntoView {
-    let filtered_students = move || {
-        students.get().map(|result| {
-            result.ok().map(|students_data| {
-                students_data
-                    .into_iter()
-                    .filter(|student| {
-                        let search = search_term().to_lowercase();
-                        let matches_search = student.firstname.to_lowercase().contains(&search)
-                            || student.lastname.to_lowercase().contains(&search)
-                            || student.student_id.to_string().contains(&search);
+    let filtered_students = create_memo(move |_| {
+        let search = search_term().trim().to_lowercase();
+        let grade = grade_filter();
+        let teacher = teacher_filter();
+        let show_iep = iep_filter();
+        let show_esl = esl_filter();
+        let show_bip = bip_filter();
 
-                        let matches_grade =
-                            grade_filter() == "all" || student.grade.to_string() == grade_filter();
+        students
+            .get()
+            .unwrap_or(None)
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|student| {
+                // Filter by search term
+                let matches_search = search.is_empty()
+                    || student.firstname.to_lowercase().contains(&search)
+                    || student.lastname.to_lowercase().contains(&search);
 
-                        let matches_iep = !iep_filter() || student.iep;
+                // Filter by grade
+                let matches_grade = grade.is_empty() || student.grade.to_string().contains(&grade);
 
-                        let matches_ell = !ell_filter() || student.ell != ELLEnum::NotApplicable;
+                // Filter by teacher
+                let matches_teacher = teacher == "all" || student.teacher.to_string() == teacher;
 
-                        let matches_teacher =
-                            teacher_filter() == "all" || student.teacher == teacher_filter();
+                // Filter by IEP
+                let matches_iep = !show_iep || student.iep;
 
-                        matches_search
-                            && matches_grade
-                            && matches_iep
-                            && matches_ell
-                            && matches_teacher
-                    })
-                    .collect::<Vec<_>>()
+                // Filter by ESL
+                let matches_esl = !show_esl
+                    || match student.esl {
+                        Some(esl_status) => esl_status != ESLEnum::None,
+                        None => false,
+                    };
+
+                // Filter by BIP
+                let matches_bip = !show_bip || student.bip;
+
+                matches_search
+                    && matches_grade
+                    && matches_teacher
+                    && matches_iep
+                    && matches_esl
+                    && matches_bip
             })
-        })
-    };
-
+            .collect::<Vec<_>>()
+    });
     view! {
         <div class=TABLE_CONTAINER_STYLE>
             // Search and filters header
