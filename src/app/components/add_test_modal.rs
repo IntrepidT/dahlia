@@ -27,7 +27,7 @@ pub fn AddTestModal(
     const ERROR_STYLE: &str = "flex flex-col bg-[#222222] border-t-8 border-[#00356B] px-6 pt-5 h-[34rem] w-full max-w-[36rem] z-50 -mt-2 fixed z-50 rounded";
     //create and send signals for various data
     let (test_name, set_test_name) = create_signal(String::new());
-    let (test_score, set_test_score) = create_signal(String::new());
+    let (test_score, set_test_score) = create_signal("0".to_string());
     let (test_comments, set_test_comments) = create_signal(String::new());
     let (test_area, set_test_area) = create_signal(String::new());
     //
@@ -129,13 +129,14 @@ pub fn AddTestModal(
                         set_test_name(event_target_value(&event));
                     }
                 />
-                <input type="text" placeholder="Score"
+                //OVERRIDE OCCURS ON:SUBMIT BUTTON TEST_BUILDER
+                /*<input type="text" placeholder="Score"
                     class=INPUT_STYLE
                     value=test_score
                     on:input=move |event| {
                         set_test_score(event_target_value(&event));
                     }
-                />
+                />*/
                 <input type="text" placeholder="Comments"
                     class=INPUT_STYLE
                     value=test_comments

@@ -19,9 +19,11 @@ const SIDE_PANEL_STYLE: &str = "w-1/3 h-[calc(100vh-5rem)] fixed right-0 top-0 m
 const BUTTON_CONTAINER_STYLE_FLOAT: &str =
     "mt-2 flex gap-2 justify-end sticky bottom-0 bg-white w-full";
 const TAB_BUTTON_ACTIVE: &str =
-    "px-4 py-2 font-medium rounded-t-l bgg-white text-[#00356B] border border-b-0";
+    "px-4 py-2 font-medium rounded-t-lg bg-[#00356b] text-white border-none";
 const TAB_BUTTON_INACTIVE: &str =
     "px-4 py-2 font-medium rounded-t-lg bg-gray-100 text-gray-600 hover:bg-gray-200";
+const ADD_BUTTON_STYLE: &str = "inline-flex items-center justify-center px-4 py-2 bg-[#50C878] text-white rounded-md font-semibold hover:bg-[#5ADB75] focus:outline-none focus:ring-2 focus:ring-[#50C87]/50 transition-colors duration-200 shadow-sm hover:shadow-md";
+const DELETE_BUTTON_STYLE: &str = "inline-flex items-center justify-center px-4 py-2 bg-red-500 text-white rounded-md font-semibold hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500/50 transition-colors duration-200 shadow-sm hover:shadow-md";
 
 // Side panel styles
 const INFO_CONTAINER_STYLE: &str =
@@ -151,16 +153,7 @@ pub fn Teachers() -> impl IntoView {
                 // Action Buttons
                 <div class=BUTTON_CONTAINER_STYLE_FLOAT>
                     <button
-                        class="inline-flex justify-items-end items-center px-4 py-2 border border-transparent rounded-md shadow-sm font-bold text-white bg-green-500 hover:bg-green-400"
-                        on:click=move |_| {
-                            set_adding_employee(true);
-                            set_selected_employee(None);
-                        }
-                    >
-                        "Add Employee"
-                    </button>
-                    <button
-                        class="inline-flex justify-items-end items-center px-4 py-2 border border-transparent rounded-md shadow-sm font-bold text-white bg-red-500 hover:bg-red-400"
+                        class=DELETE_BUTTON_STYLE
                         on:click=move |_| {
                             if selected_employee().is_some() {
                                 set_confirm_delete(true)
@@ -168,6 +161,15 @@ pub fn Teachers() -> impl IntoView {
                         }
                     >
                         "Delete"
+                    </button>
+                    <button
+                        class=ADD_BUTTON_STYLE
+                        on:click=move |_| {
+                            set_adding_employee(true);
+                            set_selected_employee(None);
+                        }
+                    >
+                        "Add Employee"
                     </button>
                 </div>
 

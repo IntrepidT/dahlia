@@ -79,30 +79,24 @@ pub fn App() -> impl IntoView {
                         }/>
                         <Route path="/mathtesting" view=|| {
                             view!{
-                                <RequireAuth>
-                                    <MathTesting />
-                                </RequireAuth>
+                                <MathTesting />
                             }
                         }/>
                         <Route path="/readingtesting" view=|| {
                             view!{
-                                <RequireAuth>
-                                    <ReadingTesting />
-                                </RequireAuth>
+                                <ReadingTesting />
                             }
                         }/>
                         <Route path="/testbuilder/:test_id" view=|| {
                             view!{
-                                <RequireRole role="teacher".to_string()>
+                                <RequireRole role="admin".to_string()>
                                     <TestBuilder />
                                 </RequireRole>
                             }
                         }/>
                         <Route path="/assessment/:test_id" view=|| {
                             view!{
-                                <RequireAuth>
-                                    <Assessment />
-                                </RequireAuth>
+                                <Assessment />
                             }
                         }/>
                         <Route path="/*any" view=NotFound/>

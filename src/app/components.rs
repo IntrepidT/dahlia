@@ -6,7 +6,6 @@ pub use toast::Toast;
 pub use toast::ToastMessage;
 pub use toast::ToastMessageType;
 
-
 pub mod administer_test_modal;
 pub use administer_test_modal::ShowAdministerTestModal;
 
@@ -39,3 +38,6 @@ pub use nav::NavBar;
 
 pub mod auth;
 pub use auth::*;
+
+pub mod dashboard;
+pub use dashboard::*;

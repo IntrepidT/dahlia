@@ -98,5 +98,26 @@ cfg_if::cfg_if! {
             Ok(test)
         }
 
+        pub async fn score_override(test_id: String, score: i32, pool: &sqlx::PgPool) -> Result<Test, ServerFnError> {
+            let ID = Uuid::parse_str(&test_id).expect("The test id was not correctly converted to UUID");
+
+            let row = sqlx::query("UPDATE tests SET score = $1 WHERE test_id = $2 RETURNING name, score, comments, testarea, test_id::text")
+                .bind(score)
+                .bind(ID)
+                .fetch_one(pool)
+                .await
+                .map_err(|e| ServerFnError::new(format!("Database error occured: {}", e)))?;
+
+            let test = Test {
+                name: row.get("name"),
+                score: row.get("score"),
+                comments: row.get("comments"),
+                testarea: row.get("testarea"),
+                test_id: row.get("test_id"),
+            };
+
+            Ok(test)
+        }
+
     }
 }

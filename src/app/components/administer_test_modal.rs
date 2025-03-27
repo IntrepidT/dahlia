@@ -1,4 +1,4 @@
-
+use log::*;
 use crate::app::components::{Toast, ToastMessage, ToastMessageType};
 use leptos::*;
 use leptos_router::*;
@@ -28,7 +28,7 @@ pub fn ShowAdministerTestModal(set_if_show_modal: WriteSignal<bool>) -> impl Int
            <div class="grid grid-cols-3 gap-4">
                <A href="/mathtesting" class=CARD_STYLE>
                    <div class=ICON_STYLE>
-                       <img src="/assets/calculator.png" class="h-6 w-6"/>
+                       <img src="/assets/calculator.png" class="h-6 w-6" />
                    </div>
                    <span class=BUTTON_TEXT_STYLE>Math</span>
                </A>

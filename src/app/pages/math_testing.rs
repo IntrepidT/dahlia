@@ -5,7 +5,7 @@ use std::rc::Rc;
 
 #[component]
 pub fn MathTesting() -> impl IntoView {
-    const ADD_BUTTON_STYLE: &str = "bg-[#00356b] px-8 py-2 rounded text-white transition-all duration-1000 ease-in-out hover:bg-black";
+    const ADD_BUTTON_STYLE: &str = "bg-[#00356b] px-8 py-2 rounded text-white transition-all duration-1000 ease-in-out hover:bg-[#00457b]";
     const EDIT_BUTTON_STYLE: &str = "bg-[#00A86B] px-8 py-2 rounded text-white transition-all duration-1000 ease-in-out hover:bg-black ml-2";
     const EDIT_BUTTON_CLICKED_STYLE: &str =
         "bg-red-800 px-8 py-2 rounded text-white transition-all duration-1000 ease-in-out ml-2";

@@ -2,6 +2,7 @@ use crate::app::components::header::Header;
 use crate::app::components::question_builder::BuildingQuestion;
 use crate::app::models::{CreateNewQuestionRequest, Question, QuestionType};
 use crate::app::server_functions::questions::{add_question, get_questions};
+use crate::app::server_functions::tests::score_overrider;
 use leptos::prelude::*;
 use leptos::*;
 use leptos_router::*;
@@ -22,10 +23,13 @@ pub fn TestBuilder() -> impl IntoView {
 
     let (selected_tab, set_selected_tab) = create_signal(0);
     let (test_title, set_test_title) = create_signal(String::new());
+
     //let (test_instructs, set_test_instructs) = create_signal(String::new());
     //let (question_number, set_question_number) = create_signal(0);
 
     let (questions, set_questions) = create_signal(Vec::<Question>::new());
+
+    let mut score_counter = 0;
 
     let add_new_question = move |_| {
         set_questions.update(|qs| {
@@ -119,11 +123,18 @@ pub fn TestBuilder() -> impl IntoView {
 
         spawn_local(async move {
             for question in question_requests {
+                score_counter += question.point_value;
                 match add_question(test_id(), question.clone()).await {
                     Ok(_) => log::info!("Added question {}", question.qnumber),
                     Err(e) => log::error!("Failed to add question {}: {:?}", question.qnumber, e),
                 }
             }
+            log::info!("Total score counter: {}", score_counter);
+            match score_overrider(test_id(), score_counter).await {
+                Ok(test) => log::info!("Score updated successfully. New score: {}", test.score),
+                Err(e) => log::error!("Failed to update score: {:?}", e),
+            }
+
             let navigate = leptos_router::use_navigate();
             navigate("/mathtesting", Default::default());
         });

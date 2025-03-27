@@ -32,6 +32,8 @@ pub fn SearchFilter(
     let iep_checkbox_ref = create_node_ref::<html::Input>();
     let esl_checkbox_ref = create_node_ref::<html::Input>();
     let bip_checkbox_ref = create_node_ref::<html::Input>();
+    let grade_filter_ref = create_node_ref::<html::Select>();
+    let teacher_filter_ref = create_node_ref::<html::Select>();
     view! {
         <div class=SEARCH_CONTAINER_STYLE>
             // Search input
@@ -64,6 +66,7 @@ pub fn SearchFilter(
                     id="grade-filter"
                     class=SELECT_STYLE
                     on:change=move |ev| set_grade_filter(event_target_value(&ev))
+                    node_ref=grade_filter_ref
                 >
                     <option value="all">"All Grades"</option>
                     <option value="Kindergarten">"K"</option>
@@ -89,6 +92,7 @@ pub fn SearchFilter(
                     id="teacher-filter"
                     class=SELECT_STYLE
                     on:change=move |ev| set_teacher_filter(event_target_value(&ev))
+                    node_ref=teacher_filter_ref
                 >
                     <option value="all">"All Teachers"</option>
                     {move || {
@@ -157,6 +161,12 @@ pub fn SearchFilter(
                         }
                         if let Some(input) = bip_checkbox_ref.get() {
                             input.set_checked(false);
+                        }
+                        if let Some(select) = grade_filter_ref.get() {
+                            select.set_value("all");
+                        }
+                        if let Some(select) = teacher_filter_ref.get() {
+                            select.set_value("all");
                         }
 
                         on_clear_filters.call(());

@@ -225,7 +225,7 @@ pub fn StudentView() -> impl IntoView {
                         "Bulk Student Upload"
                     </button>
                     <button
-                        class="px-4 py-2 bg-red-500 font-bold text-white rounded-lg hover:bg-[#FAA0A0]"
+                        class="inline-flex items-center justify-center px-4 py-2 bg-red-500 text-white rounded-md font-semibold hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500/50 transition-colors duration-200 shadow-sm hover:shadow-md"
                         class:opacity-50=move || selected_student().is_none()
                         class:cursor-not-allowed=move || selected_student().is_none()
                         on:click=move |_| {
@@ -237,7 +237,7 @@ pub fn StudentView() -> impl IntoView {
                         "Delete Student"
                     </button>
                     <button
-                        class="px-4 py-2 bg-green-500 text-white font-bold rounded-lg hover:bg-[#A8DCAB]"
+                        class="inline-flex items-center justify-center px-4 py-2 bg-[#50C878] text-white rounded-md font-semibold hover:bg-[#5ADB75] focus:outline-none focus:ring-2 focus:ring-[#50C87]/50 transition-colors duration-200 shadow-sm hover:shadow-md"
                         on:click=handle_add_student
                     >
                         "Add Student"

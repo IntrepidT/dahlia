@@ -3,7 +3,7 @@ use leptos::*;
 use std::rc::Rc;
 
 // Updated consistent color scheme and styling
-const THEME_PRIMARY: &str = "#003366"; // Darkened from #00356B
+const THEME_PRIMARY: &str = "#00356b"; // Darkened from #00356B
 const THEME_PRIMARY_LIGHT: &str = "#5D7A9E"; // Darkened from #7F9AB5
 const THEME_GRAY_BG: &str = "#F0F2F5";
 
@@ -17,11 +17,11 @@ const INFO_VALUE: &str = "text-gray-900 mt-1";const INFO_GROUP: &str = "mb-4";
 const BUTTON_CONTAINER: &str =
     "mt-6 pt-4 flex gap-3 justify-end sticky bottom-0 bg-white border-t border-gray-200";
 const BUTTON_PRIMARY: &str = 
-    "px-4 py-2 bg-[#003366] rounded-md font-medium text-white hover:bg-[#002548] transition-colors";
+    "px-4 py-2 bg-[#00356b] rounded-md font-medium text-white hover:font-large transition-colors hover:bg-[#00457b] hover:border-white";
 const BUTTON_SECONDARY: &str = 
-    "px-4 py-2 bg-gray-200 rounded-md font-medium text-gray-800 hover:bg-gray-300 transition-colors border border-gray-300";
+    "px-4 py-2 bg-gray-200 rounded-md font-medium text-gray-500 hover:text-gray-900 hover:border-gray-700 transition-colors border border-gray-300";
 const BUTTON_ACCENT: &str = 
-    "px-4 py-2 bg-[#FCEDA0] rounded-md font-medium text-gray-900 hover:bg-[#F5E080] transition-colors border border-gray-300";
+    "px-4 py-2 bg-[#FCEDA0] rounded-md font-medium text-gray-500 hover:text-gray-900 transition-colors border border-gray-300 hover:border-gray-700";
 
 #[component]
 pub fn StudentDetails(

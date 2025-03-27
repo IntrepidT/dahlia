@@ -86,7 +86,6 @@ pub fn Header() -> impl IntoView {
                         <div class="relative">
                             <button
                                 on:click=move |_| set_show_administer_modal.update(|v| *v = !*v)
-                                on:blur=move |_| set_show_administer_modal.set(false)
                                 class="flex items-center text-gray-600 hover:text-[#00356b] hover:border-gray-600 pb-1 transition-colors"
                             >
                                 <span>"Administer Test"</span>

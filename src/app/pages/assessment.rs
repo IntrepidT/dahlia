@@ -1,11 +1,13 @@
-use crate::app::models::question::{Question, QuestionType};
-use crate::app::models::score::{CreateScoreRequest, Score};
+use crate::app::models::question::QuestionType;
+use crate::app::models::score::CreateScoreRequest;
 use crate::app::models::student::Student;
+use crate::app::models::user::User;
 use crate::app::server_functions::students::get_students;
 use crate::app::server_functions::{questions::get_questions, scores::add_score};
 use chrono::Local;
 use leptos::*;
 use leptos_router::*;
+use log::*;
 use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
@@ -19,6 +21,7 @@ pub fn Assessment() -> impl IntoView {
     // Get test_id from URL parameters
     let params = use_params_map();
     let test_id = move || params.with(|params| params.get("test_id").cloned().unwrap_or_default());
+    let user = use_context::<ReadSignal<Option<User>>>().expect("AuthProvider not Found");
 
     // Create resource that depends on the test_id from URL
     let questions = create_resource(test_id, move |tid| async move {
@@ -67,7 +70,10 @@ pub fn Assessment() -> impl IntoView {
 
         // TODO: Get actual student_id and evaluator from user session/context
         let student_id = selected_student_id.get().unwrap_or(0); // Placeholder
-        let evaluator = "temp_evaluator".to_string(); // Placeholder
+        let evaluator = match user.get() {
+            Some(user_data) => user_data.id.to_string(),
+            None => 0.to_string(),
+        }; // Placeholder
         let test_variant = 1; // Placeholder
 
         // Collect all scores and comments
@@ -137,7 +143,7 @@ pub fn Assessment() -> impl IntoView {
                 {test_id}
             </h2>
             <StudentSelect set_selected_student_id=set_selected_student_id />
-            
+
             // Show loading state
             <Suspense
                 fallback=move || view! { <div>"Loading questions..."</div> }
@@ -198,7 +204,7 @@ pub fn Assessment() -> impl IntoView {
                                                                 <input
                                                                     type="radio"
                                                                     name=format!("q_{}", qnumber)
-                                                                    value="True"
+                                                                    value="true"
                                                                     on:change=move |ev| {
                                                                         let value = event_target_value(&ev);
                                                                         handle_answer_change(qnumber, value);
@@ -210,7 +216,7 @@ pub fn Assessment() -> impl IntoView {
                                                                 <input
                                                                     type="radio"
                                                                     name=format!("q_{}", qnumber)
-                                                                    value="False"
+                                                                    value="false"
                                                                     on:change=move |ev| {
                                                                         let value = event_target_value(&ev);
                                                                         handle_answer_change(qnumber, value);
@@ -259,20 +265,31 @@ pub fn Assessment() -> impl IntoView {
                                         <div class="mb-4" class:text-green-500=status.starts_with("Assessment submitted") class:text-red-500=status.starts_with("Error")>
                                             {status}
                                         </div>
+                                        <button
+                                            class="px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-600"
+                                            on:click=move |_| {
+                                                let navigate= leptos_router::use_navigate();
+                                                navigate("/dashboard", Default::default());
+                                            }
+                                        >
+                                            "Return home"
+                                        </button>
                                     }
                                 })}
 
-                                <button
-                                    class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-                                    on:click=move |_| handle_submit.dispatch(())
-                                    disabled=move || handle_submit.pending().get()
-                                >
-                                    {move || if handle_submit.pending().get() {
-                                        "Submitting..."
-                                    } else {
-                                        "Submit Assessment"
-                                    }}
-                                </button>
+                                <Show when=move || {submit_status.get() != Some("Assessment submitted successfully!")}>
+                                    <button
+                                        class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                                        on:click=move |_| handle_submit.dispatch(())
+                                        disabled=move || handle_submit.pending().get()
+                                    >
+                                        {move || if handle_submit.pending().get() {
+                                            "Submitting..."
+                                        } else {
+                                            "Submit Assessment"
+                                        }}
+                                    </button>
+                                </Show>
                             </div>
                         </div>
                     }.into_view()

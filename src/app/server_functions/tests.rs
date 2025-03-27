@@ -118,6 +118,29 @@ pub async fn update_test(update_test_request: UpdateTestRequest) -> Result<Test,
     }
 }
 
+#[server(ScoreOverride, "/api")]
+pub async fn score_overrider(test_id: String, score: i32) -> Result<Test, ServerFnError> {
+    #[cfg(feature = "ssr")]
+    {
+        use actix_web::web;
+        use leptos_actix::extract;
+
+        let pool = extract::<web::Data<PgPool>>()
+            .await
+            .map_err(|e| ServerFnError::new(format!("Failed to extract pool: {}", e)))?;
+
+        log::info!("Attempting to modify score for a test");
+
+        match test_database::score_override(test_id, score, &pool).await {
+            Ok(updated_test) => Ok(updated_test),
+            Err(e) => Err(ServerFnError::new(format!(
+                "Failed to update student: {}",
+                e
+            ))),
+        }
+    }
+}
+
 /*cfg_if::cfg_if! {
     if #[cfg(feature = "ssr")] {
 
