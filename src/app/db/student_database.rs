@@ -184,5 +184,65 @@ cfg_if::cfg_if! {
 
             Ok(Some(student))
         }
+
+        pub async fn bulk_insert_students(students: Vec<Student>, pool: &PgPool) -> Result<Vec<Student>, ServerFnError> {
+            // Start a database transaction for bulk insert
+            let mut tx = pool.begin().await?;
+
+            let mut inserted_students = Vec::new();
+
+            // Prepare the bulk insert query
+            for student in students {
+                // Use the existing add_student logic within the transaction
+                let row = sqlx::query("INSERT INTO students (firstname, lastname, preferred, gender, date_of_birth, student_id, esl, grade, teacher, iep, bip, student_504, readplan, gt, intervention, eye_glasses, notes) VALUES($1, $2, $3, $4::gender_enum, $5, $6, $7::esl_enum, $8::grade_enum, $9, $10, $11, $12, $13, $14, $15, $16, $17) RETURNING firstname, lastname, preferred, gender, date_of_birth, student_id, esl, grade, teacher, iep, bip, student_504, readplan, gt, intervention, eye_glasses, notes")
+                    .bind(&student.firstname)
+                    .bind(&student.lastname)
+                    .bind(&student.preferred)
+                    .bind(&student.gender.to_string())
+                    .bind(&student.date_of_birth)
+                    .bind(&student.student_id)
+                    .bind(&student.esl.to_string())
+                    .bind(&student.grade.to_string())
+                    .bind(&student.teacher)
+                    .bind(&student.iep)
+                    .bind(&student.bip)
+                    .bind(&student.student_504)
+                    .bind(&student.readplan)
+                    .bind(&student.gt)
+                    .bind(&student.intervention)
+                    .bind(&student.eye_glasses)
+                    .bind(&student.notes)
+                    .fetch_one(&mut *tx)
+                    .await
+                    .map_err(|e| ServerFnError::new(format!("Bulk insert error: {}", e)))?;
+
+                let inserted_student = Student {
+                    firstname: row.get("firstname"),
+                    lastname: row.get("lastname"),
+                    preferred: row.get("preferred"),
+                    gender: row.get("gender"),
+                    date_of_birth: row.get("date_of_birth"),
+                    student_id: row.get("student_id"),
+                    esl: row.get("esl"),
+                    grade: row.get("grade"),
+                    teacher: row.get("teacher"),
+                    iep: row.get("iep"),
+                    bip: row.get("bip"),
+                    student_504: row.get("student_504"),
+                    readplan: row.get("readplan"),
+                    gt: row.get("gt"),
+                    intervention: row.get("intervention"),
+                    eye_glasses: row.get("eye_glasses"),
+                    notes: row.get("notes"),
+                };
+
+                inserted_students.push(inserted_student);
+            }
+
+            // Commit the transaction
+            tx.commit().await?;
+
+            Ok(inserted_students)
+        }
     }
 }

@@ -77,7 +77,10 @@ pub fn AddTestModal(
                             //setting this to true will make the Toast
                             //"new member added" appear
                             set_if_show_added(true);
-                            let test_question = CreateNewQuestionRequest::new(
+
+                            //this is a test question which ensures that test questions are
+                            //appropriately built and linked with their corresponding test
+                            /*let test_question = CreateNewQuestionRequest::new(
                                 "What Letter is this: A".to_string(),
                                 1,
                                 QuestionType::TrueFalse,
@@ -86,10 +89,11 @@ pub fn AddTestModal(
                                 1,
                                 added_test.test_id.clone(),
                             );
+
                             match add_question(added_test.test_id.clone(), test_question).await {
                                 Ok(_) => {}
                                 Err(e) => {}
-                            }
+                            }*/
                             navigate(
                                 &format!("/testbuilder/{}", added_test.test_id),
                                 Default::default(),

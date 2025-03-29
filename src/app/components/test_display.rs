@@ -31,7 +31,7 @@ pub fn MathTestDisplay(
         } else {
             let navigate = leptos_router::use_navigate();
             navigate(
-                &format!("/assessment/{}", edit_test.test_id),
+                &format!("/flashcardset/{}", edit_test.test_id),
                 Default::default(),
             );
         }

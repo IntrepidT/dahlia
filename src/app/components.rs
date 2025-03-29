@@ -41,3 +41,6 @@ pub use auth::*;
 
 pub mod dashboard;
 pub use dashboard::*;
+
+pub mod test_templates;
+pub use test_templates::*;

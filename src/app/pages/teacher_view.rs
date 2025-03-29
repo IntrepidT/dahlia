@@ -22,7 +22,7 @@ const TAB_BUTTON_ACTIVE: &str =
     "px-4 py-2 font-medium rounded-t-lg bg-[#00356b] text-white border-none";
 const TAB_BUTTON_INACTIVE: &str =
     "px-4 py-2 font-medium rounded-t-lg bg-gray-100 text-gray-600 hover:bg-gray-200";
-const ADD_BUTTON_STYLE: &str = "inline-flex items-center justify-center px-4 py-2 bg-[#50C878] text-white rounded-md font-semibold hover:bg-[#5ADB75] focus:outline-none focus:ring-2 focus:ring-[#50C87]/50 transition-colors duration-200 shadow-sm hover:shadow-md";
+const ADD_BUTTON_STYLE: &str = "inline-flex items-center justify-center px-4 py-2 bg-[#50C878] text-white rounded-md font-semibold hover:bg-[#41C36C] focus:outline-none focus:ring-2 focus:ring-[#50C878]/50 transition-colors duration-200 shadow-sm hover:shadow-md";
 const DELETE_BUTTON_STYLE: &str = "inline-flex items-center justify-center px-4 py-2 bg-red-500 text-white rounded-md font-semibold hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500/50 transition-colors duration-200 shadow-sm hover:shadow-md";
 
 // Side panel styles

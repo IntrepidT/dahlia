@@ -8,7 +8,7 @@ pub fn Dashboard() -> impl IntoView {
 
     view! {
         <Header />
-        <div class="flex">
+        <div class="flex h-full">
             <DashboardSidebar
                 selected_item=selected_view
                 set_selected_item=set_selected_view
@@ -17,10 +17,13 @@ pub fn Dashboard() -> impl IntoView {
                 {move || match selected_view() {
                     SidebarSelected::Overview => view! {
                         <div class="text-2xl font-bold">
-                            Dashboard Overview
-                            <p class="text-base font-normal mt-4">
-                                Welcome to your dashboard. Here you can view key metrics and insights.
-                            </p>
+                            Overview
+                            <div class="flex-1 w-full shadow-lg border-gray border-2 h-[20rem] rounded-lg mt-2">
+                                <h1 class="text-base font-bold text-xl ml-2 p-2">
+                                    Today
+                                </h1>
+                                <hr class="text-sm text-gray" />
+                            </div>
                         </div>
                     },
                     SidebarSelected::Analytics => view! {

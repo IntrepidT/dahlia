@@ -1,4 +1,5 @@
 use crate::app::components::header::Header;
+use crate::app::components::student_page::bulk_upload_modal::BulkUploadModal;
 use crate::app::components::student_page::student_search_filter::SearchFilter;
 use crate::app::components::student_page::student_table::StudentTable;
 use crate::app::components::student_page::update_student_form::UpdateStudent;
@@ -73,6 +74,9 @@ pub fn StudentView() -> impl IntoView {
     // Delete student confirmation state
     let (confirm_delete_one, set_confirm_delete_one) = create_signal(false);
     let (confirm_delete_two, set_confirm_delete_two) = create_signal(String::new());
+
+    //Signal for showing bulk upload modal
+    let (show_bulk_upload_modal, set_show_bulk_upload_modal) = create_signal(false);
 
     // Extract teacher names for the filter dropdown
     let teacher_names = create_memo(move |_| {
@@ -191,6 +195,14 @@ pub fn StudentView() -> impl IntoView {
                 </div>
             </Show>
 
+            {/* Bulk Upload Modal */}
+            <Show when=move || show_bulk_upload_modal()>
+                <BulkUploadModal
+                    set_show_modal=set_show_bulk_upload_modal
+                    set_refresh_trigger=set_refresh_trigger
+                />
+            </Show>
+
             // Main content area (2/3 width)
             <div class=TABLE_CONTAINER_STYLE>
                 // Search and filter component
@@ -221,7 +233,10 @@ pub fn StudentView() -> impl IntoView {
 
                 // Bottom action buttons
                 <div class="mt-4 pt-2 flex gap-2 justify-end sticky bottom-0 bg-white">
-                    <button class="px-4 py-2 bg-gray-300 font-bold text-white rounded-lg">
+                    <button
+                        class="px-4 py-2 bg-gray-300 font-bold text-white rounded-lg"
+                        on:click=move |_| set_show_bulk_upload_modal(true)
+                    >
                         "Bulk Student Upload"
                     </button>
                     <button
@@ -237,7 +252,7 @@ pub fn StudentView() -> impl IntoView {
                         "Delete Student"
                     </button>
                     <button
-                        class="inline-flex items-center justify-center px-4 py-2 bg-[#50C878] text-white rounded-md font-semibold hover:bg-[#5ADB75] focus:outline-none focus:ring-2 focus:ring-[#50C87]/50 transition-colors duration-200 shadow-sm hover:shadow-md"
+                        class="inline-flex items-center justify-center px-4 py-2 bg-[#50C878] text-white rounded-md font-semibold hover:bg-[#41C35C] focus:outline-none focus:ring-2 focus:ring-[#50C878]/50 transition-colors duration-200 shadow-sm hover:shadow-md"
                         on:click=handle_add_student
                     >
                         "Add Student"

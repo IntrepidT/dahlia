@@ -5,8 +5,8 @@ use std::str::FromStr;
 const FIELD_TITLE: &str = "mt-5 font-base text-[#00356b] text-xl";
 const INPUT: &str = "w-40 h-12 border-[#00356b] border pr-4 pl-6 py-4 text-[#00356b] rounded transition-all duration-1000 ease-in-out";
 const INPUT_QUESTION: &str = "w-full h-12 border-[#00356b] border pr-4 pl-6 py-4 text-[#00356b] rounded transition-all duration-1000 ease-in-out";
-const SELECTED_BUTTON: &str = "w-40 h-12 border-[#00356b] border pr-4 pl-6 py-4 text-[#00356b] rounded transition-all duration-1000 ease-in-out";
-const UNSELECTED_BUTTON: &str = "w-40 h-12 bg-[#00356b] pr-4 pl-6 py-4 text-white rounded transition-all duration-1000 ease-in-out";
+const UNSELECTED_BUTTON: &str = "w-40 h-12 bg-gray-300 border-[#00356b] border pr-4 pl-6 py-4 text-[#00356b] rounded transition-all duration-1000 ease-in-out";
+const SELECTED_BUTTON: &str = "w-40 h-12 bg-[#00356b] pr-4 pl-6 py-4 text-white rounded transition-all duration-1000 ease-in-out";
 const INPUT_SELECTOR: &str ="w-45 h-12 border-[#00356b] border pr-4 pl-6 py-2 text-[#00356b] rounded transition-all duration-1000 ease-in-out";
 
 #[component]
@@ -253,19 +253,23 @@ pub fn TrueFalse(
 
     view! {
         <div class="flex gap=4 items-center mt-4">
-            <h3 class="text-[#00356b] font-semibold">True/False Answer</h3>
-            <button
-                class=move || if selected_answer() == "true" {SELECTED_BUTTON } else {UNSELECTED_BUTTON }
-                on:click=true_click
-            >
-                "True"
-            </button>
-            <button
-                class=move || if selected_answer() == "false" {SELECTED_BUTTON} else {UNSELECTED_BUTTON }
-                on:click=false_click
-            >
-                "False"
-            </button>
+            <div class="flex-col flex gap-y-4">
+                <h3 class="text-[#00356b] font-semibold">True/False Answer</h3>
+                <div class="space-x-4">
+                    <button
+                        class=move || if selected_answer() == "true" {SELECTED_BUTTON } else {UNSELECTED_BUTTON }
+                        on:click=true_click
+                    >
+                        "True"
+                    </button>
+                    <button
+                        class=move || if selected_answer() == "false" {SELECTED_BUTTON} else {UNSELECTED_BUTTON }
+                        on:click=false_click
+                    >
+                        "False"
+                    </button>
+                </div>
+            </div>
         </div>
     }
 }

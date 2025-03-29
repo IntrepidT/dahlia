@@ -17,3 +17,6 @@ pub mod employees;
 pub use employees::get_employees;
 
 pub mod auth;
+
+pub mod bulk_students;
+pub use bulk_students::upload_students_bulk;

@@ -34,3 +34,7 @@ pub use employee::StatusEnum;
 
 pub mod user;
 pub use user::User;
+
+pub mod bulk_student;
+pub use bulk_student::BulkStudentImportRequest;
+pub use bulk_student::StudentCsvRow;

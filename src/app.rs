@@ -6,6 +6,7 @@ pub mod server_functions;
 use leptos_meta::*;
 use leptos_router::*;
 pub mod pages;
+use components::test_templates::FlashCardSet;
 use pages::{
     AdministerTest, Assessment, Dashboard, HomePage, LoginPage, MathTesting, MyAccount,
     ReadingTesting, StudentView, Teachers, TestBuilder,
@@ -96,7 +97,20 @@ pub fn App() -> impl IntoView {
                         }/>
                         <Route path="/assessment/:test_id" view=|| {
                             view!{
-                                <Assessment />
+                                <RequireRole role="teacher".to_string()>
+                                    <RequireRole role="admin".to_string()>
+                                        <Assessment />
+                                    </RequireRole>
+                                </RequireRole>
+                            }
+                        }/>
+                        <Route path="/flashcardset/:test_id" view=|| {
+                            view!{
+                                <RequireRole role="teacher".to_string()>
+                                    <RequireRole role="admin".to_string()>
+                                        <FlashCardSet />
+                                    </RequireRole>
+                                </RequireRole>
                             }
                         }/>
                         <Route path="/*any" view=NotFound/>
