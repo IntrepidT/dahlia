@@ -1,7 +1,7 @@
-use crate::app::server_functions::bulk_students::test_bulk_function;
 use crate::app::server_functions::bulk_students::upload_students_bulk;
 use js_sys::Array;
 use leptos::ev::Event;
+use leptos::*;
 use leptos::*;
 use std::sync::mpsc;
 use wasm_bindgen::{closure::Closure, JsCast};
@@ -136,13 +136,6 @@ pub fn BulkUploadModal(
                     </button>
                     <button
                         type="button"
-                        class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-                        on:click=move |_| test_server_function()
-                    >
-                        "Test Server Function"
-                    </button>
-                    <button
-                        type="button"
                         class="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
                         disabled=move || file().is_none() || is_uploading()
                         on:click=handle_upload
@@ -199,29 +192,7 @@ async fn upload_file(file: web_sys::File) -> Result<usize, String> {
         .ok_or_else(|| "Failed to convert file content to string".to_string())?;
 
     // Call the server function with the file contents
-    upload_students_bulk(file_contents)
+    crate::app::server_functions::bulk_students::upload_students_bulk(file_contents)
         .await
         .map_err(|e| e.to_string())
-}
-
-fn test_server_function() {
-    spawn_local(async move {
-        match test_bulk_function().await {
-            Ok(result) => {
-                // Success - print to console or update UI
-                log::info!("Test function result: {}", result);
-                // Or use web_sys to show an alert
-                if let Some(window) = web_sys::window() {
-                    let _ = window.alert_with_message(&format!("Success: {}", result));
-                }
-            }
-            Err(e) => {
-                // Handle error
-                log::error!("Test function failed: {}", e);
-                if let Some(window) = web_sys::window() {
-                    let _ = window.alert_with_message(&format!("Error: {}", e));
-                }
-            }
-        }
-    });
 }

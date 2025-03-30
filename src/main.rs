@@ -28,7 +28,7 @@ async fn main() -> std::io::Result<()> {
 
     // Generate the list of routes in your Leptos App
     let routes = generate_route_list(App);
-    println!("Generated routes: {:?}", routes);
+    //println!("Generated routes: {:?}", routes);
     println!("listening on http://{}", &addr);
 
     // Create a secret key for cookie encryption
@@ -50,7 +50,6 @@ async fn main() -> std::io::Result<()> {
             .app_data(pool.clone())
             // Authentication middleware
             .wrap(Authentication::new(secret_key.clone()))
-            // Provide db pool to leptos via context
             // serve JS/WASM/CSS from `pkg`
             .service(Files::new("/pkg", format!("{site_root}/pkg")))
             // serve other assets from the `assets` directory
@@ -59,6 +58,7 @@ async fn main() -> std::io::Result<()> {
             .service(favicon)
             .service(Files::new("/static", "./static").show_files_listing())
             // Leptos routes (this must be last)
+            .route("/api/{tail:.*}", leptos_actix::handle_server_fns())
             .leptos_routes(leptos_options_clone.to_owned(), routes.to_owned(), App)
     })
     .bind(&addr)?

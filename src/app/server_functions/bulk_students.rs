@@ -2,22 +2,14 @@ use crate::app::models::bulk_student::StudentCsvRow;
 use crate::app::models::student::{ESLEnum, GenderEnum, GradeEnum, Student};
 use chrono::NaiveDate;
 use csv::ReaderBuilder;
-use futures::TryStreamExt;
 use leptos::*;
-use serde::{Deserialize, Serialize};
-use std::io::Write;
 use std::str::FromStr;
 use validator::Validate;
 
 #[cfg(feature = "ssr")]
-use {
-    crate::app::db::database,
-    crate::app::db::student_database,
-    actix_web::{web, Error, HttpResponse},
-    sqlx::PgPool,
-};
+use {crate::app::db::student_database, sqlx::PgPool};
 
-#[server(BulkUpload, "/api")]
+#[server(UploadStudentsBulk, "/api")]
 pub async fn upload_students_bulk(file_contents: String) -> Result<usize, ServerFnError> {
     #[cfg(feature = "ssr")]
     {
@@ -124,20 +116,6 @@ pub async fn upload_students_bulk(file_contents: String) -> Result<usize, Server
                 Err(ServerFnError::ServerError(format!("Import failed: {}", e)))
             }
         }
-    }
-    #[cfg(not(feature = "ssr"))]
-    {
-        Err(ServerFnError::ServerError(
-            "Server-side functionality not available".to_string(),
-        ))
-    }
-}
-
-#[server(TestBulkFunction)]
-pub async fn test_bulk_function() -> Result<String, ServerFnError> {
-    #[cfg(feature = "ssr")]
-    {
-        Ok("Bulk function test worked!".to_string())
     }
     #[cfg(not(feature = "ssr"))]
     {

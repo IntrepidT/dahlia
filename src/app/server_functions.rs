@@ -9,6 +9,7 @@ pub use questions::get_questions;
 
 pub mod scores;
 pub use scores::get_score;
+pub use scores::get_scores;
 
 pub mod teachers;
 pub use teachers::get_teachers;

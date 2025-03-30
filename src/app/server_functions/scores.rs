@@ -7,6 +7,35 @@ use {
     std::error::Error,
 };
 
+#[server(GetScores, "/api")]
+pub async fn get_scores() -> Result<Vec<Score>, ServerFnError> {
+    #[cfg(feature = "ssr")]
+    {
+        use actix_web::web;
+        use leptos_actix::extract;
+        let pool = extract::<web::Data<PgPool>>()
+            .await
+            .map_err(|e| ServerFnError::new(format!("Failed to extract pool: {}", e)))?;
+
+        log::info!("Attempting to retrieve all scores from database");
+        use crate::app::db::score_database;
+
+        match score_database::get_all_scores(&pool).await {
+            Ok(scores) => {
+                log::info!(
+                    "Successfully retrieved {} scores from database",
+                    scores.len()
+                );
+                Ok(scores)
+            }
+            Err(e) => {
+                log::error!("Database error: {}", e);
+                Err(ServerFnError::new(format!("Database error: {}", e)))
+            }
+        }
+    }
+}
+
 #[server(GetScore, "/api")]
 pub async fn get_score(
     student_id: i32,
