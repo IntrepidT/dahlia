@@ -1,5 +1,6 @@
 use crate::app::models::{Question, QuestionType};
 use leptos::*;
+use std::rc::Rc;
 use std::str::FromStr;
 
 const FIELD_TITLE: &str = "mt-5 font-base text-[#00356b] text-xl";
@@ -60,7 +61,7 @@ pub fn BuildingQuestion(
 
     view! {
         <div class="question-builder p-4 border rounded mb-4">
-            <h1 class=FIELD_TITLE>Question # {initial_question.qnumber}</h1>
+            <h1 class=FIELD_TITLE>Question: </h1>
             <input type="text" placeholder="Question" class=INPUT_QUESTION
                 prop:value=move || question_data.with(|q| q.word_problem.clone())
                 on:input=move |event| update_field("word_problem", event_target_value(&event))
@@ -117,103 +118,148 @@ pub fn MultipleChoice(
     options: Vec<String>,
     on_change: Callback<(Vec<String>, String)>,
 ) -> impl IntoView {
-    let (current_options, set_current_options) = create_signal(options.clone());
-    let (correct_answer, set_correct_answer) =
-        create_signal(options.first().cloned().unwrap_or_default());
+    // Generate initial IDs
+    let next_id = std::cell::Cell::new(0);
+    let get_next_id = move || {
+        let id = next_id.get();
+        next_id.set(id + 1);
+        id
+    };
 
+    // Create initial options with IDs
+    let initial_options = options
+        .into_iter()
+        .map(|value| (get_next_id(), value))
+        .collect::<Vec<_>>();
+
+    // Create signals
+    let (option_items, set_option_items) = create_signal(initial_options);
+    let (correct_answer, set_correct_answer) = create_signal(
+        option_items.with(|items| items.first().map(|(_, v)| v.clone()).unwrap_or_default()),
+    );
+
+    // Create a debounced update callback to reduce renders
+    let debounced_update = store_value(move || {
+        // Only call this when we want to notify the parent
+        let values =
+            option_items.with(|items| items.iter().map(|(_, v)| v.clone()).collect::<Vec<_>>());
+        on_change((values, correct_answer()));
+    });
+
+    // Add a new option
     let add_option = move |_| {
-        set_current_options.update(|opts| {
-            opts.push(String::new());
-            on_change((opts.clone(), correct_answer()));
+        set_option_items.update(|items| {
+            items.push((get_next_id(), String::new()));
         });
+        // Update callback after adding
+        debounced_update.with_value(|update| update());
     };
 
-    let create_update_option = move || {
-        move |index: usize, new_value: String| {
-            set_current_options.update(|opts| {
-                if index < opts.len() {
-                    opts[index] = new_value.clone();
-                    if opts[index] == correct_answer() {
-                        set_correct_answer.set(new_value);
-                    }
-                    on_change((opts.clone(), correct_answer()));
-                }
-            });
-        }
-    };
-    let create_remove_option = move || {
-        move |index: usize| {
-            set_current_options.update(|opts| {
-                if index < opts.len() {
-                    if opts[index] == correct_answer() {
-                        let new_correct = opts.first().cloned().unwrap_or_default();
-                        set_correct_answer.set(new_correct);
-                    }
-                    opts.remove(index);
-                    on_change((opts.clone(), correct_answer()));
-                }
-            });
-        }
+    // Create a stored callback for updating options
+    let update_option = move |id: usize, new_value: String| {
+        set_option_items.update(|items| {
+            if let Some(item) = items.iter_mut().find(|(item_id, _)| *item_id == id) {
+                item.1 = new_value.clone();
+            }
+        });
+        // Don't update the parent on every keystroke
+        // We'll update on blur or other significant events
     };
 
-    let set_correct_option = move |option: String| {
-        set_correct_answer.set(option);
-        on_change((current_options(), correct_answer()));
+    // Handle option blur - this is when we'll notify the parent
+    let on_option_blur = move |_| {
+        debounced_update.with_value(|update| update());
+    };
+
+    // Handle removing options
+    let remove_option = move |id: usize| {
+        set_option_items.update(|items| {
+            // Check if we're removing the correct answer
+            let removing_correct = items
+                .iter()
+                .find(|(item_id, _)| *item_id == id)
+                .map(|(_, value)| value == &correct_answer())
+                .unwrap_or(false);
+
+            // Remove the item
+            items.retain(|(item_id, _)| *item_id != id);
+
+            // Update correct answer if needed
+            if removing_correct && !items.is_empty() {
+                let new_correct = items[0].1.clone();
+                set_correct_answer.set(new_correct);
+            }
+        });
+        // Update callback after removing
+        debounced_update.with_value(|update| update());
+    };
+
+    // Set the correct answer
+    let set_as_correct = move |id: usize| {
+        if let Some(value) = option_items.with(|items| {
+            items
+                .iter()
+                .find(|(item_id, _)| *item_id == id)
+                .map(|(_, v)| v.clone())
+        }) {
+            set_correct_answer.set(value.clone());
+            // Update callback after changing correct answer
+            debounced_update.with_value(|update| update());
+        }
     };
 
     view! {
        <div class="mt-4 space-y-4">
            <h3 class="text-[#00356b] font-semibold">"Multiple Choice Options"</h3>
            <For
-            each=move || current_options.get()
-            key=|option| option.clone()
-            children=move |option: String| {
+               each=move || option_items.get()
+               key=|(id, _)| *id
+               children=move |(id, value)| {
+                   let option_id = id;
+                   let option_value = value.clone();
 
-                let index = current_options.with(|opts| opts.iter().position(|opt| opt == &option).unwrap_or(0));
-                let update_option = create_update_option();
-                let remove_option = create_remove_option();
-                let option_for_correct = option.clone();
+                   view! {
+                       <div class="flex items-center gap-2">
+                           <input
+                               type="text"
+                               placeholder=format!("Option {}", option_id + 1)
+                               class="flex-grow p-2 border rounded"
+                               prop:value=option_value.clone()
+                               on:input=move |event| {
+                                   update_option(option_id, event_target_value(&event))
+                               }
+                               on:blur=move |_| on_option_blur(option_id)
+                           />
+                           <button
+                               class=move || {
+                                   if correct_answer() == option_value {
+                                       "bg-green-500 text-white p-2 rounded"
+                                   } else {
+                                       "bg-gray-200 text-gray-700 p-2 rounded"
+                                   }
+                               }
+                               on:click=move |_| set_as_correct(option_id)
+                           >
+                               "Correct"
+                           </button>
+                           <button
+                               class="bg-red-500 text-white p-2 rounded"
+                               on:click=move |_| remove_option(option_id)
+                           >
+                               "Remove"
+                           </button>
+                       </div>
+                   }
+               }
+           />
 
-                view! {
-                    <div class="flex items-center gap-2">
-                        <input
-                            type="text"
-                            placeholder=format!("Option {}", index + 1)
-                            class="flex-grow p-2 border rounded"
-                            prop:value=option.clone()
-                            on:input=move |event| {
-                                update_option(index, event_target_value(&event))
-                            }
-                        />
-                        <button
-                            class=move || {
-                                if correct_answer() == option_for_correct {
-                                    "bg-green-500 text-white p-2 rounded"
-                                } else {
-                                    "bg-gray-200 text-gray-700 p-2 rounded"
-                                }
-                            }
-                            on:click=move |_| set_correct_option(option.clone())
-                        >
-                            "Correct"
-                        </button>
-                        <button
-                            class="bg-red-500 text-white p-2 rounded"
-                            on:click=move |_| remove_option(index)
-                        >
-                            "Remove"
-                        </button>
-                    </div>
-                }
-            }/>
-
-            <button
-                class="bg-[#00356b] text-white p-2 rounded mt-2"
-                on:click=add_option
-            >
-                "Add Option"
-            </button>
-        </div>
+           <button
+               class="bg-[#00356b] text-white p-2 rounded mt-2"
+               on:click=add_option
+           >
+               "Add Option"
+           </button>
+       </div>
     }
 }
 

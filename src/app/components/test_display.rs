@@ -18,6 +18,8 @@ pub fn MathTestDisplay(
     set_if_show_toast: WriteSignal<bool>,
     set_toast_message: WriteSignal<ToastMessage>,
     editing_mode: ReadSignal<bool>,
+    on_delete: Option<Callback<String>>,
+    show_delete_mode: ReadSignal<bool>,
 ) -> impl IntoView {
     let edit_test = test.clone();
     let test_info = test.clone();
@@ -27,7 +29,11 @@ pub fn MathTestDisplay(
 
     let on_show_info = move |_| {
         if editing_mode() {
-            set_if_show_info_modal(!if_show_info_modal());
+            let navigate = leptos_router::use_navigate();
+            navigate(
+                &format!("/testbuilder/{}", edit_test.test_id),
+                Default::default(),
+            );
         } else {
             let navigate = leptos_router::use_navigate();
             navigate(
@@ -46,23 +52,35 @@ pub fn MathTestDisplay(
     };
 
     view! {
-        <Show when=move || {if_show_info_modal()}>
-            <EditTestModal
-                test=test_info.clone()
-                set_if_show_modal=set_if_show_info_modal
-                set_if_show_deleted=set_if_show_toast
-                set_if_show_toast=set_if_show_toast
-                test_resource
-                set_toast_message
-            />
-        </Show>
-        <li class="z-auto">
+        <div class="z-auto relative">
             <button on:click=on_show_info>
                 <div class=styling>
                     <img src=IMG_SRC />
                 </div>
                 <p class=CAPTION_STYLE>{&test.name}</p>
             </button>
-        </li>
+
+            {move || {
+                if show_delete_mode() && on_delete.is_some() {
+                    let test_id = test.test_id.clone(); // Clone directly from the Rc<Test>
+                    view! {
+                        <div class="absolute top-1 right-1 z-10 mt-2">
+                            <button
+                                class="bg-red-800 text-white p-2 rounded hover:bg-red-900"
+                                on:click=move |_| {
+                                    if let Some(delete_fn) = on_delete.clone() {
+                                        delete_fn(test_id.clone());
+                                    }
+                                }
+                            >
+                                "Delete"
+                            </button>
+                        </div>
+                    }
+                } else {
+                    view! { <div></div> }
+                }
+            }}
+        </div>
     }
 }

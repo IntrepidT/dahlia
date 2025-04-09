@@ -94,7 +94,7 @@ pub fn BulkUploadModal(
                 />
 
                 <div class="text-sm text-gray-600 mb-4 flex justify-between items-center">
-                    <span>"Expected CSV format with student details"</span>
+                    <span>"Expected CSV format with student details (NOTE: column headings and fields are case specific. Capitalization matters.)"</span>
                     <button
                         class="text-blue-500 hover:underline"
                         on:click=download_template

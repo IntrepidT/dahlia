@@ -5,11 +5,10 @@ use crate::app::models::test::Test;
 use crate::app::models::user::User;
 use crate::app::server_functions::students::get_students;
 use crate::app::server_functions::{questions::get_questions, scores::add_score, tests::get_tests};
-use chrono::Local;
 use leptos::*;
 use leptos_router::*;
-use log::*;
 use std::collections::HashMap;
+use wasm_bindgen::JsCast;
 
 #[derive(Debug, Clone)]
 struct QuestionResponse {
@@ -54,7 +53,7 @@ pub fn FlashCardSet() -> impl IntoView {
         }
     });
 
-    // Store responses for each question
+    // Store responses for each question with memo to prevent unnecessary re-renders
     let (responses, set_responses) = create_signal(HashMap::<i32, QuestionResponse>::new());
     let (selected_student_id, set_selected_student_id) = create_signal(None::<i32>);
 
@@ -62,12 +61,13 @@ pub fn FlashCardSet() -> impl IntoView {
     let (current_card_index, set_current_card_index) = create_signal(0);
     let (is_submitted, set_is_submitted) = create_signal(false);
 
-    let eval1 = match user.get() {
-        Some(user_data) => user_data.id.to_string().clone(),
-        None => 0.to_string(),
-    };
+    // Get evaluator ID
+    let evaluator_id = create_memo(move |_| match user.get() {
+        Some(user_data) => user_data.id.to_string(),
+        None => "0".to_string(),
+    });
 
-    // Handler for answer updates
+    // Handler for answer updates - using a local memo to prevent full re-renders
     let handle_answer_change = move |qnumber: i32, value: String| {
         set_responses.update(|r| {
             let response = r.entry(qnumber).or_insert(QuestionResponse {
@@ -110,10 +110,7 @@ pub fn FlashCardSet() -> impl IntoView {
         let current_test_id = test_id();
 
         let student_id = selected_student_id.get().unwrap_or(0);
-        let evaluator = match user.get() {
-            Some(user_data) => user_data.id.to_string(),
-            None => 0.to_string(),
-        };
+        let evaluator = evaluator_id();
         let test_variant = 1;
 
         // Collect all scores and comments
@@ -169,6 +166,27 @@ pub fn FlashCardSet() -> impl IntoView {
         }
     });
 
+    // Memoize the percentage calculation to avoid recalculating on every render
+    let calculate_answered_percentage = create_memo(move |_| {
+        let answered_count = responses.with(|r| {
+            questions
+                .get()
+                .map(|q| {
+                    q.iter()
+                        .filter(|question| {
+                            r.get(&question.qnumber)
+                                .map(|resp| !resp.answer.trim().is_empty())
+                                .unwrap_or(false)
+                        })
+                        .count() as f32
+                })
+                .unwrap_or(0.0)
+        });
+
+        let total = questions.get().map(|q| q.len() as f32).unwrap_or(1.0);
+        (answered_count / total) * 100.0
+    });
+
     view! {
         <div class="p-4 max-w-screen h-screen overflow-y-auto bg-gray-50 mx-auto">
             {/* Header with Student Selection and Evaluator */}
@@ -178,7 +196,7 @@ pub fn FlashCardSet() -> impl IntoView {
                 </div>
                 <div class="text-sm text-gray-600 font-medium">
                     {"Evaluator: "}
-                    {eval1}
+                    {evaluator_id}
                 </div>
             </div>
 
@@ -205,11 +223,15 @@ pub fn FlashCardSet() -> impl IntoView {
                     (Some(questions), _) if questions.is_empty() => {
                         view! { <div class="text-center py-8 text-red-500">"No questions found for this test ID."</div> }.into_view()
                     },
-                    (Some(questions), test_details) => {
+                    (Some(questions), _) => {
                         let total_questions = questions.len();
+
                         // Create a memo to get the current question
                         let current_question = create_memo(move |_| {
-                            questions[current_card_index.get()].clone()
+                            questions.get(current_card_index.get()).cloned().unwrap_or_else(|| {
+                                log::warn!("Question index out of bounds");
+                                questions.first().cloned().unwrap_or_else(|| panic!("No questions available"))
+                            })
                         });
 
                         view! {
@@ -219,19 +241,19 @@ pub fn FlashCardSet() -> impl IntoView {
                                     {/* Progress Bar */}
                                     <div class="mb-4 w-full bg-gray-200 rounded-full h-2.5">
                                         <div
-                                            class="bg-gradient-to-r from-blue-500 to-purple-600 h-2.5 rounded-full"
-                                            style=format!("width: {}%", (current_card_index.get() as f32 / total_questions as f32) * 100.0)
+                                            class="bg-gradient-to-r from-blue-500 to-purple-600 h-2.5 rounded-full transition-all duration-1500 ease-in"
+                                            style=move || format!("width: {}%", calculate_answered_percentage())
                                         ></div>
                                     </div>
 
                                     {/* Card Counter */}
                                     <div class="text-center mb-4">
                                         <span class="inline-flex items-center justify-center bg-white text-sm font-medium text-gray-700 px-3 py-1 rounded-full shadow-sm border border-gray-200">
-                                            {current_card_index.get() + 1}
+                                            {move || current_card_index.get() + 1}
                                             {" / "}
                                             {total_questions}
                                             <span class="ml-2 text-purple-600 font-semibold">
-                                                {current_question.get().point_value}
+                                                {move || current_question().point_value}
                                                 {" pts"}
                                             </span>
                                         </span>
@@ -246,185 +268,169 @@ pub fn FlashCardSet() -> impl IntoView {
                                             {/* Question Section */}
                                             <div class="text-center w-full overflow-auto mb-6">
                                                 <p class="text-4xl sm:text-3xl font-bold text-gray-800 break-words mb-8">
-                                                    {current_question.get().word_problem.clone()}
+                                                    {move || current_question().word_problem.clone()}
                                                 </p>
                                             </div>
 
-                                            {/* Answer Section */}
+                                            {/* Answer Section - Using a local view! to isolate renders */}
                                             <div class="w-full mt-2">
                                                 <label class="block text-sm font-medium text-gray-700 mb-2">
                                                     "Your Answer:"
                                                 </label>
-                                                {move || match current_question.get().question_type {
-                                                    QuestionType::MultipleChoice => view! {
-                                                        <div class="space-y-2 max-h-48 overflow-y-auto">
-                                                            <For
-                                                                each=move || current_question.get().options.clone()
-                                                                key=|option| option.clone()
-                                                                children=move |option| {
-                                                                    let option_value = option.clone();
-                                                                    let qnumber = current_question.get().qnumber;
-                                                                    view! {
-                                                                        <label class="flex items-center p-3 rounded-lg border border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-colors cursor-pointer">
-                                                                            <input
-                                                                                type="radio"
-                                                                                name=format!("q_{}", qnumber)
-                                                                                value=option_value.clone()
-                                                                                class="h-4 w-4 text-blue-600 focus:ring-blue-500"
-                                                                                checked={
-                                                                                    responses.with(|r|
-                                                                                        r.get(&qnumber)
-                                                                                            .map(|resp| resp.answer == option_value)
-                                                                                            .unwrap_or(false)
-                                                                                    )
-                                                                                }
-                                                                                on:change=move |ev| {
-                                                                                    let value = event_target_value(&ev);
-                                                                                    handle_answer_change(qnumber, value);
-                                                                                }
-                                                                            />
-                                                                            <span class="ml-2 break-words">{option_value}</span>
-                                                                        </label>
+                                                {move || {
+                                                    let q = current_question();
+                                                    match q.question_type {
+                                                        QuestionType::MultipleChoice => view! {
+                                                            <div class="space-y-2 max-h-48 overflow-y-auto">
+                                                                <For
+                                                                    each=move || q.options.clone()
+                                                                    key=|option| option.clone()
+                                                                    children=move |option| {
+                                                                        let option_value = option.clone();
+                                                                        let option_value_clone = option_value.clone();
+                                                                        let qnumber = q.qnumber;
+                                                                        let is_checked = create_memo(move |_| {
+                                                                            responses.with(|r| {
+                                                                                r.get(&qnumber)
+                                                                                 .map(|resp| resp.answer == option_value_clone.clone())
+                                                                                 .unwrap_or(false)
+                                                                            })
+                                                                        });
+
+                                                                        view! {
+                                                                            <label class="flex items-center p-3 rounded-lg border border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-colors cursor-pointer">
+                                                                                <input
+                                                                                    type="radio"
+                                                                                    name=format!("q_{}", qnumber)
+                                                                                    value=option_value.clone()
+                                                                                    class="h-4 w-4 text-blue-600 focus:ring-blue-500"
+                                                                                    prop:checked=move || is_checked()
+                                                                                    on:change=move |ev| {
+                                                                                        let value = event_target_value(&ev);
+                                                                                        handle_answer_change(qnumber, value);
+                                                                                    }
+                                                                                />
+                                                                                <span class="ml-2 break-words">{option_value}</span>
+                                                                            </label>
+                                                                        }
                                                                     }
-                                                                }
-                                                            />
-                                                        </div>
-                                                    }.into_any(),
-                                                    QuestionType::TrueFalse => view! {
-                                                        <div class="w-full flex flex-col sm:flex-row gap-4 items-center justify-center">
-                                                            <button
-                                                                type="button"
-                                                                class="px-6 py-3 w-full rounded-lg font-medium text-center transition-colors"
-                                                                class:bg-white={!responses.with(|r|
-                                                                    r.get(&current_question.get().qnumber)
-                                                                        .map(|resp| resp.answer == "true")
-                                                                        .unwrap_or(false)
-                                                                )}
-                                                                class:text-gray-800={!responses.with(|r|
-                                                                    r.get(&current_question.get().qnumber)
-                                                                        .map(|resp| resp.answer == "true")
-                                                                        .unwrap_or(false)
-                                                                )}
-                                                                class:border-gray-200={!responses.with(|r|
-                                                                    r.get(&current_question.get().qnumber)
-                                                                        .map(|resp| resp.answer == "true")
-                                                                        .unwrap_or(false)
-                                                                )}
-                                                                class:border={!responses.with(|r|
-                                                                    r.get(&current_question.get().qnumber)
-                                                                        .map(|resp| resp.answer == "true")
-                                                                        .unwrap_or(false)
-                                                                )}
-                                                                class:bg-green-500={responses.with(|r|
-                                                                    r.get(&current_question.get().qnumber)
-                                                                        .map(|resp| resp.answer == "true")
-                                                                        .unwrap_or(false)
-                                                                )}
-                                                                class:text-white={responses.with(|r|
-                                                                    r.get(&current_question.get().qnumber)
-                                                                        .map(|resp| resp.answer == "true")
-                                                                        .unwrap_or(false)
-                                                                )}
-                                                                class:border-transparent={responses.with(|r|
-                                                                    r.get(&current_question.get().qnumber)
-                                                                        .map(|resp| resp.answer == "true")
-                                                                        .unwrap_or(false)
-                                                                )}
-                                                                on:click=move |_| {
-                                                                    handle_answer_change(current_question.get().qnumber, "true".to_string());
-                                                                }
-                                                            >
-                                                                "Yes"
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                class="px-6 py-3 w-full rounded-lg font-medium text-center transition-colors"
-                                                                class:bg-white={!responses.with(|r|
-                                                                    r.get(&current_question.get().qnumber)
-                                                                        .map(|resp| resp.answer == "false")
-                                                                        .unwrap_or(false)
-                                                                )}
-                                                                class:text-gray-800={!responses.with(|r|
-                                                                    r.get(&current_question.get().qnumber)
-                                                                        .map(|resp| resp.answer == "false")
-                                                                        .unwrap_or(false)
-                                                                )}
-                                                                class:border-gray-200={!responses.with(|r|
-                                                                    r.get(&current_question.get().qnumber)
-                                                                        .map(|resp| resp.answer == "false")
-                                                                        .unwrap_or(false)
-                                                                )}
-                                                                class:border={!responses.with(|r|
-                                                                    r.get(&current_question.get().qnumber)
-                                                                        .map(|resp| resp.answer == "false")
-                                                                        .unwrap_or(false)
-                                                                )}
-                                                                class:bg-red-500={responses.with(|r|
-                                                                    r.get(&current_question.get().qnumber)
-                                                                        .map(|resp| resp.answer == "false")
-                                                                        .unwrap_or(false)
-                                                                )}
-                                                                class:text-white={responses.with(|r|
-                                                                    r.get(&current_question.get().qnumber)
-                                                                        .map(|resp| resp.answer == "false")
-                                                                        .unwrap_or(false)
-                                                                )}
-                                                                class:border-transparent={responses.with(|r|
-                                                                    r.get(&current_question.get().qnumber)
-                                                                        .map(|resp| resp.answer == "false")
-                                                                        .unwrap_or(false)
-                                                                )}
-                                                                on:click=move |_| {
-                                                                    handle_answer_change(current_question.get().qnumber, "false".to_string());
-                                                                }
-                                                            >
-                                                                "No"
-                                                            </button>
-                                                        </div>
-                                                    }.into_any(),
-                                                    _ => view! {
-                                                        <textarea
-                                                            class="w-full p-3 border border-gray-200 rounded-lg focus:ring-blue-500 focus:border-blue-500"
-                                                            value={
-                                                                responses.with(|r|
-                                                                    r.get(&current_question.get().qnumber)
-                                                                        .map(|resp| resp.answer.clone())
-                                                                        .unwrap_or_default()
-                                                                )
+                                                                />
+                                                            </div>
+                                                        },
+                                                        QuestionType::TrueFalse => {
+                                                            let qnumber = q.qnumber;
+                                                            let is_true = create_memo(move |_| {
+                                                                responses.with(|r| {
+                                                                    r.get(&qnumber)
+                                                                     .map(|resp| resp.answer == "true")
+                                                                     .unwrap_or(false)
+                                                                })
+                                                            });
+                                                            let is_false = create_memo(move |_| {
+                                                                responses.with(|r| {
+                                                                    r.get(&qnumber)
+                                                                     .map(|resp| resp.answer == "false")
+                                                                     .unwrap_or(false)
+                                                                })
+                                                            });
+
+                                                            view! {
+                                                                <div class="w-full flex flex-col sm:flex-row gap-4 items-center justify-center">
+                                                                    <button
+                                                                        type="button"
+                                                                        class="px-6 py-3 w-full rounded-lg font-medium text-center transition-colors"
+                                                                        class:bg-white={move || !is_true()}
+                                                                        class:text-gray-800={move || !is_true()}
+                                                                        class:border-gray-200={move || !is_true()}
+                                                                        class:border={move || !is_true()}
+                                                                        class:bg-green-500={move || is_true()}
+                                                                        class:text-white={move || is_true()}
+                                                                        class:border-transparent={move || is_true()}
+                                                                        on:click=move |_| {
+                                                                            handle_answer_change(qnumber, "true".to_string());
+                                                                        }
+                                                                    >
+                                                                        "Yes"
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        class="px-6 py-3 w-full rounded-lg font-medium text-center transition-colors"
+                                                                        class:bg-white={move || !is_false()}
+                                                                        class:text-gray-800={move || !is_false()}
+                                                                        class:border-gray-200={move || !is_false()}
+                                                                        class:border={move || !is_false()}
+                                                                        class:bg-red-500={move || is_false()}
+                                                                        class:text-white={move || is_false()}
+                                                                        class:border-transparent={move || is_false()}
+                                                                        on:click=move |_| {
+                                                                            handle_answer_change(qnumber, "false".to_string());
+                                                                        }
+                                                                    >
+                                                                        "No"
+                                                                    </button>
+                                                                </div>
                                                             }
-                                                            on:input=move |ev| {
-                                                                let value = event_target_value(&ev);
-                                                                handle_answer_change(current_question.get().qnumber, value);
+                                                        },
+                                                        _ => {
+                                                            let qnumber = q.qnumber;
+                                                            // Create a memo for the answer value to prevent unnecessary re-renders
+                                                            let answer_value = create_memo(move |_| {
+                                                                responses.with(|r| {
+                                                                    r.get(&qnumber)
+                                                                     .map(|resp| resp.answer.clone())
+                                                                     .unwrap_or_default()
+                                                                })
+                                                            });
+
+                                                            view! {
+                                                                <div>
+                                                                    <textarea
+                                                                        class="w-full p-3 border border-gray-200 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                                                                        prop:value=move || answer_value()
+                                                                        on:input=move |ev| {
+                                                                            let value = event_target_value(&ev);
+                                                                            handle_answer_change(qnumber, value);
+                                                                        }
+                                                                        placeholder="Enter your answer here..."
+                                                                        rows="3"
+                                                                    ></textarea>
+                                                                </div>
                                                             }
-                                                            placeholder="Enter your answer here..."
-                                                            rows="3"
-                                                        ></textarea>
-                                                    }.into_any()
+                                                        }
+                                                    }
                                                 }}
                                             </div>
 
-                                            {/* Comments Section */}
+                                            {/* Comments Section - THIS NEEDS SPECIAL ATTENTION TO FIX THE FOCUS ISSUE */}
                                             <div class="w-full mt-4">
                                                 <label class="block text-sm font-medium text-gray-700 mb-2">
                                                     "Comments:"
                                                 </label>
-                                                <textarea
-                                                    class="w-full p-3 border border-gray-200 rounded-lg focus:ring-blue-500 focus:border-blue-500"
-                                                    prop:value={move ||
-                                                        responses.with(|r|
-                                                            r.get(&current_question.get().qnumber)
-                                                                .map(|resp| resp.comment.clone())
-                                                                .unwrap_or_default()
-                                                        )
+                                                {move || {
+                                                    let qnumber = current_question().qnumber;
+
+                                                    // Create a memo for the comment value to prevent unnecessary re-renders
+                                                    let comment_value = create_memo(move |_| {
+                                                        responses.with(|r| {
+                                                            r.get(&qnumber)
+                                                             .map(|resp| resp.comment.clone())
+                                                             .unwrap_or_default()
+                                                        })
+                                                    });
+
+                                                    view! {
+                                                        <textarea
+                                                            class="w-full p-3 border border-gray-200 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                                                            prop:value=move || comment_value()
+                                                            on:input=move |ev| {
+                                                                let value = event_target_value(&ev);
+                                                                handle_comment_change(qnumber, value);
+                                                            }
+                                                            placeholder="Add any comments or notes here..."
+                                                            rows="2"
+                                                        ></textarea>
                                                     }
-                                                    on:input=move |ev| {
-                                                        let value = event_target_value(&ev);
-                                                        let qnumber = current_question.get().qnumber;
-                                                        handle_comment_change(qnumber, value);
-                                                    }
-                                                    placeholder="Add any comments or notes here..."
-                                                    rows="2"
-                                                ></textarea>
+                                                }}
                                             </div>
                                         </div>
                                     </div>
@@ -434,65 +440,71 @@ pub fn FlashCardSet() -> impl IntoView {
                                 <div class="flex flex-wrap items-center justify-center gap-4 mt-8">
                                     <button
                                         class="flex items-center justify-center px-5 py-2 bg-white border border-gray-200 rounded-lg shadow-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                        disabled={current_card_index.get() == 0}
+                                        disabled=move || current_card_index.get() == 0
                                         on:click=go_to_previous_card
                                     >
                                         <span class="mr-1">"←"</span>
                                         "Previous"
                                     </button>
 
-                                    {move || if current_card_index.get() == total_questions - 1 {
-                                        view! {
-                                            <Show when=move || { !is_submitted.get() }>
-                                                <button
-                                                    class="flex items-center justify-center px-5 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg shadow-sm hover:from-blue-700 hover:to-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                                    on:click=move |_| {
-                                                        handle_submit.dispatch(());
-                                                        set_is_submitted.set(true);
-                                                    }
-                                                    disabled={selected_student_id.get().is_none()}
-                                                >
-                                                    "Submit Assessment"
-                                                    <span class="ml-1">"✓"</span>
-                                                </button>
-                                            </Show>
-                                        }.into_view()
-                                    } else {
-                                        view! {
-                                            <button
-                                                class="flex items-center justify-center px-5 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg shadow-sm hover:from-blue-700 hover:to-purple-700 transition-colors"
-                                                on:click=go_to_next_card
-                                            >
-                                                "Next"
-                                                <span class="ml-1">"→"</span>
-                                            </button>
-                                        }.into_view()
+                                    {move || {
+                                        if current_card_index.get() == total_questions - 1 {
+                                            view! {
+                                                <Show when=move || !is_submitted.get()>
+                                                    <button
+                                                        class="flex items-center justify-center px-5 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg shadow-sm hover:from-blue-700 hover:to-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                                        on:click=move |_| {
+                                                            handle_submit.dispatch(());
+                                                            set_is_submitted.set(true);
+                                                        }
+                                                        disabled=move || selected_student_id.get().is_none()
+                                                    >
+                                                        "Submit Assessment"
+                                                        <span class="ml-1">"✓"</span>
+                                                    </button>
+                                                </Show>
+                                            }.into_view()
+                                        } else {
+                                            view! {
+                                                <div>
+                                                    <button
+                                                        class="flex items-center justify-center px-5 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg shadow-sm hover:from-blue-700 hover:to-purple-700 transition-colors"
+                                                        on:click=go_to_next_card
+                                                    >
+                                                        "Next"
+                                                        <span class="ml-1">"→"</span>
+                                                    </button>
+                                                </div>
+                                            }.into_view()
+                                        }
                                     }}
                                 </div>
 
                                 {/* Submission Status */}
-                                {move || if is_submitted.get() {
-                                    view! {
-                                        <div class="mt-8 text-center">
-                                            <div class="inline-flex items-center px-4 py-2 rounded-full bg-green-100 text-green-800 mb-4">
-                                                <span class="mr-2">"✓"</span>
-                                                "Assessment submitted successfully!"
+                                {move || {
+                                    if is_submitted.get() {
+                                        view! {
+                                            <div class="mt-8 text-center">
+                                                <div class="inline-flex items-center px-4 py-2 rounded-full bg-green-100 text-green-800 mb-4">
+                                                    <span class="mr-2">"✓"</span>
+                                                    "Assessment submitted successfully!"
+                                                </div>
+                                                <div>
+                                                    <button
+                                                        class="px-5 py-2 mt-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                                                        on:click=move |_| {
+                                                            let navigate=leptos_router::use_navigate();
+                                                            navigate("/dashboard", Default::default());
+                                                        }
+                                                    >
+                                                        "Return to Dashboard"
+                                                    </button>
+                                                </div>
                                             </div>
-                                            <div>
-                                                <button
-                                                    class="px-5 py-2 mt-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-colors"
-                                                    on:click=move |_| {
-                                                        let navigate=leptos_router::use_navigate();
-                                                        navigate("/dashboard", Default::default());
-                                                    }
-                                                >
-                                                    "Return to Dashboard"
-                                                </button>
-                                            </div>
-                                        </div>
-                                    }.into_view()
-                                } else {
-                                    view! {}.into_view()
+                                        }
+                                    } else {
+                                        view! {<div></div>}
+                                    }
                                 }}
                             </div>
                         }.into_view()
@@ -503,7 +515,7 @@ pub fn FlashCardSet() -> impl IntoView {
     }
 }
 
-// StudentSelect component remains the same
+// StudentSelect component with improved performance
 #[component]
 pub fn StudentSelect(set_selected_student_id: WriteSignal<Option<i32>>) -> impl IntoView {
     let (students, set_students) = create_signal(Vec::new());
@@ -517,10 +529,12 @@ pub fn StudentSelect(set_selected_student_id: WriteSignal<Option<i32>>) -> impl 
         }
     });
 
+    // Dispatch action only once on component mount
     create_effect(move |_| {
         get_students_action.dispatch(());
     });
 
+    // Update students when data is received
     create_effect(move |_| {
         if let Some(result) = get_students_action.value().get() {
             set_students.set(result);

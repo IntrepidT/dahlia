@@ -1,4 +1,6 @@
 use crate::app::components::{Toast, ToastMessage, ToastMessageType};
+use crate::app::models::student::GradeEnum;
+use crate::app::models::test::BenchmarkCategory;
 use crate::app::models::{DeleteTestRequest, Test, TestType, UpdateTestRequest};
 use crate::app::server_functions::tests::{delete_test, update_test};
 use leptos::*;
@@ -42,6 +44,13 @@ pub fn EditTestModal(
     let (test_score, set_test_score) = create_signal(format!("{}", test.score.clone()));
     let (test_comments, set_test_comments) = create_signal(test.comments.clone());
     let (test_area, set_test_area) = create_signal(test.testarea.to_string());
+    let (school_year, set_school_year) = create_signal(test.school_year.clone().unwrap());
+    let (benchmark_categories, set_benchmark_categories) = create_signal::<Vec<BenchmarkCategory>>(
+        test.benchmark_categories.clone().unwrap_or(Vec::new()),
+    );
+    let (test_variant, set_test_variant) = create_signal(test.test_variant);
+    let (grade_level, set_grade_level) =
+        create_signal(test.grade_level.clone().unwrap().to_string());
     let (test_identifier, set_test_identifier) = create_signal(test.test_id.to_string());
     // for errors
     let (error_message, set_error_message) = create_signal(String::new());
@@ -91,12 +100,24 @@ pub fn EditTestModal(
                 return;
             }
         };
+        let convert_grade_level_to_enum = match GradeEnum::from_str(&grade_level()) {
+            Ok(grade) => grade,
+            Err(_) => {
+                set_if_error(true);
+                set_error_message(String::from("Invalid grade enum"));
+                return;
+            }
+        };
 
         let edit_test_request = UpdateTestRequest::new(
             test_name(),
             test_score_validated,
             test_comments(),
             convert_test_area_to_enum,
+            Some(school_year()),
+            Some(benchmark_categories()),
+            test_variant(),
+            Some(convert_grade_level_to_enum),
             test_identifier(),
         );
 

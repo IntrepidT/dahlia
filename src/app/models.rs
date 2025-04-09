@@ -38,3 +38,6 @@ pub use user::User;
 pub mod bulk_student;
 pub use bulk_student::BulkStudentImportRequest;
 pub use bulk_student::StudentCsvRow;
+
+pub mod session;
+pub use session::{SessionEvent, TestSession};

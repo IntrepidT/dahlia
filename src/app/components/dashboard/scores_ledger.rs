@@ -1,10 +1,13 @@
 use crate::app::models::score::{DeleteScoreRequest, Score};
 use crate::app::server_functions::scores::{delete_score, get_scores};
+use crate::app::server_functions::students::get_students;
+use crate::app::server_functions::tests::get_tests;
 use chrono::DateTime;
 use leptos::*;
 
 #[component]
 pub fn ScoresLedger() -> impl IntoView {
+    let navigate = leptos_router::use_navigate();
     // Create resource for fetching scores from the database
     let scores_resource = create_resource(
         || (),
@@ -19,6 +22,66 @@ pub fn ScoresLedger() -> impl IntoView {
         },
     );
 
+    let students_resource = create_resource(
+        || (),
+        |_| async {
+            match get_students().await {
+                Ok(students) => Ok(students),
+                Err(e) => {
+                    log::error!("Failed to load students: {}", e);
+                    Err(ServerFnError::new("Failed to load students"))
+                }
+            }
+        },
+    );
+
+    let tests_resource = create_resource(
+        || (),
+        |_| async {
+            match get_tests().await {
+                Ok(tests) => Ok(tests),
+                Err(e) => {
+                    log::error!("Failed to load tests: {}", e);
+                    Err(ServerFnError::new("Failed to load tests"))
+                }
+            }
+        },
+    );
+    //helper function to get test name
+    let get_test_name = move |test_id: String| -> String {
+        if let Some(Ok(tests)) = tests_resource.get() {
+            if let Some(test) = tests.iter().find(|t| t.test_id == test_id) {
+                return format!("{}", test.name);
+            }
+        }
+        "Unknown Test".to_string()
+    };
+    //helper function to get a max score for test
+    let get_max_score = move |test_id: String| -> i32 {
+        if let Some(Ok(tests)) = tests_resource.get() {
+            if let Some(test) = tests.iter().find(|t| t.test_id == *test_id) {
+                return test.score;
+            }
+        }
+        0
+    };
+
+    //helper function to get student name
+    let get_student_name = move |student_id: i32| -> String {
+        if let Some(Ok(students)) = students_resource.get() {
+            if let Some(student) = students.iter().find(|s| s.student_id == student_id) {
+                return format!("{} {}", student.firstname, student.lastname);
+            }
+        }
+        "Unknown Student".to_string()
+    };
+
+    let (expanded_view, set_expanded_view) = create_signal(false);
+
+    let toggle_expanded_view = move |_| {
+        set_expanded_view.update(|val| *val = !*val);
+    };
+
     // Function to format date
     let format_date =
         |date: DateTime<chrono::Utc>| -> String { date.format("%b %d, %Y").to_string() };
@@ -27,9 +90,10 @@ pub fn ScoresLedger() -> impl IntoView {
     let format_time = |date: DateTime<chrono::Utc>| -> String { date.format("%H:%M").to_string() };
 
     // Function to calculate percentage
-    let calculate_percentage = |test_scores: &Vec<i32>| -> String {
+    let calculate_percentage = move |test_scores: &Vec<i32>, test_id: String| -> String {
         let score: i32 = test_scores.iter().sum();
-        let max_score = test_scores.len() as i32;
+        let max_score = get_max_score(test_id.clone());
+
         if max_score > 0 {
             format!("{:.1}%", (score as f64 / max_score as f64 * 100.0))
         } else {
@@ -37,16 +101,71 @@ pub fn ScoresLedger() -> impl IntoView {
         }
     };
 
-    // Function to determine badge color based on score percentage
-    let get_badge_color = |test_scores: &Vec<i32>| -> &'static str {
+    let get_benchmark_label = move |test_scores: &Vec<i32>, test_id: &String| -> String {
         let score: i32 = test_scores.iter().sum();
-        let max_score = test_scores.len() as i32;
+        let max_score = get_max_score(test_id.clone());
+
+        if max_score <= 0 {
+            return "N/A".to_string();
+        }
+
+        let percentage = (score as f64 / max_score as f64) * 100.0;
+
+        if let Some(Ok(tests)) = tests_resource.get() {
+            if let Some(test) = tests.iter().find(|t| t.test_id == *test_id) {
+                if let Some(benchmark_categories) = &test.benchmark_categories {
+                    for category in benchmark_categories {
+                        let min_percent = category.min as f64;
+                        let max_percent = category.max as f64;
+                        if percentage >= min_percent && percentage <= max_percent {
+                            return category.label.clone();
+                        }
+                    }
+                }
+            }
+        }
+
+        if percentage >= 90.0 {
+            "Excellent".to_string()
+        } else if percentage >= 80.0 {
+            "Good".to_string()
+        } else if percentage >= 70.0 {
+            "Satisfactory".to_string()
+        } else {
+            "Needs Improvement".to_string()
+        }
+    };
+
+    // Function to determine badge color based on score percentage
+    let get_badge_color = move |test_scores: &Vec<i32>, test_id: String| -> &'static str {
+        let score: i32 = test_scores.iter().sum();
+        let max_score = get_max_score(test_id.clone());
 
         if max_score <= 0 {
             return "bg-gray-100 text-gray-800";
         }
 
         let percentage = (score as f64 / max_score as f64) * 100.0;
+
+        if let Some(Ok(tests)) = tests_resource.get() {
+            if let Some(test) = tests.iter().find(|t| t.test_id == *test_id) {
+                if let Some(benchmark_categories) = &test.benchmark_categories {
+                    for category in benchmark_categories {
+                        let min_percent = category.min as f64;
+                        let max_percent = category.max as f64;
+                        if percentage >= min_percent && percentage <= max_percent {
+                            if min_percent >= 85.0 {
+                                return "bg-green-100 text-green-800";
+                            } else if min_percent >= 65.0 {
+                                return "bg-yellow-100 text-yellow-800";
+                            } else {
+                                return "bg-red-100 text-red-800";
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
         if percentage >= 90.0 {
             "bg-green-100 text-green-800"
@@ -60,25 +179,48 @@ pub fn ScoresLedger() -> impl IntoView {
     };
 
     // Calculate score value from test_scores
-    let format_score = |test_scores: &Vec<i32>| -> String {
+    let format_score = |test_scores: &Vec<i32>, test_id: String| -> String {
         let score: i32 = test_scores.iter().sum();
-        let max_score = test_scores.len() as i32;
+        let max_score = get_max_score(test_id.clone());
         format!("{} / {}", score, max_score)
     };
 
     view! {
-        <div class="w-full">
-            <div class="flex items-center justify-between mb-4">
-                <h2 class="text-xl font-medium">Recent Scores</h2>
+        <div class={move || {
+            if expanded_view() {
+                "fixed inset-0 z-50 bg-white flex flex-col p-5"
+            } else {
+                "w-full"
+            }
+        }}>
+            <div class="flex items-center justify-between mb-2 p-2">
+                <h2 class="text-xl font-bold">Recent Scores</h2>
                 <div>
-                    <button class="text-indigo-600 hover:text-indigo-800 text-sm font-medium">
-                        View all
+                    <button
+                        class="text-indigo-600 hover:text-indigo-800 text-sm font-medium"
+                        on:click=toggle_expanded_view
+                    >
+                        {move || if expanded_view() {"Collapse"} else {"View all"}}
                     </button>
                 </div>
             </div>
 
-            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg border border-gray-200">
-                <div class="overflow-x-auto">
+            <div class={move ||{
+                let base_classes = "bg-white overflow-hidden shadow-sm sm:rounded-lg border border-gray-200";
+                if expanded_view() {
+                    format!("{} flex-grow overflow-hidden", base_classes)
+                } else {
+                    base_classes.to_string()
+                }
+            }}>
+                <div class={move || {
+                    let base_classes = "overflow-x-auto overflow-y-auto";
+                    if expanded_view() {
+                        format!("{} h-full", base_classes)
+                    } else {
+                        format!("{} max-h-80", base_classes)
+                    }
+                }}>
                     <table class="min-w-full divide-y divide-gray-200">
                         <thead class="bg-gray-50">
                             <tr>
@@ -86,16 +228,22 @@ pub fn ScoresLedger() -> impl IntoView {
                                     Student ID
                                 </th>
                                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Student Name
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Test
                                 </th>
                                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Date
                                 </th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                /*<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Score
-                                </th>
+                                </th>*/
                                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Percentage
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Benchmark
                                 </th>
                                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Evaluator
@@ -120,7 +268,7 @@ pub fn ScoresLedger() -> impl IntoView {
                                                 }
                                                 .into_view()
                                             } else {
-                                                scores.iter().map(|score| {
+                                                scores.iter().rev().map(|score| {
                                                     let student_id = score.student_id;
                                                     let test_id = score.test_id.clone();
                                                     let test_variant = score.test_variant;
@@ -138,9 +286,12 @@ pub fn ScoresLedger() -> impl IntoView {
                                                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                                                                 {score.student_id}
                                                             </td>
+                                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                                                {get_student_name(score.student_id)}
+                                                            </td>
                                                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                                                 <div class="flex flex-col">
-                                                                    <span>{&score.test_id}</span>
+                                                                    <span>{get_test_name(score.test_id.clone())}</span>
                                                                     <span class="text-xs text-gray-400">{"Variant: "}{score.test_variant}</span>
                                                                 </div>
                                                             </td>
@@ -150,21 +301,40 @@ pub fn ScoresLedger() -> impl IntoView {
                                                                     <span class="text-xs text-gray-400">{format_time(score.date_administered)}</span>
                                                                 </div>
                                                             </td>
-                                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                            /*<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                                                 {format_score(&score.test_scores)}
+                                                            </td>*/
+                                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                                <span class={"px-2 inline-flex text-xs leading-5 font-semibold rounded-full ".to_string() + get_badge_color(&score.test_scores, score.test_id.clone())}>
+                                                                    {calculate_percentage(&score.test_scores, score.test_id.clone())}
+                                                                </span>
                                                             </td>
                                                             <td class="px-6 py-4 whitespace-nowrap">
-                                                                <span class={"px-2 inline-flex text-xs leading-5 font-semibold rounded-full ".to_string() + get_badge_color(&score.test_scores)}>
-                                                                    {calculate_percentage(&score.test_scores)}
+                                                                <span class={"px-2 inline-flex text-xs leading-5 font-semibold rounded-full".to_string() + get_badge_color(&score.test_scores, score.test_id.clone())}>
+                                                                    {get_benchmark_label(&score.test_scores, &score.test_id)}
                                                                 </span>
                                                             </td>
                                                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                                                 {&score.evaluator}
                                                             </td>
                                                             <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                                                <button class="text-indigo-600 hover:text-indigo-900 mr-3">
-                                                                    View
-                                                                </button>
+                                                                {
+                                                                    let nav = navigate.clone();
+                                                                    let test_id = score.test_id.clone();
+                                                                    let student_id = score.student_id;
+                                                                    let test_variant = score.test_variant.clone();
+
+                                                                    view! {
+                                                                        <button
+                                                                            class="text-indigo-600 hover:text-indigo-900 mr-3"
+                                                                            on:click=move |_| {
+                                                                                nav(&format!("/reviewtest/{}/{}/{}", test_id, student_id, test_variant), Default::default());
+                                                                            }
+                                                                        >
+                                                                            View
+                                                                        </button>
+                                                                    }
+                                                                }
                                                             </td>
                                                         </tr>
                                                     }

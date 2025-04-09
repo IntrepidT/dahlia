@@ -190,6 +190,7 @@ pub struct Student {
     pub intervention: bool,
     pub eye_glasses: bool,
     pub notes: String,
+    pub pin: i32,
 }
 
 impl Student {
@@ -211,6 +212,7 @@ impl Student {
         intervention: bool,
         eye_glasses: bool,
         notes: String,
+        pin: i32,
     ) -> Student {
         Student {
             firstname,
@@ -230,6 +232,7 @@ impl Student {
             intervention,
             eye_glasses,
             notes,
+            pin,
         }
     }
 }
@@ -257,6 +260,7 @@ pub struct AddStudentRequest {
     pub intervention: bool,
     pub eye_glasses: bool,
     pub notes: String,
+    pub pin: i32,
 }
 
 impl AddStudentRequest {
@@ -278,6 +282,7 @@ impl AddStudentRequest {
         intervention: bool,
         eye_glasses: bool,
         notes: String,
+        pin: i32,
     ) -> AddStudentRequest {
         AddStudentRequest {
             firstname,
@@ -297,6 +302,7 @@ impl AddStudentRequest {
             intervention,
             eye_glasses,
             notes,
+            pin,
         }
     }
 }
@@ -323,6 +329,7 @@ pub struct UpdateStudentRequest {
     pub intervention: bool,
     pub eye_glasses: bool,
     pub notes: String,
+    pub pin: i32,
 }
 
 impl UpdateStudentRequest {
@@ -344,6 +351,7 @@ impl UpdateStudentRequest {
         intervention: bool,
         eye_glasses: bool,
         notes: String,
+        pin: i32,
     ) -> UpdateStudentRequest {
         UpdateStudentRequest {
             firstname,
@@ -363,6 +371,7 @@ impl UpdateStudentRequest {
             intervention,
             eye_glasses,
             notes,
+            pin,
         }
     }
 }

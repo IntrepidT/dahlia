@@ -17,7 +17,7 @@ const INFO_VALUE: &str = "text-gray-900 mt-1";const INFO_GROUP: &str = "mb-4";
 const BUTTON_CONTAINER: &str =
     "mt-6 pt-4 flex gap-3 justify-end sticky bottom-0 bg-white border-t border-gray-200";
 const BUTTON_PRIMARY: &str = 
-    "px-4 py-2 bg-[#00356b] rounded-md font-medium text-white hover:font-large transition-colors hover:bg-[#00457b] hover:border-white";
+    "px-4 py-2 bg-[#00356b] rounded-md font-medium text-white hover:font-large transition-colors hover:bg-blue-700 hover:border-white";
 const BUTTON_SECONDARY: &str = 
     "px-4 py-2 bg-gray-200 rounded-md font-medium text-gray-500 hover:text-gray-900 transition-colors border border-gray-300";
 const BUTTON_ACCENT: &str = 
@@ -136,6 +136,10 @@ pub fn StudentDetails(
                             <div class=INFO_GROUP>
                                 <div class=INFO_TITLE>"Date of Birth"</div>
                                 <div class=INFO_VALUE>{move || format!("{}", student_memo().date_of_birth.format("%m-%d-%Y"))}</div>
+                            </div>
+                            <div class=INFO_GROUP>
+                                <div class=INFO_TITLE>"Student Pin"</div>
+                                <div class=INFO_VALUE>{move || format!("{}", student_memo().pin)}</div>
                             </div>
                         </div>
                     </div>

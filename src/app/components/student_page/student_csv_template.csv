@@ -1,3 +1,3 @@
-firstname,lastname,preferred,gender,date_of_birth,student_id,esl,grade,teacher,iep,bip,student_504,readplan,gt,intervention,eye_glasses,notes
-John,Doe,Johnny,Male,2015-09-15,12345,NotApplicable,Fifth,Mr. Smith,false,false,false,false,false,false,false,No special notes
-Jane,Smith,Janie,Female,2016-03-22,67890,ELL,Sixth,Ms. Johnson,true,false,true,false,true,false,true,Needs extra support
+firstname,lastname,preferred,gender,date_of_birth,student_id,esl,grade,teacher,iep,bip,student_504,readplan,gt,intervention,eye_glasses,notes,pin
+John,Doe,Johnny,Male,2015-09-15,12345,NotApplicable,Fifth,Mr. Smith,false,false,false,false,false,false,false,No special notes,1234
+Jane,Smith,Janie,Female,2016-03-22,67890,ELL,Sixth,Ms. Johnson,true,false,true,false,true,false,true,Needs extra support,6789

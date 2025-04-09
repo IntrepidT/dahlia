@@ -1,3 +1,4 @@
+use crate::app::models::test::BenchmarkCategory;
 use crate::app::models::TestType;
 use crate::app::models::{test::Test, CreateNewTestRequest, DeleteTestRequest, UpdateTestRequest};
 use leptos::*;
@@ -35,6 +36,31 @@ pub async fn get_tests() -> Result<Vec<Test>, ServerFnError> {
     }
 }
 
+#[server(GetTest, "/api")]
+pub async fn get_test(test_id: String) -> Result<Test, ServerFnError> {
+    #[cfg(feature = "ssr")]
+    {
+        use actix_web::web;
+        use leptos_actix::extract;
+        let pool = extract::<web::Data<PgPool>>()
+            .await
+            .map_err(|e| ServerFnError::new(format!("Failed to extract pool: {}", e)))?;
+
+        log::info!("Attempting to retrieve test");
+
+        match test_database::get_test(test_id, &pool).await {
+            Ok(test) => {
+                log::info!("Successfully retrieved test from database");
+                Ok(test)
+            }
+            Err(e) => {
+                log::error!("Database error: {}", e);
+                Err(ServerFnError::new(format!("Database error: {}", e)))
+            }
+        }
+    }
+}
+
 #[server(AddTest, "/api")]
 pub async fn add_test(add_test_request: CreateNewTestRequest) -> Result<Test, ServerFnError> {
     #[cfg(feature = "ssr")]
@@ -54,6 +80,10 @@ pub async fn add_test(add_test_request: CreateNewTestRequest) -> Result<Test, Se
             add_test_request.score,
             add_test_request.comments,
             add_test_request.testarea,
+            add_test_request.school_year,
+            add_test_request.benchmark_categories,
+            add_test_request.test_variant,
+            add_test_request.grade_level,
             ID,
         );
         test_database::add_test(&bufferTest, &pool)
@@ -102,6 +132,10 @@ pub async fn update_test(update_test_request: UpdateTestRequest) -> Result<Test,
             update_test_request.score,
             update_test_request.comments,
             update_test_request.testarea,
+            update_test_request.school_year,
+            update_test_request.benchmark_categories,
+            update_test_request.test_variant,
+            update_test_request.grade_level,
             update_test_request.test_id,
         );
 

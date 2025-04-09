@@ -109,7 +109,7 @@ pub fn EmployeeTable(
                                                             if employee.status.to_string() == "Active" {
                                                                 "bg-green-200 text-green-800 font-medium"
                                                             } else {
-                                                                "bg-gray-200 font-mediumtext-gray-700"
+                                                                "bg-gray-200 font-medium text-gray-700"
                                                             })>
                                                             {employee.status.to_string()}
                                                         </span>
