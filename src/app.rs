@@ -6,10 +6,11 @@ pub mod server_functions;
 use leptos_meta::*;
 use leptos_router::*;
 pub mod pages;
+pub mod websockets;
 use components::test_templates::FlashCardSet;
 use pages::{
     AdministerTest, Assessment, Dashboard, HomePage, LoginPage, MathTesting, MyAccount,
-    ReadingTesting, StudentView, Teachers, TestBuilder,
+    ReadingTesting, ReviewTest, StudentView, Teachers, TestBuilder,
 };
 pub mod components;
 use components::auth::*;
@@ -88,10 +89,21 @@ pub fn App() -> impl IntoView {
                                 <ReadingTesting />
                             }
                         }/>
-                        <Route path="/testbuilder/:test_id" view=|| {
+                        <Route path="/testbuilder" view=|| {
+                            view!{
+                                <RequireRole role="teacher".to_string()>
+                                    <RequireRole role="admin".to_string()>
+                                        <TestBuilder />
+                                    </RequireRole>
+                                </RequireRole>
+                            }
+                        }/>
+                        <Route path="/testbuilder/:test_id" view= || {
                             view!{
                                 <RequireRole role="admin".to_string()>
-                                    <TestBuilder />
+                                    <RequireRole role="teacher".to_string()>
+                                        <TestBuilder />
+                                    </RequireRole>
                                 </RequireRole>
                             }
                         }/>
@@ -109,6 +121,15 @@ pub fn App() -> impl IntoView {
                                 <RequireRole role="teacher".to_string()>
                                     <RequireRole role="admin".to_string()>
                                         <FlashCardSet />
+                                    </RequireRole>
+                                </RequireRole>
+                            }
+                        }/>
+                        <Route path="/reviewtest/:test_id/:student_id/:test_variant" view=|| {
+                            view! {
+                                <RequireRole role="teacher".to_string()>
+                                    <RequireRole role="admin".to_string()>
+                                        <ReviewTest />
                                     </RequireRole>
                                 </RequireRole>
                             }

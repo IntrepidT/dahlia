@@ -6,6 +6,7 @@ async fn main() -> std::io::Result<()> {
     use argon2::password_hash;
     use dahlia::app::db::database;
     use dahlia::app::middleware::authentication::Authentication;
+    use dahlia::app::websockets::configure_websocket;
     use dahlia::app::*;
     use leptos::*;
     use leptos_actix::{generate_route_list, LeptosRoutes};
@@ -50,6 +51,8 @@ async fn main() -> std::io::Result<()> {
             .app_data(pool.clone())
             // Authentication middleware
             .wrap(Authentication::new(secret_key.clone()))
+            // configure websockets
+            .configure(configure_websocket)
             // serve JS/WASM/CSS from `pkg`
             .service(Files::new("/pkg", format!("{site_root}/pkg")))
             // serve other assets from the `assets` directory

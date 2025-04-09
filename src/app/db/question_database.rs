@@ -102,6 +102,41 @@ cfg_if::cfg_if! {
 
 
 
+        pub async fn delete_all_questions(test_id: String, pool: &PgPool) -> Result<Vec<Question>, ServerFnError> {
+            let testlinker = Uuid::parse_str(&test_id).expect("This did not convert to a UUID correctly");
+
+            let rows = sqlx::query("DELETE FROM question_table WHERE testlinker = $1 RETURNING word_problem, point_value, question_type, options, correct_answer, qnumber, testlinker")
+                .bind(&testlinker)
+                .fetch_all(pool)
+                .await
+                .map_err(|e| ServerFnError::new(format!("Database error: {}", e)))?;
+
+            let questions: Vec<Question> = rows
+                .into_iter()
+                .map(|row| {
+                    let word_problem: String = row.get("word_problem");
+                    let point_value: i32 = row.get("point_value");
+                    let question_type: QuestionType = row.get("question_type");
+                    let options: Vec<String> = row.get("options");
+                    let correct_answer: String = row.get("correct_answer");
+                    let qnumber: i32 = row.get("qnumber");
+                    let testlinker_one: Uuid = row.get("testlinker");
+
+                    let testlinker = testlinker_one.to_string();
+
+                    Question {
+                        word_problem,
+                        point_value,
+                        question_type,
+                        options,
+                        correct_answer,
+                        qnumber,
+                        testlinker,
+                    }
+                })
+                .collect();
+            Ok(questions)
+        }
         pub async fn delete_question(qnumber: i32, test_id: String, pool: &PgPool) -> Result<Question, ServerFnError> {
             let testlinker = Uuid::parse_str(&test_id).expect("This did not convert to a UUID correctly");
 

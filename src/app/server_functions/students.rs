@@ -35,6 +35,31 @@ pub async fn get_students() -> Result<Vec<Student>, ServerFnError> {
     }
 }
 
+#[server(GetStudent, "/api")]
+pub async fn get_student(student_id: i32) -> Result<Student, ServerFnError> {
+    #[cfg(feature = "ssr")]
+    {
+        use actix_web::web;
+        use leptos_actix::extract;
+        let pool = extract::<web::Data<PgPool>>()
+            .await
+            .map_err(|e| ServerFnError::new(format!("Failed to extract pool: {}", e)))?;
+
+        log::info!("Attempting to retrieve certain student");
+
+        match student_database::get_certain_student(student_id, &pool).await {
+            Ok(student) => {
+                log::info!("Successfully got certain student");
+                Ok(student)
+            }
+            Err(e) => {
+                log::error!("Database error: {}", e);
+                Err(ServerFnError::new(format!("Database error: {}", e)))
+            }
+        }
+    }
+}
+
 #[server(GetStudentsSmart, "/api")]
 pub async fn get_students_smart(fragment: String) -> Result<Vec<Student>, ServerFnError> {
     #[cfg(feature = "ssr")]
@@ -89,6 +114,7 @@ pub async fn add_student(add_student_request: AddStudentRequest) -> Result<Stude
             add_student_request.intervention,
             add_student_request.eye_glasses,
             add_student_request.notes,
+            add_student_request.pin,
         );
 
         match student_database::add_student(&bufferStudent, &pool).await {
@@ -172,6 +198,7 @@ pub async fn edit_student(
             edit_student_request.intervention,
             edit_student_request.eye_glasses,
             edit_student_request.notes,
+            edit_student_request.pin,
             &pool,
         )
         .await

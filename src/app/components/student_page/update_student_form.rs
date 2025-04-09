@@ -48,6 +48,7 @@ pub fn UpdateStudent(
     // Additional information
     let (eye_glasses, set_eye_glasses) = create_signal(student.eye_glasses);
     let (notes, set_notes) = create_signal(student.notes.clone());
+    let (pin, set_pin) = create_signal(student.pin.clone().to_string());
     // For handling form submission
     let (is_submitting, set_is_submitting) = create_signal(false);
     let (error_message, set_error_message) = create_signal(String::new());
@@ -116,6 +117,16 @@ pub fn UpdateStudent(
             }
         };
 
+        let validated_pin = match pin().parse::<i32>() {
+            Ok(pin) => pin,
+            Err(_) => {
+                set_if_error(true);
+                set_error_message(String::from("Invalid pin"));
+                set_is_submitting(false);
+                return;
+            }
+        };
+
         // Convert gender string to enum
         let convert_gender_to_enum = match GenderEnum::from_str(&gender()) {
             Ok(gender_enum) => gender_enum,
@@ -170,6 +181,7 @@ pub fn UpdateStudent(
             intervention: intervention(),
             eye_glasses: eye_glasses(),
             notes: notes(),
+            pin: validated_pin,
         };
 
         spawn_local(async move {
@@ -305,6 +317,16 @@ pub fn UpdateStudent(
                                             }
                                         }
                                     }
+                                />
+                            </div>
+                            <div class=INFO_GROUP_STYLE>
+                                <label class=INFO_TITLE_STYLE for="pin">"Pin"</label>
+                                <input
+                                    type="number"
+                                    id="birthdate"
+                                    class="mt-1 w-full rounded-md border p-2"
+                                    value={pin}
+                                    on:input=move |ev| set_pin(event_target_value(&ev))
                                 />
                             </div>
                             <div class=INFO_GROUP_STYLE>

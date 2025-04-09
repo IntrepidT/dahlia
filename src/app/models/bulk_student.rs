@@ -30,4 +30,5 @@ pub struct StudentCsvRow {
     pub intervention: bool,
     pub eye_glasses: bool,
     pub notes: String,
+    pub pin: i32,
 }

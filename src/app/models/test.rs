@@ -1,16 +1,30 @@
+use crate::app::models::student::GradeEnum;
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Debug};
 use std::str::FromStr;
 use strum_macros::EnumString;
 use validator::Validate;
-//this section of code defines the TestType enum for use on the server-side of the application
-//should it be needed
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+pub struct BenchmarkCategory {
+    pub min: i32,
+    pub max: i32,
+    pub label: String,
+}
+impl BenchmarkCategory {
+    pub fn new(min: i32, max: i32, label: String) -> BenchmarkCategory {
+        BenchmarkCategory { min, max, label }
+    }
+}
+
 #[derive(Debug, Deserialize, Serialize, PartialEq, Eq, Clone, EnumString)]
 pub enum TestType {
     #[strum(to_string = "Reading")]
     Reading,
     #[strum(to_string = "Math")]
     Math,
+    #[strum(to_string = "Other")]
+    Other,
 }
 
 impl fmt::Display for TestType {
@@ -21,12 +35,12 @@ impl fmt::Display for TestType {
             match self {
                 TestType::Reading => "Reading".to_string(),
                 TestType::Math => "Math".to_string(),
+                TestType::Other => "Other".to_string(),
             }
         )
     }
 }
-//this is the main test object, utilized when reading data out of postgres and creating this data
-//on the client side
+
 #[derive(Debug, Validate, Deserialize, Serialize, PartialEq, Eq, Clone)]
 pub struct Test {
     #[validate(length(min = 1, message = "name is required"))]
@@ -35,6 +49,10 @@ pub struct Test {
     pub score: i32,
     pub comments: String,
     pub testarea: TestType,
+    pub school_year: Option<String>,
+    pub benchmark_categories: Option<Vec<BenchmarkCategory>>,
+    pub test_variant: i32,
+    pub grade_level: Option<GradeEnum>,
     pub test_id: String,
 }
 
@@ -44,6 +62,10 @@ impl Test {
         score: i32,
         comments: String,
         testarea: TestType,
+        school_year: Option<String>,
+        benchmark_categories: Option<Vec<BenchmarkCategory>>,
+        test_variant: i32,
+        grade_level: Option<GradeEnum>,
         test_id: String,
     ) -> Test {
         Test {
@@ -51,12 +73,15 @@ impl Test {
             score,
             comments,
             testarea,
+            school_year,
+            benchmark_categories,
+            test_variant,
+            grade_level,
             test_id,
         }
     }
 }
 
-//client-side request to be processed when writing a new Test object
 #[derive(Debug, Validate, Deserialize, Serialize, PartialEq, Eq, Clone)]
 pub struct CreateNewTestRequest {
     #[validate(length(min = 1, message = "name is required"))]
@@ -65,6 +90,10 @@ pub struct CreateNewTestRequest {
     pub score: i32,
     pub comments: String,
     pub testarea: TestType,
+    pub school_year: Option<String>,
+    pub benchmark_categories: Option<Vec<BenchmarkCategory>>,
+    pub test_variant: i32,
+    pub grade_level: Option<GradeEnum>,
 }
 
 impl CreateNewTestRequest {
@@ -73,17 +102,24 @@ impl CreateNewTestRequest {
         score: i32,
         comments: String,
         testarea: TestType,
+        school_year: Option<String>,
+        benchmark_categories: Option<Vec<BenchmarkCategory>>,
+        test_variant: i32,
+        grade_level: Option<GradeEnum>,
     ) -> CreateNewTestRequest {
         CreateNewTestRequest {
             name,
             score,
             comments,
             testarea,
+            school_year,
+            benchmark_categories,
+            test_variant,
+            grade_level,
         }
     }
 }
 
-//client side object to be called when making modifications to a data in the Test Table
 #[derive(Debug, Validate, Deserialize, Serialize, PartialEq, Eq, Clone)]
 pub struct UpdateTestRequest {
     #[validate(length(min = 1, message = "name is required"))]
@@ -92,14 +128,23 @@ pub struct UpdateTestRequest {
     pub score: i32,
     pub comments: String,
     pub testarea: TestType,
+    pub school_year: Option<String>,
+    pub benchmark_categories: Option<Vec<BenchmarkCategory>>,
+    pub test_variant: i32,
+    pub grade_level: Option<GradeEnum>,
     pub test_id: String,
 }
+
 impl UpdateTestRequest {
     pub fn new(
         name: String,
         score: i32,
         comments: String,
         testarea: TestType,
+        school_year: Option<String>,
+        benchmark_categories: Option<Vec<BenchmarkCategory>>,
+        test_variant: i32,
+        grade_level: Option<GradeEnum>,
         test_id: String,
     ) -> UpdateTestRequest {
         UpdateTestRequest {
@@ -107,12 +152,15 @@ impl UpdateTestRequest {
             score,
             comments,
             testarea,
+            school_year,
+            benchmark_categories,
+            test_variant,
+            grade_level,
             test_id,
         }
     }
 }
 
-//client side object to be called when making deleting data from the Test table
 #[derive(Debug, Validate, Deserialize, Serialize, PartialEq, Eq, Clone)]
 pub struct DeleteTestRequest {
     pub test_id: String,
@@ -126,8 +174,9 @@ impl DeleteTestRequest {
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "ssr")] {
-        use sqlx::{Postgres, Encode, Decode, Type, postgres::{PgTypeInfo, PgValueRef, PgArgumentBuffer}, encode::IsNull};
+        use sqlx::{Postgres, Encode, Decode, Type, postgres::{PgTypeInfo, PgValueRef, PgArgumentBuffer, PgHasArrayType}, encode::IsNull};
         use sqlx::prelude::*;
+        use sqlx::types::Json;
 
         impl<'q> sqlx::encode::Encode<'q, sqlx::Postgres> for TestType {
            fn encode_by_ref(&self, buf: &mut PgArgumentBuffer) -> Result<IsNull, Box<dyn std::error::Error + Send + Sync>> {
@@ -148,5 +197,48 @@ cfg_if::cfg_if! {
                 sqlx::postgres::PgTypeInfo::with_name("testarea_enum")
             }
         }
+
+        impl<'q> sqlx::encode::Encode<'q, sqlx::Postgres> for BenchmarkCategory {
+            fn encode_by_ref(&self, buf: &mut PgArgumentBuffer) -> Result<IsNull, Box<dyn std::error::Error + Send + Sync>> {
+                Json(self).encode_by_ref(buf)
+            }
+        }
+
+        impl sqlx::Type<sqlx::Postgres> for BenchmarkCategory {
+            fn type_info() -> sqlx::postgres::PgTypeInfo {
+                sqlx::postgres::PgTypeInfo::with_name("jsonb")
+            }
+        }
+
+        impl<'r> sqlx::decode::Decode<'r, sqlx::Postgres> for BenchmarkCategory {
+            fn decode(value: sqlx::postgres::PgValueRef<'r>) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+                let json: Json<BenchmarkCategory> = sqlx::decode::Decode::decode(value)?;
+                Ok(json.0)
+            }
+        }
+
+        impl sqlx::postgres::PgHasArrayType for BenchmarkCategory {
+            fn array_type_info() -> sqlx::postgres::PgTypeInfo {
+                sqlx::postgres::PgTypeInfo::with_name("_jsonb")
+            }
+        }
+
+        // Create a newtype wrapper for Vec<BenchmarkCategory> to solve the orphan rule issue
+        #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+        pub struct BenchmarkCategories(pub Vec<BenchmarkCategory>);
+        
+        impl<'q> sqlx::encode::Encode<'q, sqlx::Postgres> for BenchmarkCategories {
+            fn encode_by_ref(&self, buf: &mut PgArgumentBuffer) -> Result<IsNull, Box<dyn std::error::Error + Send + Sync>> {
+                Json(&self.0).encode_by_ref(buf)
+            }
+        }
+
+        impl<'r> sqlx::decode::Decode<'r, sqlx::Postgres> for BenchmarkCategories {
+            fn decode(value: sqlx::postgres::PgValueRef<'r>) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+                let json: Json<Vec<BenchmarkCategory>> = sqlx::decode::Decode::decode(value)?;
+                Ok(BenchmarkCategories(json.0))
+            }
+        }
+
     }
 }

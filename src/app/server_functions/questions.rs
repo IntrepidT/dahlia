@@ -32,6 +32,30 @@ pub async fn get_questions(test_id: String) -> Result<Vec<Question>, ServerFnErr
     }
 }
 
+#[server(DeleteQuestions, "/api")]
+pub async fn delete_questions(test_id: String) -> Result<Vec<Question>, ServerFnError> {
+    #[cfg(feature = "ssr")]
+    {
+        use actix_web::web;
+        use leptos_actix::extract;
+        let pool = extract::<web::Data<PgPool>>()
+            .await
+            .map_err(|e| ServerFnError::new(format!("Failed to extract pool: {}", e)))?;
+        log::info!("Attempting to retrieve all tests from database");
+
+        match question_database::delete_all_questions(test_id, &pool).await {
+            Ok(questions) => {
+                log::info!("Successfully deleted all questions related to test from database");
+                Ok(questions)
+            }
+            Err(e) => {
+                log::error!("Database error: {}", e);
+                Err(ServerFnError::new(format!("Database error: {}", e)))
+            }
+        }
+    }
+}
+
 #[server(AddQuestion, "/api")]
 pub async fn add_question(
     test_id: String,

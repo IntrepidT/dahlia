@@ -234,7 +234,7 @@ pub fn StudentView() -> impl IntoView {
                 // Bottom action buttons
                 <div class="mt-4 pt-2 flex gap-2 justify-end sticky bottom-0 bg-white">
                     <button
-                        class="px-4 py-2 bg-gray-300 font-bold text-white rounded-lg"
+                        class="px-4 py-2 bg-gray-200 font-bold text-white rounded-lg hover:bg-gray-300"
                         on:click=move |_| set_show_bulk_upload_modal(true)
                     >
                         "Bulk Student Upload"

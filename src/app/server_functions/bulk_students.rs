@@ -86,6 +86,7 @@ pub async fn upload_students_bulk(file_contents: String) -> Result<usize, Server
                         intervention: record.intervention,
                         eye_glasses: record.eye_glasses,
                         notes: record.notes,
+                        pin: record.pin,
                     };
                     imported_students.push(student);
                 }

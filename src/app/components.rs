@@ -9,9 +9,6 @@ pub use toast::ToastMessageType;
 pub mod administer_test_modal;
 pub use administer_test_modal::ShowAdministerTestModal;
 
-pub mod add_test_modal;
-pub use add_test_modal::AddTestModal;
-
 pub mod test_display;
 pub use test_display::MathTestDisplay;
 

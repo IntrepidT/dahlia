@@ -112,7 +112,7 @@ pub fn Header() -> impl IntoView {
                     <div class="flex items-center">
                         <A
                             href="/myaccount"
-                            class="flex items-center space-x-2 bg-[#00356B] hover:bg-[#00457b] text-white px-4 py-2 rounded-lg transition-colors"
+                            class="flex items-center space-x-2 bg-[#00356b] hover:bg-blue-700 text-white px-2 py-2 rounded-lg transition-colors"
                         >
                             <span>"My Account"</span>
                             <img src="/assets/user.png" alt="User account" class="h-5 w-5" />

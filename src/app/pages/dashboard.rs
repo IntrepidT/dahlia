@@ -28,8 +28,7 @@ pub fn Dashboard() -> impl IntoView {
                                 </div>
                             </div>
                             <div class="text-2xl font-bold mt-5 ">
-                                Scores
-                                <div class="flex-1 w-full shadow-lg border-gray border-2 h-[20rem] rounded-lg mt-2">
+                                <div class="flex-1 w-full h-[20rem] rounded-lg mt-2">
                                     <ScoresLedger />
                                 </div>
                             </div>

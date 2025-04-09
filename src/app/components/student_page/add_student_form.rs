@@ -44,6 +44,7 @@ pub fn AddStudentForm(
     let (new_intervention, set_new_intervention) = create_signal(false);
     let (new_eye_glasses, set_new_eye_glasses) = create_signal(false);
     let (new_notes, set_new_notes) = create_signal(String::new());
+    let (new_pin, set_new_pin) = create_signal(String::new());
 
     // Create a resource to fetch teachers
     let teachers = create_resource(
@@ -98,6 +99,15 @@ pub fn AddStudentForm(
                 log::error!("Error parsing date: {}", e);
                 set_if_error(true);
                 set_error_message(String::from("Invalid date format"));
+                return;
+            }
+        };
+
+        let validated_pin = match new_pin().parse::<i32>() {
+            Ok(pin) => pin,
+            Err(_) => {
+                set_if_error(true);
+                set_error_message(String::from("Invalid pin"));
                 return;
             }
         };
@@ -157,6 +167,7 @@ pub fn AddStudentForm(
             intervention: new_intervention(),
             eye_glasses: new_eye_glasses(),
             notes: new_notes(),
+            pin: validated_pin,
         };
 
         let is_valid = add_student_request.validate();
@@ -283,6 +294,15 @@ pub fn AddStudentForm(
                                     id="birthdate"
                                     class="mt-1 w-full rounded-md border p-2"
                                     on:change=move |ev| set_student_dob(event_target_value(&ev))
+                                />
+                            </div>
+                            <div class=INFO_GROUP_STYLE>
+                                <label class=INFO_TITLE_STYLE for="pin">"Pin"</label>
+                                <input
+                                    type="number"
+                                    id="pin"
+                                    class="mt-1 w-full rounded-md border p-2"
+                                    on:input=move |ev| set_new_pin(event_target_value(&ev))
                                 />
                             </div>
                             <div class=INFO_GROUP_STYLE>

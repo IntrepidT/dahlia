@@ -1,6 +1,7 @@
 pub mod database;
 pub mod question_database;
 pub mod score_database;
+pub mod session_database;
 pub mod student_database;
 pub mod teacher_database;
 pub mod test_database;
