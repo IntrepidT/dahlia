@@ -1,3 +1,4 @@
+use crate::app::components::dashboard::dashboard_sidebar::{DashboardSidebar, SidebarSelected};
 use crate::app::components::header::Header;
 use crate::app::components::student_page::bulk_upload_modal::BulkUploadModal;
 use crate::app::components::student_page::student_search_filter::SearchFilter;
@@ -15,13 +16,14 @@ use log::{debug, error, info};
 use std::rc::Rc;
 
 // Side panel styles
-const SIDE_PANEL_STYLE: &str = "w-1/3 h-[calc(100vh-5rem)] fixed right-0 top-0 mt-20 p-8";
-const TABLE_CONTAINER_STYLE: &str = "w-2/3 mt-20 p-5 fixed h-[calc(100vh-5rem)] flex flex-col ml-5";
+const SIDE_PANEL_STYLE: &str = "w-[30%] h-[calc(100vh-2rem)] fixed right-0 top-0 mt-10 p-10";
+const TABLE_CONTAINER_STYLE: &str = "w-[68%] fixed p-5 h-[calc(100vh-2rem)] flex flex-col ml-20";
 
 #[component]
 pub fn StudentView() -> impl IntoView {
     // Signals for gathering data from existing students
     let (refresh_trigger, set_refresh_trigger) = create_signal(0);
+    let (selected_view, set_selected_view) = create_signal(SidebarSelected::StudentView);
 
     // Resource for fetching students
     let students = create_resource(
@@ -155,8 +157,12 @@ pub fn StudentView() -> impl IntoView {
     });
 
     view! {
-        <div class="min-h-screen flex flex-col">
+        <div class="min-h-screen flex flex-col bg-[#F9F9F8]">
             <Header />
+            <DashboardSidebar
+                selected_item=selected_view
+                set_selected_item=set_selected_view
+            />
 
             // Delete confirmation modal
             <Show when=move || confirm_delete_one() && selected_student().is_some()>
@@ -232,15 +238,15 @@ pub fn StudentView() -> impl IntoView {
                 />
 
                 // Bottom action buttons
-                <div class="mt-4 pt-2 flex gap-2 justify-end sticky bottom-0 bg-white">
+                <div class="mt-4 pt-2 flex gap-2 justify-end sticky bottom-0 bg-[#F9F9F8]">
                     <button
-                        class="px-4 py-2 bg-gray-200 font-bold text-white rounded-lg hover:bg-gray-300"
+                        class="px-4 py-2 bg-[#DADADA] bg-opacity-50 hover:bg-opacity-90 font-bold text-[#2E3A59] border-[#DADADA] rounded-lg border"
                         on:click=move |_| set_show_bulk_upload_modal(true)
                     >
                         "Bulk Student Upload"
                     </button>
                     <button
-                        class="inline-flex items-center justify-center px-4 py-2 bg-red-500 text-white rounded-md font-semibold hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500/50 transition-colors duration-200 shadow-sm hover:shadow-md"
+                        class="inline-flex items-center justify-center px-4 py-2 bg-[#F44336] text-white rounded-md font-semibold hover:bg-[#D32F2F] focus:outline-none focus:ring-2 focus:ring-[#F44336]/50 transition-colors duration-200 shadow-sm hover:shadow-md"
                         class:opacity-50=move || selected_student().is_none()
                         class:cursor-not-allowed=move || selected_student().is_none()
                         on:click=move |_| {
@@ -252,7 +258,7 @@ pub fn StudentView() -> impl IntoView {
                         "Delete Student"
                     </button>
                     <button
-                        class="inline-flex items-center justify-center px-4 py-2 bg-[#50C878] text-white rounded-md font-semibold hover:bg-[#41C35C] focus:outline-none focus:ring-2 focus:ring-[#50C878]/50 transition-colors duration-200 shadow-sm hover:shadow-md"
+                        class="inline-flex items-center justify-center px-4 py-2 bg-[#4CAF50] text-white rounded-md font-semibold hover:bg-[#388E3C] focus:outline-none focus:ring-2 focus:ring-[#4CAF50]/50 transition-colors duration-200 shadow-sm hover:shadow-md"
                         on:click=handle_add_student
                     >
                         "Add Student"
@@ -265,7 +271,7 @@ pub fn StudentView() -> impl IntoView {
                 <Show
                     when=move || selected_student().is_some() || adding_student() || editing()
                     fallback=|| view! {
-                        <div class="flex items-center justify-center border-t-8 border-[#00356b] h-full text-gray-500 rounded-lg shadow-lg">
+                        <div class="flex items-center justify-center border-t-8 border-[#2E3A59] h-full text-gray-500 rounded-lg shadow-lg bg-[#F9F9F8]">
                             "Select a student to view details"
                         </div>
                     }

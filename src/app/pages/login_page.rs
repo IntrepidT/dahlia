@@ -17,7 +17,7 @@ pub fn LoginPage() -> impl IntoView {
     });
 
     view! {
-        <div class="max-w-md mx-auto mt-10">
+        <div class="max-w-md mx-auto mt-10 bg-[#f9f9f8]">
             {move || {
                 if show_register.get() {
                     view! {

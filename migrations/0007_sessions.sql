@@ -1,31 +1,25 @@
-CREATE TABLE IF NOT EXISTS test_sessions (
-  session_id VARCHAR(36) PRIMARY KEY,
-  test_id UUID NOT NULL,
-  student_id INTEGER NOT NULL,
-  evaluator_id VARCHAR(36) NOT NULL,
-  current_card_index INTEGER NOT NULL DEFAULT 0,
-  is_active BOOLEAN NOT NULL DEFAULT TRUE,
-  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-  completed_at TIMESTAMP WITH TIME ZONE,
-  FOREIGN KEY (test_id) REFERENCES tests(test_id),
-  FOREIGN KEY (student_id) REFERENCES students(student_id)
+-- Create enum types needed for session status
+CREATE TYPE session_status_enum AS ENUM ('active', 'inactive', 'expired');
+
+-- Create sessions table
+CREATE TABLE websocket_sessions (
+    id UUID PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    last_active TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    owner_id UUID,
+    status session_status_enum NOT NULL DEFAULT 'active',
+    max_users INTEGER DEFAULT 0,
+    current_users INTEGER DEFAULT 0,
+    is_private BOOLEAN DEFAULT false,
+    password_required BOOLEAN DEFAULT false,
+    password_hash VARCHAR(255),
+    metadata JSONB
 );
 
-CREATE OR REPLACE FUNCTION update_updated_at_column()
-RETURNS TRIGGER AS $$
-BEGIN
-  NEW.updated_at = NOW();
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
+-- Create index for quick lookups by status
+CREATE INDEX sessions_status_idx ON websocket_sessions(status);
 
-CREATE TRIGGER update_test_session_updated_at
-BEFORE UPDATE ON test_sessions
-FOR EACH ROW
-EXECUTE FUNCTION update_updated_at_column();
-
-
-CREATE INDEX idx_test_sessions_test_id ON test_sessions(test_id);
-CREATE INDEX idx_test_sessions_student_id ON test_sessions(student_id);
-CREATE INDEX idx_test_sessions_active ON test_sessions(is_active);
+-- Create index for sorting by activity
+CREATE INDEX sessions_last_active_idx ON websocket_sessions(last_active);

@@ -1,14 +1,27 @@
+use icondata::IoChatbubbleEllipsesOutline;
 use icondata::{AiBarChartOutlined, AiHomeOutlined, AiSettingOutlined};
+// Add new imports for additional icons
+use crate::app::components::ShowAdministerTestModal;
+use icondata::{AiDashboardOutlined, IoPeopleOutline, IoPricetagOutline, IoSchoolOutline};
 use leptos::ev::MouseEvent;
 use leptos::*;
 use leptos_icons::Icon;
+use leptos_router::*;
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum SidebarSelected {
     Overview,
     Analytics,
     Settings,
+    Chat,
+    Dashboard,
+    StudentView,
+    TeacherView,
+    AdministerTest,
 }
+const GRAY_COLOR: &str = "text-[#DADADA]";
+const BLUE_COLOR: &str = "text-[#2E3A59]";
+const BLUE_HUE: &str = "bg-blue-100";
 
 #[component]
 pub fn DashboardSidebar(
@@ -16,10 +29,23 @@ pub fn DashboardSidebar(
     set_selected_item: WriteSignal<SidebarSelected>,
 ) -> impl IntoView {
     let (is_expanded, set_is_expanded) = create_signal(false);
+    let (show_administer_modal, set_show_administer_modal) = create_signal(false);
+
+    // Handle current route for active styling
+    let (current_path, set_current_path) = create_signal(String::new());
+
+    // Effect to track current route
+    create_effect(move |_| {
+        if let Some(route_context) = use_context::<RouterContext>() {
+            set_current_path(route_context.pathname().get());
+        } else {
+            set_current_path(String::from("/"));
+        }
+    });
 
     view! {
         <div
-            class="fixed left-0 top-16 h-[calc(100vh-4rem)] bg-white shadow-lg transition-all duration-300 ease-in-out z-40"
+            class="fixed left-0 top-16 h-[calc(100vh-4rem)] bg-[#F9F9F8] shadow-lg transition-all duration-300 ease-in-out z-40"
             class:w-20={move || !is_expanded()}
             class:w-64={move || is_expanded()}
             on:mouseenter=move |_| set_is_expanded(true)
@@ -27,6 +53,7 @@ pub fn DashboardSidebar(
         >
             <div class="flex flex-col h-full p-4 overflow-y-auto">
                 <div class="space-y-4">
+                    // Original sidebar items
                     <SidebarItem
                         icon=AiHomeOutlined
                         label="Overview"
@@ -44,6 +71,14 @@ pub fn DashboardSidebar(
                         on_click=move |_| set_selected_item(SidebarSelected::Analytics)
                     />
                     <SidebarItem
+                        icon=IoChatbubbleEllipsesOutline
+                        label="Chat"
+                        description="Communicate with your coworkers"
+                        is_expanded=is_expanded.into()
+                        is_selected=Signal::derive(move || selected_item() == SidebarSelected::Chat)
+                        on_click=move |_| set_selected_item(SidebarSelected::Chat)
+                    />
+                    <SidebarItem
                         icon=AiSettingOutlined
                         label="Settings"
                         description="Customize your account preferences"
@@ -51,6 +86,72 @@ pub fn DashboardSidebar(
                         is_selected=Signal::derive(move || selected_item() == SidebarSelected::Settings)
                         on_click=move |_| set_selected_item(SidebarSelected::Settings)
                     />
+
+                    // Divider
+                    <div class="border-t border-[#DADADA] my-2"></div>
+
+                    // Transferred navigation items from header
+                    <SidebarNavLink
+                        icon=AiDashboardOutlined
+                        label="Dashboard"
+                        path="/dashboard"
+                        is_expanded=is_expanded.into()
+                        is_active=Signal::derive(move || current_path().starts_with("/dashboard"))
+                    />
+                    <SidebarNavLink
+                        icon=IoPeopleOutline
+                        label="Student View"
+                        path="/studentview"
+                        is_expanded=is_expanded.into()
+                        is_active=Signal::derive(move || current_path().starts_with("/studentview"))
+                    />
+                    <SidebarNavLink
+                        icon=IoSchoolOutline
+                        label="Teacher View"
+                        path="/teachers"
+                        is_expanded=is_expanded.into()
+                        is_active=Signal::derive(move || current_path().starts_with("/teachers"))
+                    />
+
+                    // Administer Test item with dropdown
+                    <div
+                        class="flex items-center cursor-pointer hover:bg-[#DADADA] p-2 rounded-md transition-colors"
+                        on:click=move |_| set_show_administer_modal.update(|v| *v = !*v)
+                    >
+                        <Icon
+                            icon=IoPricetagOutline
+                            class="w-6 h-6 mr-4 text-[#2E3A59]"
+                        />
+                        <div class="overflow-hidden">
+                            <Show
+                                when=move || is_expanded()
+                                fallback=|| view! { <></> }
+                            >
+                                <div class="flex items-center justify-between w-full">
+                                    <span class="font-semibold text-[#2E3A59]">"Administer Test"</span>
+                                    <span>
+                                        <Show when=move || show_administer_modal()>
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                <polyline points="18 15 12 9 6 15"></polyline>
+                                            </svg>
+                                        </Show>
+                                        <Show when=move || !show_administer_modal()>
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                <polyline points="6 9 12 15 18 9"></polyline>
+                                            </svg>
+                                        </Show>
+                                    </span>
+                                </div>
+                            </Show>
+                        </div>
+                    </div>
+
+                    // Modal Dropdown
+                    <Show when=move || show_administer_modal()>
+                        <div class="ml-10 bg-[#F9F9F8] rounded-lg border border-[#DADADA] border-opacity-50">
+                            <ShowAdministerTestModal set_if_show_modal=set_show_administer_modal />
+                        </div>
+                    </Show>
                 </div>
             </div>
         </div>
@@ -68,13 +169,13 @@ fn SidebarItem(
 ) -> impl IntoView {
     view! {
         <div
-            class="flex items-center cursor-pointer hover:bg-gray-100 p-2 rounded-md transition-colors"
+            class="flex items-center cursor-pointer hover:bg-[#DADADA] p-2 rounded-md transition-colors"
             class:bg-blue-100=move || is_selected()
             on:click=on_click
         >
             <Icon
                 icon=icon
-                class="w-6 h-6 mr-4 text-gray-600"
+                class="w-6 h-6 mr-4 text-[#2E3A59]"
             />
             <div class="overflow-hidden">
                 <Show
@@ -84,15 +185,50 @@ fn SidebarItem(
                     <div class="flex flex-col">
                         <span
                             class="font-semibold"
-                            class:text-gray-800=move || !is_selected.get()
-                            class:text-blue-800=move || is_selected.get()
+                            class:GRAY_COLOR=move || !is_selected.get()
+                            class:BLUE_COLOR=move || is_selected.get()
                         >
                             {label}
                         </span>
-                        <span class="text-xs text-gray-500">{description}</span>
+                        <span class="text-xs text-[#2E3A59]">{description}</span>
                     </div>
                 </Show>
             </div>
         </div>
+    }
+}
+
+#[component]
+fn SidebarNavLink(
+    icon: icondata::Icon,
+    label: &'static str,
+    path: &'static str,
+    is_expanded: Signal<bool>,
+    is_active: Signal<bool>,
+) -> impl IntoView {
+    view! {
+        <A
+            href={path}
+            class="flex items-center cursor-pointer hover:bg-[#DADADA] p-2 rounded-md transition-colors"
+        >
+            <Icon
+                icon=icon
+                class="w-6 h-6 mr-4 text-[#2E3A59]"
+            />
+            <div class="overflow-hidden">
+                <Show
+                    when=move || is_expanded()
+                    fallback=|| view! { <></> }
+                >
+                    <span
+                        class="font-semibold"
+                        class:GRAY_COLOR=move || !is_active()
+                        class:BLUE_COLOR=move || is_active()
+                    >
+                        {label}
+                    </span>
+                </Show>
+            </div>
+        </A>
     }
 }

@@ -2,7 +2,11 @@
 module.exports = {
   content: ["./index.html", "./src/*.rs", "./src/**/*.rs", "./style/**/*.{html,js,rs}"],
   theme: {
-    extend: {},
+    extend: {
+      backgroundColor: {
+        'page': '#f9f9f8',
+      }
+    },
   },
   plugins: [
     function({ addBase }) {

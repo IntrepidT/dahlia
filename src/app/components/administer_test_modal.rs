@@ -5,23 +5,23 @@ use leptos_router::*;
 use std::rc::Rc;
 
 const MODAL_STYLE: &str = 
-    "flex flex-col bg-white px-6 py-5 w-96 rounded-lg shadow-lg border border-gray-100";
+    "flex flex-col bg-[#F9F9F8] px-6 py-5 w-96 rounded-lg shadow-lg border border-[#DADADA]";
 
 const CARD_STYLE: &str = 
-    "flex flex-col items-center justify-center p-4 rounded-lg hover:bg-gray-50 border border-gray-200 transition-all duration-200 hover:shadow-md";
+    "flex flex-col items-center justify-center p-4 rounded-lg hover:bg-[#DADADA] border border-[#DADADA] transition-all duration-200 hover:shadow-md";
 
 const ICON_STYLE: &str = 
-    "h-10 w-10 mb-3 p-2 rounded-full bg-gray-100";
+    "h-10 w-10 mb-3 p-2 rounded-full bg-[#DADADA]";
 
 const BUTTON_TEXT_STYLE: &str = 
-    "text-gray-800 font-medium text-sm mt-1";
+    "text-[#2E3A59] font-medium text-sm mt-1";
 
 #[component]
 pub fn ShowAdministerTestModal(set_if_show_modal: WriteSignal<bool>) -> impl IntoView {
     view! {
        <div class=MODAL_STYLE>
            <div class="mb-4">
-               <h2 class="text-xl font-semibold text-gray-800">Select Assessment Type</h2>
+               <h2 class="text-xl font-semibold text-[#2E3A59]">Select Assessment Type</h2>
                <p class="text-sm text-gray-500">"Choose which assessment you'd like to administer"</p>
            </div>
            
@@ -52,7 +52,7 @@ pub fn ShowAdministerTestModal(set_if_show_modal: WriteSignal<bool>) -> impl Int
            
            <div class="mt-4 flex justify-end">
                <button 
-                   class="text-sm text-gray-500 hover:text-gray-700"
+                   class="text-sm text-[#2E3A59] hover:text-[#DADADA]"
                    on:click=move |_| set_if_show_modal.update(|value| *value = false)
                >
                    Cancel

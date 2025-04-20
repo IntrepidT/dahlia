@@ -1,3 +1,4 @@
+use crate::app::components::dashboard::dashboard_sidebar::{DashboardSidebar, SidebarSelected};
 use crate::app::components::{Header, MathTestDisplay, Toast, ToastMessage, ToastMessageType};
 use crate::app::models::{DeleteTestRequest, Test, TestType};
 use crate::app::server_functions::{get_tests, tests::delete_test};
@@ -7,10 +8,11 @@ use std::rc::Rc;
 
 #[component]
 pub fn MathTesting() -> impl IntoView {
+    let (selected_view, set_selected_view) = create_signal(SidebarSelected::AdministerTest);
     // Button styles updated to match Stripe's design language
-    const ADD_BUTTON_STYLE: &str = "bg-indigo-600 px-4 py-2 rounded-md text-white font-medium text-sm shadow-sm transition-all hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2";
+    const ADD_BUTTON_STYLE: &str = "bg-[#2E3A59] px-4 py-2 rounded-md text-white font-medium text-sm shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-[#2E3A59] focus:ring-offset-2";
     const EDIT_BUTTON_STYLE: &str = "bg-white px-4 py-2 rounded-md text-gray-700 font-medium text-sm border border-gray-300 shadow-sm transition-all hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ml-3";
-    const EDIT_BUTTON_CLICKED_STYLE: &str = "bg-indigo-100 px-4 py-2 rounded-md text-indigo-700 font-medium text-sm border border-indigo-300 shadow-sm transition-all hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ml-3";
+    const EDIT_BUTTON_CLICKED_STYLE: &str = "bg-indigo-100 px-4 py-2 rounded-md text-indigo-700 font-medium text-sm border border-[#2E3A59] shadow-sm transition-all hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-[#2E3A59] focus:ring-offset-2 ml-3";
     const DELETE_BUTTON_STYLE: &str = "bg-white px-4 py-2 rounded-md text-red-600 font-medium text-sm border border-gray-300 shadow-sm transition-all hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 ml-3";
 
     let (if_show_modal, set_if_show_modal) = create_signal(false);
@@ -63,8 +65,12 @@ pub fn MathTesting() -> impl IntoView {
     });
 
     view! {
-        <div class="min-h-screen">
+        <div class="min-h-screen bg-[#F9F9F8]">
             <Header />
+            <DashboardSidebar
+                selected_item=selected_view
+                set_selected_item=set_selected_view
+            />
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
                 <Toast
                     toast_message
@@ -76,7 +82,7 @@ pub fn MathTesting() -> impl IntoView {
                 <div class="pb-5 border-b border-gray-200 mb-8">
                     <div class="flex items-center justify-between">
                         <div>
-                            <h1 class="text-3xl font-bold text-gray-900">Math Tests</h1>
+                            <h1 class="text-3xl font-bold text-[#2E3A59]">Math Tests</h1>
                             <p class="mt-2 text-sm text-gray-500">
                                 "Manage your math test collection"
                             </p>
@@ -133,7 +139,7 @@ pub fn MathTesting() -> impl IntoView {
                         </div>
                     }
                 }>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    <div class="grid grid-cols-1 gap-6">
                         {
                             move || {
                                 get_tests_info.get().map(|data| {
@@ -166,7 +172,7 @@ pub fn MathTesting() -> impl IntoView {
                                                         let test_id = each_test.test_id.clone();
 
                                                         view!{
-                                                            <div class="group relative bg-white rounded-lg overflow-hidden hover:shadow-md transition-all duration-300">
+                                                            <div class="group relative bg-[#F9F9F8] rounded-lg overflow-hidden">
                                                                 <MathTestDisplay
                                                                     test=Rc::new(each_test.clone())
                                                                     test_resource=get_tests_info

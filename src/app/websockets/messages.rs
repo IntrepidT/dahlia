@@ -1,29 +1,34 @@
 #[cfg(feature = "ssr")]
-use {
-    crate::app::websockets::actors::ClientActor,
-    actix::{Addr, Message},
-};
+use actix::prelude::{Message, Recipient};
+use uuid::Uuid;
 
-// Message types
 #[cfg(feature = "ssr")]
 #[derive(Message)]
 #[rtype(result = "()")]
-pub struct ForwardMessage {
-    pub client_id: String,
-    pub message: String,
-}
+pub struct WsMessage(pub String);
+
 #[cfg(feature = "ssr")]
 #[derive(Message)]
 #[rtype(result = "()")]
-pub struct ClientMessage {
-    pub message: String,
+pub struct Connect {
+    pub addr: Recipient<WsMessage>,
+    pub lobby_id: Uuid,
+    pub self_id: Uuid,
 }
 
-// Register client with session
 #[cfg(feature = "ssr")]
 #[derive(Message)]
 #[rtype(result = "()")]
-pub struct RegisterClient {
-    pub client_id: String,
-    pub client_addr: Addr<ClientActor>,
+pub struct Disconnect {
+    pub id: Uuid,
+    pub room_id: Uuid,
+}
+
+#[cfg(feature = "ssr")]
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct ClientActorMessage {
+    pub id: Uuid,
+    pub msg: String,
+    pub room_id: Uuid,
 }

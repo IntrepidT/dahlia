@@ -1,3 +1,4 @@
+use crate::app::components::dashboard::dashboard_sidebar::{DashboardSidebar, SidebarSelected};
 use crate::app::components::header::Header;
 use crate::app::components::teacher_page::{
     AddEmployeeForm, DeleteConfirmation, EmployeeDetails, EmployeeTable, SearchFilter, TeacherTable,
@@ -15,19 +16,19 @@ use strum::IntoEnumIterator;
 use validator::Validate;
 
 // Side panel and button styles
-const SIDE_PANEL_STYLE: &str = "w-1/3 h-[calc(100vh-5rem)] fixed right-0 top-0 mt-20 p-8";
+const SIDE_PANEL_STYLE: &str = "w-[30%] h-[calc(100vh-5rem)] fixed right-0 top-0 mt-20 p-8";
 const BUTTON_CONTAINER_STYLE_FLOAT: &str =
-    "mt-2 flex gap-2 justify-end sticky bottom-0 bg-white w-full";
+    "mt-4 pt-2 flex gap-2 justify-end sticky bottom-0 bg-[#F9F9F8] w-full";
 const TAB_BUTTON_ACTIVE: &str =
-    "px-4 py-2 font-medium rounded-t-lg bg-[#00356b] text-white border-none";
+    "px-4 py-2 font-medium rounded-t-lg bg-[#2E3A59] text-white border-none";
 const TAB_BUTTON_INACTIVE: &str =
-    "px-4 py-2 font-medium rounded-t-lg bg-gray-100 text-gray-600 hover:bg-gray-200";
-const ADD_BUTTON_STYLE: &str = "inline-flex items-center justify-center px-4 py-2 bg-[#50C878] text-white rounded-md font-semibold hover:bg-[#41C36C] focus:outline-none focus:ring-2 focus:ring-[#50C878]/50 transition-colors duration-200 shadow-sm hover:shadow-md";
-const DELETE_BUTTON_STYLE: &str = "inline-flex items-center justify-center px-4 py-2 bg-red-500 text-white rounded-md font-semibold hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500/50 transition-colors duration-200 shadow-sm hover:shadow-md";
+    "px-4 py-2 font-medium rounded-t-lg bg-[#DADADA] text-white hover:bg-gray-200";
+const ADD_BUTTON_STYLE: &str = "inline-flex items-center justify-center px-4 py-2 bg-[#4CAF50] text-white rounded-md font-semibold hover:bg-[#388E3C] focus:outline-none focus:ring-2 focus:ring-[#388E3C]/50 transition-colors duration-200 shadow-sm hover:shadow-md";
+const DELETE_BUTTON_STYLE: &str = "inline-flex items-center justify-center px-4 py-2 bg-[#F44336] text-white rounded-md font-semibold hover:bg-[#D32F2F] focus:outline-none focus:ring-2 focus:ring-[#D32F2F]/50 transition-colors duration-200 shadow-sm hover:shadow-md";
 
 // Side panel styles
 const INFO_CONTAINER_STYLE: &str =
-    "h-full p-6 border-t-8 border-[#00356B] shadow-lg rounded-lg flex flex-col";
+    "h-full p-6 border-t-8 border-[#2E3A59] shadow-lg rounded-lg flex flex-col";
 const INFO_CONTENT_STYLE: &str = "flex-grow overflow-y-auto";
 const INFO_TITLE_STYLE: &str = "text-stone-400 text-xs";
 const INFO_VALUE_STYLE: &str = "mt-1";
@@ -39,6 +40,7 @@ const BUTTON_CONTAINER_STYLE: &str =
 pub fn Teachers() -> impl IntoView {
     // Create resource for refreshing data
     let (refresh_trigger, set_refresh_trigger) = create_signal(0);
+    let (selected_view, set_selected_view) = create_signal(SidebarSelected::TeacherView);
     //
     // Create resources for employees and teachers
     let employees = create_resource(
@@ -86,9 +88,12 @@ pub fn Teachers() -> impl IntoView {
     };
 
     view! {
-        <div class="min-h-screen flex flex-col">
+        <div class="min-h-screen flex flex-col bg-[#F9F9F8]">
             <Header/>
-
+            <DashboardSidebar
+                selected_item=selected_view
+                set_selected_item=set_selected_view
+            />
             // Delete confirmation modal
             <Show when=move || confirm_delete() && selected_employee().is_some()>
                 <DeleteConfirmation
@@ -102,7 +107,7 @@ pub fn Teachers() -> impl IntoView {
                 />
             </Show>
 
-            <div class="w-2/3 mt-12 px-6 ml-5">
+            <div class="w-[68%] px-6 ml-20">
                 // Search and Filters
                 <SearchFilter
                     search_term=search_term

@@ -2,26 +2,27 @@ use crate::app::models::student::Student;
 use leptos::*;
 use std::rc::Rc;
 
-// Updated consistent color scheme and styling
-const THEME_PRIMARY: &str = "#00356b"; // Darkened from #00356B
-const THEME_PRIMARY_LIGHT: &str = "#5D7A9E"; // Darkened from #7F9AB5
-const THEME_GRAY_BG: &str = "#F0F2F5";
+// Updated color scheme to match the palette
+const THEME_PRIMARY: &str = "#2E3A59"; // Navy blue
+const THEME_SECONDARY: &str = "#DADADA"; // Light gray
+const THEME_BG: &str = "#F9F9F8"; // Off-white
 
 // Improved consistent styling with better naming
-const CARD_CONTAINER: &str = "h-full bg-white p-6 border-t-4 border-l border-r border-b border-gray-200 shadow-md rounded-lg flex flex-col";
-const SECTION_CONTAINER: &str = "bg-gray-50 p-5 rounded-lg border border-gray-100 shadow-sm";
+const CARD_CONTAINER: &str = "h-full bg-[#F9F9F8] p-6 border-t-8 border-[#2E3A59] shadow-md rounded-lg flex flex-col";
+const SECTION_CONTAINER: &str = "bg-white p-5 rounded-lg border border-[#DADADA] shadow-sm";
 const SECTION_TITLE: &str =
-    "text-sm font-semibold text-gray-700 mb-3 pb-2 border-b border-gray-200";
-const INFO_TITLE: &str = "text-xs text-gray-600 font-medium"; // Darkened from text-gray-500
-const INFO_VALUE: &str = "text-gray-900 mt-1";const INFO_GROUP: &str = "mb-4";
+    "text-sm font-semibold text-[#2E3A59] mb-3 pb-2 border-b border-[#DADADA]";
+const INFO_TITLE: &str = "text-xs text-[#2E3A59] text-opacity-70 font-medium";
+const INFO_VALUE: &str = "text-[#2E3A59] mt-1";
+const INFO_GROUP: &str = "mb-4";
 const BUTTON_CONTAINER: &str =
-    "mt-6 pt-4 flex gap-3 justify-end sticky bottom-0 bg-white border-t border-gray-200";
+    "mt-6 pt-4 flex gap-3 justify-end sticky bottom-0 bg-[#F9F9F8] border-t border-[#DADADA]";
 const BUTTON_PRIMARY: &str = 
-    "px-4 py-2 bg-[#00356b] rounded-md font-medium text-white hover:font-large transition-colors hover:bg-blue-700 hover:border-white";
+    "px-4 py-2 bg-[#2E3A59] rounded-md font-medium text-[#F9F9F8] hover:bg-opacity-80 transition-colors";
 const BUTTON_SECONDARY: &str = 
-    "px-4 py-2 bg-gray-200 rounded-md font-medium text-gray-500 hover:text-gray-900 transition-colors border border-gray-300";
+    "px-4 py-2 bg-[#F9F9F8] rounded-md font-medium text-[#2E3A59] hover:bg-opacity-80 transition-colors border border-[#DADADA]";
 const BUTTON_ACCENT: &str = 
-    "px-4 py-2 bg-[#FCEDA0] rounded-md font-medium text-gray-500 hover:text-gray-900 transition-colors border border-gray-300";
+    "px-4 py-2 bg-[#F9F9F8] rounded-md font-medium text-[#2E3A59] hover:bg-[#DADADA] hover:bg-opacity-30 transition-colors border border-[#DADADA]";
 
 #[component]
 pub fn StudentDetails(
@@ -50,7 +51,7 @@ pub fn StudentDetails(
                                 </div>
                             }
                         } else {
-                            view! { <div><span class="text-gray-500 font-medium">"Inactive"</span></div> }
+                            view! { <div><span class="text-[#2E3A59] text-opacity-50 font-medium">"Inactive"</span></div> }
                         }}
                     </div>
                 </div>
@@ -90,7 +91,7 @@ pub fn StudentDetails(
                 <div class=INFO_GROUP>
                     <div class=INFO_TITLE>"ESL Status"</div>
                     <div class=INFO_VALUE>
-                        <span class="px-2 py-1 bg-blue-100 text-blue-800 rounded-md text-xs font-medium">
+                        <span class="px-2 py-1 bg-[#2E3A59] bg-opacity-10 text-[#2E3A59] rounded-md text-xs font-medium">
                             {student.esl.to_string()}
                         </span>
                     </div>
@@ -104,10 +105,10 @@ pub fn StudentDetails(
     view! {
         <div class=CARD_CONTAINER>
             <div class="flex items-center justify-between mb-6">
-                <h2 class="text-xl font-bold text-gray-800">
+                <h2 class="text-xl font-bold text-[#2E3A59]">
                     {move || format!("{} {}", student_memo().firstname, student_memo().lastname)}
                 </h2>
-                <div class="px-3 py-1 rounded-full bg-blue-200 text-blue-800 text-xs font-medium">
+                <div class="px-3 py-1 rounded-full bg-[#2E3A59] text-white text-xs font-medium">
                     {move || student_memo().grade.to_string()}
                 </div>
             </div>
@@ -161,11 +162,11 @@ pub fn StudentDetails(
                     <div class=SECTION_CONTAINER>
                         <div class=INFO_GROUP>
                             <div class=INFO_TITLE>"Student Notes"</div>
-                            <div class="mt-2 whitespace-pre-wrap text-gray-700 bg-white p-3 rounded border border-gray-200 min-h-12">
+                            <div class="mt-2 whitespace-pre-wrap text-[#2E3A59] bg-white p-3 rounded border border-[#DADADA] min-h-12">
                                 {move || {
                                     let notes = student_memo().notes.clone();
                                     if notes.is_empty() {
-                                        view! { <span class="text-gray-400 italic">"No notes available"</span> }
+                                        view! { <span class="text-[#2E3A59] text-opacity-40 italic">"No notes available"</span> }
                                     } else {
                                         view! { <span>{notes}</span> }
                                     }
@@ -178,9 +179,9 @@ pub fn StudentDetails(
 
             // Button container at the bottom
             <div class=BUTTON_CONTAINER>
-                <button class=BUTTON_SECONDARY>
+                /*<button class=BUTTON_SECONDARY>
                     "Next Student"
-                </button>
+                </button>*/
                 <button class=BUTTON_ACCENT
                     on:click=move |_| {
                         if let Some(callback) = on_edit_student {

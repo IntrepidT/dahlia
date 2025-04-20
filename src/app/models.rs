@@ -39,5 +39,7 @@ pub mod bulk_student;
 pub use bulk_student::BulkStudentImportRequest;
 pub use bulk_student::StudentCsvRow;
 
-pub mod session;
-pub use session::{SessionEvent, TestSession};
+pub mod websocket_session;
+pub use websocket_session::CreateSessionRequest;
+pub use websocket_session::Session;
+pub use websocket_session::SessionSummary;

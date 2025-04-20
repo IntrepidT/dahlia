@@ -3,15 +3,16 @@ use leptos::*;
 use std::rc::Rc;
 
 const TABLE_CONTAINER_STYLE: &str =
-    "bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden";
+    "bg-[#F9F9F8] rounded-lg shadow-sm border border-[#DADADA] overflow-hidden";
 const TABLE_HEADER_STYLE: &str =
-    "py-5 px-6 flex justify-between items-center border-b border-gray-100 bg-[#00356b]";
-const TABLE_WRAPPER_STYLE: &str = "overflow-x-auto h-[33rem]";
-const TABLE_STYLE: &str = "min-w-full divide-y divide-gray-100";
+    "py-5 px-6 flex justify-between items-center border-b border-[#2E3A59] bg-[#2E3A59]";
+const TABLE_WRAPPER_STYLE: &str = "overflow-x-auto h-[34rem]";
+const TABLE_STYLE: &str = "min-w-full divide-y divide-[#DADADA]";
 const HEADER_CELL_STYLE: &str =
-    "px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider";
-const CELL_STYLE: &str = "px-6 py-4 whitespace-nowrap text-sm";
-const SELECTED_ROW_STYLE: &str = "bg-blue-50 border-l-4 border-blue-500";
+    "px-6 py-3 text-left text-xs font-medium text-[#2E3A59] uppercase tracking-wider";
+const CELL_STYLE: &str = "px-6 py-4 whitespace-nowrap text-sm bg-[#F9F9F8]";
+const SELECTED_ROW_STYLE: &str =
+    "bg-[#DADADA] border-l-4 border-r-2 border-t-2 border-b-2 border-[#2E3A59]";
 
 #[component]
 pub fn TeacherTable(
@@ -60,7 +61,7 @@ pub fn TeacherTable(
             <div class=TABLE_WRAPPER_STYLE>
                 <div class="overflow-y-auto max-h-full">
                     <table class=TABLE_STYLE>
-                        <thead class="bg-gray-50 sticky top-0 z-10">
+                        <thead class="bg-[#DADADA] sticky top-0 z-10">
                             <tr>
                                 <th class=HEADER_CELL_STYLE>"ID"</th>
                                 <th class=HEADER_CELL_STYLE>"First Name"</th>
@@ -72,7 +73,7 @@ pub fn TeacherTable(
                         <Suspense fallback=move || view! {
                             <tr>
                                 <td colspan="6" class="text-center p-8">
-                                    <div class="inline-block h-6 w-6 animate-spin rounded-full border-2 border-gray-300 border-t-gray-600"></div>
+                                    <div class="inline-block h-6 w-6 animate-spin rounded-full border-2 border-[#DADADA] border-t-[#2E3A59]"></div>
                                 </td>
                             </tr>
                         }>
@@ -97,24 +98,24 @@ pub fn TeacherTable(
                                                     class=move || if is_selected() {
                                                         format!("{} {}", SELECTED_ROW_STYLE, "cursor-pointer")
                                                     } else {
-                                                        "hover:bg-gray-50 cursor-pointer border-b border-gray-100".to_string()
+                                                        "hover:bg-opacity-20 cursor-pointer border-b border-[#DADADA]".to_string()
                                                     }
                                                     on:click=move |_| set_selected_employee(Some(teacher_rc.clone()))
                                                 >
-                                                    <td class=format!("{} {}", CELL_STYLE, "text-gray-600")>{teacher.id}</td>
-                                                    <td class=format!("{} {}", CELL_STYLE, "font-medium text-gray-900")>{&teacher.firstname}</td>
-                                                    <td class=format!("{} {}", CELL_STYLE, "text-gray-900 font-medium")>{&teacher.lastname}</td>
+                                                    <td class=format!("{} {}", CELL_STYLE, "text-[#2E3A59]")>{teacher.id}</td>
+                                                    <td class=format!("{} {}", CELL_STYLE, "font-medium text-[#2E3A59]")>{&teacher.firstname}</td>
+                                                    <td class=format!("{} {}", CELL_STYLE, "text-[#2E3A59] font-medium")>{&teacher.lastname}</td>
                                                     <td class=CELL_STYLE>
                                                         <span class=format!("px-2 py-1 text-xs font-medium rounded-full {}",
                                                             if teacher.status.to_string() == "Active" {
-                                                                "bg-green-200 text-green-800"
+                                                                "bg-[#4CAF50] bg-opacity-40 text-[#2E3A59]"
                                                             } else {
-                                                                "bg-gray-200 text-gray-700"
+                                                                "bg-[#F44336] bg-opacity-40 text-[#2E3A59]"
                                                             })>
                                                             {teacher.status.to_string()}
                                                         </span>
                                                     </td>
-                                                    <td class=format!("{} {}", CELL_STYLE, "text-gray-500")>
+                                                    <td class=format!("{} {}", CELL_STYLE, "text-[#2E3A59]")>
                                                         {match &teacher.role {
                                                             EmployeeRole::Teacher { grade } =>
                                                                 grade.as_ref().map_or("Not Assigned".to_string(), |g| g.to_string()),

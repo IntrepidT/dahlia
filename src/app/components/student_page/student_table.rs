@@ -3,16 +3,31 @@ use crate::app::models::student::Student;
 use leptos::*;
 use std::rc::Rc;
 
+// Base colors
+const COLOR_PRIMARY: &str = "#2E3A59"; // Navy blue
+const COLOR_NEAR_BLACK: &str = "#0D0D0D";
+const COLOR_LIGHT_GRAY: &str = "#DADADA"; // Light gray
+const COLOR_OFF_WHITE: &str = "#F9F9F8"; // Off-white
+
+// Accent/Functional colors
+const COLOR_ERROR: &str = "#D64045";
+const COLOR_WARNING: &str = "#E9B872";
+const COLOR_SUCCESS: &str = "#5B8C5A";
+const COLOR_ACCENT_BLUE: &str = "#3E92CC";
+const COLOR_ACCENT_TERRACOTTA: &str = "#D3A588";
+
+// Table styles
 const TABLE_CONTAINER_STYLE: &str =
-    "bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden";
+    "bg-[#F9F9F8] rounded-lg shadow-sm border border-[#DADADA] overflow-hidden";
 const TABLE_HEADER_STYLE: &str =
-    "py-5 px-6 flex justify-between items-center bg-[#00356b] border-b border-gray-100";
-const TABLE_WRAPPER_STYLE: &str = "overflow-x-auto h-[33rem]";
-const TABLE_STYLE: &str = "min-w-full divide-y divide-gray-100";
+    "py-5 px-6 flex justify-between items-center bg-[#2E3A59] border-b border-[#2E3A59]";
+const TABLE_WRAPPER_STYLE: &str = "overflow-x-auto h-[42rem]";
+const TABLE_STYLE: &str = "min-w-full divide-y divide-[#DADADA]";
 const HEADER_CELL_STYLE: &str =
-    "px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider";
-const CELL_STYLE: &str = "px-6 py-4 whitespace-nowrap text-sm";
-const SELECTED_ROW_STYLE: &str = "bg-blue-100 border-l-4 border-blue-600";
+    "px-6 py-3 text-left text-xs font-medium text-[#2E3A59] uppercase tracking-wider";
+const CELL_STYLE: &str = "px-6 py-4 whitespace-nowrap text-sm bg-[#F9F9F8]";
+const SELECTED_ROW_STYLE: &str =
+    "bg-[#DADADA] border-l-4 border-t-2 border-b-2 border-r-2 border-[#2E3A59]";
 
 #[component]
 pub fn StudentTable(
@@ -72,10 +87,10 @@ pub fn StudentTable(
     view! {
         <div class=TABLE_CONTAINER_STYLE>
             <div class=TABLE_HEADER_STYLE>
-                <h2 class="text-xl font-medium text-white">
+                <h2 class="text-xl font-medium text-[#F9F9F8]">
                     "Students"
                 </h2>
-                <span class="text-sm text-white">
+                <span class="text-sm text-[#F9F9F8]">
                     {move || {
                         let count = filtered_students().len();
                         format!("{} {}", count, if count == 1 { "student" } else { "students" })
@@ -85,7 +100,7 @@ pub fn StudentTable(
             <div class=TABLE_WRAPPER_STYLE>
                 <div class="overflow-y-auto max-h-full">
                     <table class=TABLE_STYLE>
-                        <thead class="bg-gray-50 sticky top-0 z-10">
+                        <thead class="bg-[#DADADA] sticky top-0 z-10">
                             <tr>
                                 <th class=HEADER_CELL_STYLE>"First Name"</th>
                                 <th class=HEADER_CELL_STYLE>"Last Name"</th>
@@ -98,7 +113,7 @@ pub fn StudentTable(
                         <Suspense fallback=move || view! {
                             <tr>
                                 <td colspan="6" class="text-center p-8">
-                                    <div class="inline-block h-6 w-6 animate-spin rounded-full border-2 border-gray-300 border-t-gray-600"></div>
+                                    <div class="inline-block h-6 w-6 animate-spin rounded-full border-2 border-[#DADADA] border-t-[#2E3A59]"></div>
                                 </td>
                             </tr>
                         }>
@@ -108,7 +123,7 @@ pub fn StudentTable(
                                     if students.is_empty() {
                                         view! {
                                             <tr>
-                                                <td colspan="6" class="px-6 py-12 text-center text-sm text-gray-500">
+                                                <td colspan="6" class="px-6 py-12 text-center text-sm text-[#2E3A59] text-opacity-70">
                                                     "No students match your search criteria"
                                                 </td>
                                             </tr>
@@ -123,25 +138,25 @@ pub fn StudentTable(
                                                     class=move || if is_selected() {
                                                         format!("{} {}", SELECTED_ROW_STYLE, "cursor-pointer")
                                                     } else {
-                                                        "hover:bg-gray-100 cursor-pointer border-b border-gray-200".to_string()
+                                                        "hover:bg-[#DADADA] hover:bg-opacity-20 cursor-pointer border-b border-[#DADADA]".to_string()
                                                     }
                                                     on:click=move |_| set_selected_student(Some(student_rc.clone()))
                                                 >
-                                                    <td class=format!("{} {}", CELL_STYLE, "font-medium text-gray-900")>{&student.firstname}</td>
-                                                    <td class=format!("{} {}", CELL_STYLE, "font-medium text-gray-900")>{&student.lastname}</td>
-                                                    <td class=format!("{} {}", CELL_STYLE, "text-gray-600")>{&student.student_id.to_string()}</td>
-                                                    <td class=format!("{} {}", CELL_STYLE, "text-gray-600")>{&student.grade.to_string()}</td>
-                                                    <td class=format!("{} {}", CELL_STYLE, "text-gray-600")>{&student.teacher.to_string()}</td>
+                                                    <td class=format!("{} {}", CELL_STYLE, "font-medium text-[#2E3A59]")>{&student.firstname}</td>
+                                                    <td class=format!("{} {}", CELL_STYLE, "font-medium text-[#2E3A59]")>{&student.lastname}</td>
+                                                    <td class=format!("{} {}", CELL_STYLE, "text-[#2E3A59] text-opacity-70")>{&student.student_id.to_string()}</td>
+                                                    <td class=format!("{} {}", CELL_STYLE, "text-[#2E3A59] text-opacity-70")>{&student.grade.to_string()}</td>
+                                                    <td class=format!("{} {}", CELL_STYLE, "text-[#2E3A59] text-opacity-70")>{&student.teacher.to_string()}</td>
                                                     <td class=CELL_STYLE>
                                                         { if student.iep {
                                                             view! {
-                                                                <span class="px-2 py-1 text-xs font-medium rounded-full bg-green-200 text-green-800">
+                                                                <span class="px-2 py-1 text-xs font-medium rounded-full bg-[#4CAF50] bg-opacity-40 text-[#2E3A59]">
                                                                     "Yes"
                                                                 </span>
                                                             }
                                                         } else {
                                                             view! {
-                                                                <span class="px-2 py-1 text-xs font-medium rounded-full bg-gray-200 text-gray-700">
+                                                                <span class="px-2 py-1 text-xs font-medium rounded-full bg-[#F44336] bg-opacity-40 text-[#2E3A59]">
                                                                     "No"
                                                                 </span>
                                                             }

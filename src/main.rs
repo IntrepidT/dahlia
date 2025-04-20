@@ -1,12 +1,14 @@
 #[cfg(feature = "ssr")]
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    use actix::Actor;
     use actix_files::Files;
     use actix_web::{web, App, HttpServer};
     use argon2::password_hash;
     use dahlia::app::db::database;
     use dahlia::app::middleware::authentication::Authentication;
-    use dahlia::app::websockets::configure_websocket;
+    use dahlia::app::websockets::lobby::Lobby;
+    use dahlia::app::websockets::start_connection::start_connection;
     use dahlia::app::*;
     use leptos::*;
     use leptos_actix::{generate_route_list, LeptosRoutes};
@@ -27,6 +29,9 @@ async fn main() -> std::io::Result<()> {
     println!("Database connection pool created successfully");
     let pool = web::Data::new(pool_one.clone());
 
+    //Initialize the Chat server
+    let chat_server = web::Data::new(Lobby::default().start());
+
     // Generate the list of routes in your Leptos App
     let routes = generate_route_list(App);
     //println!("Generated routes: {:?}", routes);
@@ -45,14 +50,15 @@ async fn main() -> std::io::Result<()> {
         // We make the pool available to Leptos server functions
         let pool_clone = pool_one.clone();
         let leptos_options_clone = leptos_options.clone();
+        let chat_server_clone = chat_server.clone();
 
         App::new()
             // Make DB pool available to the app
             .app_data(pool.clone())
+            //make chat server available to app
+            .app_data(chat_server_clone.clone())
             // Authentication middleware
             .wrap(Authentication::new(secret_key.clone()))
-            // configure websockets
-            .configure(configure_websocket)
             // serve JS/WASM/CSS from `pkg`
             .service(Files::new("/pkg", format!("{site_root}/pkg")))
             // serve other assets from the `assets` directory
@@ -60,6 +66,7 @@ async fn main() -> std::io::Result<()> {
             // serve the favicon from /favicon.ico
             .service(favicon)
             .service(Files::new("/static", "./static").show_files_listing())
+            .service(web::scope("/ws").service(start_connection))
             // Leptos routes (this must be last)
             .route("/api/{tail:.*}", leptos_actix::handle_server_fns())
             .leptos_routes(leptos_options_clone.to_owned(), routes.to_owned(), App)

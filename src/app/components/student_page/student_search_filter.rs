@@ -1,6 +1,6 @@
 use leptos::*;
 
-const SEARCH_CONTAINER_STYLE: &str = "mb-4 mt-10 flex flex-wrap gap-4 items-center";
+const SEARCH_CONTAINER_STYLE: &str = "mt-10 mb-4 flex flex-wrap gap-4 items-center";
 const INPUT_STYLE: &str = "focus:ring-indigo-500 focus:border-indigo-500 block w-full pl-3 pr-3 sm:text-sm border-gray-300 rounded-md h-10 border";
 const SELECT_STYLE: &str = "mt-1 block w-full pl-3 pr-10 py-2 text-base bg-white shadow-sm border-gray-200 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md h-10 border transition-all";
 const CHECKBOX_STYLE: &str =
@@ -119,7 +119,7 @@ pub fn SearchFilter(
                         on:change=move |ev| set_iep_filter(event_target_checked(&ev))
                         node_ref=iep_checkbox_ref
                     />
-                    <label for="iep-filter" class="text-sm text-gray-700">"Show IEP Students"</label>
+                    <label for="iep-filter" class="text-sm text-gray-700">"IEP Students"</label>
                 </div>
 
                 // ESL filter checkbox
@@ -131,7 +131,7 @@ pub fn SearchFilter(
                         on:change=move |ev| set_esl_filter(event_target_checked(&ev))
                         node_ref=esl_checkbox_ref
                     />
-                    <label for="esl-filter" class="text-sm text-gray-700">"Show ESL Students"</label>
+                    <label for="esl-filter" class="text-sm text-gray-700">"ESL Students"</label>
                 </div>
 
                 // BIP filter checkbox
@@ -143,7 +143,7 @@ pub fn SearchFilter(
                         on:change=move |ev| set_bip_filter(event_target_checked(&ev))
                         node_ref=bip_checkbox_ref
                     />
-                    <label for="bip-filter" class="text-sm text-gray-700">"Show BIP Students"</label>
+                    <label for="bip-filter" class="text-sm text-gray-700">"BIP Students"</label>
                 </div>
             </div>
 

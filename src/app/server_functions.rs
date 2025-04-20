@@ -22,5 +22,5 @@ pub mod auth;
 pub mod bulk_students;
 pub use bulk_students::upload_students_bulk;
 
-pub mod sessions;
-pub use sessions::get_sessions;
+pub mod websocket_sessions;
+pub use websocket_sessions::list_active_sessions;

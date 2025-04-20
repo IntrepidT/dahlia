@@ -1,129 +1,53 @@
-use crate::app::components::ShowAdministerTestModal;
 use leptos::*;
 use leptos_router::*;
 
 #[component]
 pub fn Header() -> impl IntoView {
-    // State for modal and hover effects
-    let (show_administer_modal, set_show_administer_modal) = create_signal(false);
-
-    // Handle current route for active styling
-    let (current_path, set_current_path) = create_signal(String::new());
-
-    // Effect to track current route
-    create_effect(move |_| {
-        if let Some(route_context) = use_context::<RouterContext>() {
-            set_current_path(route_context.pathname().get());
-        } else {
-            set_current_path(String::from("/"));
-        }
-    });
-
-    // Determine if a nav link is active
-    let is_active = move |path: &str| current_path().starts_with(path);
-
     view! {
-        <header class="sticky top-0 z-50 w-full bg-white shadow-sm">
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div class="flex justify-between items-center h-16">
+        <header class="sticky top-0 z-50 w-full bg-[#F9F9F8] backdrop-blur bg-opacity-90">
+            <div class="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between items-center h-20">
                     {/* Logo and brand name */}
-                    <div class="flex items-center">
-                        <A href="/dashboard" class="flex items-center space-x-3">
-                            <div class="bg-[#00356b] p-1.5 rounded-lg">
+                    <div class="flex items-center transform hover:scale-105 transition-transform duration-200">
+                        <A href="/dashboard" class="flex items-center">
+                            <div class="rounded-lg ">
                                 <img
-                                    src="/assets/dahliano.png"
-                                    alt="Dahlia Software"
-                                    class="h-10 w-10 object-contain"
+                                    src="/assets/teapot2.png"
+                                    alt="Teapot Testing"
+                                    class="h-24 w-auto "
                                 />
                             </div>
-                            <div>
-                                <div class="text-lg font-semibold text-[#00356b]">"Dahlia Software"</div>
-                                <div class="text-xs text-gray-500">"for Connie Le"</div>
+                            <div class="hidden sm:block">
+                                <div class="font-montserrat text-4xl font-bold text-[#2E3A59] leading-tight">
+                                    "teapot"
+                                </div>
                             </div>
                         </A>
                     </div>
 
-                    {/* Main Navigation */}
-                    <nav class="md:flex items-center space-x-6">
-                        <A
-                            href="/dashboard"
-                            class=move || {
-                                if is_active("/dashboard") {
-                                    "text-[#00356b] font-medium border-b-2 border-[#00356b] pb-1"
-                                } else {
-                                    "text-gray-600 hover:text-[#00356b] hover:border-b-2 hover:border-gray-600 pb-1 transition-colors"
-                                }
-                            }
-                        >
-                            "Dashboard"
-                        </A>
-                        <A
-                            href="/studentview"
-                            class=move || {
-                                if is_active("/studentview") {
-                                    "text-[#00356b] font-medium border-b-2 border-[#00356b] pb-1"
-                                } else {
-                                    "text-gray-600 hover:text-[#00356b] hover:border-b-2 hover:border-gray-600 pb-1 transition-colors"
-                                }
-                            }
-                        >
-                            "Student View"
-                        </A>
-                        <A
-                            href="/teachers"
-                            class=move || {
-                                if is_active("/teachers") {
-                                    "text-[#00356b] font-medium border-b-2 border-[#00356b] pb-1"
-                                } else {
-                                    "text-gray-600 hover:text-[#00356b] hover:border-b-2 hover:border-gray-600 pb-1 transition-colors"
-                                }
-                            }
-                        >
-                            "Teacher View"
-                        </A>
-
-                        {/* Administer Test Dropdown */}
-                        <div class="relative">
-                            <button
-                                on:click=move |_| set_show_administer_modal.update(|v| *v = !*v)
-                                class="flex items-center text-gray-600 hover:text-[#00356b] hover:border-gray-600 pb-1 transition-colors"
-                            >
-                                <span>"Administer Test"</span>
-                                <span class="ml-1">
-                                    <Show when=move || show_administer_modal()>
-                                        <img src="/assets/arrow_up.png" class="h-4 w-4" />
-                                    </Show>
-                                    <Show when=move || !show_administer_modal()>
-                                        <img src="/assets/arrow_down.png" class="h-4 w-4" />
-                                    </Show>
-                                </span>
-                            </button>
-
-                            {/* Modal Dropdown */}
-                            <Show when=move || show_administer_modal()>
-                                <div class="absolute right-0 mt-2 rounded-md shadow-lg z-50">
-                                    <ShowAdministerTestModal set_if_show_modal=set_show_administer_modal />
-                                </div>
-                            </Show>
-                        </div>
-                    </nav>
-
                     {/* User Account */}
-                    <div class="flex items-center">
+                    <div class="flex items-center transform hover:scale-105 transition-transform duration-200">
                         <A
                             href="/myaccount"
-                            class="flex items-center space-x-2 bg-[#00356b] hover:bg-blue-700 text-white px-2 py-2 rounded-lg transition-colors"
+                            class="flex items-center space-x-2 bg-[#2E3A59] hover:bg-opacity-80 text-[#F9F9F8] px-4 py-2 rounded-lg transition-colors duration-200 text-sm font-medium"
                         >
-                            <span>"My Account"</span>
-                            <img src="/assets/user.png" alt="User account" class="h-5 w-5" />
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="12" cy="7" r="4"></circle>
+                            </svg>
                         </A>
                     </div>
 
                     {/* Mobile menu button - hidden on desktop */}
                     <div class="md:hidden flex items-center">
-                        <button class="text-gray-600 hover:text-[#00356b] focus:outline-none">
+                        <button class="text-[#DADADA] hover:text-[#2E3A59] focus:outline-none transition-colors duration-200">
                             <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"></path>
+                                <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    stroke-width="2"
+                                    d="M4 6h16M4 12h16m-7 6h7"
+                                ></path>
                             </svg>
                         </button>
                     </div>

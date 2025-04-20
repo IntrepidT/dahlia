@@ -1,7 +1,9 @@
-pub mod actors;
-pub mod handlers;
+pub mod lobby;
 pub mod messages;
-pub mod state;
+pub mod start_connection;
+pub mod ws;
 
-#[cfg(feature = "ssr")]
-pub use handlers::configure_websocket;
+pub use lobby::*;
+pub use messages::*;
+pub use start_connection::*;
+pub use ws::*;

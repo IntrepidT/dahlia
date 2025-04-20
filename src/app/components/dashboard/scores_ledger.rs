@@ -188,7 +188,7 @@ pub fn ScoresLedger() -> impl IntoView {
     view! {
         <div class={move || {
             if expanded_view() {
-                "fixed inset-0 z-50 bg-white flex flex-col p-5"
+                "fixed inset-0 z-50 bg-[#F9F9F8] flex flex-col p-5"
             } else {
                 "w-full"
             }
@@ -206,7 +206,7 @@ pub fn ScoresLedger() -> impl IntoView {
             </div>
 
             <div class={move ||{
-                let base_classes = "bg-white overflow-hidden shadow-sm sm:rounded-lg border border-gray-200";
+                let base_classes = "bg-[#F9F9F8] overflow-hidden shadow-lg sm:rounded-lg border border-gray-200";
                 if expanded_view() {
                     format!("{} flex-grow overflow-hidden", base_classes)
                 } else {
@@ -221,39 +221,39 @@ pub fn ScoresLedger() -> impl IntoView {
                         format!("{} max-h-80", base_classes)
                     }
                 }}>
-                    <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-50">
+                    <table class="min-w-full divide-y divide-[#DADADA]">
+                        <thead class="bg-[#DADADA]">
                             <tr>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-[#2E3A59] uppercase tracking-wider">
                                     Student ID
                                 </th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-[#2E3A59] uppercase tracking-wider">
                                     Student Name
                                 </th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-[#2E3A59] uppercase tracking-wider">
                                     Test
                                 </th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-[#2E3A59] uppercase tracking-wider">
                                     Date
                                 </th>
                                 /*<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Score
                                 </th>*/
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-[#2E3A59] uppercase tracking-wider">
                                     Percentage
                                 </th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-[#2E3A59] uppercase tracking-wider">
                                     Benchmark
                                 </th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-[#2E3A59] uppercase tracking-wider">
                                     Evaluator
                                 </th>
-                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-[#2E3A59] uppercase tracking-wider">
                                     Actions
                                 </th>
                             </tr>
                         </thead>
-                        <tbody class="bg-white divide-y divide-gray-200">
+                        <tbody class="bg-[#F9F9F8] divide-y divide-[#DADADA]">
                             {move || {
                                 scores_resource.get().map(|result| {
                                     match result {
@@ -261,7 +261,7 @@ pub fn ScoresLedger() -> impl IntoView {
                                             if scores.is_empty() {
                                                 view! {
                                                     <tr>
-                                                        <td colspan="7" class="px-6 py-4 text-center text-sm text-gray-500">
+                                                        <td colspan="7" class="px-6 py-4 text-center text-sm text-[#2E3A59]">
                                                             No scores found.
                                                         </td>
                                                     </tr>
@@ -283,22 +283,22 @@ pub fn ScoresLedger() -> impl IntoView {
 
                                                     view! {
                                                         <tr class="hover:bg-gray-50">
-                                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-[#2E3A59]">
                                                                 {score.student_id}
                                                             </td>
-                                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-[#2E3A59]">
                                                                 {get_student_name(score.student_id)}
                                                             </td>
-                                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-[#2E3A59]">
                                                                 <div class="flex flex-col">
                                                                     <span>{get_test_name(score.test_id.clone())}</span>
-                                                                    <span class="text-xs text-gray-400">{"Variant: "}{score.test_variant}</span>
+                                                                    <span class="text-xs text-[#2E3A59]">{"Variant: "}{score.test_variant}</span>
                                                                 </div>
                                                             </td>
-                                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-[#2E3A59]">
                                                                 <div class="flex flex-col">
                                                                     <span>{format_date(score.date_administered)}</span>
-                                                                    <span class="text-xs text-gray-400">{format_time(score.date_administered)}</span>
+                                                                    <span class="text-xs text-[#2E3A59]">{format_time(score.date_administered)}</span>
                                                                 </div>
                                                             </td>
                                                             /*<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -314,7 +314,7 @@ pub fn ScoresLedger() -> impl IntoView {
                                                                     {get_benchmark_label(&score.test_scores, &score.test_id)}
                                                                 </span>
                                                             </td>
-                                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-[#2E3A59]">
                                                                 {&score.evaluator}
                                                             </td>
                                                             <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -345,7 +345,7 @@ pub fn ScoresLedger() -> impl IntoView {
                                         Err(_) => {
                                             view! {
                                                 <tr>
-                                                    <td colspan="7" class="px-6 py-4 text-center text-sm text-gray-500">
+                                                    <td colspan="7" class="px-6 py-4 text-center text-sm text-[#2E3A59]">
                                                         Failed to load scores. Please try again later.
                                                     </td>
                                                 </tr>
@@ -355,7 +355,7 @@ pub fn ScoresLedger() -> impl IntoView {
                                     }
                                 }).unwrap_or_else(|| view! {
                                     <tr>
-                                        <td colspan="7" class="px-6 py-4 text-center text-sm text-gray-500">
+                                        <td colspan="7" class="px-6 py-4 text-center text-sm text-[#2E3A59]">
                                             <div class="flex justify-center items-center">
                                                 <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>

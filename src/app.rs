@@ -27,7 +27,7 @@ pub fn App() -> impl IntoView {
         <link data-trunk rel="tailwind-css" href="/style/input.css" />
         <link rel="icon" href="/assets/favicon.ico" />
         // sets the document title
-        <Title text="Dahlia"/>
+        <Title text="Teapot Testing"/>
 
         // Wrap everything in the AuthProvider
         <AuthProvider>

@@ -9,19 +9,20 @@ const THEME_PRIMARY_LIGHT: &str = "#5D7A9E";
 const THEME_GRAY_BG: &str = "#F0F2F5";
 
 // Improved consistent styling with better naming
-const CARD_CONTAINER: &str = "h-full bg-white p-6 border-t-4 border-l border-r border-b border-gray-200 shadow-md rounded-lg flex flex-col";
-const SECTION_CONTAINER: &str = "bg-gray-50 p-5 rounded-lg border border-gray-100 shadow-sm";
+const CARD_CONTAINER: &str =
+    "h-full bg-[#F9F9F8] p-6 border-t-8 border-[#2E3A59] shadow-md rounded-lg flex flex-col";
+const SECTION_CONTAINER: &str = "bg-white p-5 rounded-lg border border-[#DADADA] shadow-sm";
 const SECTION_TITLE: &str =
-    "text-sm font-semibold text-gray-700 mb-3 pb-2 border-b border-gray-200";
-const INFO_TITLE: &str = "text-xs text-gray-600 font-medium";
-const INFO_VALUE: &str = "text-gray-800 mt-1";
+    "text-sm font-semibold text-[#2E3A59] mb-3 pb-2 border-b border-[#DADADA]";
+const INFO_TITLE: &str = "text-xs text-[#2E3A59] text-opacity-70 font-medium";
+const INFO_VALUE: &str = "text-[#2E3A59] mt-1";
 const INFO_GROUP: &str = "mb-4";
 const BUTTON_CONTAINER: &str =
-    "mt-6 pt-4 flex gap-3 justify-end sticky bottom-0 bg-white border-t border-gray-200";
+    "mt-6 pt-4 flex gap-3 justify-end sticky bottom-0 bg-[#F9F9F8] border-t border-[#DADADA]";
 const BUTTON_PRIMARY: &str =
-    "px-4 py-2 bg-[#00356B] rounded-md font-medium text-white hover:bg-blue-700 transition-colors";
-const BUTTON_SECONDARY: &str = "px-4 py-2 bg-gray-200 rounded-md font-medium text-gray-500 hover:text-gray-900 transition-colors border border-gray-300";
-const BUTTON_ACCENT: &str = "px-4 py-2 bg-[#FCEDA0] rounded-md font-medium text-gray-900 hover:bg-[#F5E080] transition-colors border border-gray-300";
+    "px-4 py-2 bg-[#2E3A59] rounded-md font-medium text-[#F9F9F8] hover:bg-opacity-80 transition-colors";
+const BUTTON_SECONDARY: &str = "px-4 py-2 bg-[#F9F9F8] rounded-md font-medium text-[#2E3A59] hover:bg-opacity-80 transition-colors border border-[#DADADA]";
+const BUTTON_ACCENT: &str = "px-4 py-2 bg-[#F9F9F8] rounded-md font-medium text-[#2E3A59] hover:bg-opacity-30 hover:bg-[#DADADA] transition-colors border border-[#DADADA]";
 
 #[component]
 pub fn EmployeeDetails(
@@ -55,10 +56,10 @@ pub fn EmployeeDetails(
         <Show when=move || !updating_employee()>
             <div class=CARD_CONTAINER>
                 <div class="flex items-center justify-between mb-6">
-                    <h2 class="text-xl font-bold text-gray-800">
+                    <h2 class="text-xl font-bold text-[#2E3A59]">
                         {move || format!("{} {}", employee_memo().firstname, employee_memo().lastname)}
                     </h2>
-                    <div class="px-3 py-1 rounded-full bg-blue-100 text-blue-800 text-xs font-medium">
+                    <div class="px-3 py-1 rounded-full bg-[#2E3A59] text-white text-xs font-medium">
                         {move || employee_memo().status.to_string()}
                     </div>
                 </div>
