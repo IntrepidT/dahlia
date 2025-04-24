@@ -9,7 +9,7 @@ use wasm_bindgen::JsCast;
 use web_sys::{MessageEvent, WebSocket};
 
 // Import the server functions
-use crate::app::models::websocket_session::{CreateSessionRequest, SessionSummary};
+use crate::app::models::websocket_session::{CreateSessionRequest, SessionSummary, SessionType};
 use crate::app::server_functions::websocket_sessions::{
     create_session, get_session, join_session, leave_session, list_active_sessions,
 };
@@ -225,6 +225,8 @@ pub fn Chat() -> impl IntoView {
                 } else {
                     Some(password_val)
                 },
+                session_type: Some(SessionType::Chat),
+                test_id: None,
                 metadata: None,
             };
 

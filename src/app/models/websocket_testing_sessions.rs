@@ -30,27 +30,6 @@ impl ToString for SessionStatus {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[cfg_attr(feature = "ssr", derive(Type))]
-#[cfg_attr(feature = "ssr", sqlx(type_name = "session_type_enum"))]
-pub enum SessionType {
-    #[serde(rename = "chat")]
-    #[cfg_attr(feature = "ssr", sqlx(rename = "chat"))]
-    Chat,
-    #[serde(rename = "test")]
-    #[cfg_attr(feature = "ssr", sqlx(rename = "test"))]
-    Test,
-}
-
-impl ToString for SessionType {
-    fn to_string(&self) -> String {
-        match self {
-            SessionType::Chat => "chat".to_string(),
-            SessionType::Test => "test".to_string(),
-        }
-    }
-}
-
 //this is the model used for a websocket chat session
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Session {
@@ -65,22 +44,12 @@ pub struct Session {
     pub current_users: i32,
     pub is_private: bool,
     pub password_required: bool,
-    pub session_type: SessionType,
-    pub test_id: Option<String>,
-    pub start_time: Option<DateTime<Utc>>,
-    pub end_time: Option<DateTime<Utc>>,
     #[serde(skip_serializing)]
     pub metadata: Option<serde_json::Value>,
 }
 
 impl Session {
-    pub fn new(
-        name: String,
-        description: Option<String>,
-        owner_id: Option<Uuid>,
-        session_type: SessionType,
-        test_id: Option<String>,
-    ) -> Self {
+    pub fn new(name: String, description: Option<String>, owner_id: Option<Uuid>) -> Self {
         Session {
             id: Uuid::new_v4(),
             name,
@@ -93,10 +62,6 @@ impl Session {
             current_users: 0,
             is_private: false,
             password_required: false,
-            session_type,
-            test_id,
-            start_time: None,
-            end_time: None,
             metadata: None,
         }
     }
@@ -109,12 +74,10 @@ pub struct CreateSessionRequest {
     pub max_users: Option<i32>,
     pub is_private: Option<bool>,
     pub password: Option<String>,
-    pub session_type: Option<SessionType>,
-    pub test_id: Option<String>,
     pub metadata: Option<serde_json::Value>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SessionSummary {
     pub id: Uuid,
     pub name: String,
@@ -124,10 +87,6 @@ pub struct SessionSummary {
     pub last_active: DateTime<Utc>,
     pub is_private: bool,
     pub password_required: bool,
-    pub session_type: SessionType,
-    pub test_id: Option<String>,
-    pub start_time: Option<DateTime<Utc>>,
-    pub end_time: Option<DateTime<Utc>>,
 }
 
 impl From<Session> for SessionSummary {
@@ -141,10 +100,6 @@ impl From<Session> for SessionSummary {
             last_active: session.last_active,
             is_private: session.is_private,
             password_required: session.password_required,
-            session_type: session.session_type,
-            test_id: session.test_id,
-            start_time: session.start_time,
-            end_time: session.end_time,
         }
     }
 }

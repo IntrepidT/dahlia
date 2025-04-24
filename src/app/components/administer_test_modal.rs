@@ -8,57 +8,67 @@ const MODAL_STYLE: &str =
     "flex flex-col bg-[#F9F9F8] px-6 py-5 w-96 rounded-lg shadow-lg border border-[#DADADA]";
 
 const CARD_STYLE: &str = 
-    "flex flex-col items-center justify-center p-4 rounded-lg hover:bg-[#DADADA] border border-[#DADADA] transition-all duration-200 hover:shadow-md";
+    "flex flex-col items-center justify-center p-4 rounded-lg hover:bg-[#DADADA] border border-[#DADADA] transition-all duration-200 hover:shadow-md cursor-pointer";
 
 const ICON_STYLE: &str = 
-    "h-10 w-10 mb-3 p-2 rounded-full bg-[#DADADA]";
+    "h-10 w-10 mb-3 p-2 rounded-full bg-[#DADADA] flex items-center justify-center";
 
 const BUTTON_TEXT_STYLE: &str = 
     "text-[#2E3A59] font-medium text-sm mt-1";
 
 #[component]
 pub fn ShowAdministerTestModal(set_if_show_modal: WriteSignal<bool>) -> impl IntoView {
+    let close_modal = move |_| set_if_show_modal.update(|value| *value = false);
+
+    // Prevent clicks inside the modal from closing the overlay
+    let prevent_propagation = move |ev: leptos::ev::MouseEvent| {
+        ev.stop_propagation();
+    };
+
     view! {
-       <div class=MODAL_STYLE>
-           <div class="mb-4">
-               <h2 class="text-xl font-semibold text-[#2E3A59]">Select Assessment Type</h2>
-               <p class="text-sm text-gray-500">"Choose which assessment you'd like to administer"</p>
-           </div>
-           
-           <div class="grid grid-cols-3 gap-4">
-               <A href="/mathtesting" class=CARD_STYLE>
-                   <div class=ICON_STYLE>
-                       <img src="/assets/calculator.png" class="h-6 w-6" />
-                   </div>
-                   <span class=BUTTON_TEXT_STYLE>Math</span>
-               </A>
-               
-               <A href="/readingtesting" class=CARD_STYLE>
-                   <div class=ICON_STYLE>
-                       <img src="/assets/reading.png" class="h-6 w-6" />
-                   </div>
-                   <span class=BUTTON_TEXT_STYLE>Reading</span>
-               </A>
-               
-               <A href="https://dibels.amplify.com" class=CARD_STYLE>
-                   <div class=ICON_STYLE>
-                       <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                       </svg>
-                   </div>
-                   <span class=BUTTON_TEXT_STYLE>Dibels</span>
-               </A>
-           </div>
-           
-           <div class="mt-4 flex justify-end">
-               <button 
-                   class="text-sm text-[#2E3A59] hover:text-[#DADADA]"
-                   on:click=move |_| set_if_show_modal.update(|value| *value = false)
-               >
-                   Cancel
-               </button>
-           </div>
-       </div>
+        <div 
+            class=format!("{} animate-slide-in-right", MODAL_STYLE)
+            on:click=prevent_propagation
+        >
+            <div class="mb-4">
+                <div class="flex justify-between items-center mb-2">
+                    <h2 class="text-xl font-semibold text-[#2E3A59]">Select Assessment Type</h2>
+                    /*<button 
+                        class="text-gray-400 hover:text-gray-600 transition-colors"
+                        on:click=close_modal
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                        </svg>
+                    </button>*/
+                </div>
+                <p class="text-sm text-gray-500">"Choose which assessment you'd like to administer"</p>
+            </div>
+            
+            <div class="grid grid-cols-3 gap-4">
+                <A href="/mathtesting" class=CARD_STYLE on:click=close_modal>
+                    <div class=ICON_STYLE>
+                        <img src="/assets/calculator.png" class="h-6 w-6" />
+                    </div>
+                    <span class=BUTTON_TEXT_STYLE>Math</span>
+                </A>
+                
+                <A href="/readingtesting" class=CARD_STYLE on:click=close_modal>
+                    <div class=ICON_STYLE>
+                        <img src="/assets/reading.png" class="h-6 w-6" />
+                    </div>
+                    <span class=BUTTON_TEXT_STYLE>Reading</span>
+                </A>
+
+                <A href="https://dibels.amplify.com" class=CARD_STYLE on:click=close_modal>
+                    <div class=ICON_STYLE>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                    </div>
+                    <span class=BUTTON_TEXT_STYLE>Dibels</span>
+                </A>
+            </div>
+        </div>
     }
 }
-

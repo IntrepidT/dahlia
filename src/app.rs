@@ -7,10 +7,11 @@ use leptos_meta::*;
 use leptos_router::*;
 pub mod pages;
 pub mod websockets;
+use components::live_test::RealtimeTestSession;
 use components::test_templates::FlashCardSet;
 use pages::{
     AdministerTest, Assessment, Dashboard, HomePage, LoginPage, MathTesting, MyAccount,
-    ReadingTesting, ReviewTest, StudentView, Teachers, TestBuilder,
+    ReadingTesting, ReviewTest, StudentView, Teachers, TestBuilder, TestSessionsList,
 };
 pub mod components;
 use components::auth::*;
@@ -43,7 +44,9 @@ pub fn App() -> impl IntoView {
                         }/>
                         <Route path="/dashboard" view=move || {
                             view! {
-                                <Dashboard />
+                                <RequireAuth>
+                                    <Dashboard />
+                                </RequireAuth>
                             }
                         }/>
                         <Route path="/studentview" view=move || {
@@ -81,12 +84,20 @@ pub fn App() -> impl IntoView {
                         }/>
                         <Route path="/mathtesting" view=|| {
                             view!{
-                                <MathTesting />
+                                <RequireRole role="admin".to_string()>
+                                    <RequireRole role="teacher".to_string()>
+                                        <MathTesting />
+                                    </RequireRole>
+                                </RequireRole>
                             }
                         }/>
                         <Route path="/readingtesting" view=|| {
                             view!{
-                                <ReadingTesting />
+                                <RequireRole role="admin".to_string()>
+                                    <RequireRole role="teacher".to_string()>
+                                        <ReadingTesting />
+                                    </RequireRole>
+                                </RequireRole>
                             }
                         }/>
                         <Route path="/testbuilder" view=|| {
@@ -134,6 +145,8 @@ pub fn App() -> impl IntoView {
                                 </RequireRole>
                             }
                         }/>
+                        <Route path="/test-session/:test_id" view=RealtimeTestSession/>
+                        <Route path="/testsessions" view=TestSessionsList/>
                         <Route path="/*any" view=NotFound/>
                     </Routes>
                 </main>

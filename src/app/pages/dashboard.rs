@@ -2,6 +2,7 @@ use crate::app::components::dashboard::chat::Chat;
 use crate::app::components::dashboard::scores_ledger::ScoresLedger;
 use crate::app::components::dashboard_sidebar::{DashboardSidebar, SidebarSelected};
 use crate::app::components::header::Header;
+use crate::app::components::live_testing::live_test::RealtimeTestSession;
 use leptos::*;
 use leptos_router::*;
 
@@ -11,12 +12,12 @@ pub fn Dashboard() -> impl IntoView {
 
     // Listen for route changes to update sidebar selection accordingly
     let location = use_location();
-    
+
     create_effect(move |_| {
         let path = location.pathname.get();
         // Update sidebar selection based on current path
         if path.starts_with("/dashboard") {
-            set_selected_view(SidebarSelected::Dashboard);
+            set_selected_view(SidebarSelected::Overview);
         } else if path.starts_with("/studentview") {
             set_selected_view(SidebarSelected::StudentView);
         } else if path.starts_with("/teachers") {

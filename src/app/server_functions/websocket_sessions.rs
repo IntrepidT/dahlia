@@ -1,6 +1,7 @@
 use crate::app::models::websocket_session::{
-    CreateSessionRequest, Session, SessionStatus, SessionSummary,
+    CreateSessionRequest, Session, SessionStatus, SessionSummary, SessionType,
 };
+use chrono::{DateTime, Utc};
 use leptos::*;
 use uuid::Uuid;
 
@@ -35,6 +36,24 @@ pub async fn list_active_sessions() -> Result<Vec<SessionSummary>, ServerFnError
     }
 }
 
+#[server(GetActiveTestSessions, "/api")]
+pub async fn get_active_test_sessions() -> Result<Vec<SessionSummary>, ServerFnError> {
+    #[cfg(feature = "ssr")]
+    {
+        let pool = extract::<web::Data<PgPool>>()
+            .await
+            .map_err(|e| ServerFnError::new(format!("Failed to extract pool: {}", e)))?;
+
+        log::info!("Retrieving active test sessions from database");
+
+        let sessions = websocket_session_database::get_active_test_sessions(&pool).await?;
+
+        let summaries = sessions.into_iter().map(SessionSummary::from).collect();
+
+        Ok(summaries)
+    }
+}
+
 #[server(GetSession, "/api")]
 pub async fn get_session(session_id: String) -> Result<Option<SessionSummary>, ServerFnError> {
     #[cfg(feature = "ssr")]
@@ -54,6 +73,26 @@ pub async fn get_session(session_id: String) -> Result<Option<SessionSummary>, S
     }
 }
 
+#[server(GetTestSessionsByTestId, "/api")]
+pub async fn get_test_sessions_by_test_id(
+    test_id: String,
+) -> Result<Vec<SessionSummary>, ServerFnError> {
+    #[cfg(feature = "ssr")]
+    {
+        let pool = extract::<web::Data<PgPool>>()
+            .await
+            .map_err(|e| ServerFnError::new(format!("Failed to extract pool: {}", e)))?;
+
+        log::info!("Retrieving test sessions for test ID: {}", test_id);
+
+        let sessions = websocket_session_database::get_sessions_by_test_id(&test_id, &pool).await?;
+
+        let summaries = sessions.into_iter().map(SessionSummary::from).collect();
+
+        Ok(summaries)
+    }
+}
+
 #[server(CreateSession, "/api")]
 pub async fn create_session(
     request: CreateSessionRequest,
@@ -66,10 +105,14 @@ pub async fn create_session(
 
         log::info!("Creating new session with name: {}", request.name);
 
+        let session_type = request.session_type.unwrap_or(SessionType::Chat);
+
         let mut session = Session::new(
             request.name,
             request.description,
             None, // You might want to store the user ID here if you have authentication
+            session_type,
+            request.test_id,
         );
 
         // Set optional fields
@@ -93,6 +136,48 @@ pub async fn create_session(
         let created_session = websocket_session_database::create_session(&session, &pool).await?;
 
         Ok(SessionSummary::from(created_session))
+    }
+}
+
+#[server(StartTestSession, "/api")]
+pub async fn start_test_session(
+    session_id: String,
+    scheduled_end_time: Option<DateTime<Utc>>,
+) -> Result<SessionSummary, ServerFnError> {
+    #[cfg(feature = "ssr")]
+    {
+        let pool = extract::<web::Data<PgPool>>()
+            .await
+            .map_err(|e| ServerFnError::new(format!("Failed to extract pool: {}", e)))?;
+
+        let uuid = Uuid::parse_str(&session_id)
+            .map_err(|e| ServerFnError::new(format!("Invalid UUID: {}", e)))?;
+
+        log::info!("Starting test session: {}", uuid);
+
+        let session_opt = websocket_session_database::get_session(uuid, &pool).await?;
+
+        if let Some(mut session) = session_opt {
+            if session.session_type != SessionType::Test {
+                return Err(ServerFnError::new("Session is not a test session"));
+            }
+
+            let start_time = Utc::now();
+            session.start_time = Some(start_time);
+            session.end_time = scheduled_end_time;
+
+            let updated_session = websocket_session_database::update_test_session_times(
+                uuid,
+                Some(start_time),
+                scheduled_end_time,
+                &pool,
+            )
+            .await?;
+
+            Ok(SessionSummary::from(updated_session))
+        } else {
+            Err(ServerFnError::new("Session not found"))
+        }
     }
 }
 
@@ -161,6 +246,46 @@ pub async fn leave_session(session_id: String) -> Result<(), ServerFnError> {
         websocket_session_database::update_session_user_count(uuid, false, &pool).await?;
 
         Ok(())
+    }
+}
+
+#[server(EndTestSession, "/api")]
+pub async fn end_test_session(session_id: String) -> Result<SessionSummary, ServerFnError> {
+    #[cfg(feature = "ssr")]
+    {
+        let pool = extract::<web::Data<PgPool>>()
+            .await
+            .map_err(|e| ServerFnError::new(format!("Failed to extract pool: {}", e)))?;
+
+        let uuid = Uuid::parse_str(&session_id)
+            .map_err(|e| ServerFnError::new(format!("Invalid Uuid: {}", e)))?;
+
+        log::info!("Ending test session: {}", uuid);
+
+        let session_opt = websocket_session_database::get_session(uuid, &pool).await?;
+
+        if let Some(session) = session_opt {
+            if session.session_type != SessionType::Test {
+                return Err(ServerFnError::new("Session is not a test session"));
+            }
+
+            let end_time = Utc::now();
+
+            let updated_session = websocket_session_database::update_test_session_times(
+                uuid,
+                session.start_time,
+                Some(end_time),
+                &pool,
+            )
+            .await?;
+
+            websocket_session_database::update_session_status(uuid, SessionStatus::Inactive, &pool)
+                .await?;
+
+            Ok(SessionSummary::from(updated_session))
+        } else {
+            Err(ServerFnError::new("Session not found"))
+        }
     }
 }
 

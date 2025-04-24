@@ -1,6 +1,8 @@
 use leptos::ServerFnError;
 use uuid::Uuid;
 
+use crate::app::{models::websocket_session::SessionType, server_functions::tests::update_test};
+
 cfg_if::cfg_if! {
     if #[cfg(feature = "ssr")]{
         use crate::app::models::websocket_session::Session;
@@ -16,7 +18,8 @@ cfg_if::cfg_if! {
         pub async fn get_active_sessions(pool: &PgPool) -> Result<Vec<Session>, ServerFnError> {
             let rows = sqlx::query(
                 "SELECT id, name, description, created_at, last_active, owner_id,
-                status, max_users, current_users, is_private, password_required, metadata 
+                status, max_users, current_users, is_private, password_required, metadata,
+                session_type, test_id, start_time, end_time
                 FROM websocket_sessions WHERE status = 'active' ORDER BY last_active DESC"
             )
             .fetch_all(pool)
@@ -37,6 +40,10 @@ cfg_if::cfg_if! {
                     let is_private: bool = row.get("is_private");
                     let password_required: bool = row.get("password_required");
                     let metadata: Option<JsonValue> = row.get("metadata");
+                    let session_type: SessionType = row.get("session_type");
+                    let test_id: Option<String> = row.get("test_id");
+                    let start_time: Option<DateTime<Utc>> = row.get("start_time");
+                    let end_time: Option<DateTime<Utc>> = row.get("end_time");
 
                     Session {
                         id,
@@ -51,6 +58,67 @@ cfg_if::cfg_if! {
                         is_private,
                         password_required,
                         metadata,
+                        session_type,
+                        test_id,
+                        start_time,
+                        end_time,
+                    }
+                })
+                .collect();
+
+            Ok(sessions)
+        }
+
+        ///Get all active test sessions
+        pub async fn get_active_test_sessions(pool: &PgPool) -> Result<Vec<Session>, ServerFnError> {
+            let rows = sqlx::query(
+                "SELECT id, name, description, created_at, last_active, owner_id,
+                status, max_users, current_users, is_private, password_required, metadata, 
+                session_type, test_id, start_time, end_time
+                FROM websocket_sessions
+                WHERE status = 'active' AND session_type = 'test'
+                ORDER BY last_active DESC"
+            )
+            .fetch_all(pool)
+            .await?;
+
+            let sessions: Vec<Session> = rows
+                .into_iter()
+                .map(|row| {
+                    let id: Uuid = row.get("id");
+                    let name: String = row.get("name");
+                    let description: Option<String> = row.get("description");
+                    let created_at: DateTime<Utc> = row.get("created_at");
+                    let last_active: DateTime<Utc> = row.get("last_active");
+                    let owner_id: Option<Uuid> = row.get("owner_id");
+                    let status: SessionStatus = row.get("status");
+                    let max_users: i32 = row.get("max_users");
+                    let current_users: i32 = row.get("current_users");
+                    let is_private: bool = row.get("is_private");
+                    let password_required: bool = row.get("password_required");
+                    let metadata: Option<JsonValue> = row.get("metadata");
+                    let session_type: SessionType = row.get("session_type");
+                    let test_id: Option<String> = row.get("test_id");
+                    let start_time: Option<DateTime<Utc>> = row.get("start_time");
+                    let end_time: Option<DateTime<Utc>> = row.get("end_time");
+
+                    Session {
+                        id,
+                        name,
+                        description,
+                        created_at,
+                        last_active,
+                        owner_id,
+                        status,
+                        max_users,
+                        current_users,
+                        is_private,
+                        password_required,
+                        metadata,
+                        session_type,
+                        test_id,
+                        start_time,
+                        end_time,
                     }
                 })
                 .collect();
@@ -62,7 +130,8 @@ cfg_if::cfg_if! {
         pub async fn get_session(session_id: Uuid, pool: &PgPool) -> Result<Option<Session>, ServerFnError> {
             let row = sqlx::query(
                 "SELECT id, name, description, created_at, last_active, owner_id,
-                status, max_users, current_users, is_private, password_required, metadata 
+                status, max_users, current_users, is_private, password_required, metadata,
+                session_type, test_id, start_time, end_time
                 FROM websocket_sessions WHERE id = $1"
             )
             .bind(session_id)
@@ -85,6 +154,10 @@ cfg_if::cfg_if! {
                         is_private: row.get("is_private"),
                         password_required: row.get("password_required"),
                         metadata: row.get("metadata"),
+                        session_type: row.get("session_type"),
+                        test_id: row.get("test_id"),
+                        start_time: row.get("start_time"),
+                        end_time: row.get("end_time"),
                     };
                     Ok(Some(session))
                 },
@@ -92,14 +165,72 @@ cfg_if::cfg_if! {
             }
         }
 
+        ///Get sessions by test ID
+        pub async fn get_sessions_by_test_id(test_id: &str, pool: &PgPool) -> Result<Vec<Session>, ServerFnError> {
+            let rows = sqlx::query(
+                "SELECT id, name, description, created_at, last_active, owner_id,
+                status, max_users, current_users, is_private, password_required, metadata,
+                session_type, test_id, start_time, end_time
+                FROM websocket_sessions
+                WHERE test_id = $1 
+                ORDER BY created_at DESC"
+            )
+            .bind(test_id)
+            .fetch_all(pool)
+            .await?;
+
+            let sessions: Vec<Session> = rows
+                .into_iter()
+                .map(|row| {
+                    let id: Uuid = row.get("id");
+                    let name: String = row.get("name");
+                    let description: Option<String> = row.get("description");
+                    let created_at: DateTime<Utc> = row.get("created_at");
+                    let last_active: DateTime<Utc> = row.get("last_active");
+                    let owner_id: Option<Uuid> = row.get("owner_id");
+                    let status: SessionStatus = row.get("status");
+                    let max_users: i32 = row.get("max_users");
+                    let current_users: i32 = row.get("current_users");
+                    let is_private: bool = row.get("is_private");
+                    let password_required: bool = row.get("password_required");
+                    let metadata: Option<JsonValue> = row.get("metadata");
+                    let session_type: SessionType = row.get("session_type");
+                    let test_id: Option<String> = row.get("test_id");
+                    let start_time: Option<DateTime<Utc>> = row.get("start_time");
+                    let end_time: Option<DateTime<Utc>> = row.get("end_time");
+
+                    Session {
+                        id,
+                        name,
+                        description,
+                        created_at,
+                        last_active,
+                        owner_id,
+                        status,
+                        max_users,
+                        current_users,
+                        is_private,
+                        password_required,
+                        metadata,
+                        session_type,
+                        test_id,
+                        start_time,
+                        end_time,
+                    }
+                })
+                .collect();
+
+            Ok(sessions)
+        }
+
         /// Creates a new session
         pub async fn create_session(session: &Session, pool: &PgPool) -> Result<Session, ServerFnError> {
             let row = sqlx::query(
                 "INSERT INTO websocket_sessions
-                (id, name, description, owner_id, status, max_users, is_private, password_required, password_hash, metadata) 
-                VALUES ($1, $2, $3, $4, $5::session_status_enum, $6, $7, $8, $9, $10) 
+                (id, name, description, owner_id, status, max_users, is_private, password_required, password_hash, metadata, session_type, test_id, start_time, end_time) 
+                VALUES ($1, $2, $3, $4, $5::session_status_enum, $6, $7, $8, $9, $10, $11::session_type_enum, $12, $13, $14) 
                 RETURNING id, name, description, created_at, last_active, owner_id, 
-                status, max_users, current_users, is_private, password_required, metadata"
+                status, max_users, current_users, is_private, password_required, metadata, session_type, test_id, start_time, end_time"
             )
             .bind(session.id)
             .bind(&session.name)
@@ -111,6 +242,10 @@ cfg_if::cfg_if! {
             .bind(session.password_required)
             .bind(None::<String>) // password_hash - would implement proper hashing in production
             .bind(&session.metadata)
+            .bind(&session.session_type.to_string())
+            .bind(&session.test_id)
+            .bind(session.start_time)
+            .bind(session.end_time)
             .fetch_one(pool)
             .await
             .map_err(|e| ServerFnError::new(format!("Database error: {}", e)))?;
@@ -128,6 +263,10 @@ cfg_if::cfg_if! {
                 is_private: row.get("is_private"),
                 password_required: row.get("password_required"),
                 metadata: row.get("metadata"),
+                session_type: row.get("session_type"),
+                test_id: row.get("test_id"),
+                start_time: row.get("start_time"),
+                end_time: row.get("end_time"),
             };
 
             Ok(session)
@@ -160,6 +299,50 @@ cfg_if::cfg_if! {
             Ok(())
         }
 
+        ///Updates a test session's start and end times
+        pub async fn update_test_session_times(
+            session_id: Uuid,
+            start_time: Option<DateTime<Utc>>,
+            end_time: Option<DateTime<Utc>>,
+            pool: &PgPool
+        ) -> Result<Session, ServerFnError> {
+            let update_result = sqlx::query(
+                "UPDATE websocket_sessions
+                SET start_time = $1, end_time = $2, last_active = NOW()
+                WHERE id =  $3 
+                RETURNING id, name, description, created_at, last_active, owner_id, 
+                status, max_users, current_users, is_private, password_required, metadata,
+                session_type, test_id, start_time, end_time"
+            )
+            .bind(start_time)
+            .bind(end_time)
+            .bind(session_id)
+            .fetch_one(pool)
+            .await
+            .map_err(|e| ServerFnError::new(format!("Database error: {}", e)))?;
+
+            let session = Session {
+                id: update_result.get("id"),
+                name: update_result.get("name"),
+                description: update_result.get("description"),
+                created_at: update_result.get("created_at"),
+                last_active: update_result.get("last_active"),
+                owner_id: update_result.get("owner_id"),
+                status: update_result.get("status"),
+                max_users: update_result.get("max_users"),
+                current_users: update_result.get("current_users"),
+                is_private: update_result.get("is_private"),
+                password_required: update_result.get("password_required"),
+                metadata: update_result.get("metadata"),
+                session_type: update_result.get("session_type"),
+                test_id: update_result.get("test_id"),
+                start_time: update_result.get("start_time"),
+                end_time: update_result.get("end_time"),
+            };
+
+            Ok(session)
+        }
+
         /// Deletes a session
         pub async fn delete_session(session_id: Uuid, pool: &PgPool) -> Result<(), ServerFnError> {
             sqlx::query("DELETE FROM websocket_sessions WHERE id = $1")
@@ -170,23 +353,48 @@ cfg_if::cfg_if! {
             Ok(())
         }
 
-        /// Cleanup expired or empty sessions
+        //Auto-expire test session that have passed their end times
+        pub async fn expire_completed_test_sessions(pool: &PgPool) -> Result<(), ServerFnError> {
+            sqlx::query(
+                "UPDATE websocket_sessions
+                SET status = 'expired'::session_status_enum
+                WHERE status = 'active'::session_status_enum
+                AND session_type = 'test'::session_type_enum
+                AND end_time IS NOT NULL
+                AND end_time < NOW()"
+            )
+            .execute(pool)
+            .await?;
+
+            Ok(())
+        }
+
+        //Cleanup expired or empty session (for test and chat session)
         pub async fn cleanup_inactive_sessions(pool: &PgPool) -> Result<(), ServerFnError> {
-            // Mark sessions as expired if they've been inactive for more than 24 hours
             sqlx::query(
                 "UPDATE websocket_sessions SET status = 'expired'::session_status_enum
-                WHERE status = 'active'::session_status_enum 
+                WHERE status = 'active'::session_status_enum
                 AND last_active < NOW() - INTERVAL '24 hours'"
             )
             .execute(pool)
             .await?;
 
-            // Mark sessions as inactive if they have 0 users but are still marked as active
             sqlx::query(
                 "UPDATE websocket_sessions SET status = 'inactive'::session_status_enum
-                WHERE status = 'active'::session_status_enum 
-                AND current_users = 0 
+                WHERE status = 'active'::session_status_enum
+                AND current_users = 0
                 AND last_active < NOW() - INTERVAL '1 hour'"
+            )
+            .execute(pool)
+            .await?;
+
+            sqlx::query(
+                "Update websocket_sessions
+                SET status = 'expired'::session_status_enum
+                WHERE status = 'active'::session_status_enum
+                AND session_type = 'test'::session_type_enum
+                AND end_time IS NOT NULL
+                AND end_time < NOW()"
             )
             .execute(pool)
             .await?;

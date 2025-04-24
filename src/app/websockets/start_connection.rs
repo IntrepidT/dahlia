@@ -2,12 +2,17 @@ use uuid::Uuid;
 #[cfg(feature = "ssr")]
 use {
     crate::app::db::websocket_session_database,
-    crate::app::models::websocket_session::SessionStatus,
+    crate::app::models::websocket_session::{
+        CreateSessionRequest, Session, SessionStatus, SessionType,
+    },
     crate::app::websockets::lobby::Lobby,
     crate::app::websockets::ws::WsConn,
     actix::Addr,
-    actix_web::{get, web::Data, web::Path, web::Payload, Error, HttpRequest, HttpResponse},
+    actix_web::{
+        get, post, web::Data, web::Json, web::Path, web::Payload, Error, HttpRequest, HttpResponse,
+    },
     actix_web_actors::ws,
+    serde::{Deserialize, Serialize},
 };
 
 #[cfg(feature = "ssr")]

@@ -33,7 +33,7 @@ pub fn MathTestDisplay(
         if editing_mode() {
             navigate(&format!("/testbuilder/{}", test_id), Default::default());
         } else {
-            navigate(&format!("/flashcardset/{}", test_id), Default::default());
+            navigate(&format!("/test-session/{}", test_id), Default::default());
         }
     };
 

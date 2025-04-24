@@ -1,11 +1,14 @@
 #[cfg(feature = "ssr")]
 use {
     crate::app::websockets::lobby::Lobby,
-    crate::app::websockets::messages::{ClientActorMessage, Connect, Disconnect, WsMessage},
+    crate::app::websockets::messages::{
+        ClientActorMessage, Connect, Disconnect, TestMessageType, TestSessionMessage, WsMessage,
+    },
     actix::{fut, ActorContext, ActorFuture, ContextFutureSpawner, WrapFuture},
     actix::{Actor, Addr, Running, StreamHandler},
     actix::{ActorFutureExt, AsyncContext, Handler},
     actix_web_actors::ws,
+    serde_json::{from_str, Value},
 };
 
 use std::time::{Duration, Instant};
@@ -103,11 +106,52 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsConn {
                 ctx.stop();
             }
             Ok(ws::Message::Nop) => (),
-            Ok(ws::Message::Text(s)) => self.lobby_addr.do_send(ClientActorMessage {
-                id: self.id,
-                msg: s.to_string(),
-                room_id: self.room,
-            }),
+            Ok(ws::Message::Text(s)) => {
+                if let Ok(json_value) = from_str::<Value>(&s) {
+                    if let Some(msg_type) = json_value.get("type").and_then(|t| t.as_str()) {
+                        match msg_type {
+                            "test_message" => {
+                                if let Some(test_msg_type_str) =
+                                    json_value.get("test_message_type").and_then(|t| t.as_str())
+                                {
+                                    let message_type = match test_msg_type_str {
+                                        "start_test" => TestMessageType::StartTest,
+                                        "submit_answer" => TestMessageType::SubmitAnswer,
+                                        "teacher_comment" => TestMessageType::TeacherComment,
+                                        "end_test" => TestMessageType::EndTest,
+                                        "student_joined" => TestMessageType::StudentJoined,
+                                        "student_left" => TestMessageType::StudentLeft,
+                                        "question_focus" => TestMessageType::QuestionFocus,
+                                        "time_update" => TestMessageType::TimeUpdate,
+                                        unknown => {
+                                            println!("Unknown test message type: {}", unknown);
+                                            return;
+                                        }
+                                    };
+
+                                    let payload =
+                                        json_value.get("payload").cloned().unwrap_or(Value::Null);
+
+                                    self.lobby_addr.do_send(TestSessionMessage {
+                                        message_type,
+                                        payload,
+                                        id: self.id,
+                                        room_id: self.room,
+                                    });
+                                    return;
+                                }
+                            }
+                            _ => (),
+                        }
+                    }
+                }
+
+                self.lobby_addr.do_send(ClientActorMessage {
+                    id: self.id,
+                    msg: s.to_string(),
+                    room_id: self.room,
+                });
+            }
             Err(e) => std::panic::panic_any(e),
         }
     }

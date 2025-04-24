@@ -41,3 +41,6 @@ pub use dashboard::*;
 
 pub mod test_templates;
 pub use test_templates::*;
+
+pub mod live_testing;
+pub use live_testing::*;

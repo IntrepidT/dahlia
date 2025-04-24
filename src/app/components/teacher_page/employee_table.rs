@@ -72,7 +72,7 @@ pub fn EmployeeTable(
                     <Suspense fallback=move || view! {
                         <tr>
                             <td colspan="6" class="text-center p-8">
-                                <div class="inline-block h-6 w-6 animate-spin rounded-full border-2 border-[#DADADA] border-t-[#2E3A59]"></div>
+                                <div class="inline-block h-6 w-6 animate-spin rounded-full border-2border-t-[#2E3A59]"></div>
                             </td>
                         </tr>
                     }>

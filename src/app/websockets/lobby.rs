@@ -1,10 +1,19 @@
+use crate::app::models::Question;
+use crate::app::server_functions::questions;
 use std::collections::{HashMap, HashSet};
 use uuid::Uuid;
+
 #[cfg(feature = "ssr")]
 use {
     crate::app::db::websocket_session_database,
-    crate::app::websockets::messages::{ClientActorMessage, Connect, Disconnect, WsMessage},
+    crate::app::models::question::QuestionType,
+    crate::app::models::websocket_session::{Session, SessionType},
+    crate::app::server_functions::questions::get_questions,
+    crate::app::websockets::messages::{
+        ClientActorMessage, Connect, Disconnect, TestMessageType, TestSessionMessage, WsMessage,
+    },
     actix::prelude::{Actor, Context, Handler, Recipient},
+    serde_json::{json, Value},
     sqlx::PgPool,
 };
 
@@ -15,6 +24,9 @@ type Socket = Recipient<WsMessage>;
 pub struct Lobby {
     sessions: HashMap<Uuid, Socket>,
     rooms: HashMap<Uuid, HashSet<Uuid>>,
+    room_roles: HashMap<(Uuid, Uuid), String>,
+    active_tests: HashMap<Uuid, String>,
+    test_questions: HashMap<String, Vec<Value>>,
     db_pool: Option<sqlx::PgPool>,
 }
 
@@ -24,6 +36,9 @@ impl Default for Lobby {
         Lobby {
             sessions: HashMap::new(),
             rooms: HashMap::new(),
+            room_roles: HashMap::new(),
+            active_tests: HashMap::new(),
+            test_questions: HashMap::new(),
             db_pool: None,
         }
     }
@@ -36,6 +51,9 @@ impl Lobby {
             sessions: HashMap::new(),
             rooms: HashMap::new(),
             db_pool: Some(pool),
+            room_roles: HashMap::new(),
+            active_tests: HashMap::new(),
+            test_questions: HashMap::new(),
         }
     }
 
@@ -55,6 +73,168 @@ impl Lobby {
                     .await
             {
                 log::error!("Failed to update session count: {}", e);
+            }
+        }
+    }
+
+    fn handle_test_message(&mut self, msg: TestSessionMessage) {
+        match msg.message_type {
+            TestMessageType::StartTest => {
+                if let Some(test_id) = msg.payload.get("test_id").and_then(|id| id.as_str()) {
+                    self.active_tests.insert(msg.room_id, test_id.to_string());
+
+                    if !self.test_questions.contains_key(test_id) {
+                        let test_id_copy = test_id.to_string();
+                        let db_pool = self.db_pool.clone();
+
+                        if let Some(pool) = db_pool {
+                            actix::spawn(async move {
+                                match get_questions(test_id_copy.clone()).await {
+                                    Ok(questions) => {}
+                                    Err(e) => {
+                                        log::error!("Failed to fetch test questions: {}", e);
+                                    }
+                                }
+                            });
+                        }
+                    }
+
+                    if let Some(room_users) = self.rooms.get(&msg.room_id) {
+                        let start_msg = json!({
+                            "type": "test_started",
+                            "test_id": test_id,
+                        });
+
+                        for user_id in room_users.iter() {
+                            self.send_message(&start_msg.to_string(), user_id);
+                        }
+                    }
+                }
+            }
+            TestMessageType::SubmitAnswer => {
+                // A student is submitting an answer
+                if let Some(room_users) = self.rooms.get(&msg.room_id) {
+                    // Forward answers only to teacher(s)
+                    let answer_msg = json!({
+                        "type": "student_answer",
+                        "student_id": msg.id.to_string(),
+                        "answer_data": msg.payload,
+                    });
+
+                    // Send only to teachers in the room
+                    for user_id in room_users.iter() {
+                        if let Some(role) = self.room_roles.get(&(msg.room_id, *user_id)) {
+                            if role == "teacher" {
+                                self.send_message(&answer_msg.to_string(), user_id);
+                            }
+                        }
+                    }
+                }
+            }
+            TestMessageType::TeacherComment => {
+                // Teacher is providing feedback - broadcast to everyone
+                if let Some(room_users) = self.rooms.get(&msg.room_id) {
+                    let comment_msg = json!({
+                        "type": "teacher_comment",
+                        "comment": msg.payload,
+                    });
+
+                    for user_id in room_users.iter() {
+                        self.send_message(&comment_msg.to_string(), user_id);
+                    }
+                }
+            }
+            TestMessageType::EndTest => {
+                // End the test and remove it from active tests
+                self.active_tests.remove(&msg.room_id);
+
+                // Notify all users in the room
+                if let Some(room_users) = self.rooms.get(&msg.room_id) {
+                    let end_msg = json!({
+                        "type": "test_ended",
+                    });
+
+                    for user_id in room_users.iter() {
+                        self.send_message(&end_msg.to_string(), user_id);
+                    }
+                }
+            }
+            TestMessageType::StudentJoined => {
+                // Notify the teacher that a new student joined
+                if let Some(room_users) = self.rooms.get(&msg.room_id) {
+                    let student_msg = json!({
+                        "type": "student_joined",
+                        "student_id": msg.id.to_string(),
+                        "student_data": msg.payload,
+                    });
+
+                    // Send only to teachers
+                    for user_id in room_users.iter() {
+                        if let Some(role) = self.room_roles.get(&(msg.room_id, *user_id)) {
+                            if role == "teacher" {
+                                self.send_message(&student_msg.to_string(), user_id);
+                            }
+                        }
+                    }
+                }
+            }
+            TestMessageType::StudentLeft => {
+                // Notify the teacher that a student left
+                if let Some(room_users) = self.rooms.get(&msg.room_id) {
+                    let student_msg = json!({
+                        "type": "student_left",
+                        "student_id": msg.id.to_string(),
+                    });
+
+                    // Send only to teachers
+                    for user_id in room_users.iter() {
+                        if let Some(role) = self.room_roles.get(&(msg.room_id, *user_id)) {
+                            if role == "teacher" {
+                                self.send_message(&student_msg.to_string(), user_id);
+                            }
+                        }
+                    }
+                }
+            }
+            TestMessageType::QuestionFocus => {
+                // Teacher wants to focus everyone on a specific question
+                if let Some(room_users) = self.rooms.get(&msg.room_id) {
+                    let focus_msg = json!({
+                        "type": "focus_question",
+                        "question_data": msg.payload,
+                    });
+
+                    for user_id in room_users.iter() {
+                        self.send_message(&focus_msg.to_string(), user_id);
+                    }
+                }
+            }
+            TestMessageType::TimeUpdate => {
+                // Update time remaining for the test
+                if let Some(room_users) = self.rooms.get(&msg.room_id) {
+                    let time_msg = json!({
+                        "type": "time_update",
+                        "time_data": msg.payload,
+                    });
+
+                    for user_id in room_users.iter() {
+                        self.send_message(&time_msg.to_string(), user_id);
+                    }
+                }
+            }
+            _ => {
+                //Basic pass-through for other message types
+                if let Some(room_users) = self.rooms.get(&msg.room_id) {
+                    let msg_json = json!({
+                        "type": format!("{:?}", msg.message_type).to_lowercase(),
+                        "from": msg.id.to_string(),
+                        "data": msg.payload,
+                    });
+
+                    for user_id in room_users.iter() {
+                        self.send_message(&msg_json.to_string(), user_id);
+                    }
+                }
             }
         }
     }
@@ -131,6 +311,23 @@ impl Handler<Connect> for Lobby {
             .or_insert_with(HashSet::new)
             .insert(msg.self_id);
 
+        if !self.room_roles.contains_key(&(msg.lobby_id, msg.self_id)) {
+            let is_test_room = self.active_tests.contains_key(&msg.lobby_id);
+            let room_empty = self
+                .rooms
+                .get(&msg.lobby_id)
+                .map_or(true, |users| users.len() <= 1);
+
+            let role = if is_test_room && room_empty {
+                "teacher"
+            } else {
+                "student"
+            };
+
+            self.room_roles
+                .insert((msg.lobby_id, msg.self_id), role.to_string());
+        }
+
         // Notify existing users
         if let Some(room_users) = self.rooms.get(&msg.lobby_id) {
             for conn_id in room_users.iter().filter(|id| **id != msg.self_id) {
@@ -143,6 +340,41 @@ impl Handler<Connect> for Lobby {
 
         // Send welcome message
         self.send_message(&format!("your id is {}", msg.self_id), &msg.self_id);
+
+        if let Some(test_id) = self.active_tests.get(&msg.lobby_id) {
+            let role = self.room_roles.get(&(msg.lobby_id, msg.self_id)).unwrap();
+
+            let role_msg = json!({
+                "type": "role_assigned",
+                "role": role
+            });
+            self.send_message(&role_msg.to_string(), &msg.self_id);
+
+            if let Some(questions) = self.test_questions.get(test_id) {
+                let filtered_questions = if role == "teacher" {
+                    questions.clone()
+                } else {
+                    questions
+                        .iter()
+                        .map(|q| {
+                            let mut q_copy = q.clone();
+                            if let Some(obj) = q_copy.as_object_mut() {
+                                obj.remove("correct_answer");
+                            }
+                            q_copy
+                        })
+                        .collect()
+                };
+
+                let test_data = json!({
+                    "type": "test_data",
+                    "test_id": test_id,
+                    "questions": filtered_questions
+                });
+
+                self.send_message(&test_data.to_string(), &msg.self_id);
+            }
+        }
 
         // Update database session count
         let room_id = msg.lobby_id;
@@ -177,5 +409,14 @@ impl Handler<ClientActorMessage> for Lobby {
                 }
             }
         }
+    }
+}
+
+#[cfg(feature = "ssr")]
+impl Handler<TestSessionMessage> for Lobby {
+    type Result = ();
+
+    fn handle(&mut self, msg: TestSessionMessage, _ctx: &mut Context<Self>) -> Self::Result {
+        self.handle_test_message(msg);
     }
 }

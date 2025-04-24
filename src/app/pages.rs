@@ -33,3 +33,6 @@ pub use dashboard::Dashboard;
 
 pub mod review_test;
 pub use review_test::ReviewTest;
+
+pub mod test_sessions;
+pub use test_sessions::TestSessionsList;
