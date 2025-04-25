@@ -311,8 +311,10 @@ pub fn RealtimeTestSession() -> impl IntoView {
                     Ok(sessions) => {
                         if let Some(active_session) = sessions.iter().find(|s| {
                             let now = Utc::now();
-                            let active_threshold = now - chrono::Duration::hours(1);
+                            let active_threshold = now - chrono::Duration::minutes(5);
                             s.last_active > active_threshold
+                                && s.start_time.is_none()
+                                && s.end_time.is_none()
                         }) {
                             // Join existing session
                             set_room_id.set(Some(active_session.id));

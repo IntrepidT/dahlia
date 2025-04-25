@@ -20,7 +20,7 @@ pub fn TestSessionsList() -> impl IntoView {
     let (error_message, set_error_message) = create_signal(String::new());
     let (filter_value, set_filter_value) = create_signal(String::new());
 
-    let (selected_view, set_selected_view) = create_signal(SidebarSelected::AdministerTest);
+    let (selected_view, set_selected_view) = create_signal(SidebarSelected::Live);
 
     // Action to fetch sessions
     let fetch_sessions = create_action(move |_: &()| async move {
@@ -103,7 +103,7 @@ pub fn TestSessionsList() -> impl IntoView {
                 if let Some(test_id) = &session.test_id {
                     // Navigate directly to the test-session route with the test_id
                     navigate(
-                        &format!("/test-session/{}", test_id),
+                        &format!("/tests/{}/sessions/{}", test_id, session_id),
                         NavigateOptions::default(),
                     );
                 }
@@ -260,7 +260,7 @@ pub fn TestSessionsList() -> impl IntoView {
                     </Show>
                 </div>
 
-                {/* Create new test session button (only for teachers) */}
+                /*{/* Create new test session button (only for teachers) */}
                 <Show when=move || {
                     user.get().map(|u| u.is_admin() || u.is_teacher()).unwrap_or(false)
                 }>
@@ -272,7 +272,7 @@ pub fn TestSessionsList() -> impl IntoView {
                             "Create New Test Session"
                         </A>
                     </div>
-                </Show>
+                </Show>*/
             </div>
         </div>
     }

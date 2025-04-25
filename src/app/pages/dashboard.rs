@@ -22,6 +22,8 @@ pub fn Dashboard() -> impl IntoView {
             set_selected_view(SidebarSelected::StudentView);
         } else if path.starts_with("/teachers") {
             set_selected_view(SidebarSelected::TeacherView);
+        } else if path.starts_with("/testsessions") {
+            set_selected_view(SidebarSelected::Live);
         }
         // Note: AdministerTest doesn't have its own page, it's handled by the modal
     });
@@ -196,6 +198,11 @@ pub fn Dashboard() -> impl IntoView {
                                 </div>
                             </div>
                         },
+                        SidebarSelected::Live => view! {
+                            <div>
+                                <p>This is the dashboard component for Live testing</p>
+                            </div>
+                        }
                     }}
                 </main>
             </div>

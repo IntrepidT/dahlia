@@ -146,6 +146,7 @@ pub fn App() -> impl IntoView {
                             }
                         }/>
                         <Route path="/test-session/:test_id" view=RealtimeTestSession/>
+                        <Route path="/tests/:test_id/sessions/:session_id" view=RealtimeTestSession/>
                         <Route path="/testsessions" view=TestSessionsList/>
                         <Route path="/*any" view=NotFound/>
                     </Routes>

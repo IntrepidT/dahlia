@@ -18,6 +18,7 @@ pub enum SidebarSelected {
     StudentView,
     TeacherView,
     AdministerTest,
+    Live,
 }
 const GRAY_COLOR: &str = "text-[#DADADA]";
 const BLUE_COLOR: &str = "text-[#2E3A59]";
