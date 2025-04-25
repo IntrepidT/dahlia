@@ -53,6 +53,8 @@ pub enum TestMessageType {
     EndTest,
     StudentJoined,
     StudentLeft,
+    UserJoined,
+    UserLeft,
     QuestionFocus,
     TimeUpdate,
 }

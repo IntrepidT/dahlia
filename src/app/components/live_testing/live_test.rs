@@ -9,6 +9,7 @@ use crate::app::server_functions::scores::add_score;
 use crate::app::server_functions::students::get_students;
 use crate::app::server_functions::{tests::get_tests, websocket_sessions};
 use chrono::{DateTime, Duration, Utc};
+use leptos::ev::ErrorEvent;
 use leptos::*;
 use leptos_router::*;
 use log::{error, info, warn};
@@ -18,6 +19,14 @@ use std::time::Duration as StdDuration;
 use uuid::Uuid;
 use wasm_bindgen::{closure::Closure, JsCast, JsValue};
 use web_sys::{CloseEvent, MessageEvent, WebSocket};
+
+#[derive(Clone, Copy, PartialEq, Debug)]
+enum ConnectionStatus {
+    Disconnected,
+    Connecting,
+    Connected,
+    Error,
+}
 
 #[derive(Debug, Clone)]
 struct QuestionResponse {
@@ -52,14 +61,27 @@ pub fn RealtimeTestSession() -> impl IntoView {
     let (role, set_role) = create_signal(Role::Student);
     let (connected_students, set_connected_students) =
         create_signal::<Vec<ConnectedStudent>>(Vec::new());
+    let (connection_status, set_connection_status) = create_signal(ConnectionStatus::Disconnected);
+    let (error_message, set_error_message) = create_signal(None::<String>);
+
+    let (should_disable_inputs, set_should_disable_inputs) = create_signal(true);
 
     if user().expect("Unwrapping a user").is_admin()
         || user().expect("Unwrapping a user").is_teacher()
     {
         set_role(Role::Teacher);
     } else {
-        set_role(Role::Student)
+        set_role(Role::Student);
     };
+
+    create_effect(move |_| {
+        let current_role = role.get();
+        match current_role {
+            Role::Teacher => set_should_disable_inputs.set(false),
+            Role::Student => set_should_disable_inputs.set(true),
+            Role::Unknown => set_should_disable_inputs.set(true),
+        }
+    });
 
     // Test session state
     let test_details = create_resource(test_id.clone(), move |tid| async move {
@@ -116,8 +138,28 @@ pub fn RealtimeTestSession() -> impl IntoView {
         let host = web_sys::window().unwrap().location().host().unwrap();
         let ws_url = format!("{protocol}://{host}/api/ws/{session_id}");
 
+        // Clone necessary signals for the async block
+        let set_role = set_role.clone();
+        let set_connected_students = set_connected_students.clone();
+        let set_responses = set_responses.clone();
+        let set_current_card_index = set_current_card_index.clone();
+        let set_remaining_time = set_remaining_time.clone();
+        let set_is_test_active = set_is_test_active.clone();
+        let set_is_submitted = set_is_submitted.clone();
+        let set_connection_status = set_connection_status.clone(); // Add a new signal for connection status
+        let set_error_message = set_error_message.clone(); // Add error message signal
+
         async move {
             log::info!("Connecting to WebSocket at: {}", ws_url);
+
+            // Close any existing connection
+            if let Some(ws) = ws.get_untracked() {
+                let _ = ws.close();
+            }
+
+            // Reset connection-dependent state
+            set_connection_status.set(ConnectionStatus::Connecting);
+            set_error_message.set(None);
 
             match WebSocket::new(&ws_url) {
                 Ok(websocket) => {
@@ -128,173 +170,246 @@ pub fn RealtimeTestSession() -> impl IntoView {
                             let message = text.as_string().unwrap();
                             log::debug!("WebSocket message received: {}", message);
 
-                            if let Ok(json_value) = serde_json::from_str::<Value>(&message) {
-                                if let Some(msg_type) =
-                                    json_value.get("type").and_then(|t| t.as_str())
-                                {
-                                    match msg_type {
-                                        "role_assigned" => {
-                                            if let Some(role_str) =
-                                                json_value.get("role").and_then(|r| r.as_str())
-                                            {
-                                                match role_str {
-                                                    "teacher" => set_role.set(Role::Teacher),
-                                                    "student" => set_role.set(Role::Student),
-                                                    _ => set_role.set(Role::Unknown),
-                                                }
-                                            }
-                                        }
-                                        "test_data" => {
-                                            if let Some(questions_array) = json_value
-                                                .get("questions")
-                                                .and_then(|q| q.as_array())
-                                            {
-                                                let qs: Vec<
-                                                    crate::app::models::question::Question,
-                                                > = questions_array
-                                                    .iter()
-                                                    .filter_map(|q| {
-                                                        serde_json::from_value(q.clone()).ok()
-                                                    })
-                                                    .collect();
-                                            }
-                                        }
-                                        "student_joined" => {
-                                            if let Some(student_id) = json_value
-                                                .get("student_id")
-                                                .and_then(|s| s.as_str())
-                                            {
-                                                if let Some(student_data) =
-                                                    json_value.get("student_data")
+                            match serde_json::from_str::<Value>(&message) {
+                                Ok(json_value) => {
+                                    if let Some(msg_type) =
+                                        json_value.get("type").and_then(|t| t.as_str())
+                                    {
+                                        match msg_type {
+                                            "role_assigned" => {
+                                                log::info!("Assigning role");
+                                                if let Some(role_str) =
+                                                    json_value.get("role").and_then(|r| r.as_str())
                                                 {
-                                                    let name = student_data
-                                                        .get("name")
-                                                        .and_then(|n| n.as_str())
-                                                        .unwrap_or("Unknown");
-
-                                                    set_connected_students.update(|students| {
-                                                        students.push(ConnectedStudent {
-                                                            student_id: student_id.to_string(),
-                                                            name: name.to_string(),
-                                                            status: "Connected".to_string(),
-                                                        });
-                                                    });
-                                                }
-                                            }
-                                        }
-                                        "student_left" => {
-                                            if let Some(student_id) = json_value
-                                                .get("student_id")
-                                                .and_then(|s| s.as_str())
-                                            {
-                                                set_connected_students.update(|students| {
-                                                    if let Some(pos) = students
-                                                        .iter()
-                                                        .position(|s| s.student_id == student_id)
-                                                    {
-                                                        students[pos].status =
-                                                            "Disconnected".to_string();
+                                                    match role_str {
+                                                        "teacher" => set_role.set(Role::Teacher),
+                                                        "student" => set_role.set(Role::Student),
+                                                        _ => set_role.set(Role::Unknown),
                                                     }
-                                                });
+                                                }
                                             }
-                                        }
-                                        "student_answer" => {
-                                            if let Some(answer_data) = json_value.get("answer_data")
-                                            {
-                                                if let (Some(qnumber), Some(answer)) = (
-                                                    answer_data
-                                                        .get("question_id")
-                                                        .and_then(|q| q.as_i64()),
-                                                    answer_data
-                                                        .get("answer")
-                                                        .and_then(|a| a.as_str()),
-                                                ) {
-                                                    set_responses.update(|r| {
-                                                        let qnumber = qnumber as i32;
-                                                        let response = r.entry(qnumber).or_insert(
-                                                            QuestionResponse {
-                                                                answer: String::new(),
-                                                                comment: String::new(),
-                                                            },
-                                                        );
-                                                        response.answer = answer.to_string();
+                                            "test_data" => {
+                                                if let Some(questions_array) = json_value
+                                                    .get("questions")
+                                                    .and_then(|q| q.as_array())
+                                                {
+                                                    let qs: Vec<
+                                                        crate::app::models::question::Question,
+                                                    > = questions_array
+                                                        .iter()
+                                                        .filter_map(|q| {
+                                                            serde_json::from_value(q.clone()).ok()
+                                                        })
+                                                        .collect();
+                                                }
+                                            }
+                                            "student_joined" | "user_joined" => {
+                                                let is_student = msg_type == "student_joined";
+                                                let log_msg = if is_student {
+                                                    "student joined"
+                                                } else {
+                                                    "user joined"
+                                                };
+                                                log::info!(
+                                                    "Received {} message {:?}",
+                                                    log_msg,
+                                                    json_value
+                                                );
+
+                                                // Extract ID field based on message type
+                                                let id_field =
+                                                    if is_student { "student_id" } else { "id" };
+                                                let data_field = if is_student {
+                                                    "student_data"
+                                                } else {
+                                                    "user_data"
+                                                };
+                                                let name_field =
+                                                    if is_student { "name" } else { "username" };
+
+                                                if let Some(user_id) = json_value
+                                                    .get(id_field)
+                                                    .and_then(|s| s.as_str())
+                                                {
+                                                    if let Some(user_data) =
+                                                        json_value.get(data_field)
+                                                    {
+                                                        let name = user_data
+                                                            .get(name_field)
+                                                            .and_then(|n| n.as_str())
+                                                            .unwrap_or("Unknown");
+
+                                                        set_connected_students.update(|students| {
+                                                            // Check if student already exists
+                                                            if let Some(pos) =
+                                                                students.iter().position(|s| {
+                                                                    s.student_id == user_id
+                                                                })
+                                                            {
+                                                                students[pos].status =
+                                                                    "Connected".to_string();
+                                                            } else {
+                                                                students.push(ConnectedStudent {
+                                                                    student_id: user_id.to_string(),
+                                                                    name: name.to_string(),
+                                                                    status: "Connected".to_string(),
+                                                                });
+                                                            }
+                                                        });
+                                                    }
+                                                }
+                                            }
+                                            "student_left" | "user_left" => {
+                                                let is_student = msg_type == "student_left";
+                                                let log_msg = if is_student {
+                                                    "student left"
+                                                } else {
+                                                    "user left"
+                                                };
+                                                log::info!(
+                                                    "Received {} message {:?}",
+                                                    log_msg,
+                                                    json_value
+                                                );
+
+                                                // Extract ID field based on message type
+                                                let id_field =
+                                                    if is_student { "student_id" } else { "id" };
+
+                                                if let Some(user_id) = json_value
+                                                    .get(id_field)
+                                                    .and_then(|s| s.as_str())
+                                                {
+                                                    set_connected_students.update(|students| {
+                                                        if let Some(pos) = students
+                                                            .iter()
+                                                            .position(|s| s.student_id == user_id)
+                                                        {
+                                                            students[pos].status =
+                                                                "Disconnected".to_string();
+                                                        }
                                                     });
                                                 }
                                             }
-                                        }
-                                        "focus_question" => {
-                                            if let Some(question_data) =
-                                                json_value.get("question_data")
-                                            {
-                                                if let Some(index) = question_data
-                                                    .get("index")
-                                                    .and_then(|i| i.as_i64())
+                                            "student_answer" => {
+                                                if let Some(answer_data) =
+                                                    json_value.get("answer_data")
                                                 {
-                                                    set_current_card_index.set(index as usize);
+                                                    if let (Some(qnumber), Some(answer)) = (
+                                                        answer_data
+                                                            .get("question_id")
+                                                            .and_then(|q| q.as_i64()),
+                                                        answer_data
+                                                            .get("answer")
+                                                            .and_then(|a| a.as_str()),
+                                                    ) {
+                                                        set_responses.update(|r| {
+                                                            let qnumber = qnumber as i32;
+                                                            let response = r
+                                                                .entry(qnumber)
+                                                                .or_insert(QuestionResponse {
+                                                                    answer: String::new(),
+                                                                    comment: String::new(),
+                                                                });
+                                                            response.answer = answer.to_string();
+                                                        });
+                                                    }
                                                 }
                                             }
-                                        }
-                                        "time_update" => {
-                                            if let Some(time_data) = json_value.get("time_data") {
-                                                if let Some(remaining) = time_data
-                                                    .get("remaining")
-                                                    .and_then(|r| r.as_i64())
+                                            "focus_question" => {
+                                                if let Some(question_data) =
+                                                    json_value.get("question_data")
                                                 {
-                                                    set_remaining_time.set(Some(remaining as i32));
+                                                    if let Some(index) = question_data
+                                                        .get("index")
+                                                        .and_then(|i| i.as_i64())
+                                                    {
+                                                        set_current_card_index.set(index as usize);
+                                                    }
                                                 }
                                             }
-                                        }
-                                        "test_started" => {
-                                            set_is_test_active.set(true);
-                                        }
-                                        "test_ended" => {
-                                            set_is_test_active.set(false);
-                                            set_is_submitted.set(true);
-                                        }
-                                        _ => {
-                                            log::debug!("Unhandled message type: {}", msg_type);
+                                            "time_update" => {
+                                                if let Some(time_data) = json_value.get("time_data")
+                                                {
+                                                    if let Some(remaining) = time_data
+                                                        .get("remaining")
+                                                        .and_then(|r| r.as_i64())
+                                                    {
+                                                        set_remaining_time
+                                                            .set(Some(remaining as i32));
+                                                    }
+                                                }
+                                            }
+                                            "test_started" => {
+                                                set_is_test_active.set(true);
+                                            }
+                                            "test_ended" => {
+                                                set_is_test_active.set(false);
+                                                set_is_submitted.set(true);
+                                            }
+                                            _ => {
+                                                log::debug!("Unhandled message type: {}", msg_type);
+                                            }
                                         }
                                     }
+                                }
+                                Err(err) => {
+                                    log::error!("Failed to parse WebSocket message: {:?}", err);
                                 }
                             }
                         }
                     })
                         as Box<dyn FnMut(MessageEvent)>);
 
-                    // Setup event handlers
-                    websocket.set_onmessage(Some(onmessage_callback.as_ref().unchecked_ref()));
-                    onmessage_callback.forget();
-
+                    // Setup onopen handler
+                    let set_connection_status_clone = set_connection_status.clone();
                     let onopen_callback = Closure::wrap(Box::new(move |_| {
                         log::info!("WebSocket connection established");
+                        set_connection_status_clone.set(ConnectionStatus::Connected);
                     })
                         as Box<dyn FnMut(JsValue)>);
 
-                    websocket.set_onopen(Some(onopen_callback.as_ref().unchecked_ref()));
-                    onopen_callback.forget();
-
-                    let ws_clone = websocket.clone();
+                    // Setup onclose handler
+                    let set_connection_status_clone = set_connection_status.clone();
                     let onclose_callback = Closure::wrap(Box::new(move |e: CloseEvent| {
                         log::info!("WebSocket closed: {} - {}", e.code(), e.reason());
+                        set_connection_status_clone.set(ConnectionStatus::Disconnected);
                     })
                         as Box<dyn FnMut(CloseEvent)>);
 
-                    websocket.set_onclose(Some(onclose_callback.as_ref().unchecked_ref()));
-                    onclose_callback.forget();
-
-                    let onerror_callback = Closure::wrap(Box::new(move |_| {
-                        log::error!("WebSocket error occurred");
+                    // Setup onerror handler
+                    let set_connection_status_clone = set_connection_status.clone();
+                    let set_error_message_clone = set_error_message.clone();
+                    let onerror_callback = Closure::wrap(Box::new(move |e: ErrorEvent| {
+                        let error_msg = e.message();
+                        log::error!("WebSocket error occurred: {}", error_msg);
+                        set_connection_status_clone.set(ConnectionStatus::Error);
+                        set_error_message_clone
+                            .set(Some(format!("Connection error: {}", error_msg)));
                     })
-                        as Box<dyn FnMut(JsValue)>);
+                        as Box<dyn FnMut(ErrorEvent)>);
 
+                    // Set event handlers
+                    websocket.set_onmessage(Some(onmessage_callback.as_ref().unchecked_ref()));
+                    websocket.set_onopen(Some(onopen_callback.as_ref().unchecked_ref()));
+                    websocket.set_onclose(Some(onclose_callback.as_ref().unchecked_ref()));
                     websocket.set_onerror(Some(onerror_callback.as_ref().unchecked_ref()));
+
+                    // Store callbacks to prevent them from being dropped
+                    onmessage_callback.forget();
+                    onopen_callback.forget();
+                    onclose_callback.forget();
                     onerror_callback.forget();
 
+                    // Store the websocket
                     set_ws.set(Some(websocket));
                     Ok(())
                 }
                 Err(err) => {
-                    log::error!("WebSocket connection failed: {:?}", err);
+                    let error_msg = format!("WebSocket connection failed: {:?}", err);
+                    log::error!("{}", error_msg);
+                    set_connection_status.set(ConnectionStatus::Error);
+                    set_error_message.set(Some(error_msg));
                     Err(())
                 }
             }
@@ -849,9 +964,12 @@ pub fn RealtimeTestSession() -> impl IntoView {
                                                                                     value=option_value.clone()
                                                                                     class="h-4 w-4 text-blue-600 focus:ring-blue-500"
                                                                                     prop:checked=move || is_checked()
+                                                                                    prop:disabled=should_disable_inputs.get()
                                                                                     on:change=move |ev| {
-                                                                                        let value = event_target_value(&ev);
-                                                                                        handle_answer_change(qnumber, value);
+                                                                                        if !should_disable_inputs.get() {
+                                                                                            let value = event_target_value(&ev);
+                                                                                            handle_answer_change(qnumber, value);
+                                                                                        }
                                                                                     }
                                                                                 />
                                                                                 <span class="ml-2 break-words">{option_value}</span>
@@ -890,8 +1008,11 @@ pub fn RealtimeTestSession() -> impl IntoView {
                                                                         class:bg-green-500={move || is_true()}
                                                                         class:text-white={move || is_true()}
                                                                         class:border-transparent={move || is_true()}
+                                                                        class:cursor-not-allowd={should_disable_inputs()}
                                                                         on:click=move |_| {
-                                                                            handle_answer_change(qnumber, "true".to_string());
+                                                                            if !should_disable_inputs.get() {
+                                                                                handle_answer_change(qnumber, "true".to_string());
+                                                                            }
                                                                         }
                                                                     >
                                                                         "Yes"
@@ -906,8 +1027,11 @@ pub fn RealtimeTestSession() -> impl IntoView {
                                                                         class:bg-red-500={move || is_false()}
                                                                         class:text-white={move || is_false()}
                                                                         class:border-transparent={move || is_false()}
+                                                                        class:cursor-not-allowed={should_disable_inputs()}
                                                                         on:click=move |_| {
-                                                                            handle_answer_change(qnumber, "false".to_string());
+                                                                            if !should_disable_inputs.get() {
+                                                                                handle_answer_change(qnumber, "false".to_string());
+                                                                            }
                                                                         }
                                                                     >
                                                                         "No"
@@ -930,9 +1054,12 @@ pub fn RealtimeTestSession() -> impl IntoView {
                                                                     <textarea
                                                                         class="w-full p-3 border border-gray-200 rounded-lg focus:ring-blue-500 focus:border-blue-500"
                                                                         prop:value=move || answer_value()
+                                                                        prop:disabled={should_disable_inputs()}
                                                                         on:input=move |ev| {
-                                                                            let value = event_target_value(&ev);
-                                                                            handle_answer_change(qnumber, value);
+                                                                            if !should_disable_inputs.get() {
+                                                                                let value = event_target_value(&ev);
+                                                                                handle_answer_change(qnumber, value);
+                                                                            }
                                                                         }
                                                                         placeholder="Enter your answer here..."
                                                                         rows="3"
@@ -984,7 +1111,7 @@ pub fn RealtimeTestSession() -> impl IntoView {
                                         <div class="flex flex-wrap items-center justify-center gap-4 mt-8">
                                             <button
                                                 class="flex items-center justify-center px-5 py-2 bg-white border border-gray-200 rounded-lg shadow-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                                disabled=move || current_card_index.get() == 0
+                                                disabled=move || (current_card_index.get() == 0 || should_disable_inputs())
                                                 on:click=go_to_previous_card
                                             >
                                                 <span class="mr-1">"←"</span>
@@ -1001,7 +1128,7 @@ pub fn RealtimeTestSession() -> impl IntoView {
                                                             on:click=move |_| {
                                                                 handle_submit.dispatch(());
                                                             }
-                                                            disabled=move || selected_student_id.get().is_none()
+                                                            disabled=move || (selected_student_id.get().is_none() || should_disable_inputs())
                                                         >
                                                             "Submit Assessment"
                                                             <span class="ml-1">"✓"</span>
@@ -1012,6 +1139,7 @@ pub fn RealtimeTestSession() -> impl IntoView {
                                                         <button
                                                             class="flex items-center justify-center px-5 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg shadow-sm hover:from-blue-700 hover:to-purple-700 transition-colors"
                                                             on:click=go_to_next_card
+                                                            disabled=move || {should_disable_inputs}
                                                         >
                                                             "Next"
                                                             <span class="ml-1">"→"</span>
