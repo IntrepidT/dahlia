@@ -37,6 +37,9 @@ impl Score {
             evaluator,
         }
     }
+    pub fn get_total(&self) -> i32 {
+        self.test_scores.iter().sum()
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]

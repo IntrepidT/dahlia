@@ -1,5 +1,6 @@
 use crate::app::models::student::Student;
 use leptos::*;
+use leptos_router::*;
 use std::rc::Rc;
 
 // Updated color scheme to match the palette
@@ -192,7 +193,9 @@ pub fn StudentDetails(
                     "Edit Student"
                 </button>
                 <button class=BUTTON_PRIMARY>
-                    "Test Results"
+                    <a href=format!("/studentview/{}/results", &student_memo().student_id)>
+                        "Test Results"
+                    </a>
                 </button>
             </div>
         </div>

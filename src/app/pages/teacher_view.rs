@@ -22,7 +22,7 @@ const BUTTON_CONTAINER_STYLE_FLOAT: &str =
 const TAB_BUTTON_ACTIVE: &str =
     "px-4 py-2 font-medium rounded-t-lg bg-[#2E3A59] text-white border-none";
 const TAB_BUTTON_INACTIVE: &str =
-    "px-4 py-2 font-medium rounded-t-lg bg-[#DADADA] text-white hover:bg-gray-200";
+    "px-4 py-2 font-medium rounded-t-lg bg-[#DADADA] text-[#2E3A59] hover:bg-gray-200";
 const ADD_BUTTON_STYLE: &str = "inline-flex items-center justify-center px-4 py-2 bg-[#4CAF50] text-white rounded-md font-semibold hover:bg-[#388E3C] focus:outline-none focus:ring-2 focus:ring-[#388E3C]/50 transition-colors duration-200 shadow-sm hover:shadow-md";
 const DELETE_BUTTON_STYLE: &str = "inline-flex items-center justify-center px-4 py-2 bg-[#F44336] text-white rounded-md font-semibold hover:bg-[#D32F2F] focus:outline-none focus:ring-2 focus:ring-[#D32F2F]/50 transition-colors duration-200 shadow-sm hover:shadow-md";
 

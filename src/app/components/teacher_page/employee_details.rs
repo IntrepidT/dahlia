@@ -21,7 +21,7 @@ const BUTTON_CONTAINER: &str =
     "mt-6 pt-4 flex gap-3 justify-end sticky bottom-0 bg-[#F9F9F8] border-t border-[#DADADA]";
 const BUTTON_PRIMARY: &str =
     "px-4 py-2 bg-[#2E3A59] rounded-md font-medium text-[#F9F9F8] hover:bg-opacity-80 transition-colors";
-const BUTTON_SECONDARY: &str = "px-4 py-2 bg-[#F9F9F8] rounded-md font-medium text-[#2E3A59] hover:bg-opacity-80 transition-colors border border-[#DADADA]";
+const BUTTON_SECONDARY: &str = "px-4 py-2 bg-[#F9F9F8] rounded-md font-medium text-gray-600 bg-white hover:bg-gray-50 transition-colors border  shadow-sm border-[#DADADA]";
 const BUTTON_ACCENT: &str = "px-4 py-2 bg-[#F9F9F8] rounded-md font-medium text-[#2E3A59] hover:bg-opacity-30 hover:bg-[#DADADA] transition-colors border border-[#DADADA]";
 
 #[component]

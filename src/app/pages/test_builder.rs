@@ -78,7 +78,7 @@ pub fn TestBuilder() -> impl IntoView {
                 QuestionType::Selection,
                 Vec::new(),
                 String::new(),
-                (qs.len() + 1) as i32,
+                (qs.len() + 1) as i32, // Use 1-based indexing for question numbers
                 test_id(),
             );
             qs.push(new_question);
@@ -97,6 +97,7 @@ pub fn TestBuilder() -> impl IntoView {
         set_questions.update(|qs| {
             qs.remove(index);
 
+            // Renumber all questions to ensure sequential numbering
             for (i, q) in qs.iter_mut().enumerate() {
                 q.qnumber = (i + 1) as i32;
             }
@@ -138,6 +139,12 @@ pub fn TestBuilder() -> impl IntoView {
                 // Sort questions by question number
                 let mut sorted_questions = loaded_questions.clone();
                 sorted_questions.sort_by_key(|q| q.qnumber);
+                
+                // Renumber questions sequentially starting from 1
+                for (i, q) in sorted_questions.iter_mut().enumerate() {
+                    q.qnumber = (i + 1) as i32;
+                }
+                
                 set_questions(sorted_questions);
             }
         }
@@ -250,14 +257,20 @@ pub fn TestBuilder() -> impl IntoView {
         };
 
         // Convert our tuple representation back to BenchmarkCategory
-        let converted_cats = benchmark_categories()
-            .iter()
-            .map(|(_, min, max, label)| BenchmarkCategory {
-                min: *min,
-                max: *max,
-                label: label.clone(),
-            })
-            .collect::<Vec<BenchmarkCategory>>();
+        let converted_cats = if benchmark_categories().is_empty() {
+            None
+        } else {
+            Some(
+                benchmark_categories()
+                    .iter()
+                    .map(|(_, min, max, label)| BenchmarkCategory {
+                        min: *min,
+                        max: *max,
+                        label: label.clone(),
+                    })
+                    .collect::<Vec<BenchmarkCategory>>(),
+            )
+        };
 
         // Create the test request, whether for new or update
         let add_test_request = CreateNewTestRequest::new(
@@ -266,11 +279,12 @@ pub fn TestBuilder() -> impl IntoView {
             test_comments(),
             test_type.clone(),
             Some(school_year()),
-            Some(converted_cats.clone()),
+            converted_cats.clone(),
             test_variant(),
             Some(convert_grade_to_enum.clone()),
         );
 
+        let converted_clone = converted_cats.clone();
         spawn_local(async move {
             let current_test_id = test_id();
             let is_editing = is_edit_mode();
@@ -283,7 +297,7 @@ pub fn TestBuilder() -> impl IntoView {
                     test_comments(),
                     test_type,
                     Some(school_year()),
-                    Some(converted_cats),
+                    converted_clone,
                     test_variant(),
                     Some(convert_grade_to_enum),
                     test_id(),
@@ -380,7 +394,7 @@ pub fn TestBuilder() -> impl IntoView {
 
             // Navigate to the test list page only after all questions are processed
             let navigate = leptos_router::use_navigate();
-            navigate("/mathtesting", Default::default());
+            navigate("/dashboard", Default::default());
         });
     };
 
@@ -717,6 +731,15 @@ pub fn TestBuilder() -> impl IntoView {
                             </div>
 
                             <div class="flex justify-between pt-6">
+                                <button
+                                    class="flex items-center px-5 py-2 bg-[#00356b] text-white rounded-md font-medium shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all"
+                                    on:click=add_new_question
+                                >
+                                    <svg class="w-5 h-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" />
+                                    </svg>
+                                    "Add New Question"
+                                </button>
                                 <button
                                     class="px-5 py-2 bg-gray-100 text-gray-700 rounded-md font-medium hover:bg-gray-200 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-all"
                                     on:click=move |_| set_selected_tab.set(0)

@@ -59,6 +59,16 @@ pub fn BuildingQuestion(
         on_update(question_data());
     };
 
+    // Function to convert QuestionType to dropdown value - Fixed to match dropdown options
+    let question_type_to_value = move |question_type: &QuestionType| -> String {
+        match question_type {
+            QuestionType::MultipleChoice => "MultipleChoice".to_string(),
+            QuestionType::Written => "Written".to_string(),
+            QuestionType::Selection => "Selection".to_string(),
+            QuestionType::TrueFalse => "TrueFalse".to_string(),
+        }
+    };
+
     view! {
         <div class="question-builder p-4 border rounded mb-4">
             <h1 class=FIELD_TITLE>Question: </h1>
@@ -73,20 +83,23 @@ pub fn BuildingQuestion(
             />
             <h1 class=FIELD_TITLE>Question Type</h1>
             <select class=INPUT_SELECTOR
+                prop:value=move || question_data.with(|q| question_type_to_value(&q.question_type))
                 on:change=move |event| update_field("question_type", event_target_value(&event))
             >
-                <option value="">"Please Select a Value"</option>
-                <option value="MultipleChoice">"Multiple Choice"</option>
-                <option value="Written">"Written"</option>
-                <option value="Selection">"Selection"</option>
-                <option value="TrueFalse">"True-False"</option>
+                <option value="">Please Select a Value</option>
+                <option value="MultipleChoice">Multiple Choice</option>
+                <option value="Written">Written</option>
+                <option value="Selection">Selection</option>
+                <option value="TrueFalse">True-False</option>
             </select>
             {move || match question_data.with(|q| q.question_type.clone()) {
                 QuestionType::MultipleChoice => {
                     let options = question_data.with(|q| q.options.clone());
+                    let correct_answer = question_data.with(|q| q.correct_answer.clone());
                     view! {
                         <MultipleChoice
                         options=options
+                        designated_answer=correct_answer
                         on_change=Callback::new(handle_options_update)
                         />
                     }
@@ -116,6 +129,7 @@ pub fn BuildingQuestion(
 #[component]
 pub fn MultipleChoice(
     options: Vec<String>,
+    designated_answer: String,
     on_change: Callback<(Vec<String>, String)>,
 ) -> impl IntoView {
     // Generate initial IDs
@@ -135,7 +149,11 @@ pub fn MultipleChoice(
     // Create signals
     let (option_items, set_option_items) = create_signal(initial_options);
     let (correct_answer, set_correct_answer) = create_signal(
-        option_items.with(|items| items.first().map(|(_, v)| v.clone()).unwrap_or_default()),
+        if designated_answer.is_empty() {
+            option_items.with(|items| items.first().map(|(_, v)| v.clone()).unwrap_or_default())
+        } else {
+            designated_answer
+        }
     );
 
     // Create a debounced update callback to reduce renders

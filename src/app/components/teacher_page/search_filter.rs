@@ -5,7 +5,7 @@ use strum::IntoEnumIterator;
 const SEARCH_CONTAINER_STYLE: &str = "flex flex-wrap gap-4 items-end mb-8";
 const INPUT_STYLE: &str = "w-full px-4 py-2 bg-white border border-gray-200 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-200 transition-all duration-200";
 const LABEL_STYLE: &str = "block text-sm font-medium text-gray-700 mb-1";
-const BUTTON_STYLE: &str = "px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-md shadow-sm hover:bg-gray-50 transition-all duration-200";
+const BUTTON_STYLE: &str = "px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-[#DADADA] rounded-md shadow-sm hover:bg-gray-50 transition-all duration-200";
 
 #[component]
 pub fn SearchFilter(

@@ -3,7 +3,7 @@ use leptos::*;
 use std::rc::Rc;
 
 const TABLE_CONTAINER_STYLE: &str =
-    "bg-[#F9F9F8] rounded-lg shadow-sm border border-gray-100 overflow-hidden";
+    "bg-[#F9F9F8] rounded-lg shadow-sm border border-[#DADADA] overflow-hidden";
 const TABLE_HEADER_STYLE: &str =
     "py-5 px-6 flex justify-between items-center border-b border-[#2E3A59] bg-[#2E3A59]";
 const TABLE_WRAPPER_STYLE: &str = "overflow-x-auto h-[34rem]";
@@ -114,7 +114,7 @@ pub fn EmployeeTable(
                                                         {employee.status.to_string()}
                                                     </span>
                                                 </td>
-                                                <td class=format!("{} {}", CELL_STYLE, "text-[#2E3A59] font-medium")>{employee.role.to_string()}</td>
+                                                <td class=format!("{} {}", CELL_STYLE, "text-[#2E3A59] text-opacity-70")>{employee.role.to_string()}</td>
                                             </tr>
                                         }
                                     }).collect_view()

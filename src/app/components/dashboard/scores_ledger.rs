@@ -13,7 +13,12 @@ pub fn ScoresLedger() -> impl IntoView {
         || (),
         |_| async {
             match get_scores().await {
-                Ok(scores) => Ok(scores),
+                Ok(mut scores) => {
+                    if scores.len() > 4 {
+                        scores.truncate(4);
+                    }
+                    Ok(scores)
+                }
                 Err(e) => {
                     log::error!("Failed to load scores: {}", e);
                     Err(ServerFnError::new("Failed to load scores"))
@@ -39,7 +44,7 @@ pub fn ScoresLedger() -> impl IntoView {
         || (),
         |_| async {
             match get_tests().await {
-                Ok(tests) => Ok(tests),
+                Ok(mut tests) => Ok(tests),
                 Err(e) => {
                     log::error!("Failed to load tests: {}", e);
                     Err(ServerFnError::new("Failed to load tests"))

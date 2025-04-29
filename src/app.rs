@@ -10,8 +10,9 @@ pub mod websockets;
 use components::live_test::RealtimeTestSession;
 use components::test_templates::FlashCardSet;
 use pages::{
-    AdministerTest, Assessment, Dashboard, HomePage, LoginPage, MathTesting, MyAccount,
-    ReadingTesting, ReviewTest, StudentView, Teachers, TestBuilder, TestSessionsList,
+    AdministerTest, Assessment, AssessmentPage, Dashboard, HomePage, LoginPage, MathTesting,
+    MyAccount, ReadingTesting, ReviewTest, StudentView, Teachers, TestBuilder, TestResultsPage,
+    TestSessionsList,
 };
 pub mod components;
 use components::auth::*;
@@ -29,6 +30,8 @@ pub fn App() -> impl IntoView {
         <link rel="icon" href="/assets/favicon.ico" />
         // sets the document title
         <Title text="Teapot Testing"/>
+
+        <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
 
         // Wrap everything in the AuthProvider
         <AuthProvider>
@@ -56,6 +59,7 @@ pub fn App() -> impl IntoView {
                                 </RequireRole>
                             }
                         }/>
+                        <Route path="/studentview/:student_id/results" view=TestResultsPage />
                         <Route path="/admintest" view=move || {
                             view!{
                                 <RequireRole role="teacher".to_string()>
@@ -67,6 +71,13 @@ pub fn App() -> impl IntoView {
                             view! {
                                 <RequireRole role="admin".to_string()>
                                     <Teachers />
+                                </RequireRole>
+                            }
+                        }/>
+                        <Route path="/assessments" view=move || {
+                            view! {
+                                <RequireRole role="admin".to_string()>
+                                    <AssessmentPage />
                                 </RequireRole>
                             }
                         }/>

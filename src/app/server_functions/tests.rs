@@ -145,7 +145,7 @@ pub async fn update_test(update_test_request: UpdateTestRequest) -> Result<Test,
                 "A None value was returned instead of an updated test"
             ))),
             Err(e) => Err(ServerFnError::new(format!(
-                "Failed to update student: {}",
+                "Failed to update test: {}",
                 e
             ))),
         }

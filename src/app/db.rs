@@ -1,3 +1,4 @@
+pub mod assessment_database;
 pub mod database;
 pub mod question_database;
 pub mod score_database;
@@ -7,6 +8,7 @@ pub mod test_database;
 pub mod user_database;
 pub mod websocket_session_database;
 
+pub use assessment_database::*;
 pub use database::*;
 pub use question_database::*;
 pub use score_database::*;

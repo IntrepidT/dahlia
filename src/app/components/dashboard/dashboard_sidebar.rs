@@ -1,5 +1,5 @@
 use icondata::IoChatbubbleEllipsesOutline;
-use icondata::{AiApiOutlined, AiBarChartOutlined, AiHomeOutlined, AiSettingOutlined};
+use icondata::{AiApiOutlined, AiBarChartOutlined, AiHomeOutlined, AiSettingOutlined, ChStack};
 // Add new imports for additional icons
 use crate::app::components::ShowAdministerTestModal;
 use icondata::{AiCoffeeOutlined, AiDashboardOutlined, IoPeopleOutline, IoPricetagOutline};
@@ -19,6 +19,7 @@ pub enum SidebarSelected {
     TeacherView,
     AdministerTest,
     Live,
+    Assessments,
 }
 const GRAY_COLOR: &str = "text-[#DADADA]";
 const BLUE_COLOR: &str = "text-[#2E3A59]";
@@ -90,6 +91,13 @@ pub fn DashboardSidebar(
                             is_expanded=is_expanded.into()
                             is_active=Signal::derive(move || current_path().starts_with("/testsessions"))
                         />
+                        <SidebarNavLink
+                            icon=ChStack
+                            label="Assessments"
+                            path="/assessments"
+                            is_expanded=is_expanded.into()
+                            is_active=Signal::derive(move || current_path().starts_with("/assessments"))
+                        />
 
                         // Administer Test item with dropdown
                         <div
@@ -106,7 +114,7 @@ pub fn DashboardSidebar(
                                     fallback=|| view! { <></> }
                                 >
                                     <div class="flex items-center justify-between w-full">
-                                        <span class="font-semibold text-[#2E3A59]">"Administer Test"</span>
+                                        <span class="font-semibold">"Administer Test"</span>
                                         <span>
                                             <Show when=move || show_administer_modal()>
                                                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

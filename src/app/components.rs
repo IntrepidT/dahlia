@@ -44,3 +44,6 @@ pub use test_templates::*;
 
 pub mod live_testing;
 pub use live_testing::*;
+
+pub mod charts;
+pub use charts::*;

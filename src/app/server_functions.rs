@@ -24,3 +24,6 @@ pub use bulk_students::upload_students_bulk;
 
 pub mod websocket_sessions;
 pub use websocket_sessions::list_active_sessions;
+
+pub mod assessments;
+pub use assessments::get_assessments;

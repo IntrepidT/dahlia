@@ -43,3 +43,10 @@ pub mod websocket_session;
 pub use websocket_session::CreateSessionRequest;
 pub use websocket_session::Session;
 pub use websocket_session::SessionSummary;
+
+pub mod assessment;
+pub use assessment::Assessment;
+pub use assessment::CreateNewAssessmentRequest;
+pub use assessment::DeleteAssessmentRequest;
+pub use assessment::UpdateAssessmentRequest;
+pub use assessment::{RangeCategory, SubjectEnum};

@@ -115,7 +115,7 @@ pub fn TeacherTable(
                                                             {teacher.status.to_string()}
                                                         </span>
                                                     </td>
-                                                    <td class=format!("{} {}", CELL_STYLE, "text-[#2E3A59]")>
+                                                    <td class=format!("{} {}", CELL_STYLE, "text-[#2E3A59] text-opacity-70")>
                                                         {match &teacher.role {
                                                             EmployeeRole::Teacher { grade } =>
                                                                 grade.as_ref().map_or("Not Assigned".to_string(), |g| g.to_string()),

@@ -202,7 +202,12 @@ pub fn Dashboard() -> impl IntoView {
                             <div>
                                 <p>This is the dashboard component for Live testing</p>
                             </div>
-                        }
+                        },
+                        SidebarSelected::Assessments => view! {
+                            <div>
+                                <p>This is the assessments component for grouping/organizing your tests</p>
+                            </div>
+                        },
                     }}
                 </main>
             </div>

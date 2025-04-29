@@ -36,3 +36,9 @@ pub use review_test::ReviewTest;
 
 pub mod test_sessions;
 pub use test_sessions::TestSessionsList;
+
+pub mod assessment_page;
+pub use assessment_page::AssessmentPage;
+
+pub mod student_results;
+pub use student_results::TestResultsPage;
