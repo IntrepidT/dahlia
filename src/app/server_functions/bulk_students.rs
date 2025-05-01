@@ -1,5 +1,5 @@
 use crate::app::models::bulk_student::StudentCsvRow;
-use crate::app::models::student::{ESLEnum, GenderEnum, GradeEnum, Student};
+use crate::app::models::student::{ESLEnum, GenderEnum, GradeEnum, InterventionEnum, Student};
 use chrono::NaiveDate;
 use csv::ReaderBuilder;
 use leptos::*;
@@ -68,6 +68,25 @@ pub async fn upload_students_bulk(file_contents: String) -> Result<usize, Server
                         }
                     };
 
+                    let intervention = if record.intervention == "None" {
+                        None
+                    } else {
+                        match InterventionEnum::from_str(&record.intervention) {
+                            Ok(i) => Some(i),
+                            Err(e) => {
+                                log::error!(
+                                    "Invalid intervention for student {}: {}",
+                                    record.firstname,
+                                    e
+                                );
+                                return Err(ServerFnError::new(format!(
+                                    "Invalid intervention for student {}",
+                                    record.firstname
+                                )));
+                            }
+                        }
+                    };
+
                     let student = Student {
                         firstname: record.firstname,
                         lastname: record.lastname,
@@ -83,7 +102,7 @@ pub async fn upload_students_bulk(file_contents: String) -> Result<usize, Server
                         student_504: record.student_504,
                         readplan: record.readplan,
                         gt: record.gt,
-                        intervention: record.intervention,
+                        intervention,
                         eye_glasses: record.eye_glasses,
                         notes: record.notes,
                         pin: record.pin,

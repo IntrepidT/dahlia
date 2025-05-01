@@ -9,7 +9,7 @@ use crate::app::server_functions::scores::get_scores;
 use crate::app::server_functions::students::get_student;
 use crate::app::server_functions::tests::get_tests;
 // Import the chart rendering functions
-use crate::app::components::charts::charts::{
+use crate::app::components::data_charts::{
     render_overall_progress, render_score_distribution, render_test_distribution, render_test_plot,
 };
 use leptos::*;

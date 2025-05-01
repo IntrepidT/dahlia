@@ -16,16 +16,17 @@ const COLOR_SUCCESS: &str = "#5B8C5A";
 const COLOR_ACCENT_BLUE: &str = "#3E92CC";
 const COLOR_ACCENT_TERRACOTTA: &str = "#D3A588";
 
-// Table styles
+// Table styles - Updated for better responsiveness
 const TABLE_CONTAINER_STYLE: &str =
     "bg-[#F9F9F8] rounded-lg shadow-sm border border-[#DADADA] overflow-hidden";
 const TABLE_HEADER_STYLE: &str =
-    "py-5 px-6 flex justify-between items-center bg-[#2E3A59] border-b border-[#2E3A59]";
-const TABLE_WRAPPER_STYLE: &str = "overflow-x-auto h-[42rem]";
+    "py-3 md:py-5 px-4 md:px-6 flex justify-between items-center bg-[#2E3A59] border-b border-[#2E3A59]";
+const TABLE_WRAPPER_STYLE: &str = "overflow-x-auto h-[calc(100vh-15rem)] md:h-[42rem]";
 const TABLE_STYLE: &str = "min-w-full divide-y divide-[#DADADA]";
 const HEADER_CELL_STYLE: &str =
-    "px-6 py-3 text-left text-xs font-medium text-[#2E3A59] uppercase tracking-wider";
-const CELL_STYLE: &str = "px-6 py-4 whitespace-nowrap text-sm bg-[#F9F9F8]";
+    "px-2 md:px-6 py-2 md:py-3 text-left text-xs font-medium text-[#2E3A59] uppercase tracking-wider";
+const CELL_STYLE: &str =
+    "px-2 md:px-6 py-2 md:py-4 whitespace-nowrap text-xs md:text-sm bg-[#F9F9F8]";
 const SELECTED_ROW_STYLE: &str =
     "bg-[#DADADA] border-l-4 border-t-2 border-b-2 border-r-2 border-[#2E3A59]";
 
@@ -37,7 +38,7 @@ pub fn StudentTable(
     #[prop(into)] teacher_filter: Signal<String>,
     #[prop(into)] iep_filter: Signal<bool>,
     #[prop(into)] esl_filter: Signal<bool>,
-    #[prop(into)] bip_filter: Signal<bool>,
+    #[prop(into)] intervention_filter: Signal<String>,
     #[prop(into)] selected_student: Signal<Option<Rc<Student>>>,
     #[prop(into)] set_selected_student: WriteSignal<Option<Rc<Student>>>,
 ) -> impl IntoView {
@@ -47,7 +48,7 @@ pub fn StudentTable(
         let teacher = teacher_filter();
         let show_iep = iep_filter();
         let show_esl = esl_filter();
-        let show_bip = bip_filter();
+        let intervention = intervention_filter();
 
         students
             .get()
@@ -73,24 +74,31 @@ pub fn StudentTable(
                 let matches_esl = !show_esl || student.esl != ESLEnum::NotApplicable;
 
                 // Filter by BIP
-                let matches_bip = !show_bip || student.bip;
+                let matches_intervention = intervention.is_empty()
+                    || intervention == "all"
+                    || (intervention == "None" && student.intervention.is_none())
+                    || student
+                        .intervention
+                        .as_ref()
+                        .map(|i| i.to_string().contains(&intervention))
+                        .unwrap_or(false);
 
                 matches_search
                     && matches_grade
                     && matches_teacher
                     && matches_iep
                     && matches_esl
-                    && matches_bip
+                    && matches_intervention
             })
             .collect::<Vec<_>>()
     });
     view! {
         <div class=TABLE_CONTAINER_STYLE>
             <div class=TABLE_HEADER_STYLE>
-                <h2 class="text-xl font-medium text-[#F9F9F8]">
+                <h2 class="text-lg md:text-xl font-medium text-[#F9F9F8]">
                     "Students"
                 </h2>
-                <span class="text-sm text-[#F9F9F8]">
+                <span class="text-xs md:text-sm text-[#F9F9F8]">
                     {move || {
                         let count = filtered_students().len();
                         format!("{} {}", count, if count == 1 { "student" } else { "students" })
@@ -102,12 +110,12 @@ pub fn StudentTable(
                     <table class=TABLE_STYLE>
                         <thead class="bg-[#DADADA] sticky top-0 z-10">
                             <tr>
-                                <th class=HEADER_CELL_STYLE>"First Name"</th>
-                                <th class=HEADER_CELL_STYLE>"Last Name"</th>
+                                <th class=HEADER_CELL_STYLE>"First"</th>
+                                <th class=HEADER_CELL_STYLE>"Last"</th>
                                 <th class=HEADER_CELL_STYLE>"ID"</th>
-                                <th class=HEADER_CELL_STYLE>"Grade"</th>
-                                <th class=HEADER_CELL_STYLE>"Teacher"</th>
-                                <th class=HEADER_CELL_STYLE>"IEP"</th>
+                                <th class="hidden sm:table-cell md:table-cell lg:table-cell xl:table-cell px-2 md:px-6 py-2 md:py-3 text-left text-xs font-medium text-[#2E3A59] uppercase tracking-wider">"Grade"</th>
+                                <th class="hidden md:table-cell px-2 md:px-6 py-2 md:py-3 text-left text-xs font-medium text-[#2E3A59] uppercase tracking-wider">"Teacher"</th>
+                                <th class="hidden sm:table-cell md:table-cell lg:table-cell xl:table-cell px-2 md:px-6 py-2 md:py-3 text-left text-xs font-medium text-[#2E3A59] uppercase tracking-wider">"IEP"</th>
                             </tr>
                         </thead>
                         <Suspense fallback=move || view! {
@@ -145,9 +153,9 @@ pub fn StudentTable(
                                                     <td class=format!("{} {}", CELL_STYLE, "font-medium text-[#2E3A59]")>{&student.firstname}</td>
                                                     <td class=format!("{} {}", CELL_STYLE, "font-medium text-[#2E3A59]")>{&student.lastname}</td>
                                                     <td class=format!("{} {}", CELL_STYLE, "text-[#2E3A59] text-opacity-70")>{&student.student_id.to_string()}</td>
-                                                    <td class=format!("{} {}", CELL_STYLE, "text-[#2E3A59] text-opacity-70")>{&student.grade.to_string()}</td>
-                                                    <td class=format!("{} {}", CELL_STYLE, "text-[#2E3A59] text-opacity-70")>{&student.teacher.to_string()}</td>
-                                                    <td class=CELL_STYLE>
+                                                    <td class=format!("{} {} {}", CELL_STYLE, "text-[#2E3A59] text-opacity-70", "hidden sm:table-cell md:table-cell lg:table-cell xl:table-cell")>{&student.grade.to_string()}</td>
+                                                    <td class=format!("{} {} {}", CELL_STYLE, "text-[#2E3A59] text-opacity-70", "hidden md:table-cell")>{&student.teacher.to_string()}</td>
+                                                    <td class=format!("{} {}", CELL_STYLE, "hidden sm:table-cell md:table-cell lg:table-cell xl:table-cell")>
                                                         { if student.iep {
                                                             view! {
                                                                 <span class="px-2 py-1 text-xs font-medium rounded-full bg-[#4CAF50] bg-opacity-40 text-[#2E3A59]">

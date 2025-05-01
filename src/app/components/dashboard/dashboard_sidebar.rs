@@ -2,7 +2,9 @@ use icondata::IoChatbubbleEllipsesOutline;
 use icondata::{AiApiOutlined, AiBarChartOutlined, AiHomeOutlined, AiSettingOutlined, ChStack};
 // Add new imports for additional icons
 use crate::app::components::ShowAdministerTestModal;
-use icondata::{AiCoffeeOutlined, AiDashboardOutlined, IoPeopleOutline, IoPricetagOutline};
+use icondata::{
+    AiCoffeeOutlined, AiDashboardOutlined, IoPeopleOutline, IoPricetagOutline, IoSettingsOutline,
+};
 use leptos::ev::MouseEvent;
 use leptos::*;
 use leptos_icons::Icon;
@@ -34,6 +36,9 @@ pub fn DashboardSidebar(
     let (is_expanded, set_is_expanded) = create_signal(false);
     let (show_administer_modal, set_show_administer_modal) = create_signal(false);
 
+    // Handle window size for responsive behavior
+    let (is_small_screen, set_is_small_screen) = create_signal(false);
+
     // Handle current route for active styling
     let (current_path, set_current_path) = create_signal(String::new());
 
@@ -46,12 +51,44 @@ pub fn DashboardSidebar(
         }
     });
 
+    // Handle window resize events
+    let window = window();
+
+    // Function to check screen size
+    let check_screen_size = move || {
+        // Direct usage of window without trying to unwrap Result
+        let width = window.inner_width().unwrap().as_f64().unwrap();
+        set_is_small_screen(width < 768.0); // 768px is typical md breakpoint
+    };
+
+    // Check screen size on mount
+    check_screen_size();
+
+    // Set up resize event listener - use window_event_listener instead of use_event_listener
+    // The returned handle will be automatically cleaned up when the component is removed
+    let _cleanup = window_event_listener(ev::resize, move |_| {
+        check_screen_size();
+    });
+
+    // We don't need an explicit on_cleanup as the WindowListenerHandle will be dropped automatically
+
+    // Computed position for dropdown modal based on screen size
+    let modal_position = move || {
+        if is_small_screen() {
+            "left: 12rem; top: 12rem;" // Adjusted position for small screens
+        } else {
+            "left: 16rem; top: 12rem;" // Original position
+        }
+    };
+
     view! {
         <div class="relative">
             <div
                 class="fixed left-0 top-16 h-[calc(100vh-4rem)] bg-[#F9F9F8] shadow-lg transition-all duration-300 ease-in-out z-40"
-                class:w-20={move || !is_expanded()}
-                class:w-64={move || is_expanded()}
+                class:w-16={move || !is_expanded() && is_small_screen()}
+                class:w-20={move || !is_expanded() && !is_small_screen()}
+                class:w-48={move || is_expanded() && is_small_screen()}
+                class:w-64={move || is_expanded() && !is_small_screen()}
                 on:mouseenter=move |_| set_is_expanded(true)
                 on:mouseleave=move |_| {
                     // Only close the sidebar if we're not hovering the modal
@@ -69,6 +106,7 @@ pub fn DashboardSidebar(
                             path="/dashboard"
                             is_expanded=is_expanded.into()
                             is_active=Signal::derive(move || current_path().starts_with("/dashboard"))
+                            is_small_screen=is_small_screen.into()
                         />
                         <SidebarNavLink
                             icon=IoPeopleOutline
@@ -76,6 +114,7 @@ pub fn DashboardSidebar(
                             path="/studentview"
                             is_expanded=is_expanded.into()
                             is_active=Signal::derive(move || current_path().starts_with("/studentview"))
+                            is_small_screen=is_small_screen.into()
                         />
                         <SidebarNavLink
                             icon=AiCoffeeOutlined
@@ -83,6 +122,7 @@ pub fn DashboardSidebar(
                             path="/teachers"
                             is_expanded=is_expanded.into()
                             is_active=Signal::derive(move || current_path().starts_with("/teachers"))
+                            is_small_screen=is_small_screen.into()
                         />
                         <SidebarNavLink
                             icon=AiApiOutlined
@@ -90,6 +130,7 @@ pub fn DashboardSidebar(
                             path="/testsessions"
                             is_expanded=is_expanded.into()
                             is_active=Signal::derive(move || current_path().starts_with("/testsessions"))
+                            is_small_screen=is_small_screen.into()
                         />
                         <SidebarNavLink
                             icon=ChStack
@@ -97,6 +138,7 @@ pub fn DashboardSidebar(
                             path="/assessments"
                             is_expanded=is_expanded.into()
                             is_active=Signal::derive(move || current_path().starts_with("/assessments"))
+                            is_small_screen=is_small_screen.into()
                         />
 
                         // Administer Test item with dropdown
@@ -106,7 +148,7 @@ pub fn DashboardSidebar(
                         >
                             <Icon
                                 icon=IoPricetagOutline
-                                class="w-6 h-6 mr-4 flex-shrink-0 text-[#2E3A59]"
+                                class="w-6 h-6 flex-shrink-0 text-[#2E3A59]"
                             />
                             <div class="overflow-hidden">
                                 <Show
@@ -114,7 +156,7 @@ pub fn DashboardSidebar(
                                     fallback=|| view! { <></> }
                                 >
                                     <div class="flex items-center justify-between w-full">
-                                        <span class="font-semibold">"Administer Test"</span>
+                                        <span class="font-semibold text-sm sm:text-base">"Administer Test"</span>
                                         <span>
                                             <Show when=move || show_administer_modal()>
                                                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -132,6 +174,15 @@ pub fn DashboardSidebar(
                             </div>
                         </div>
 
+                        <SidebarNavLink
+                            icon=IoSettingsOutline
+                            label="Settings"
+                            path="/settings"
+                            is_expanded=is_expanded.into()
+                            is_active=Signal::derive(move || current_path().starts_with("/settings"))
+                            is_small_screen=is_small_screen.into()
+                        />
+
                         // Divider
                         <div class="border-t border-[#DADADA] my-2"></div>
 
@@ -143,6 +194,7 @@ pub fn DashboardSidebar(
                             is_expanded=is_expanded.into()
                             is_selected=Signal::derive(move || selected_item() == SidebarSelected::Overview)
                             on_click=move |_| set_selected_item(SidebarSelected::Overview)
+                            is_small_screen=is_small_screen.into()
                         />
                         <SidebarItem
                             icon=AiBarChartOutlined
@@ -151,6 +203,7 @@ pub fn DashboardSidebar(
                             is_expanded=is_expanded.into()
                             is_selected=Signal::derive(move || selected_item() == SidebarSelected::Analytics)
                             on_click=move |_| set_selected_item(SidebarSelected::Analytics)
+                            is_small_screen=is_small_screen.into()
                         />
                         <SidebarItem
                             icon=IoChatbubbleEllipsesOutline
@@ -159,6 +212,7 @@ pub fn DashboardSidebar(
                             is_expanded=is_expanded.into()
                             is_selected=Signal::derive(move || selected_item() == SidebarSelected::Chat)
                             on_click=move |_| set_selected_item(SidebarSelected::Chat)
+                            is_small_screen=is_small_screen.into()
                         />
                         <SidebarItem
                             icon=AiSettingOutlined
@@ -167,17 +221,18 @@ pub fn DashboardSidebar(
                             is_expanded=is_expanded.into()
                             is_selected=Signal::derive(move || selected_item() == SidebarSelected::Settings)
                             on_click=move |_| set_selected_item(SidebarSelected::Settings)
+                            is_small_screen=is_small_screen.into()
                         />
                         */
                     </div>
                 </div>
             </div>
 
-            // Modal Dropdown - Improved positioning
+            // Modal Dropdown - Improved positioning with responsive adjustments
             <Show when=move || show_administer_modal() && is_expanded()>
                 <div
                     class="fixed z-50 hover-area"
-                    style="left: 16rem; top: 12rem;"
+                    style=move || modal_position()
                     on:mouseenter=move |_| set_is_expanded(true) // Keep sidebar open when hovering modal
                     on:mouseleave=move |_| {
                         // Only close everything when leaving the modal
@@ -199,6 +254,7 @@ fn SidebarItem(
     description: &'static str,
     is_expanded: Signal<bool>,
     is_selected: Signal<bool>,
+    is_small_screen: Signal<bool>,
     on_click: impl Fn(MouseEvent) + 'static,
 ) -> impl IntoView {
     view! {
@@ -209,7 +265,7 @@ fn SidebarItem(
         >
             <Icon
                 icon=icon
-                class="w-6 h-6 text-[#2E3A59] mr-4 flex-shrink-0"
+                class="w-6 h-6 text-[#2E3A59] flex-shrink-0"
             />
             <div class="overflow-hidden">
                 <Show
@@ -218,13 +274,18 @@ fn SidebarItem(
                 >
                     <div class="flex flex-col">
                         <span
-                            class="font-semibold"
+                            class="font-semibold text-sm sm:text-base"
                             class:GRAY_COLOR=move || !is_selected.get()
                             class:BLUE_COLOR=move || is_selected.get()
                         >
                             {label}
                         </span>
-                        <span class="text-xs text-[#2E3A59]">{description}</span>
+                        <Show
+                            when=move || !is_small_screen()
+                            fallback=|| view! { <></> }
+                        >
+                            <span class="text-xs text-[#2E3A59]">{description}</span>
+                        </Show>
                     </div>
                 </Show>
             </div>
@@ -239,6 +300,7 @@ fn SidebarNavLink(
     path: &'static str,
     is_expanded: Signal<bool>,
     is_active: Signal<bool>,
+    is_small_screen: Signal<bool>,
 ) -> impl IntoView {
     view! {
         <div
@@ -251,7 +313,7 @@ fn SidebarNavLink(
             >
                 <Icon
                     icon=icon
-                    class="w-6 h-6 text-[#2E3A59] flex-shrink-0 mr-4"
+                    class="w-6 h-6 text-[#2E3A59] flex-shrink-0 mr-2"
                 />
                 <div class="overflow-hidden">
                     <Show
@@ -259,7 +321,7 @@ fn SidebarNavLink(
                         fallback=|| view! { <></> }
                     >
                         <span
-                            class="font-semibold"
+                            class="font-semibold text-sm sm:text-base"
                             class:GRAY_COLOR=move || !is_active.get()
                             class:BLUE_COLOR=move || is_active.get()
                         >

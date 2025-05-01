@@ -11,8 +11,8 @@ use components::live_test::RealtimeTestSession;
 use components::test_templates::FlashCardSet;
 use pages::{
     AdministerTest, Assessment, AssessmentPage, Dashboard, HomePage, LoginPage, MathTesting,
-    MyAccount, ReadingTesting, ReviewTest, StudentView, Teachers, TestBuilder, TestResultsPage,
-    TestSessionsList,
+    MyAccount, ReadingTesting, ReviewTest, Settings, StudentView, Teachers, TestBuilder,
+    TestResultsPage, TestSessionsList,
 };
 pub mod components;
 use components::auth::*;
@@ -85,6 +85,13 @@ pub fn App() -> impl IntoView {
                             view!{
                                 <RequireAuth>
                                     <MyAccount />
+                                </RequireAuth>
+                            }
+                        }/>
+                        <Route path="/settings" view=|| {
+                            view! {
+                                <RequireAuth>
+                                    <Settings />
                                 </RequireAuth>
                             }
                         }/>

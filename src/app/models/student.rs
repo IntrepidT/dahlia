@@ -166,6 +166,37 @@ impl FromStr for GradeEnum {
         }
     }
 }
+#[derive(Debug, Deserialize, Serialize, PartialEq, Eq, Clone, EnumIter)]
+pub enum InterventionEnum {
+    Literacy,
+    Math,
+    Both,
+}
+impl fmt::Display for InterventionEnum {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                InterventionEnum::Literacy => "Literacy".to_string(),
+                InterventionEnum::Math => "Math".to_string(),
+                InterventionEnum::Both => "Literacy and Math".to_string(),
+            }
+        )
+    }
+}
+impl FromStr for InterventionEnum {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "Literacy" => Ok(InterventionEnum::Literacy),
+            "Math" => Ok(InterventionEnum::Math),
+            "Literacy and Math" => Ok(InterventionEnum::Both),
+            _ => Err(format!("Invalid intervention enum value: {}", s)),
+        }
+    }
+}
 //this object instantiates a student on the client side for use in reading and writing data from
 //the database
 #[derive(Debug, Validate, Deserialize, Serialize, PartialEq, Eq, Clone)]
@@ -187,7 +218,7 @@ pub struct Student {
     pub student_504: bool,
     pub readplan: bool,
     pub gt: bool,
-    pub intervention: bool,
+    pub intervention: Option<InterventionEnum>,
     pub eye_glasses: bool,
     pub notes: String,
     pub pin: i32,
@@ -209,7 +240,7 @@ impl Student {
         student_504: bool,
         readplan: bool,
         gt: bool,
-        intervention: bool,
+        intervention: Option<InterventionEnum>,
         eye_glasses: bool,
         notes: String,
         pin: i32,
@@ -257,7 +288,7 @@ pub struct AddStudentRequest {
     pub student_504: bool,
     pub readplan: bool,
     pub gt: bool,
-    pub intervention: bool,
+    pub intervention: Option<InterventionEnum>,
     pub eye_glasses: bool,
     pub notes: String,
     pub pin: i32,
@@ -279,7 +310,7 @@ impl AddStudentRequest {
         student_504: bool,
         readplan: bool,
         gt: bool,
-        intervention: bool,
+        intervention: Option<InterventionEnum>,
         eye_glasses: bool,
         notes: String,
         pin: i32,
@@ -326,7 +357,7 @@ pub struct UpdateStudentRequest {
     pub student_504: bool,
     pub readplan: bool,
     pub gt: bool,
-    pub intervention: bool,
+    pub intervention: Option<InterventionEnum>,
     pub eye_glasses: bool,
     pub notes: String,
     pub pin: i32,
@@ -348,7 +379,7 @@ impl UpdateStudentRequest {
         student_504: bool,
         readplan: bool,
         gt: bool,
-        intervention: bool,
+        intervention: Option<InterventionEnum>,
         eye_glasses: bool,
         notes: String,
         pin: i32,
@@ -450,6 +481,23 @@ cfg_if::cfg_if! {
         impl Type<Postgres> for GradeEnum {
             fn type_info() -> sqlx::postgres::PgTypeInfo {
                 sqlx::postgres::PgTypeInfo::with_name("grade_enum")
+            }
+        }
+        impl<'q> sqlx::encode::Encode<'q, sqlx::Postgres> for InterventionEnum {
+            fn encode_by_ref(&self, buf: &mut PgArgumentBuffer) -> Result<IsNull, Box<dyn std::error::Error + Send + Sync>> {
+                let s = self.to_string();
+                <&str as Encode<Postgres>>::encode(&s.as_str(), buf)
+            }
+        }
+        impl <'r> sqlx::decode::Decode<'r, sqlx::Postgres> for InterventionEnum {
+            fn decode(value: sqlx::postgres::PgValueRef<'r>) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+                let s: &str = Decode::<sqlx::Postgres>::decode(value)?;
+                InterventionEnum::from_str(s).map_err(|_| format!("Invalid InterventionEnum: {:?}", s).into())
+            }
+        }
+        impl Type<Postgres> for InterventionEnum {
+            fn type_info() -> sqlx::postgres::PgTypeInfo {
+                sqlx::postgres::PgTypeInfo::with_name("intervention_enum")
             }
         }
     }

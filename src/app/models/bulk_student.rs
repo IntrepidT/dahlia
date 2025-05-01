@@ -1,4 +1,4 @@
-use crate::app::models::student::{ESLEnum, GenderEnum, GradeEnum, Student};
+use crate::app::models::student::{ESLEnum, GenderEnum, GradeEnum, InterventionEnum, Student};
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 
@@ -27,7 +27,7 @@ pub struct StudentCsvRow {
     pub student_504: bool,
     pub readplan: bool,
     pub gt: bool,
-    pub intervention: bool,
+    pub intervention: String,
     pub eye_glasses: bool,
     pub notes: String,
     pub pin: i32,

@@ -1,4 +1,4 @@
-use crate::app::models::student::{ESLEnum, GenderEnum, GradeEnum, Student};
+use crate::app::models::student::{ESLEnum, GenderEnum, GradeEnum, InterventionEnum, Student};
 use crate::app::models::UpdateStudentRequest;
 use crate::app::server_functions::students::edit_student;
 use leptos::*;
@@ -13,7 +13,7 @@ const INFO_CONTENT_STYLE: &str = "flex-grow overflow-y-auto";
 const INFO_TITLE_STYLE: &str = "text-stone-400 text-xs";
 const INFO_GROUP_STYLE: &str = "mb-2";
 const BUTTON_CONTAINER_STYLE: &str =
-    "mt-4 pt-4 flex border-t gap-2 justify-end sticky bottom-0 bg-white";
+    "mt-4 pt-4 flex border-t gap-2 justify-end sticky bottom-0 bg-[#F9F9F8]";
 
 #[component]
 pub fn UpdateStudent(
@@ -43,7 +43,11 @@ pub fn UpdateStudent(
     let (student_504, set_student_504) = create_signal(student.student_504);
     let (readplan, set_readplan) = create_signal(student.readplan);
     let (gt, set_gt) = create_signal(student.gt);
-    let (intervention, set_intervention) = create_signal(student.intervention);
+    let (intervention_selection, set_intervention_selection) =
+        create_signal(match &student.intervention {
+            Some(intervention) => intervention.to_string(),
+            None => "None".to_string(),
+        });
 
     // Additional information
     let (eye_glasses, set_eye_glasses) = create_signal(student.eye_glasses);
@@ -163,6 +167,22 @@ pub fn UpdateStudent(
             }
         };
 
+        // Convert selection_intervention into enum
+        let convert_intervention = if intervention_selection() == "None" {
+            None
+        } else {
+            match InterventionEnum::from_str(&intervention_selection()) {
+                Ok(intervention_enum) => Some(intervention_enum),
+                Err(_) => {
+                    log::error!("Invalid intervention value submitted for update");
+                    set_if_error(true);
+                    set_error_message(String::from("Invalid intervention selection"));
+                    set_is_submitting(false);
+                    return;
+                }
+            }
+        };
+
         let update_data = UpdateStudentRequest {
             firstname: firstname(),
             lastname: lastname(),
@@ -178,7 +198,7 @@ pub fn UpdateStudent(
             student_504: student_504(),
             readplan: readplan(),
             gt: gt(),
-            intervention: intervention(),
+            intervention: convert_intervention,
             eye_glasses: eye_glasses(),
             notes: notes(),
             pin: validated_pin,
@@ -448,12 +468,20 @@ pub fn UpdateStudent(
                             </div>
                             <div class=INFO_GROUP_STYLE>
                                 <label class="flex items-center gap-2">
-                                    <input
-                                        type="checkbox"
-                                        class="form-checkbox h-5 w-5"
-                                        checked={move || intervention()}
-                                        on:change=move |ev| set_intervention(event_target_checked(&ev))
-                                    />
+                                    <select
+                                        required
+                                        id="intervention"
+                                        class="mt-1 w-full rounded-md p-2"
+                                        on:change=move |ev| set_intervention_selection(event_target_value(&ev))
+                                    >
+                                        <option value="">"Please select a value"</option>
+                                        <option value="None" selected={intervention_selection() == "None"}>"None"</option>
+                                        {InterventionEnum::iter().map(|intervention| view! {
+                                            <option value=format!("{}", intervention) selected=intervention.to_string() == intervention_selection()>
+                                                {format!("{}", intervention)}
+                                            </option>
+                                        }).collect::<Vec<_>>()}
+                                    </select>
                                     <span class=INFO_TITLE_STYLE>"Intervention"</span>
                                 </label>
                             </div>
@@ -495,7 +523,7 @@ pub fn UpdateStudent(
                 <div class=BUTTON_CONTAINER_STYLE>
                     <button
                         type="button"
-                        class="px-4 py-2 bg-gray-200 rounded-lg font-bold hover:bg-gray-300"
+                        class="px-4 py-2 bg-gray-200 rounded-lg font-md hover:bg-gray-300"
                         on:click=handle_cancel
                         disabled=move || is_submitting()
                     >
@@ -503,7 +531,7 @@ pub fn UpdateStudent(
                     </button>
                     <button
                         type="submit"
-                        class="px-4 py-2 bg-green-500 text-white font-bold rounded-lg hover:bg-[#A8DCAB]"
+                        class="px-4 py-2 bg-green-500 text-white font-md rounded-lg hover:bg-[#A8DCAB]"
                         disabled=move || is_submitting()
                     >
                         {move || if is_submitting() { "Updating..." } else { "Update Student" }}

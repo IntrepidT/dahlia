@@ -6,7 +6,7 @@ cfg_if::cfg_if! {
     if #[cfg(feature = "ssr")]{
 
         use crate::app::models::Student;
-        use crate::app::models::student::{GradeEnum, ESLEnum, GenderEnum};
+        use crate::app::models::student::{GradeEnum, ESLEnum, GenderEnum, InterventionEnum};
         use log::{debug, error, info, warn};
         use chrono::NaiveDate;
         use leptos::*;
@@ -35,7 +35,7 @@ cfg_if::cfg_if! {
                     let student_504: bool = row.get("student_504");
                     let readplan: bool = row.get("readplan");
                     let gt: bool = row.get("gt");
-                    let intervention: bool = row.get("intervention");
+                    let intervention: Option<InterventionEnum> = row.get("intervention");
                     let eye_glasses: bool = row.get("eye_glasses");
                     let notes: String = row.get("notes");
                     let pin: i32 = row.get("pin");
@@ -97,7 +97,7 @@ cfg_if::cfg_if! {
         }
 
         pub async fn add_student(new_student: &Student, pool: &PgPool) -> Result<Student, ServerFnError>{
-            let row = sqlx::query("INSERT INTO students (firstname, lastname, preferred, gender, date_of_birth, student_id, esl, grade, teacher, iep, bip, student_504, readplan, gt, intervention, eye_glasses, notes, pin) VALUES($1, $2, $3, $4::gender_enum, $5, $6, $7::esl_enum, $8::grade_enum, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18) RETURNING firstname, lastname, preferred, gender, date_of_birth, student_id, esl, grade, teacher, iep, bip, student_504, readplan, gt, intervention, eye_glasses, notes, pin")
+            let row = sqlx::query("INSERT INTO students (firstname, lastname, preferred, gender, date_of_birth, student_id, esl, grade, teacher, iep, bip, student_504, readplan, gt, intervention, eye_glasses, notes, pin) VALUES($1, $2, $3, $4::gender_enum, $5, $6, $7::esl_enum, $8::grade_enum, $9, $10, $11, $12, $13, $14, $15::intervention_enum, $16, $17, $18) RETURNING firstname, lastname, preferred, gender, date_of_birth, student_id, esl, grade, teacher, iep, bip, student_504, readplan, gt, intervention, eye_glasses, notes, pin")
                 .bind(&new_student.firstname)
                 .bind(&new_student.lastname)
                 .bind(&new_student.preferred)
@@ -178,9 +178,9 @@ cfg_if::cfg_if! {
 
         }
 
-        pub async fn update_student(firstname: String, lastname: String, preferred: String, gender: GenderEnum, date_of_birth: NaiveDate, student_id: i32, esl: ESLEnum, grade: GradeEnum, teacher: String, iep: bool, bip: bool, student_504: bool, readplan: bool, gt: bool, intervention: bool, eye_glasses: bool, notes: String, pin: i32, pool: &PgPool) -> Result<Option<Student>, ServerFnError> {
+        pub async fn update_student(firstname: String, lastname: String, preferred: String, gender: GenderEnum, date_of_birth: NaiveDate, student_id: i32, esl: ESLEnum, grade: GradeEnum, teacher: String, iep: bool, bip: bool, student_504: bool, readplan: bool, gt: bool, intervention: Option<InterventionEnum>, eye_glasses: bool, notes: String, pin: i32, pool: &PgPool) -> Result<Option<Student>, ServerFnError> {
 
-            let row = sqlx::query("UPDATE students SET firstname =$1, lastname =$2, preferred =$3, gender =$4::gender_enum, date_of_birth=$5::DATE, student_id=$6, esl =$7::esl_enum, grade =$8::grade_enum, teacher =$9, iep =$10, bip =$11, student_504 =$12, readplan =$13, gt =$14, intervention =$15, eye_glasses =$16, notes =$17, pin =$18 WHERE student_id = $6 RETURNING firstname, lastname, preferred, gender, date_of_birth, student_id, esl, grade, teacher, iep, bip, student_504, readplan, gt, intervention, eye_glasses, notes, pin")
+            let row = sqlx::query("UPDATE students SET firstname =$1, lastname =$2, preferred =$3, gender =$4::gender_enum, date_of_birth=$5::DATE, student_id=$6, esl =$7::esl_enum, grade =$8::grade_enum, teacher =$9, iep =$10, bip =$11, student_504 =$12, readplan =$13, gt =$14, intervention =$15::intervention_enum, eye_glasses =$16, notes =$17, pin =$18 WHERE student_id = $6 RETURNING firstname, lastname, preferred, gender, date_of_birth, student_id, esl, grade, teacher, iep, bip, student_504, readplan, gt, intervention, eye_glasses, notes, pin")
                 .bind(firstname)
                 .bind(lastname)
                 .bind(preferred)
@@ -236,7 +236,7 @@ cfg_if::cfg_if! {
             // Prepare the bulk insert query
             for student in students {
                 // Use the existing add_student logic within the transaction
-                let row = sqlx::query("INSERT INTO students (firstname, lastname, preferred, gender, date_of_birth, student_id, esl, grade, teacher, iep, bip, student_504, readplan, gt, intervention, eye_glasses, notes, pin) VALUES($1, $2, $3, $4::gender_enum, $5, $6, $7::esl_enum, $8::grade_enum, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18) RETURNING firstname, lastname, preferred, gender, date_of_birth, student_id, esl, grade, teacher, iep, bip, student_504, readplan, gt, intervention, eye_glasses, notes, pin")
+                let row = sqlx::query("INSERT INTO students (firstname, lastname, preferred, gender, date_of_birth, student_id, esl, grade, teacher, iep, bip, student_504, readplan, gt, intervention, eye_glasses, notes, pin) VALUES($1, $2, $3, $4::gender_enum, $5, $6, $7::esl_enum, $8::grade_enum, $9, $10, $11, $12, $13, $14, $15::intervention_enum, $16, $17, $18) RETURNING firstname, lastname, preferred, gender, date_of_birth, student_id, esl, grade, teacher, iep, bip, student_504, readplan, gt, intervention, eye_glasses, notes, pin")
                     .bind(&student.firstname)
                     .bind(&student.lastname)
                     .bind(&student.preferred)

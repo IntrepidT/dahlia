@@ -1,3 +1,4 @@
+use crate::app::models::student::InterventionEnum;
 use crate::app::models::student::{AddStudentRequest, ESLEnum, GenderEnum, GradeEnum};
 use crate::app::models::EmployeeRole;
 use chrono::NaiveDate;
@@ -41,7 +42,7 @@ pub fn AddStudentForm(
     let (new_esl, set_new_esl) = create_signal(String::from("Not Applicable"));
     let (new_gt, set_new_gt) = create_signal(false);
     let (new_readplan, set_new_readplan) = create_signal(false);
-    let (new_intervention, set_new_intervention) = create_signal(false);
+    let (new_intervention, set_new_intervention) = create_signal(String::new());
     let (new_eye_glasses, set_new_eye_glasses) = create_signal(false);
     let (new_notes, set_new_notes) = create_signal(String::new());
     let (new_pin, set_new_pin) = create_signal(String::new());
@@ -142,6 +143,20 @@ pub fn AddStudentForm(
             }
         };
 
+        let convert_intervention_to_enum = if new_intervention() == "None" {
+            None
+        } else {
+            match InterventionEnum::from_str(&new_intervention()) {
+                Ok(intervention_enum) => Some(intervention_enum),
+                Err(_) => {
+                    log::error!("Invalid intervention value for new student");
+                    set_if_error(true);
+                    set_error_message(String::from("Invalid intervention selection"));
+                    return;
+                }
+            }
+        };
+
         let add_student_request = AddStudentRequest {
             firstname: new_firstname(),
             lastname: new_lastname(),
@@ -164,7 +179,7 @@ pub fn AddStudentForm(
             student_504: new_504(),
             readplan: new_readplan(),
             gt: new_gt(),
-            intervention: new_intervention(),
+            intervention: convert_intervention_to_enum,
             eye_glasses: new_eye_glasses(),
             notes: new_notes(),
             pin: validated_pin,
@@ -415,11 +430,20 @@ pub fn AddStudentForm(
                             </div>
                             <div class=INFO_GROUP_STYLE>
                                 <label class="flex items-center gap-2">
-                                    <input
-                                        type="checkbox"
-                                        class="form-checkbox h-5 w-5"
-                                        on:change=move |ev| set_new_intervention(event_target_checked(&ev))
-                                    />
+                                    <select
+                                        class="mt-1 w-full rounded-md border p-2"
+                                        required
+                                        id="intervention"
+                                        on:change=move |event| set_new_intervention(event_target_value(&event))
+                                    >
+                                        <option value="">"Please Select"</option>
+                                        <option value="None">"None"</option>
+                                        {InterventionEnum::iter().map(|int| view! {
+                                            <option value=format!("{}", int)>
+                                                {format!("{}", int)}
+                                            </option>
+                                        }).collect::<Vec<_>>()}
+                                    </select>
                                     <span class=INFO_TITLE_STYLE>"Intervention"</span>
                                 </label>
                             </div>
