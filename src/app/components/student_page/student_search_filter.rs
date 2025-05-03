@@ -1,7 +1,8 @@
 use leptos::*;
 
 // More responsive container style with padding adjustments for small screens
-const SEARCH_CONTAINER_STYLE: &str = "mt-14 mb-4 flex flex-wrap gap-2 sm:gap-4 items-center";
+const SEARCH_CONTAINER_STYLE: &str =
+    "mt-14 mb-4 flex flex-grow gap-2 sm:gap-4 items-center w-full justify-between";
 // Improved input style with better handling for small screens
 const INPUT_STYLE: &str = "focus:ring-indigo-500 focus:border-indigo-500 block w-full pl-3 pr-3 text-xs sm:text-sm border-gray-300 rounded-md h-8 sm:h-10 border";
 // Responsive select style
@@ -11,6 +12,9 @@ const CHECKBOX_STYLE: &str =
 const LABEL_STYLE: &str = "block text-xs sm:text-sm font-medium text-gray-700 mb-1";
 const CHECKBOX_CONTAINER_STYLE: &str = "flex items-center mt-3 sm:mt-6";
 
+// Extra filters container for expanded view
+const EXPANDED_FILTERS_STYLE: &str = "w-full flex flex-wrap gap-2 sm:gap-4 mt-2 pb-2";
+
 #[derive(Clone)]
 pub struct FilterState {
     pub search_term: String,
@@ -19,6 +23,9 @@ pub struct FilterState {
     pub esl_filter: bool,
     pub teacher_filter: String,
     pub intervention_filter: String,
+    pub student_504_filter: bool,
+    pub readplan_filter: bool,
+    pub gt_filter: bool,
 }
 
 #[component]
@@ -29,19 +36,27 @@ pub fn SearchFilter(
     #[prop(into)] set_iep_filter: Callback<bool>,
     #[prop(into)] set_esl_filter: Callback<bool>,
     #[prop(into)] set_intervention_filter: Callback<String>,
+    #[prop(into)] set_student_504_filter: Callback<bool>,
+    #[prop(into)] set_readplan_filter: Callback<bool>,
+    #[prop(into)] set_gt_filter: Callback<bool>,
     #[prop(into)] teachers: Signal<Vec<String>>,
     #[prop(into)] search_term: Signal<String>,
     #[prop(into)] on_clear_filters: Callback<()>,
+    #[prop(into)] is_panel_expanded: Signal<bool>,
 ) -> impl IntoView {
     let iep_checkbox_ref = create_node_ref::<html::Input>();
     let esl_checkbox_ref = create_node_ref::<html::Input>();
+    let student_504_checkbox_ref = create_node_ref::<html::Input>();
+    let readplan_checkbox_ref = create_node_ref::<html::Input>();
+    let gt_checkbox_ref = create_node_ref::<html::Input>();
     let intervention_filter_ref = create_node_ref::<html::Select>();
     let grade_filter_ref = create_node_ref::<html::Select>();
     let teacher_filter_ref = create_node_ref::<html::Select>();
+
     view! {
         <div class=SEARCH_CONTAINER_STYLE>
-            // Search input - full width on small screens
-            <div class="w-full sm:flex-1">
+            // Search input - adjusted to be less wide
+            <div class="flex-grow sm:w-64 md:w-72">
                 <label for="search" class=LABEL_STYLE>"Search Students"</label>
                 <div class="relative rounded-md shadow-sm">
                     <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -63,9 +78,9 @@ pub fn SearchFilter(
                 </div>
             </div>
 
-            // Grade filter dropdown - half width on small screens
-            <div class="w-1/2 sm:w-35 md:w-40">
-                <label for="grade-filter" class=LABEL_STYLE>"Filter Grade"</label>
+            // Grade filter dropdown - optimized width
+            <div class="flex-grow sm:w-32 md:w-36">
+                <label for="grade-filter" class=LABEL_STYLE>"Grade"</label>
                 <select
                     id="grade-filter"
                     class=SELECT_STYLE
@@ -89,9 +104,9 @@ pub fn SearchFilter(
                 </select>
             </div>
 
-            // Teacher filter dropdown - half width on small screens
-            <div class="w-1/2 sm:w-35 md:w-40">
-                <label for="teacher-filter" class=LABEL_STYLE>"Filter Teacher"</label>
+            // Teacher filter dropdown - optimized width
+            <div class="flex-grow sm:w-32 md:w-36">
+                <label for="teacher-filter" class=LABEL_STYLE>"Teacher"</label>
                 <select
                     id="teacher-filter"
                     class=SELECT_STYLE
@@ -112,8 +127,8 @@ pub fn SearchFilter(
                 </select>
             </div>
 
-
-            <div class="w-1/2 sm:w-35 md:w-40">
+            // Intervention filter - optimized width
+            <div class="flex-grow sm:w-32 md:w-36">
                 <label for="intervention-filter" class=LABEL_STYLE>"Intervention"</label>
                 <select
                     id="intervention-filter"
@@ -121,18 +136,18 @@ pub fn SearchFilter(
                     on:change=move |ev| set_intervention_filter(event_target_value(&ev))
                     node_ref=intervention_filter_ref
                 >
-                    <option value="">"All Students"</option>
+                    <option value="all">"All Students"</option>
                     <option value="Literacy">"Literacy"</option>
                     <option value="Math">"Math"</option>
                     <option value="Literacy and Math">"Both"</option>
-                    <option value="None">"Exclude Intervention Students"</option>
+                    <option value="None">"Exclude"</option>
                 </select>
             </div>
 
-            // Checkboxes container - flow better on small screens
-            <div class="flex flex-wrap w-full sm:w-auto gap-3 sm:gap-6">
+            // Checkboxes - consolidated for better fit
+            <div class="flex flex-grow items-center gap-3 mt-3 sm:mt-6">
                 // IEP filter checkbox
-                <div class=CHECKBOX_CONTAINER_STYLE>
+                <div class="flex items-center mr-2">
                     <input
                         type="checkbox"
                         id="iep-filter"
@@ -144,7 +159,7 @@ pub fn SearchFilter(
                 </div>
 
                 // ESL filter checkbox
-                <div class=CHECKBOX_CONTAINER_STYLE>
+                <div class="flex items-center mr-2">
                     <input
                         type="checkbox"
                         id="esl-filter"
@@ -154,13 +169,58 @@ pub fn SearchFilter(
                     />
                     <label for="esl-filter" class="text-xs sm:text-sm text-gray-700">"ESL"</label>
                 </div>
+
+                // 504 Plan filter - moved to main row
+                <div class="flex items-center mr-2">
+                    <input
+                        type="checkbox"
+                        id="504-filter"
+                        class=CHECKBOX_STYLE
+                        on:change=move |ev| set_student_504_filter(event_target_checked(&ev))
+                        node_ref=student_504_checkbox_ref
+                    />
+                    <label for="504-filter" class="text-xs sm:text-sm text-gray-700">"504"</label>
+                </div>
+
+                // Additional filters that only show when panel is expanded
+                <Show when=move || !is_panel_expanded()>
+                    <div class=EXPANDED_FILTERS_STYLE>
+                        <div class="font-medium text-sm text-gray-700 mr-2 flex items-center">
+                            "Additional:"
+                        </div>
+
+                        // Read Plan filter
+                        <div class="flex items-center mr-3">
+                            <input
+                                type="checkbox"
+                                id="readplan-filter"
+                                class=CHECKBOX_STYLE
+                                on:change=move |ev| set_readplan_filter(event_target_checked(&ev))
+                                node_ref=readplan_checkbox_ref
+                            />
+                            <label for="readplan-filter" class="text-xs sm:text-sm text-gray-700">"Read Plan"</label>
+                        </div>
+
+                        // GT filter
+                        <div class="flex items-center mr-3">
+                            <input
+                                type="checkbox"
+                                id="gt-filter"
+                                class=CHECKBOX_STYLE
+                                on:change=move |ev| set_gt_filter(event_target_checked(&ev))
+                                node_ref=gt_checkbox_ref
+                            />
+                            <label for="gt-filter" class="text-xs sm:text-sm text-gray-700">"GT"</label>
+                        </div>
+                    </div>
+                </Show>
             </div>
 
-            // Clear filters button - full width on mobile
-            <div class="w-full sm:w-auto flex justify-end sm:items-end mt-3 sm:mt-6">
+            // Clear filters button
+            <div class="flex items-center mt-3 sm:mt-6">
                 <button
                     type="button"
-                    class="w-full sm:w-auto inline-flex justify-center items-center px-3 sm:px-4 py-1 sm:py-2 border border-gray-300 rounded-md shadow-sm text-xs sm:text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 h-8 sm:h-10"
+                    class="inline-flex justify-center items-center px-3 sm:px-4 py-1 sm:py-2 border border-gray-300 rounded-md shadow-sm text-xs sm:text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 h-8 sm:h-10"
                     on:click=move |_| {
                         if let Some(input) = iep_checkbox_ref.get() {
                             input.set_checked(false);
@@ -176,6 +236,16 @@ pub fn SearchFilter(
                         }
                         if let Some(select) = teacher_filter_ref.get() {
                             select.set_value("all");
+                        }
+                        // Clear the new checkbox filters too
+                        if let Some(input) = student_504_checkbox_ref.get() {
+                            input.set_checked(false);
+                        }
+                        if let Some(input) = readplan_checkbox_ref.get() {
+                            input.set_checked(false);
+                        }
+                        if let Some(input) = gt_checkbox_ref.get() {
+                            input.set_checked(false);
                         }
 
                         on_clear_filters.call(());

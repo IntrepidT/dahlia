@@ -21,6 +21,7 @@ pub fn TeacherTable(
     #[prop(into)] role_filter: Signal<String>,
     #[prop(into)] selected_employee: Signal<Option<Rc<Employee>>>,
     #[prop(into)] set_selected_employee: WriteSignal<Option<Rc<Employee>>>,
+    #[prop(into)] is_panel_expanded: Signal<bool>,
 ) -> impl IntoView {
     let filtered_teachers = create_memo(move |_| {
         let search = search_term().trim().to_lowercase();
@@ -45,8 +46,19 @@ pub fn TeacherTable(
             .collect::<Vec<_>>()
     });
 
+    // Create a derived class for the container based on panel expansion state
+    let container_class = create_memo(move |_| {
+        if is_panel_expanded() {
+            // Less width when panel is expanded
+            format!("{} transition-all duration-300 ease-in-out", TABLE_CONTAINER_STYLE)
+        } else {
+            // Full width when panel is collapsed
+            format!("{} transition-all duration-300 ease-in-out", TABLE_CONTAINER_STYLE)
+        }
+    });
+
     view! {
-        <div class=TABLE_CONTAINER_STYLE>
+        <div class=move || container_class()>
             <div class=TABLE_HEADER_STYLE>
                 <h2 class="text-xl font-medium text-white">
                     "Teachers"

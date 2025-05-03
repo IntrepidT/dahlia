@@ -21,6 +21,7 @@ pub fn EmployeeTable(
     #[prop(into)] role_filter: Signal<String>,
     #[prop(into)] selected_employee: Signal<Option<Rc<Employee>>>,
     #[prop(into)] set_selected_employee: WriteSignal<Option<Rc<Employee>>>,
+    #[prop(into)] is_panel_expanded: Signal<bool>,
 ) -> impl IntoView {
     let filtered_employees = create_memo(move |_| {
         let search = search_term().trim().to_lowercase();
@@ -45,8 +46,19 @@ pub fn EmployeeTable(
             .collect::<Vec<_>>()
     });
 
+    // Create a derived class for the container based on panel expansion state
+    let container_class = create_memo(move |_| {
+        if is_panel_expanded() {
+            // Less width when panel is expanded
+            format!("{} transition-all duration-300 ease-in-out", TABLE_CONTAINER_STYLE)
+        } else {
+            // Full width when panel is collapsed
+            format!("{} transition-all duration-300 ease-in-out", TABLE_CONTAINER_STYLE)
+        }
+    });
+
     view! {
-        <div class=TABLE_CONTAINER_STYLE>
+        <div class=move || container_class()>
             <div class=TABLE_HEADER_STYLE>
                 <h2 class="text-xl font-medium text-white">
                     "Employees"
@@ -72,7 +84,7 @@ pub fn EmployeeTable(
                     <Suspense fallback=move || view! {
                         <tr>
                             <td colspan="6" class="text-center p-8">
-                                <div class="inline-block h-6 w-6 animate-spin rounded-full border-2border-t-[#2E3A59]"></div>
+                                <div class="inline-block h-6 w-6 animate-spin rounded-full border-2 border-[#DADADA] border-t-[#2E3A59]"></div>
                             </td>
                         </tr>
                     }>
@@ -102,7 +114,7 @@ pub fn EmployeeTable(
                                                 on:click=move |_| set_selected_employee(Some(employee_rc.clone()))
                                             >
                                                 <td class=format!("{} {}", CELL_STYLE, "text-[#2E3A59]")>{employee.id}</td>
-                                                <td class=format!("{} {}", CELL_STYLE, "font-medium text=[#2E3A59]")>{&employee.firstname}</td>
+                                                <td class=format!("{} {}", CELL_STYLE, "font-medium text-[#2E3A59]")>{&employee.firstname}</td>
                                                 <td class=format!("{} {}", CELL_STYLE, "font-medium text-[#2E3A59]")>{&employee.lastname}</td>
                                                 <td class=CELL_STYLE>
                                                     <span class=format!("px-2 py-1 text-xs font-medium rounded-full {}",

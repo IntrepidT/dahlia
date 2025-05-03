@@ -9,7 +9,7 @@ const THEME_SECONDARY: &str = "#DADADA"; // Light gray
 const THEME_BG: &str = "#F9F9F8"; // Off-white
 
 // Improved consistent styling with better naming and responsive design
-const CARD_CONTAINER: &str = "h-full bg-[#F9F9F8] p-3 sm:p-6 border-t-8 border-[#2E3A59] shadow-md rounded-lg flex flex-col";
+const CARD_CONTAINER: &str = "h-[95%] bg-[#F9F9F8] p-3 sm:p-6 border-t-8 border-[#2E3A59] shadow-md rounded-lg flex flex-col";
 const SECTION_CONTAINER: &str = "bg-white p-3 sm:p-5 rounded-lg border border-[#DADADA] shadow-sm";
 const SECTION_TITLE: &str =
     "text-xs sm:text-sm font-semibold text-[#2E3A59] mb-2 sm:mb-3 pb-2 border-b border-[#DADADA]";
