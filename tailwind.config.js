@@ -5,7 +5,10 @@ module.exports = {
     extend: {
       backgroundColor: {
         'page': '#f9f9f8',
-      }
+      },
+      fontFamily: {
+        'custom': ["KinderPeeps"],
+      },
     },
   },
   plugins: [

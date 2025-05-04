@@ -23,6 +23,8 @@ pub fn MathTesting() -> impl IntoView {
     let (if_show_toast, set_if_show_toast) = create_signal(false);
     let (toast_message, set_toast_message) = create_signal(ToastMessage::new());
 
+    let (search_term, set_search_term) = create_signal(String::new());
+
     let get_tests_info = create_resource(|| (), |_| async move { get_tests().await });
 
     let on_click_add = move |_| {
@@ -87,6 +89,24 @@ pub fn MathTesting() -> impl IntoView {
                                 "Manage your math test collection"
                             </p>
                         </div>
+                        <div>
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <span class="text-gray-500 sm:text-sm">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 sm:h-5 sm:w-5" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 - 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
+                                    </svg>
+                                </span>
+                            </div>
+                            <input
+                                type="text"
+                                name="search"
+                                id="search"
+                                class="focus:ring-indigo-500 focus:border-indigo-500 block w-full pl-10 pr-10 pr-10 text-xs sm:text-sm border-gray-300 rounded-md h-8 sm:h-10 border"
+                                placeholder="Search tests..."
+                                prop:value={move || search_term.get()}
+                                on:input=move |ev| set_search_term(event_target_value(&ev))
+                            />
+                        </div>
                         <div class="flex space-x-3">
                             <button on:click=on_click_add class=ADD_BUTTON_STYLE>
                                 <div class="flex items-center">
@@ -145,7 +165,12 @@ pub fn MathTesting() -> impl IntoView {
                                 get_tests_info.get().map(|data| {
                                     match data {
                                         Ok(tests_data) => {
-                                            if tests_data.iter().filter(|test| test.testarea == TestType::Math).count() == 0 {
+                                            let filtered_tests = tests_data.iter()
+                                                .filter(|test| test.testarea == TestType::Math &&
+                                                    (search_term().is_empty() ||
+                                                     test.name.to_lowercase().contains(&search_term().to_lowercase())))
+                                                .collect::<Vec<_>>();
+                                            if filtered_tests.iter().filter(|test| test.testarea == TestType::Math).count() == 0 {
                                                 view! {
                                                     <div class="col-span-full text-center py-12">
                                                         <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -166,8 +191,7 @@ pub fn MathTesting() -> impl IntoView {
                                                     </div>
                                                 }.into_view()
                                             } else {
-                                                tests_data.iter()
-                                                    .filter(|test| test.testarea == TestType::Math)
+                                                filtered_tests.into_iter()
                                                     .map(|each_test| {
                                                         let test_id = each_test.test_id.clone();
 

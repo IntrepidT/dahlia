@@ -15,7 +15,7 @@ const INFO_CONTENT_STYLE: &str = "flex-grow overflow-y-auto";
 const INFO_TITLE_STYLE: &str = "text-stone-400 text-xs";
 const INFO_GROUP_STYLE: &str = "mb-2";
 const BUTTON_CONTAINER_STYLE: &str =
-    "mt-4 pt-4 flex border-t gap-2 justify-end sticky bottom-0 bg-white";
+    "mt-4 pt-4 flex border-t gap-2 justify-end sticky bottom-0 bg-[#F9F9F8]";
 
 #[component]
 pub fn AddStudentForm(

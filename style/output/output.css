@@ -577,6 +577,18 @@ video {
   scrollbar-color: rgba(203, 213, 225, 0.5) transparent;
 }
 
+@font-face {
+  font-family: 'KinderPeeps';
+
+  src: url('/fonts/APLKinderPeeps.ttf') format('ttf');
+
+  font-weight: 400;
+
+  font-style: normal;
+
+  font-display: swap;
+}
+
 body {
   --tw-bg-opacity: 1;
   background-color: rgb(249 249 248 / var(--tw-bg-opacity, 1));
@@ -1045,10 +1057,6 @@ body {
   height: calc(100vh - 4rem);
 }
 
-.h-\[calc\(100vh-5rem\)\] {
-  height: calc(100vh - 5rem);
-}
-
 .h-dvh {
   height: 100dvh;
 }
@@ -1147,14 +1155,6 @@ body {
 
 .w-\[20rem\] {
   width: 20rem;
-}
-
-.w-\[30\%\] {
-  width: 30%;
-}
-
-.w-\[68\%\] {
-  width: 68%;
 }
 
 .w-auto {
@@ -2122,6 +2122,10 @@ body {
 
 .align-text-top {
   vertical-align: text-top;
+}
+
+.font-custom {
+  font-family: KinderPeeps;
 }
 
 .font-sans {

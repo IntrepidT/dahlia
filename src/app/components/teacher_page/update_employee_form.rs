@@ -18,7 +18,7 @@ const FORM_INPUT_STYLE: &str = "w-full px-3 py-2 border border-gray-300 rounded-
 const FORM_SELECT_STYLE: &str = "w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500";
 const ERROR_MESSAGE_STYLE: &str = "text-red-500 text-sm mb-4";
 const BUTTON_CONTAINER_STYLE: &str =
-    "mt-4 pt-4 flex border-t gap-2 justify-end sticky bottom-0 bg-white w-full";
+    "mt-4 pt-4 flex border-t gap-2 justify-end sticky bottom-0 bg-[#F9F9F8] w-full";
 const BUTTON_PRIMARY_STYLE: &str = "px-4 py-2 bg-green-500 text-white rounded-lg font-bold";
 const BUTTON_SECONDARY_STYLE: &str = "px-4 py-2 bg-gray-200 rounded-lg font-bold hover:bg-gray-300";
 

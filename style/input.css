@@ -3,6 +3,13 @@
 @tailwind utilities;
 
 @layer base {
+  @font-face {
+    font-family: 'KinderPeeps';
+    src: url('/fonts/APLKinderPeeps.ttf') format('ttf');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+  }
   body {
     @apply bg-page;
   }
