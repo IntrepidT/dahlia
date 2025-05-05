@@ -53,7 +53,7 @@ pub fn Dashboard() -> impl IntoView {
                                     <div class="flex-1 w-1/2">
                                         <div class="shadow-lg border-gray border-2 h-[20rem] rounded-lg">
                                             <h1 class="text-base font-bold text-xl ml-2 p-2 text-[#2E3A59]">
-                                                Chat Logs
+                                                Logs
                                             </h1>
                                             <hr class="text-sm text-gray" />
                                         </div>

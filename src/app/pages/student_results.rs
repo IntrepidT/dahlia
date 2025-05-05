@@ -171,7 +171,8 @@ pub fn TestResultsPage() -> impl IntoView {
                                             <tr>
                                                 <th class="py-2 px-4 text-left">"Assessment Name"</th>
                                                 <th class="py-2 px-4 text-left">"Subject"</th>
-                                                <th class="py-2 px-4 text-left">"Average Score"</th>
+                                                <th class="py-2 px-4 text-left">"Total Possible"</th>
+                                                <th class="py-2 px-4 text-left">"Current Score"</th>
                                                 <th class="py-2 px-4 text-left">"Grade Level"</th>
                                                 <th class="py-2 px-4 text-left">"Action"</th>
                                             </tr>
@@ -186,6 +187,8 @@ pub fn TestResultsPage() -> impl IntoView {
                                                     <tr class="border-t hover:bg-gray-50">
                                                         <td class="py-3 px-4">{assessment.name}</td>
                                                         <td class="py-3 px-4">{format!("{:?}", assessment.subject)}</td>
+
+                                                        <td class="py-3 px-4">{assessment.composite_score.map(|score| score.to_string()).unwrap_or_else(|| "N/A".to_string())}</td>
                                                         <td class="py-3 px-4">{calculate_assessment_avg(&assessment_id)}</td>
                                                         <td class="py-3 px-4">{assessment.grade.map(|g| format!("{:?}", g)).unwrap_or_else(|| "Any".to_string())}</td>
                                                         <td class="py-3 px-4">

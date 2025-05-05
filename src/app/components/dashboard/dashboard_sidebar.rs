@@ -1,9 +1,16 @@
 use icondata::IoChatbubbleEllipsesOutline;
 use icondata::{AiApiOutlined, AiBarChartOutlined, AiHomeOutlined, AiSettingOutlined, ChStack};
-// Add new imports for additional icons
+// Add new imports for additional icons, including pin/unpin icons
 use crate::app::components::ShowAdministerTestModal;
 use icondata::{
-    AiCoffeeOutlined, AiDashboardOutlined, IoPeopleOutline, IoPricetagOutline, IoSettingsOutline,
+    AiCoffeeOutlined,
+    AiDashboardOutlined,
+    IoPeopleOutline,
+    // Add pin/unpin icons
+    IoPinOutline,
+    IoPinSharp,
+    IoPricetagOutline,
+    IoSettingsOutline,
 };
 use leptos::ev::MouseEvent;
 use leptos::*;
@@ -35,6 +42,9 @@ pub fn DashboardSidebar(
 ) -> impl IntoView {
     let (is_expanded, set_is_expanded) = create_signal(false);
     let (show_administer_modal, set_show_administer_modal) = create_signal(false);
+
+    // New signal for pinned state
+    let (is_pinned_closed, set_is_pinned_closed) = create_signal(false);
 
     // Handle window size for responsive behavior
     let (is_small_screen, set_is_small_screen) = create_signal(false);
@@ -81,6 +91,35 @@ pub fn DashboardSidebar(
         }
     };
 
+    // Handle mouseenter event with consideration for pinned state
+    let handle_mouseenter = move |_| {
+        if !is_pinned_closed() {
+            set_is_expanded(true);
+        }
+    };
+
+    // Handle mouseleave event with consideration for pinned state
+    let handle_mouseleave = move |_| {
+        // Only close the sidebar if we're not hovering the modal and not pinned
+        if !show_administer_modal() && !is_pinned_closed() {
+            set_is_expanded(false);
+        }
+    };
+
+    // Toggle pinned state
+    let toggle_pinned = move |_| {
+        let new_value = !is_pinned_closed.get();
+        set_is_pinned_closed.set(new_value);
+
+        // If unpinning, we immediately expand the sidebar
+        if !new_value {
+            set_is_expanded(true);
+        } else {
+            // If pinning closed, we collapse the sidebar
+            set_is_expanded(false);
+        }
+    };
+
     view! {
         <div class="relative">
             <div
@@ -89,13 +128,8 @@ pub fn DashboardSidebar(
                 class:w-20={move || !is_expanded() && !is_small_screen()}
                 class:w-48={move || is_expanded() && is_small_screen()}
                 class:w-64={move || is_expanded() && !is_small_screen()}
-                on:mouseenter=move |_| set_is_expanded(true)
-                on:mouseleave=move |_| {
-                    // Only close the sidebar if we're not hovering the modal
-                    if !show_administer_modal() {
-                        set_is_expanded(false);
-                    }
-                }
+                on:mouseenter=handle_mouseenter
+                on:mouseleave=handle_mouseleave
             >
                 <div class="flex flex-col h-full p-4 overflow-y-auto">
                     <div class="space-y-4">
@@ -186,6 +220,26 @@ pub fn DashboardSidebar(
                         // Divider
                         <div class="border-t border-[#DADADA] my-2"></div>
 
+                        // Pin/Unpin button
+                        <div
+                            class="flex items-center cursor-pointer hover:bg-[#DADADA] p-2 rounded-md transition-colors"
+                            on:click=toggle_pinned
+                            title=move || if is_pinned_closed() { "Unpin sidebar (allow expand on hover)" } else { "Pin sidebar closed" }
+                        >
+                            <Icon
+                                icon={if is_pinned_closed() { IoPinSharp } else { IoPinOutline }}
+                                class="w-5 h-5 text-[#2E3A59] flex-shrink-0"
+                            />
+                            <Show
+                                when=move || is_expanded()
+                                fallback=|| view! { <></> }
+                            >
+                                <span class="ml-2 font-semibold text-sm sm:text-base">
+                                    {move || if is_pinned_closed() { "Unpin" } else { "Pin" }}
+                                </span>
+                            </Show>
+                        </div>
+
                         /*// Original sidebar items
                         <SidebarItem
                             icon=AiHomeOutlined
@@ -235,8 +289,10 @@ pub fn DashboardSidebar(
                     style=move || modal_position()
                     on:mouseenter=move |_| set_is_expanded(true) // Keep sidebar open when hovering modal
                     on:mouseleave=move |_| {
-                        // Only close everything when leaving the modal
-                        set_is_expanded(false);
+                        // Only close everything when leaving the modal and not pinned
+                        if !is_pinned_closed() {
+                            set_is_expanded(false);
+                        }
                         set_show_administer_modal(false);
                     }
                 >
