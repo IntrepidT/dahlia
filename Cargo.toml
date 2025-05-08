@@ -48,6 +48,7 @@ actix-web-actors = { version = "4.3.1", optional = true}
 serde_json = "1.0.140"
 actix = {version = "0.13.5", optional = true}
 gloo-utils = "0.2.0"
+polars = { version = "0.46.0", optional = true, features = ["lazy", "random", "strings", "temporal"]}
 
 [features]
 csr = ["leptos/csr", "leptos_meta/csr", "leptos_router/csr"]
@@ -57,6 +58,7 @@ ssr = [
   "dep:actix-files",
   "dep:actix-web",
   "dep:actix-web-actors",
+  "dep:polars",
   "dep:leptos_actix",
   "leptos/ssr",
   "leptos_meta/ssr",

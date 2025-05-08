@@ -8,7 +8,7 @@ use leptos_router::*;
 pub mod pages;
 pub mod websockets;
 use components::live_test::RealtimeTestSession;
-use components::test_templates::FlashCardSet;
+use components::test_templates::{FlashCardSet, GridTest};
 use pages::{
     AdministerTest, Assessment, AssessmentPage, Dashboard, HomePage, LoginPage, MathTesting,
     MyAccount, ReadingTesting, ReviewTest, Settings, StudentView, Teachers, TestBuilder,
@@ -166,6 +166,7 @@ pub fn App() -> impl IntoView {
                         <Route path="/test-session/:test_id" view=RealtimeTestSession/>
                         <Route path="/tests/:test_id/sessions/:session_id" view=RealtimeTestSession/>
                         <Route path="/testsessions" view=TestSessionsList/>
+                        <Route path="/gridtest/:test_id" view=GridTest/>
                         <Route path="/*any" view=NotFound/>
                     </Routes>
                 </main>

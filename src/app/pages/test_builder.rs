@@ -4,6 +4,7 @@ use crate::app::models::student::GradeEnum;
 use crate::app::models::test::BenchmarkCategory;
 use crate::app::models::test::{CreateNewTestRequest, TestType, UpdateTestRequest};
 use crate::app::models::{CreateNewQuestionRequest, Question, QuestionType};
+use crate::app::server_functions::assessments::update_assessment_score;
 use crate::app::server_functions::questions::{add_question, delete_questions, get_questions};
 use crate::app::server_functions::tests::{add_test, get_test, score_overrider, update_test};
 use leptos::prelude::*;
@@ -139,12 +140,12 @@ pub fn TestBuilder() -> impl IntoView {
                 // Sort questions by question number
                 let mut sorted_questions = loaded_questions.clone();
                 sorted_questions.sort_by_key(|q| q.qnumber);
-                
+
                 // Renumber questions sequentially starting from 1
                 for (i, q) in sorted_questions.iter_mut().enumerate() {
                     q.qnumber = (i + 1) as i32;
                 }
-                
+
                 set_questions(sorted_questions);
             }
         }
@@ -306,13 +307,14 @@ pub fn TestBuilder() -> impl IntoView {
                 log::info!("Updating test with ID: {}", current_test_id);
                 // Implement update_test function as needed
                 match update_test(update_test_request).await {
-                    Ok(updated) => {
-                        let new_id = updated.test_id.clone();
+                    Ok(_updated) => {
+                        // We don't need to save the updated test since we're just using the ID
                     }
                     Err(e) => {
                         log::error!("Error updating test: {:?}", e);
                         set_show_error(true);
                         set_error_message(format!("Failed to update test: {}", e));
+                        set_is_submitting(false);
                         return;
                     }
                 }
@@ -391,6 +393,18 @@ pub fn TestBuilder() -> impl IntoView {
                 success_count,
                 &question_requests.len()
             );
+
+            // Always update assessment scores, whether this is a new test or an edited one
+            match update_assessment_score(new_test_id.clone()).await {
+                Ok(_) => {
+                    log::info!("Successfully updated assessment scores for test: {}", new_test_id);
+                }
+                Err(e) => {
+                    log::error!("Failed to update assessment scores: {:?}", e);
+                    // We continue even if updating assessment scores fails
+                    // This allows the user to still complete their task
+                }
+            }
 
             // Navigate to the test list page only after all questions are processed
             let navigate = leptos_router::use_navigate();

@@ -50,12 +50,43 @@ pub async fn get_score(
             .await
             .map_err(|e| ServerFnError::new(format!("Failed to extract pool: {}", e)))?;
 
-        log::info!("Attempting to retrieve all tests from database");
+        log::info!("Attempting to retrieve all scores from database");
 
         match score_database::get_score(student_id, test_id, test_variant, &pool).await {
             Ok(score) => {
                 log::info!("Successfully retrieved score from database");
                 Ok(score)
+            }
+            Err(e) => {
+                log::error!("Database error: {}", e);
+                Err(ServerFnError::new(format!("Database error: {}", e)))
+            }
+        }
+    }
+}
+
+#[server(GetStudentScores, "/api")]
+pub async fn get_student_scores(student_id: i32) -> Result<Vec<Score>, ServerFnError> {
+    #[cfg(feature = "ssr")]
+    {
+        use actix_web::web;
+        use leptos_actix::extract;
+        let pool = extract::<web::Data<PgPool>>()
+            .await
+            .map_err(|e| ServerFnError::new(format!("Failed to extract pool: {}", e)))?;
+
+        log::info!(
+            "Attempting to retrieve all scores for student: {}",
+            student_id
+        );
+
+        match score_database::get_all_student_scores(student_id, &pool).await {
+            Ok(scores) => {
+                log::info!(
+                    "Successfully retrieved scores from database for student: {}",
+                    student_id
+                );
+                Ok(scores)
             }
             Err(e) => {
                 log::error!("Database error: {}", e);

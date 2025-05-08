@@ -93,6 +93,7 @@ pub fn MathTestDisplay(
     // Create separate variables for each navigation type
     let realtime_test = test.clone();
     let individual_test = test.clone();
+    let grid_test = test.clone();
     let set_modal = set_show_options_modal.clone();
 
     let on_realtime_click = move |_| {
@@ -106,6 +107,13 @@ pub fn MathTestDisplay(
         let test_id = individual_test.test_id.clone();
         let navigate = leptos_router::use_navigate();
         navigate(&format!("/flashcardset/{}", test_id), Default::default());
+        set_modal.set(false);
+    };
+
+    let on_grid_test_click = move |_| {
+        let test_id = grid_test.test_id.clone();
+        let navigate = leptos_router::use_navigate();
+        navigate(&format!("/gridtest/{}", test_id), Default::default());
         set_modal.set(false);
     };
 
@@ -191,7 +199,20 @@ pub fn MathTestDisplay(
                                             <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd" />
                                         </svg>
                                     </button>
+
+
+                                    <button
+                                        class="w-full p-3 bg-purple-600 text-white rounded-lg flex items-center justify-between hover:bg-purple-700 transition-colors"
+                                        on:click=on_grid_test_click.clone()
+                                    >
+                                        <span class="text-lg">Grid Test</span>
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                            <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
+                                            <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd" />
+                                        </svg>
+                                    </button>
                                 </div>
+
                                 <div class="mt-6 flex justify-end">
                                     <button
                                         class="px-4 py-2 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors"

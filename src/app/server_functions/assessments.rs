@@ -160,6 +160,33 @@ pub async fn delete_assessment(
     }
 }
 
+#[server(UpdateAssessmentScore, "/api")]
+pub async fn update_assessment_score(test_id: String) -> Result<(), ServerFnError> {
+    #[cfg(feature = "ssr")]
+    {
+        use actix_web::web;
+        use leptos_actix::extract;
+
+        let pool = extract::<web::Data<PgPool>>()
+            .await
+            .map_err(|e| ServerFnError::new(format!("Failed to extract pool: {}", e)))?;
+
+        match assessment_database::update_all_assessments_referencing_test(&test_id, &pool).await {
+            Ok(()) => Ok(()),
+            Err(e) => Err(ServerFnError::new(format!(
+                "Failed to update assessment scores: {}", e
+            ))),
+        }
+    }
+    
+    #[cfg(not(feature = "ssr"))]
+    {
+        Err(ServerFnError::new(
+            "Server function called in client context",
+        ))
+    }
+}
+
 #[server(EditAssessment, "/api")]
 pub async fn update_assessment(
     update_assessment_request: UpdateAssessmentRequest,

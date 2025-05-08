@@ -68,6 +68,42 @@ cfg_if::cfg_if! {
             Ok(score)
         }
 
+        pub async fn get_all_student_scores(student_id: i32, pool: &PgPool) -> Result<Vec<Score>, ServerFnError> {
+            let row = sqlx::query("SELECT student_id, date_administered, test_id::text, test_scores, comments, test_variant, evaluator FROM scores WHERE student_id = $1")
+                .bind(&student_id)
+                .fetch_all(pool)
+                .await
+                .map_err(|e| ServerFnError::new(format!("Database error: {}", e)))?;
+
+
+            let scores: Vec<Score> = row
+                .into_iter()
+                .map(|row| {
+
+                    let naive_datetime: NaiveDateTime = row.get("date_administered");
+
+                    let student_id: i32 =  row.get("student_id");
+                    let date_administered: DateTime<Utc> = DateTime::<Utc>::from_naive_utc_and_offset(naive_datetime, Utc);
+                    let test_id: String = row.get("test_id");
+                    let test_scores: Vec<i32> = row.get("test_scores");
+                    let comments: Vec<String> = row.get("comments");
+                    let test_variant: i32 = row.get("test_variant");
+                    let evaluator: String = row.get("evaluator");
+
+                    Score {
+                        student_id,
+                        date_administered,
+                        test_id,
+                        test_scores,
+                        comments,
+                        test_variant,
+                        evaluator,
+                    }
+                })
+                .collect();
+            Ok(scores)
+        }
+
         pub async fn add_score(new_score_request: &CreateScoreRequest, pool: &sqlx::PgPool) -> Result<Score, ServerFnError> {
             let ID = Uuid::parse_str(&new_score_request.test_id).expect("Invalid UUID format");
             let timestamp = Local::now();

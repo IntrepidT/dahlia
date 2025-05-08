@@ -145,6 +145,51 @@ cfg_if::cfg_if! {
             Ok(assessment)
         }
 
+        pub async fn update_all_assessments_referencing_test(test_id: &String, pool: &sqlx::PgPool) -> Result<(), ServerFnError> {
+            // Convert the string to a UUID
+            let test_uuid = Uuid::parse_str(test_id)
+                .map_err(|e| ServerFnError::new(format!("Invalid UUID format: {}", e)))?;
+
+            // Find all assessments that reference this test
+            let assessment_ids: Vec<Uuid> = sqlx::query_as::<_, (Uuid,)>("SELECT id FROM assessments WHERE $1 = ANY(tests)")
+                .bind(test_uuid)
+                .fetch_all(pool)
+                .await
+                .map_err(|e| ServerFnError::new(format!("Database error: {}", e)))?
+                .into_iter()
+                .map(|(id,)| id)
+                .collect();
+
+            // Update each assessment's composite score
+            for assessment_id in assessment_ids {
+                // Get the test IDs for this assessment
+                let test_ids: Vec<Uuid> = sqlx::query_scalar::<_, Uuid>("SELECT unnest(tests) FROM assessments WHERE id = $1")
+                    .bind(assessment_id)
+                    .fetch_all(pool)
+                    .await
+                    .map_err(|e| ServerFnError::new(format!("Database error: {}", e)))?;
+
+                // Get scores for all tests and calculate the sum
+                let scores: Vec<i32> = sqlx::query_scalar::<_, i32>("SELECT score FROM tests WHERE test_id = ANY($1)")
+                    .bind(&test_ids)
+                    .fetch_all(pool)
+                    .await
+                    .map_err(|e| ServerFnError::new(format!("Issue retrieving score values for tests: {}", e)))?;
+
+                let total: i32 = scores.iter().sum();
+
+                // Update the assessment with the new composite score
+                sqlx::query("UPDATE assessments SET composite_score = $1 WHERE id = $2")
+                    .bind(total)
+                    .bind(assessment_id)
+                    .execute(pool)
+                    .await
+                    .map_err(|e| ServerFnError::new(format!("Database error updating assessment: {}", e)))?;
+            }
+
+            Ok(())
+        }
+
         pub async fn update_assessment(assessment: &Assessment, pool: &sqlx::PgPool) -> Result<Assessment, ServerFnError> {
             let risk_benchmarks = match &assessment.risk_benchmarks {
                 Some(categories) => Json(categories.clone()),

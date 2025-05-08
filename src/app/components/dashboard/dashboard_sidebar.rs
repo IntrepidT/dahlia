@@ -235,7 +235,7 @@ pub fn DashboardSidebar(
                                 fallback=|| view! { <></> }
                             >
                                 <span class="ml-2 font-semibold text-sm sm:text-base">
-                                    {move || if is_pinned_closed() { "Unpin" } else { "Pin" }}
+                                    {move || if is_pinned_closed() { "Unpin" } else { "Pin Sidebar" }}
                                 </span>
                             </Show>
                         </div>

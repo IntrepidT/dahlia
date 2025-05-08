@@ -275,86 +275,98 @@ pub fn AssessmentPage() -> impl IntoView {
                                                             style:max-height={move || if expanded.get() { "500px" } else { "0" }}
                                                             style:opacity={move || if expanded.get() { "1" } else { "0" }}
                                                         >
-                                                            <div class="p-4 space-y-3">
-                                                                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-                                                                    {move || {
-                                                                        // Get all tests
-                                                                        let all_tests = tests_resource.get().map(|r| r.ok()).flatten().unwrap_or_default();
+                                                            <div class="p-4">
+                                                                <div class="flex flex-col md:flex-row gap-4">
+                                                                    <div class="flex-grow">
+                                                                        <h4 class="text-sm font-medium mb-2">Tests</h4>
+                                                                        <div class="max-h-64 overflow-y-auto pr-2 mb-3">
+                                                                            <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                                                                {move || {
+                                                                                    // Get all tests
+                                                                                    let all_tests = tests_resource.get().map(|r| r.ok()).flatten().unwrap_or_default();
 
-                                                                        // Get the IDs of tests assigned to this specific assessment
-                                                                        let assessment_test_ids = &assessment.tests;
+                                                                                    // Get the IDs of tests assigned to this specific assessment
+                                                                                    let assessment_test_ids = &assessment.tests;
 
-                                                                        // First show assessment tests in their original order
-                                                                        let mut ordered_tests: Vec<_> = all_tests.iter()
-                                                                            .filter(|test| {
-                                                                                let test_id = Uuid::parse_str(&test.test_id).expect("Did not convert uuid to string");
-                                                                                assessment_test_ids.contains(&test_id)
-                                                                            })
-                                                                            .collect();
+                                                                                    // First show assessment tests in their original order
+                                                                                    let mut ordered_tests: Vec<_> = all_tests.iter()
+                                                                                        .filter(|test| {
+                                                                                            let test_id = Uuid::parse_str(&test.test_id).expect("Did not convert uuid to string");
+                                                                                            assessment_test_ids.contains(&test_id)
+                                                                                        })
+                                                                                        .collect();
 
-                                                                        // Sort ordered_tests according to the order in assessment_test_ids
-                                                                        ordered_tests.sort_by(|a, b| {
-                                                                            let a_id = Uuid::parse_str(&a.test_id).expect("Did not convert uuid to string");
-                                                                            let b_id = Uuid::parse_str(&b.test_id).expect("Did not convert uuid to string");
-                                                                            let a_pos = assessment_test_ids.iter().position(|id| *id == a_id).unwrap_or(usize::MAX);
-                                                                            let b_pos = assessment_test_ids.iter().position(|id| *id == b_id).unwrap_or(usize::MAX);
-                                                                            a_pos.cmp(&b_pos)
-                                                                        });
+                                                                                    // Sort ordered_tests according to the order in assessment_test_ids
+                                                                                    ordered_tests.sort_by(|a, b| {
+                                                                                        let a_id = Uuid::parse_str(&a.test_id).expect("Did not convert uuid to string");
+                                                                                        let b_id = Uuid::parse_str(&b.test_id).expect("Did not convert uuid to string");
+                                                                                        let a_pos = assessment_test_ids.iter().position(|id| *id == a_id).unwrap_or(usize::MAX);
+                                                                                        let b_pos = assessment_test_ids.iter().position(|id| *id == b_id).unwrap_or(usize::MAX);
+                                                                                        a_pos.cmp(&b_pos)
+                                                                                    });
 
-                                                                        ordered_tests.into_iter().enumerate().map(|(index, test)| {
-                                                                            let test_id = Uuid::parse_str(&test.test_id).expect("Did not convert uuid to string");
-                                                                            let test_name = test.name.clone();
-                                                                            view! {
-                                                                                <div class="flex items-center space-x-2 p-2 rounded bg-gray-50">
-                                                                                    <span class="text-sm font-medium mr-2">{index + 1}.</span>
-                                                                                    <span class="text-sm">{test_name}</span>
-                                                                                </div>
+                                                                                    ordered_tests.into_iter().enumerate().map(|(index, test)| {
+                                                                                        let test_name = test.name.clone();
+                                                                                        view! {
+                                                                                            <div class="flex items-center space-x-2 p-2 rounded bg-gray-50">
+                                                                                                <span class="text-sm font-medium mr-2">{index + 1}.</span>
+                                                                                                <span class="text-sm text-ellipsis overflow-hidden">{test_name}</span>
+                                                                                            </div>
+                                                                                        }
+                                                                                    }).collect_view()
+                                                                                }}
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+
+                                                                    <div class="md:w-72 space-y-4">
+                                                                        {move || {
+                                                                            if let Some(benchmarks) = &assessment.risk_benchmarks {
+                                                                                view! {
+                                                                                    <div class="space-y-1">
+                                                                                        <h4 class="text-sm font-medium">Risk Benchmarks</h4>
+                                                                                        <div class="max-h-28 overflow-y-auto">
+                                                                                            {benchmarks.iter().map(|b| {
+                                                                                                view! {
+                                                                                                    <div class="text-xs flex justify-between">
+                                                                                                        <span>{&b.label}</span>
+                                                                                                        <span>{b.min} - {b.max}</span>
+                                                                                                    </div>
+                                                                                                }
+                                                                                            }).collect_view()}
+                                                                                        </div>
+                                                                                    </div>
+                                                                                }
+                                                                            } else {
+                                                                                view! { <div></div> }
                                                                             }
-                                                                        }).collect_view()
-                                                                    }}
+                                                                        }}
+
+                                                                        {move || {
+                                                                            if let Some(benchmarks) = &assessment.national_benchmarks {
+                                                                                view! {
+                                                                                    <div class="space-y-1">
+                                                                                        <h4 class="text-sm font-medium">National Benchmarks</h4>
+                                                                                        <div class="max-h-28 overflow-y-auto">
+                                                                                            {benchmarks.iter().map(|b| {
+                                                                                                view! {
+                                                                                                    <div class="text-xs flex justify-between">
+                                                                                                        <span>{&b.label}</span>
+                                                                                                        <span>{b.min} - {b.max}</span>
+                                                                                                    </div>
+                                                                                                }
+                                                                                            }).collect_view()}
+                                                                                        </div>
+                                                                                    </div>
+                                                                                }
+                                                                            } else {
+                                                                                view! { <div></div> }
+                                                                            }
+                                                                        }}
+                                                                    </div>
                                                                 </div>
 
-                                                                {move || {
-                                                                    if let Some(benchmarks) = &assessment.risk_benchmarks {
-                                                                        view! {
-                                                                            <div class="space-y-1">
-                                                                                <h4 class="text-sm font-medium">Risk Benchmarks</h4>
-                                                                                {benchmarks.iter().map(|b| {
-                                                                                    view! {
-                                                                                        <div class="text-xs flex justify-between">
-                                                                                            <span>{&b.label}</span>
-                                                                                            <span>{b.min} - {b.max}</span>
-                                                                                        </div>
-                                                                                    }
-                                                                                }).collect_view()}
-                                                                            </div>
-                                                                        }
-                                                                    } else {
-                                                                        view! { <div></div> }
-                                                                    }
-                                                                }}
-
-                                                                {move || {
-                                                                    if let Some(benchmarks) = &assessment.national_benchmarks {
-                                                                        view! {
-                                                                            <div class="space-y-1">
-                                                                                <h4 class="text-sm font-medium">National Benchmarks</h4>
-                                                                                {benchmarks.iter().map(|b| {
-                                                                                    view! {
-                                                                                        <div class="text-xs flex justify-between">
-                                                                                            <span>{&b.label}</span>
-                                                                                            <span>{b.min} - {b.max}</span>
-                                                                                        </div>
-                                                                                    }
-                                                                                }).collect_view()}
-                                                                            </div>
-                                                                        }
-                                                                    } else {
-                                                                        view! { <div></div> }
-                                                                    }
-                                                                }}
-
-                                                                <div class="pt-3 flex space-x-2">
+                                                                <div class="flex justify-end space-x-2 pt-3 mt-2 border-t border-gray-100">
                                                                     <button
                                                                         class="text-xs px-3 py-1 bg-gray-100 rounded-full text-[#2E3A59] hover:bg-gray-200 transition-colors"
                                                                         on:click=move |ev| {
