@@ -277,12 +277,14 @@ pub fn ScoresLedger() -> impl IntoView {
                                                     let student_id = score.student_id;
                                                     let test_id = score.test_id.clone();
                                                     let test_variant = score.test_variant;
+                                                    let attempt = score.attempt;
 
                                                     // Create delete request for this score
                                                     let delete_req = DeleteScoreRequest {
                                                         student_id,
                                                         test_id: test_id.clone(),
                                                         test_variant,
+                                                        attempt,
                                                     };
 
 
@@ -328,12 +330,13 @@ pub fn ScoresLedger() -> impl IntoView {
                                                                     let test_id = score.test_id.clone();
                                                                     let student_id = score.student_id;
                                                                     let test_variant = score.test_variant.clone();
+                                                                    let attempt = score.attempt.clone();
 
                                                                     view! {
                                                                         <button
                                                                             class="text-indigo-600 hover:text-indigo-900 mr-3"
                                                                             on:click=move |_| {
-                                                                                nav(&format!("/reviewtest/{}/{}/{}", test_id, student_id, test_variant), Default::default());
+                                                                                nav(&format!("/reviewtest/{}/{}/{}/{}", test_id, student_id, test_variant, attempt), Default::default());
                                                                             }
                                                                         >
                                                                             View

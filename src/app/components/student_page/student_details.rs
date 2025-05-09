@@ -64,7 +64,7 @@ pub fn StudentDetails(
         }
 
         if student.bip {
-            services.push(create_service_item("BIP Status", true));
+            services.push(create_service_item("BEH Status", true));
         }
 
         if student.student_504 {

@@ -136,11 +136,11 @@ pub fn SearchFilter(
                     on:change=move |ev| set_intervention_filter(event_target_value(&ev))
                     node_ref=intervention_filter_ref
                 >
-                    <option value="all">"All Students"</option>
+                    <option value="all">""</option>
                     <option value="Literacy">"Literacy"</option>
                     <option value="Math">"Math"</option>
-                    <option value="Literacy and Math">"Both"</option>
-                    <option value="None">"Exclude"</option>
+                    <option value="Literacy and Math">"Literacy and Math"</option>
+                    <option value="None">"Exclude Intervention"</option>
                 </select>
             </div>
 
@@ -185,12 +185,13 @@ pub fn SearchFilter(
                 // Additional filters that only show when panel is expanded
                 <Show when=move || !is_panel_expanded()>
                     <div class=EXPANDED_FILTERS_STYLE>
-                        <div class="font-medium text-sm text-gray-700 mr-2 flex items-center">
+                        //Mom wanted removed but may be helpful to other users
+                        /*<div class="font-medium text-sm text-gray-700 mr-2 flex items-center">
                             "Additional:"
-                        </div>
+                        </div>*/
 
                         // Read Plan filter
-                        <div class="flex items-center mr-3">
+                        <div class="flex items-center mr-2">
                             <input
                                 type="checkbox"
                                 id="readplan-filter"
@@ -202,7 +203,7 @@ pub fn SearchFilter(
                         </div>
 
                         // GT filter
-                        <div class="flex items-center mr-3">
+                        <div class="flex items-center mr-2">
                             <input
                                 type="checkbox"
                                 id="gt-filter"

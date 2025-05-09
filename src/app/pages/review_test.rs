@@ -36,15 +36,23 @@ pub fn ReviewTest() -> impl IntoView {
             .parse::<i32>()
             .unwrap()
     };
+    let attempt = move || {
+        params()
+            .get("attempt")
+            .cloned()
+            .unwrap_or_default()
+            .parse::<i32>()
+            .unwrap()
+    };
 
     // Active tab state
     let (active_tab, set_active_tab) = create_signal(ReviewTab::Detailed);
 
     //Create resources for fetching score, test, and questions
     let score = create_resource(
-        move || (student_id(), test_id(), test_variant()),
-        |(student_id, test_id, test_variant)| async move {
-            match get_score(student_id, test_id, test_variant).await {
+        move || (student_id(), test_id(), test_variant(), attempt()),
+        |(student_id, test_id, test_variant, attempt)| async move {
+            match get_score(student_id, test_id, test_variant, attempt).await {
                 Ok(score) => Ok(score),
                 Err(e) => {
                     log::error!("Failed to load score: {}", e);
@@ -174,17 +182,25 @@ pub fn ReviewTest() -> impl IntoView {
                         score.get().map(|score_result| {
                             match score_result {
                                 Ok(score) => {
-                                    let total_score: i32 = score.test_scores.iter().sum();
+                                    // Calculate total correct answers
+                                    let total_correct = create_memo(move |_| {
+                                        if let Some(qs) = questions.get() {
+                                            qs.iter().enumerate().filter(|(i, q)| {
+                                                *i < score.test_scores.len() && score.test_scores[*i] == q.point_value
+                                            }).count() as i32
+                                        } else {
+                                            0
+                                        }
+                                    });
+
                                     let total_possible = move || {
-                                        questions.get().map(|q| {
-                                            q.iter().map(|question| question.point_value).sum::<i32>()
-                                        }).unwrap_or(0)
+                                        questions.get().map(|q| q.len()).unwrap_or(0) as i32
                                     };
 
                                     let percentage = move || {
                                         let total = total_possible();
                                         if total > 0 {
-                                            (total_score as f32 / total as f32) * 100.0
+                                            (total_correct.get() as f32 / total as f32) * 100.0
                                         } else {
                                             0.0
                                         }
@@ -210,7 +226,7 @@ pub fn ReviewTest() -> impl IntoView {
                                                 <div>
                                                     <h3 class="text-sm font-medium text-gray-500">Total Score</h3>
                                                     <div class="flex items-baseline">
-                                                        <p class="text-3xl font-bold text-indigo-600">{total_score}</p>
+                                                        <p class="text-3xl font-bold text-indigo-600">{move || total_correct.get()}</p>
                                                         <p class="ml-2 text-lg text-gray-500">/ {total_possible}</p>
                                                     </div>
                                                 </div>
@@ -302,7 +318,7 @@ pub fn ReviewTest() -> impl IntoView {
 #[component]
 fn DetailedView(
     questions: Resource<String, Vec<crate::app::models::question::Question>>,
-    score: Resource<(i32, String, i32), Result<Score, ServerFnError>>,
+    score: Resource<(i32, String, i32, i32), Result<Score, ServerFnError>>,
 ) -> impl IntoView {
     view! {
         <div class="bg-white shadow rounded-lg p-6">
@@ -328,6 +344,7 @@ fn DetailedView(
                                                 String::new()
                                             };
 
+                                            // Fixed: A student answer is correct if it equals the point value
                                             let is_correct = student_answer == question.point_value;
 
                                             view! {
@@ -416,7 +433,7 @@ fn DetailedView(
 #[component]
 fn GridView(
     questions: Resource<String, Vec<crate::app::models::question::Question>>,
-    score: Resource<(i32, String, i32), Result<Score, ServerFnError>>,
+    score: Resource<(i32, String, i32, i32), Result<Score, ServerFnError>>,
 ) -> impl IntoView {
     // Calculate square grid dimensions
     let grid_dimensions = create_memo(move |_| {
@@ -496,6 +513,7 @@ fn GridView(
                                                         0
                                                     };
 
+                                                    // Fixed: A student answer is correct if it equals the point value
                                                     let is_correct = student_answer == question.point_value;
                                                     let is_selected = create_memo(move |_| {
                                                         selected_question.get() == Some(qnumber)
@@ -566,6 +584,7 @@ fn GridView(
                                             String::new()
                                         };
 
+                                        // Fixed: A student answer is correct if it equals the point value
                                         let is_correct = student_answer == q.point_value;
 
                                         view! {

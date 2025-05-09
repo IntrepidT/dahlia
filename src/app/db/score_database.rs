@@ -11,7 +11,7 @@ cfg_if::cfg_if! {
         use sqlx::PgPool;
 
         pub async fn get_all_scores(pool: &PgPool) -> Result<Vec<Score>, ServerFnError> {
-            let row = sqlx::query("SELECT student_id, date_administered, test_id::text, test_scores, comments, test_variant, evaluator FROM scores")
+            let row = sqlx::query("SELECT student_id, date_administered, test_id::text, test_scores, comments, test_variant, evaluator, attempt FROM scores ORDER BY date_administered DESC")
                 .fetch_all(pool)
                 .await?;
 
@@ -29,6 +29,7 @@ cfg_if::cfg_if! {
                    let comments: Vec<String> = row.get("comments");
                    let test_variant: i32 = row.get("test_variant");
                    let evaluator: String = row.get("evaluator");
+                   let attempt: i32 = row.get("attempt");
 
                    Score {
                        student_id,
@@ -38,16 +39,17 @@ cfg_if::cfg_if! {
                        comments,
                        test_variant,
                        evaluator,
+                       attempt,
                    }
                 })
                 .collect();
             Ok(scores)
         }
 
-        pub async fn get_score(student_id: i32, test_id: String, test_variant: i32, pool: &PgPool)-> Result<Score, ServerFnError> {
+        pub async fn get_score(student_id: i32, test_id: String, test_variant: i32, attempt: i32, pool: &PgPool)-> Result<Score, ServerFnError> {
             let ID = Uuid::parse_str(&test_id).expect("Invalid UUID format");
 
-            let row = sqlx::query("SELECT student_id, date_administered, test_id::text, test_scores, comments, test_variant, evaluator FROM scores WHERE student_id = $1 AND test_id = $2 AND test_variant = $3").bind(&student_id).bind(ID).bind(&test_variant).fetch_one(pool)
+            let row = sqlx::query("SELECT student_id, date_administered, test_id::text, test_scores, comments, test_variant, evaluator, attempt FROM scores WHERE student_id = $1 AND test_id = $2 AND test_variant = $3 AND attempt = $4").bind(&student_id).bind(ID).bind(&test_variant).bind(&attempt).fetch_one(pool)
                 .await
                 .map_err(|e| ServerFnError::new(format!("Database error: {}", e)))?;
 
@@ -63,13 +65,14 @@ cfg_if::cfg_if! {
                 comments: row.get("comments"),
                 test_variant: row.get("test_variant"),
                 evaluator: row.get("evaluator"),
+                attempt: row.get("attempt"),
             };
 
             Ok(score)
         }
 
         pub async fn get_all_student_scores(student_id: i32, pool: &PgPool) -> Result<Vec<Score>, ServerFnError> {
-            let row = sqlx::query("SELECT student_id, date_administered, test_id::text, test_scores, comments, test_variant, evaluator FROM scores WHERE student_id = $1")
+            let row = sqlx::query("SELECT student_id, date_administered, test_id::text, test_scores, comments, test_variant, evaluator, attempt FROM scores WHERE student_id = $1 ORDER BY date_administered DESC")
                 .bind(&student_id)
                 .fetch_all(pool)
                 .await
@@ -89,6 +92,7 @@ cfg_if::cfg_if! {
                     let comments: Vec<String> = row.get("comments");
                     let test_variant: i32 = row.get("test_variant");
                     let evaluator: String = row.get("evaluator");
+                    let attempt: i32 = row.get("attempt");
 
                     Score {
                         student_id,
@@ -98,6 +102,7 @@ cfg_if::cfg_if! {
                         comments,
                         test_variant,
                         evaluator,
+                        attempt,
                     }
                 })
                 .collect();
@@ -107,7 +112,7 @@ cfg_if::cfg_if! {
         pub async fn add_score(new_score_request: &CreateScoreRequest, pool: &sqlx::PgPool) -> Result<Score, ServerFnError> {
             let ID = Uuid::parse_str(&new_score_request.test_id).expect("Invalid UUID format");
             let timestamp = Local::now();
-            let row = sqlx::query("INSERT INTO scores (student_id, date_administered, test_id, test_scores, comments, test_variant, evaluator) VALUES($1, $2, $3, $4, $5, $6, $7) RETURNING student_id, date_administered, test_id::text, test_scores, comments, test_variant, evaluator")
+            let row = sqlx::query("INSERT INTO scores (student_id, date_administered, test_id, test_scores, comments, test_variant, evaluator, attempt) VALUES($1, $2, $3, $4, $5, $6, $7, next_attempt_number($1, $3, $6)) RETURNING student_id, date_administered, test_id::text, test_scores, comments, test_variant, evaluator, attempt")
                 .bind(&new_score_request.student_id)
                 .bind(timestamp)
                 .bind(ID)
@@ -129,18 +134,20 @@ cfg_if::cfg_if! {
                 comments: row.get("comments"),
                 test_variant: row.get("test_variant"),
                 evaluator: row.get("evaluator"),
+                attempt: row.get("attempt"),
             };
 
             Ok(score)
         }
 
-        pub async fn delete_score(student_id: i32, test_id: String, test_variant: i32, pool: &sqlx::PgPool) -> Result<Score, ServerFnError> {
+        pub async fn delete_score(student_id: i32, test_id: String, test_variant: i32, attempt: i32, pool: &sqlx::PgPool) -> Result<Score, ServerFnError> {
             let ID = Uuid::parse_str(&test_id).expect("Invalid UUID format");
 
-            let row = sqlx::query("DELETE FROM scores WHERE student_id = $1 AND test_id = $2 AND test_variant = $3 RETURNING student_id, date_administered, test_id::text, test_scores, comments, test_variant, evaluator")
+            let row = sqlx::query("DELETE FROM scores WHERE student_id = $1 AND test_id = $2 AND test_variant = $3 AND attempt = $4 RETURNING student_id, date_administered, test_id::text, test_scores, comments, test_variant, evaluator, attempt")
                 .bind(&student_id)
                 .bind(ID)
                 .bind(&test_variant)
+                .bind(&attempt)
                 .fetch_one(pool)
                 .await
                 .map_err(|e| ServerFnError::new(format!("Database error: {}", e)))?;
@@ -155,6 +162,7 @@ cfg_if::cfg_if! {
                 comments: row.get("comments"),
                 test_variant: row.get("test_variant"),
                 evaluator: row.get("evaluator"),
+                attempt: row.get("attempt"),
             };
 
             Ok(deleted_score)

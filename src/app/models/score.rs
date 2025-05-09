@@ -12,6 +12,7 @@ pub struct Score {
     pub comments: Vec<String>,
     pub test_variant: i32,
     pub evaluator: String,
+    pub attempt: i32,
     //in theory it should be most efficient to use a hashmap whereby the key to the map is the
     //qnumber from the questions_table and links to the tuple: (points, comments)
 }
@@ -26,6 +27,7 @@ impl Score {
         comments: Vec<String>,
         test_variant: i32,
         evaluator: String,
+        attempt: i32,
     ) -> Score {
         Score {
             student_id,
@@ -35,6 +37,7 @@ impl Score {
             comments,
             test_variant,
             evaluator,
+            attempt,
         }
     }
     pub fn get_total(&self) -> i32 {
@@ -82,6 +85,7 @@ pub struct UpdateScoreRequest {
     pub comments: Vec<String>,
     pub test_variant: i32,
     pub evaluator: String,
+    pub attempt: i32,
 }
 
 impl UpdateScoreRequest {
@@ -94,6 +98,7 @@ impl UpdateScoreRequest {
         test_variant: i32,
         //I think i want this to be Local date offset on the front end but save to UTC on the back
         evaluator: String,
+        attempt: i32,
     ) -> UpdateScoreRequest {
         UpdateScoreRequest {
             student_id,
@@ -103,6 +108,7 @@ impl UpdateScoreRequest {
             comments,
             test_variant,
             evaluator,
+            attempt,
         }
     }
 }
@@ -113,14 +119,21 @@ pub struct DeleteScoreRequest {
     //test_id refers to the key used to create the hashmap
     pub test_id: String,
     pub test_variant: i32,
+    pub attempt: i32,
 }
 
 impl DeleteScoreRequest {
-    pub fn new(student_id: i32, test_id: String, test_variant: i32) -> DeleteScoreRequest {
+    pub fn new(
+        student_id: i32,
+        test_id: String,
+        test_variant: i32,
+        attempt: i32,
+    ) -> DeleteScoreRequest {
         DeleteScoreRequest {
             student_id,
             test_id,
             test_variant,
+            attempt,
         }
     }
 }

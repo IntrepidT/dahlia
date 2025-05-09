@@ -201,20 +201,20 @@ pub fn GridTest() -> impl IntoView {
             let count = questions_list.len();
             // Determine appropriate cell size based on question count
             if count > 100 {
-                "text-xl" // Extremely small text for very many questions
+                "text-xs" // Extremely small text for very many questions
             } else if count > 64 {
-                "text-xl" // Very small text for many questions
+                "text-sm" // Very small text for many questions
             } else if count > 36 {
-                "text-2xl" // Small text for lots of questions
+                "text-base" // Small text for lots of questions
             } else if count > 16 {
-                "text-2xl" // Normal text for medium count
+                "text-lg" // Normal text for medium count
             } else if count > 9 {
-                "text-3xl" // Larger text for few questions
+                "text-xl" // Larger text for few questions
             } else {
-                "text-4xl" // Very large text for very few questions
+                "text-2xl" // Very large text for very few questions
             }
         } else {
-            "text-lg" // Default size
+            "text-base" // Default size
         }
     });
 
@@ -232,30 +232,32 @@ pub fn GridTest() -> impl IntoView {
     });
 
     view! {
-        <div class="p-4 max-w-screen h-screen flex flex-col bg-gray-50 overflow-hidden">
-            {/* Header with Student Selection and Evaluator - Styled like FlashCardSet */}
-            <div class="flex flex-wrap items-center justify-between mb-4 max-w-4xl mx-auto w-full">
-                <div class="w-full md:w-1/2 mb-2 md:mb-0">
-                    <StudentSelect set_selected_student_id=set_selected_student_id />
+        <div class="flex flex-col h-screen bg-gray-50 overflow-hidden">
+            {/* Header with Student Selection and Evaluator - Fixed at top */}
+            <div class="p-4 bg-white shadow-sm">
+                <div class="flex flex-wrap items-center justify-between mb-2 max-w-4xl mx-auto w-full">
+                    <div class="w-full md:w-1/2 mb-2 md:mb-0">
+                        <StudentSelect set_selected_student_id=set_selected_student_id />
+                    </div>
+                    <div class="text-sm text-gray-600 font-medium">
+                        {"Evaluator: "}
+                        {evaluator_id}
+                    </div>
                 </div>
-                <div class="text-sm text-gray-600 font-medium">
-                    {"Evaluator: "}
-                    {evaluator_id}
+
+                {/* Test Title */}
+                <div class="text-center">
+                    <h2 class="text-xl font-medium text-gray-700 break-words">
+                        {move || match &test_details.get() {
+                            Some(Some(test)) => test.name.clone(),
+                            _ => test_id()
+                        }}
+                    </h2>
                 </div>
             </div>
 
-            {/* Test Title */}
-            <div class="text-center mb-4">
-                <h2 class="text-xl font-medium text-gray-700 break-words">
-                    {move || match &test_details.get() {
-                        Some(Some(test)) => test.name.clone(),
-                        _ => test_id()
-                    }}
-                </h2>
-            </div>
-
-            {/* Main content area with grid - takes maximum available space */}
-            <div class="flex-grow flex flex-col">
+            {/* Main container with grid and comments - scrollable with proper height constraints */}
+            <div class="flex-1 flex flex-col overflow-auto p-4">
                 <Suspense
                     fallback=move || view! { <div class="flex justify-center items-center h-full">
                         <div class="animate-pulse bg-white rounded w-full h-full flex items-center justify-center">
@@ -289,64 +291,61 @@ pub fn GridTest() -> impl IntoView {
                                 let current_cell_size = cell_size_class();
 
                                 view! {
-                                    <div class="flex flex-col h-full">
-                                        {/* Main grid - takes most of the space and adapts to fill available area */}
-                                        <div class="flex-grow flex items-center justify-center p-1 overflow-hidden">
-                                            {/* Perfect square container with minimal gaps */}
-                                            <div class="aspect-square h-full max-w-full bg-white rounded shadow-md">
-                                                <div
-                                                    class="grid h-full w-full"
-                                                    style=move || format!(
-                                                        "grid-template-columns: repeat({}, minmax(0, 1fr)); grid-template-rows: repeat({}, minmax(0, 1fr)); gap: 1px; background-color: #e5e7eb;",
-                                                        cols, rows
-                                                    )
-                                                >
-                                                    {move || {
-                                                        sorted_questions().into_iter().map(|question| {
-                                                            let qnumber = question.qnumber;
-                                                            let display_text = question.word_problem.clone();
+                                    <div class="flex flex-col h-full gap-4">
+                                        {/* Grid container with fixed max height instead of aspect-square */}
+                                        <div class="bg-white rounded shadow-md p-2 max-h-[55vh] overflow-auto">
+                                            <div
+                                                class="grid w-full"
+                                                style=move || format!(
+                                                    "grid-template-columns: repeat({}, minmax(0, 1fr)); grid-template-rows: repeat({}, minmax(0, 1fr)); gap: 1px; background-color: #e5e7eb;",
+                                                    cols, rows
+                                                )
+                                            >
+                                                {move || {
+                                                    sorted_questions().into_iter().map(|question| {
+                                                        let qnumber = question.qnumber;
+                                                        let display_text = question.word_problem.clone();
 
-                                                            let is_correct = create_memo(move |_| {
-                                                                responses.with(|r| {
-                                                                    r.get(&qnumber)
-                                                                     .map(|resp| resp.answer == "true")
-                                                                     .unwrap_or(true) // Default to true if not explicitly marked
-                                                                })
-                                                            });
+                                                        let is_correct = create_memo(move |_| {
+                                                            responses.with(|r| {
+                                                                r.get(&qnumber)
+                                                                 .map(|resp| resp.answer == "true")
+                                                                 .unwrap_or(true) // Default to true if not explicitly marked
+                                                            })
+                                                        });
 
-                                                            let is_selected = create_memo(move |_| {
-                                                                selected_question.get() == Some(qnumber)
-                                                            });
+                                                        let is_selected = create_memo(move |_| {
+                                                            selected_question.get() == Some(qnumber)
+                                                        });
 
-                                                            view! {
-                                                                <div
-                                                                    class="flex items-center justify-center cursor-pointer transition-all relative"
-                                                                    class:bg-green-100=move || is_correct()
-                                                                    class:bg-red-100=move || !is_correct()
-                                                                    class:ring-2=move || is_selected()
-                                                                    class:ring-blue-500=move || is_selected()
-                                                                    on:click=move |_| toggle_answer(qnumber)
-                                                                >
-                                                                    <span class=format!("select-none font-bold {} px-1 py-1 text-center", current_cell_size)>{display_text}</span>
-                                                                    {move || if !is_correct() {
-                                                                        view! {
-                                                                            <span class="absolute top-0 right-0 text-xs bg-red-500 text-white rounded-full w-3 h-3 flex items-center justify-center">
-                                                                                "×"
-                                                                            </span>
-                                                                        }.into_view()
-                                                                    } else {
-                                                                        view! { <span></span> }.into_view()
-                                                                    }}
-                                                                </div>
-                                                            }
-                                                        }).collect_view()
-                                                    }}
-                                                </div>
+                                                        view! {
+                                                            <div
+                                                                class="flex items-center justify-center cursor-pointer transition-all relative p-2"
+                                                                class:bg-green-100=move || is_correct()
+                                                                class:bg-red-100=move || !is_correct()
+                                                                class:ring-2=move || is_selected()
+                                                                class:ring-blue-500=move || is_selected()
+                                                                on:click=move |_| toggle_answer(qnumber)
+                                                            >
+                                                                <span class=format!("select-none font-medium {} px-1 py-1 text-center", current_cell_size)>{display_text}</span>
+                                                                {move || if !is_correct() {
+                                                                    view! {
+                                                                        <span class="absolute top-0 right-0 text-xs bg-red-500 text-white rounded-full w-3 h-3 flex items-center justify-center">
+                                                                            "×"
+                                                                        </span>
+                                                                    }.into_view()
+                                                                } else {
+                                                                    view! { <span></span> }.into_view()
+                                                                }}
+                                                            </div>
+                                                        }
+                                                    }).collect_view()
+                                                }}
                                             </div>
                                         </div>
 
-                                        {/* Comments section styled like FlashCardSet */}
-                                        <div class="mt-4 bg-white rounded-lg shadow-sm p-4 mb-4">
+                                        {/* Comments section - will now always be visible */}
+                                        <div class="bg-white rounded-lg shadow-sm p-4">
                                             {move || match selected_question.get() {
                                                 Some(qnumber) => {
                                                     let question_text = sorted_questions().iter()
@@ -373,15 +372,15 @@ pub fn GridTest() -> impl IntoView {
                                                     }.into_view()
                                                 },
                                                 None => view! {
-                                                    <div class="text-sm text-gray-500 italic py-6 text-center">
+                                                    <div class="text-sm text-gray-500 italic py-3 text-center">
                                                         "Click any grid cell to select it and add comments"
                                                     </div>
                                                 }.into_view()
                                             }}
                                         </div>
 
-                                        {/* Submit Button section - styled like FlashCardSet */}
-                                        <div class="flex flex-wrap items-center justify-center gap-4 mb-4">
+                                        {/* Submit Button section - always visible */}
+                                        <div class="flex flex-wrap items-center justify-center gap-4 mb-2">
                                             {move || if !is_submitted.get() {
                                                 view! {
                                                     <button

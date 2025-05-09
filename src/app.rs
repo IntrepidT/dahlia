@@ -154,7 +154,7 @@ pub fn App() -> impl IntoView {
                                 </RequireRole>
                             }
                         }/>
-                        <Route path="/reviewtest/:test_id/:student_id/:test_variant" view=|| {
+                        <Route path="/reviewtest/:test_id/:student_id/:test_variant/:attempt" view=|| {
                             view! {
                                 <RequireRole role="teacher".to_string()>
                                     <RequireRole role="admin".to_string()>

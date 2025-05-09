@@ -41,6 +41,7 @@ pub async fn get_score(
     student_id: i32,
     test_id: String,
     test_variant: i32,
+    attempt: i32,
 ) -> Result<Score, ServerFnError> {
     #[cfg(feature = "ssr")]
     {
@@ -52,7 +53,7 @@ pub async fn get_score(
 
         log::info!("Attempting to retrieve all scores from database");
 
-        match score_database::get_score(student_id, test_id, test_variant, &pool).await {
+        match score_database::get_score(student_id, test_id, test_variant, attempt, &pool).await {
             Ok(score) => {
                 log::info!("Successfully retrieved score from database");
                 Ok(score)
@@ -144,6 +145,7 @@ pub async fn delete_score(
             delete_score_request.student_id,
             delete_score_request.test_id,
             delete_score_request.test_variant,
+            delete_score_request.attempt,
             &pool,
         )
         .await
