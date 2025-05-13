@@ -26,6 +26,7 @@ pub struct FilterState {
     pub student_504_filter: bool,
     pub readplan_filter: bool,
     pub gt_filter: bool,
+    pub bip_filter: bool,
 }
 
 #[component]
@@ -39,6 +40,7 @@ pub fn SearchFilter(
     #[prop(into)] set_student_504_filter: Callback<bool>,
     #[prop(into)] set_readplan_filter: Callback<bool>,
     #[prop(into)] set_gt_filter: Callback<bool>,
+    #[prop(into)] set_bip_filter: Callback<bool>,
     #[prop(into)] teachers: Signal<Vec<String>>,
     #[prop(into)] search_term: Signal<String>,
     #[prop(into)] on_clear_filters: Callback<()>,
@@ -49,6 +51,7 @@ pub fn SearchFilter(
     let student_504_checkbox_ref = create_node_ref::<html::Input>();
     let readplan_checkbox_ref = create_node_ref::<html::Input>();
     let gt_checkbox_ref = create_node_ref::<html::Input>();
+    let bip_checkbox_ref = create_node_ref::<html::Input>();
     let intervention_filter_ref = create_node_ref::<html::Select>();
     let grade_filter_ref = create_node_ref::<html::Select>();
     let teacher_filter_ref = create_node_ref::<html::Select>();
@@ -213,6 +216,18 @@ pub fn SearchFilter(
                             />
                             <label for="gt-filter" class="text-xs sm:text-sm text-gray-700">"GT"</label>
                         </div>
+
+                        // BEH filter
+                        <div class="flex items-center mr-2">
+                            <input
+                                type="checkbox"
+                                id="bip-filter"
+                                class=CHECKBOX_STYLE
+                                on:change=move |ev| set_bip_filter(event_target_checked(&ev))
+                                node_ref=bip_checkbox_ref
+                            />
+                            <label for="bip-filter" class="text-xs sm:text-sm text-gray-700">"BEH"</label>
+                        </div>
                     </div>
                 </Show>
             </div>
@@ -246,6 +261,9 @@ pub fn SearchFilter(
                             input.set_checked(false);
                         }
                         if let Some(input) = gt_checkbox_ref.get() {
+                            input.set_checked(false);
+                        }
+                        if let Some(input) = bip_checkbox_ref.get() {
                             input.set_checked(false);
                         }
 

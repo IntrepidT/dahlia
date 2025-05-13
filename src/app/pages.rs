@@ -45,3 +45,6 @@ pub use student_results::TestResultsPage;
 
 pub mod settings;
 pub use settings::Settings;
+
+pub mod gradebook;
+pub use gradebook::Gradebook;

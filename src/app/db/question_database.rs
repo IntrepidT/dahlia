@@ -13,7 +13,7 @@ cfg_if::cfg_if! {
         pub async fn get_all_questions(test_id: String, pool: &sqlx::PgPool) -> Result<Vec<Question>, ServerFnError> {
             let ID = Uuid::parse_str(&test_id).expect("Invalid UUID format");
 
-            let rows = sqlx::query("SELECT word_problem, point_value, question_type, options, correct_answer, qnumber, testlinker FROM question_table WHERE testlinker = $1::uuid")
+            let rows = sqlx::query("SELECT word_problem, point_value, question_type, options, correct_answer, qnumber, testlinker FROM question_table WHERE testlinker = $1::uuid ORDER BY qnumber ASC")
                 .bind(&ID)
                 .fetch_all(pool)
                 .await?;

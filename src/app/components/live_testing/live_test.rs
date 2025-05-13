@@ -7,6 +7,7 @@ use crate::app::models::websocket_session::{CreateSessionRequest, SessionSummary
 use crate::app::server_functions::questions::get_questions;
 use crate::app::server_functions::scores::add_score;
 use crate::app::server_functions::students::get_students;
+use crate::app::server_functions::tests::get_test;
 use crate::app::server_functions::{tests::get_tests, websocket_sessions};
 use chrono::{DateTime, Duration, Utc};
 use leptos::ev::ErrorEvent;
@@ -419,6 +420,10 @@ pub fn RealtimeTestSession() -> impl IntoView {
     // Create or join session
     create_effect(move |_| {
         let tid = test_id();
+        let test_name = match &test_details() {
+            Some(Some(test)) => test.name.clone(),
+            _ => "Could not get test".to_string(),
+        };
         if !tid.is_empty() {
             spawn_local(async move {
                 // First check if there's an active session for this test
@@ -439,10 +444,10 @@ pub fn RealtimeTestSession() -> impl IntoView {
                         } else {
                             // Create new session
                             let request = CreateSessionRequest {
-                                name: format!("Test Session for {}", tid),
+                                name: format!("Test Session for {}", test_name),
                                 description: Some(format!(
-                                    "Interactive test session for test {}",
-                                    tid
+                                    "Hosted by: evaluator {}",
+                                    &evaluator_id()
                                 )),
                                 session_type: Some(SessionType::Test),
                                 test_id: Some(tid),

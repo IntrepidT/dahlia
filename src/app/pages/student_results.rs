@@ -211,7 +211,7 @@ pub fn TestResultsPage() -> impl IntoView {
                                                                                                 <th class="py-2 px-3 text-left text-sm">"Score"</th>
                                                                                                 <th class="py-2 px-3 text-left text-sm">"Total"</th>
                                                                                                 <th class="py-2 px-3 text-left text-sm">"Test Area"</th>
-                                                                                                <th class="py-2 px-3 text-left text-sm">"Date Taken"</th>
+                                                                                                <th class="py-2 px-3 text-left text-sm">"Taken"</th>
                                                                                                 <th class="py-2 px-3 text-left text-sm">"Performance"</th>
                                                                                             </tr>
                                                                                         </thead>
@@ -477,9 +477,9 @@ pub fn TestResultsPage() -> impl IntoView {
                                                     <thead class="bg-gray-100">
                                                         <tr>
                                                             <th class="py-2 px-4 text-left">"Test Name"</th>
-                                                            <th class="py-2 px-4 text-left">"Date Taken"</th>
+                                                            <th class="py-2 px-4 text-left">"Taken"</th>
                                                             <th class="py-2 px-4 text-left">"Score"</th>
-                                                            <th class="py-2 px-4 text-left">"Total Possible"</th>
+                                                            <th class="py-2 px-4 text-left">"Possible"</th>
                                                             <th class="py-2 px-4 text-left">"Percentage"</th>
                                                             <th class="py-2 px-4 text-left">"Performance"</th>
                                                             <th class="py-2 px-4 text-left">"Evaluator"</th>

@@ -1,5 +1,7 @@
 use icondata::IoChatbubbleEllipsesOutline;
-use icondata::{AiApiOutlined, AiBarChartOutlined, AiHomeOutlined, AiSettingOutlined, ChStack};
+use icondata::{
+    AiApiOutlined, AiBarChartOutlined, AiHomeOutlined, AiSettingOutlined, ChStack, FiBook,
+};
 // Add new imports for additional icons, including pin/unpin icons
 use crate::app::components::ShowAdministerTestModal;
 use icondata::{
@@ -28,6 +30,7 @@ pub enum SidebarSelected {
     TeacherView,
     AdministerTest,
     Live,
+    Gradebook,
     Assessments,
 }
 const GRAY_COLOR: &str = "text-[#DADADA]";
@@ -117,6 +120,22 @@ pub fn DashboardSidebar(
         } else {
             // If pinning closed, we collapse the sidebar
             set_is_expanded(false);
+            // Also hide the modal if it's currently shown
+            if show_administer_modal() {
+                set_show_administer_modal(false);
+            }
+        }
+    };
+
+    // Handle administer test click with consideration for pinned state
+    let handle_administer_click = move |_| {
+        if is_pinned_closed() {
+            // When pinned closed, we need to temporarily expand to show the modal
+            set_is_expanded(true);
+            set_show_administer_modal(true);
+        } else {
+            // Normal toggle behavior when not pinned closed
+            set_show_administer_modal.update(|v| *v = !*v);
         }
     };
 
@@ -174,11 +193,19 @@ pub fn DashboardSidebar(
                             is_active=Signal::derive(move || current_path().starts_with("/assessments"))
                             is_small_screen=is_small_screen.into()
                         />
+                        <SidebarNavLink
+                            icon=FiBook
+                            label="Gradebook"
+                            path="/gradebook"
+                            is_expanded=is_expanded.into()
+                            is_active=Signal::derive(move || current_path().starts_with("/gradebook"))
+                            is_small_screen=is_small_screen.into()
+                        />
 
-                        // Administer Test item with dropdown
+                        // Administer Test item with dropdown - Updated click handler
                         <div
                             class="flex items-center cursor-pointer hover:bg-[#DADADA] p-2 rounded-md transition-colors"
-                            on:click=move |_| set_show_administer_modal.update(|v| *v = !*v)
+                            on:click=handle_administer_click
                         >
                             <Icon
                                 icon=IoPricetagOutline
@@ -239,61 +266,29 @@ pub fn DashboardSidebar(
                                 </span>
                             </Show>
                         </div>
-
-                        /*// Original sidebar items
-                        <SidebarItem
-                            icon=AiHomeOutlined
-                            label="Overview"
-                            description="View your main dashboard metrics"
-                            is_expanded=is_expanded.into()
-                            is_selected=Signal::derive(move || selected_item() == SidebarSelected::Overview)
-                            on_click=move |_| set_selected_item(SidebarSelected::Overview)
-                            is_small_screen=is_small_screen.into()
-                        />
-                        <SidebarItem
-                            icon=AiBarChartOutlined
-                            label="Analytics"
-                            description="Deep dive into your performance data"
-                            is_expanded=is_expanded.into()
-                            is_selected=Signal::derive(move || selected_item() == SidebarSelected::Analytics)
-                            on_click=move |_| set_selected_item(SidebarSelected::Analytics)
-                            is_small_screen=is_small_screen.into()
-                        />
-                        <SidebarItem
-                            icon=IoChatbubbleEllipsesOutline
-                            label="Chat"
-                            description="Communicate with your coworkers"
-                            is_expanded=is_expanded.into()
-                            is_selected=Signal::derive(move || selected_item() == SidebarSelected::Chat)
-                            on_click=move |_| set_selected_item(SidebarSelected::Chat)
-                            is_small_screen=is_small_screen.into()
-                        />
-                        <SidebarItem
-                            icon=AiSettingOutlined
-                            label="Settings"
-                            description="Customize your account preferences"
-                            is_expanded=is_expanded.into()
-                            is_selected=Signal::derive(move || selected_item() == SidebarSelected::Settings)
-                            on_click=move |_| set_selected_item(SidebarSelected::Settings)
-                            is_small_screen=is_small_screen.into()
-                        />
-                        */
-                    </div>
+            </div>
                 </div>
             </div>
 
-            // Modal Dropdown - Improved positioning with responsive adjustments
-            <Show when=move || show_administer_modal() && is_expanded()>
+            // Modal Dropdown - Improved display logic for pinned state
+            <Show when=move || show_administer_modal()>
                 <div
                     class="fixed z-50 hover-area"
                     style=move || modal_position()
-                    on:mouseenter=move |_| set_is_expanded(true) // Keep sidebar open when hovering modal
+                    on:mouseenter=move |_| {
+                        // Keep sidebar expanded when hovering modal
+                        set_is_expanded(true);
+                    }
                     on:mouseleave=move |_| {
-                        // Only close everything when leaving the modal and not pinned
-                        if !is_pinned_closed() {
+                        // If pinned closed, hide modal but keep sidebar collapsed
+                        if is_pinned_closed() {
+                            set_show_administer_modal(false);
                             set_is_expanded(false);
+                        } else {
+                            // Normal behavior when not pinned
+                            set_is_expanded(false);
+                            set_show_administer_modal(false);
                         }
-                        set_show_administer_modal(false);
                     }
                 >
                     <ShowAdministerTestModal set_if_show_modal=set_show_administer_modal />

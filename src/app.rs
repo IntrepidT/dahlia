@@ -10,9 +10,9 @@ pub mod websockets;
 use components::live_test::RealtimeTestSession;
 use components::test_templates::{FlashCardSet, GridTest};
 use pages::{
-    AdministerTest, Assessment, AssessmentPage, Dashboard, HomePage, LoginPage, MathTesting,
-    MyAccount, ReadingTesting, ReviewTest, Settings, StudentView, Teachers, TestBuilder,
-    TestResultsPage, TestSessionsList,
+    AdministerTest, Assessment, AssessmentPage, Dashboard, Gradebook, HomePage, LoginPage,
+    MathTesting, MyAccount, ReadingTesting, ReviewTest, Settings, StudentView, Teachers,
+    TestBuilder, TestResultsPage, TestSessionsList,
 };
 pub mod components;
 use components::auth::*;
@@ -98,6 +98,15 @@ pub fn App() -> impl IntoView {
                         <Route path="/login" view=|| {
                             view!{
                                 <LoginPage />
+                            }
+                        }/>
+                        <Route path="/gradebook" view=|| {
+                            view!{
+                                <RequireRole role="admin".to_string()>
+                                    <RequireRole role="teacher".to_string()>
+                                        <Gradebook />
+                                    </RequireRole>
+                                </RequireRole>
                             }
                         }/>
                         <Route path="/mathtesting" view=|| {

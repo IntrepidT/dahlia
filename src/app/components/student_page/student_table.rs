@@ -21,7 +21,8 @@ const TABLE_CONTAINER_STYLE: &str =
     "bg-[#F9F9F8] rounded-lg shadow-sm border border-[#DADADA] overflow-hidden";
 const TABLE_HEADER_STYLE: &str =
     "py-3 md:py-5 px-4 md:px-6 flex justify-between items-center bg-[#2E3A59] border-b border-[#2E3A59]";
-const TABLE_WRAPPER_STYLE: &str = "overflow-x-auto h-[calc(100vh-15rem)] md:h-[42rem]";
+const TABLE_WRAPPER_STYLE: &str =
+    "overflow-x-auto h-[calc(100vh-15rem)] md:h-[42rem] overflow-y-auto";
 const TABLE_STYLE: &str = "min-w-full divide-y divide-[#DADADA]";
 const HEADER_CELL_STYLE: &str =
     "px-2 md:px-6 py-2 md:py-3 text-left text-xs font-medium text-[#2E3A59] uppercase tracking-wider";
@@ -42,6 +43,7 @@ pub fn StudentTable(
     #[prop(into)] student_504_filter: Signal<bool>,
     #[prop(into)] readplan_filter: Signal<bool>,
     #[prop(into)] gt_filter: Signal<bool>,
+    #[prop(into)] bip_filter: Signal<bool>,
     #[prop(into)] is_panel_expanded: Signal<bool>,
     #[prop(into)] selected_student: Signal<Option<Rc<Student>>>,
     #[prop(into)] set_selected_student: WriteSignal<Option<Rc<Student>>>,
@@ -56,6 +58,7 @@ pub fn StudentTable(
         let show_504 = student_504_filter();
         let show_readplan = readplan_filter();
         let show_gt = gt_filter();
+        let show_bip = bip_filter();
 
         students
             .get()
@@ -89,11 +92,12 @@ pub fn StudentTable(
                         .as_ref()
                         .map(|i| i.to_string().contains(&intervention))
                         .unwrap_or(false);
-                
+
                 // New filters - assuming these fields exist on Student
                 let matches_504 = !show_504 || student.student_504;
                 let matches_readplan = !show_readplan || student.readplan;
                 let matches_gt = !show_gt || student.gt;
+                let matches_bip = !show_bip || student.bip;
 
                 matches_search
                     && matches_grade
@@ -104,10 +108,11 @@ pub fn StudentTable(
                     && matches_504
                     && matches_readplan
                     && matches_gt
+                    && matches_bip
             })
             .collect::<Vec<_>>()
     });
-    
+
     view! {
         <div class=TABLE_CONTAINER_STYLE>
             <div class=TABLE_HEADER_STYLE>
@@ -134,11 +139,12 @@ pub fn StudentTable(
                                 <th class=format!("{} {}", HEADER_CELL_STYLE, "whitespace-nowrap")>"IEP"</th>
                                 <th class=format!("{} {}", HEADER_CELL_STYLE, "whitespace-nowrap")>"ESL"</th>
                                 <th class=format!("{} {}", HEADER_CELL_STYLE, "whitespace-nowrap")>"Intervention"</th>
-                                
+
                                 // Additional columns that appear regardless of panel state
                                 <th class=format!("{} {}", HEADER_CELL_STYLE, "whitespace-nowrap")>"504 Plan"</th>
                                 <th class=format!("{} {}", HEADER_CELL_STYLE, "whitespace-nowrap")>"Read Plan"</th>
                                 <th class=format!("{} {}", HEADER_CELL_STYLE, "whitespace-nowrap")>"GT"</th>
+                                <th class=format!("{} {}", HEADER_CELL_STYLE, "whitespace-nowrap")>"BEH"</th>
                             </tr>
                         </thead>
                         <Suspense fallback=move || view! {
@@ -178,7 +184,7 @@ pub fn StudentTable(
                                                     <td class=format!("{} {}", CELL_STYLE, "text-[#2E3A59] text-opacity-70")>{&student.student_id.to_string()}</td>
                                                     <td class=format!("{} {}", CELL_STYLE, "text-[#2E3A59] text-opacity-70")>{&student.grade.to_string()}</td>
                                                     <td class=format!("{} {}", CELL_STYLE, "text-[#2E3A59] text-opacity-70")>{&student.teacher.to_string()}</td>
-                                                    
+
                                                     // IEP Column
                                                     <td class=CELL_STYLE>
                                                         { if student.iep {
@@ -195,7 +201,7 @@ pub fn StudentTable(
                                                             }
                                                         }}
                                                     </td>
-                                                    
+
                                                     // ESL Column
                                                     <td class=CELL_STYLE>
                                                         { if student.esl != ESLEnum::NotApplicable {
@@ -212,7 +218,7 @@ pub fn StudentTable(
                                                             }
                                                         }}
                                                     </td>
-                                                    
+
                                                     // Intervention Column
                                                     <td class=CELL_STYLE>
                                                         { if let Some(intervention) = &student.intervention {
@@ -229,7 +235,7 @@ pub fn StudentTable(
                                                             }
                                                         }}
                                                     </td>
-                                                    
+
                                                     // 504 Plan Column
                                                     <td class=CELL_STYLE>
                                                         { if student.student_504 {
@@ -246,7 +252,7 @@ pub fn StudentTable(
                                                             }
                                                         }}
                                                     </td>
-                                                    
+
                                                     // Read Plan Column
                                                     <td class=CELL_STYLE>
                                                         { if student.readplan {
@@ -263,7 +269,7 @@ pub fn StudentTable(
                                                             }
                                                         }}
                                                     </td>
-                                                    
+
                                                     // GT Column
                                                     <td class=CELL_STYLE>
                                                         { if student.gt {
@@ -275,6 +281,23 @@ pub fn StudentTable(
                                                         } else {
                                                             view! {
                                                                 <span class="px-2 py-1 text-xs font-medium rounded-full bg-[#F44336] bg-opacity-40 text-[#2E3A59]">
+                                                                    "No"
+                                                                </span>
+                                                            }
+                                                        }}
+                                                    </td>
+
+                                                    //BEH/BIP column
+                                                    <td class=CELL_STYLE>
+                                                        { if student.bip {
+                                                            view! {
+                                                                <span class="px-2 py-1 text-xs font-medium rounded-full bg-[#4CAF50] bg-opacity-40 text-[#2E3A59]">
+                                                                    "Yes"
+                                                                </span>
+                                                          }
+                                                        } else {
+                                                            view! {
+                                                                <span class="px-2 py-1 text-xs font-medium rounded-full bg-[#4CAF50] bg-opacity-40 text-[#2E3A59]">
                                                                     "No"
                                                                 </span>
                                                             }

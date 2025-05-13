@@ -81,6 +81,7 @@ pub fn StudentView() -> impl IntoView {
     let (student_504_filter, set_student_504_filter) = create_signal(false);
     let (readplan_filter, set_readplan_filter) = create_signal(false);
     let (gt_filter, set_gt_filter) = create_signal(false);
+    let (bip_filter, set_bip_filter) = create_signal(false);
 
     // Adding student state
     let (adding_student, set_adding_student) = create_signal(false);
@@ -177,6 +178,7 @@ pub fn StudentView() -> impl IntoView {
         set_student_504_filter(false);
         set_readplan_filter(false);
         set_gt_filter(false);
+        set_bip_filter(false);
     };
 
     // Grade filter transformer (converts "all" to empty string for matching logic)
@@ -269,6 +271,7 @@ pub fn StudentView() -> impl IntoView {
                     set_student_504_filter=set_student_504_filter
                     set_readplan_filter=set_readplan_filter
                     set_gt_filter=set_gt_filter
+                    set_bip_filter=set_bip_filter
                     search_term=search_term
                     teachers=Signal::derive(move || teacher_names())
                     on_clear_filters=Callback::new(handle_clear_filters)
@@ -287,6 +290,7 @@ pub fn StudentView() -> impl IntoView {
                     student_504_filter=student_504_filter
                     readplan_filter=readplan_filter
                     gt_filter=gt_filter
+                    bip_filter=bip_filter
                     is_panel_expanded=Signal::derive(move || panel_expanded())
                     selected_student=selected_student
                     set_selected_student=set_selected_student

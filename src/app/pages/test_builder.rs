@@ -42,7 +42,7 @@ pub fn TestBuilder() -> impl IntoView {
     let (test_instructions, set_test_instructions) = create_signal(String::new());
     let (test_area, set_test_area) = create_signal(String::new());
     let (school_year, set_school_year) = create_signal(String::new());
-    let (grade_level, set_grade_level) = create_signal(String::new());
+    let (grade_level, set_grade_level) = create_signal::<Option<GradeEnum>>(None);
     let (benchmark_categories, set_benchmark_categories) =
         create_signal::<Vec<(i32, i32, i32, String)>>(Vec::new());
     let (test_variant, set_test_variant) = create_signal(0);
@@ -111,6 +111,7 @@ pub fn TestBuilder() -> impl IntoView {
             set_is_edit_mode(true);
             set_test_id(test.test_id.clone());
             set_test_title(test.name.clone());
+            set_grade_level(test.grade_level.clone());
             set_test_area(test.testarea.clone().to_string());
             set_school_year(test.school_year.clone().unwrap_or_default());
             set_test_comments(test.comments.clone());
@@ -124,12 +125,6 @@ pub fn TestBuilder() -> impl IntoView {
                 .map(|(idx, cat)| (idx as i32, cat.min, cat.max, cat.label.clone()))
                 .collect::<Vec<_>>();
             set_benchmark_categories(tuple_categories);
-
-            set_grade_level(
-                test.grade_level
-                    .as_ref()
-                    .map_or("default".to_string(), |grade| grade.to_string()),
-            );
         }
     });
 
@@ -244,19 +239,6 @@ pub fn TestBuilder() -> impl IntoView {
         // Calculate total points from current questions for initial test creation
         let total_points: i32 = questions.get().iter().map(|q| q.point_value).sum();
 
-        let convert_grade_to_enum = match GradeEnum::from_str(&grade_level()) {
-            Ok(grade_enum) => grade_enum,
-            Err(_) => {
-                set_error_message(format!(
-                    "Grade Enum was not converted correctly: {}",
-                    grade_level()
-                ));
-                set_show_error(true);
-                set_is_submitting(false);
-                return;
-            }
-        };
-
         // Convert our tuple representation back to BenchmarkCategory
         let converted_cats = if benchmark_categories().is_empty() {
             None
@@ -282,7 +264,7 @@ pub fn TestBuilder() -> impl IntoView {
             Some(school_year()),
             converted_cats.clone(),
             test_variant(),
-            Some(convert_grade_to_enum.clone()),
+            grade_level(),
         );
 
         let converted_clone = converted_cats.clone();
@@ -300,7 +282,7 @@ pub fn TestBuilder() -> impl IntoView {
                     Some(school_year()),
                     converted_clone,
                     test_variant(),
-                    Some(convert_grade_to_enum),
+                    grade_level(),
                     test_id(),
                 );
                 // For now, we'll assume we're just keeping the same test_id
@@ -397,7 +379,10 @@ pub fn TestBuilder() -> impl IntoView {
             // Always update assessment scores, whether this is a new test or an edited one
             match update_assessment_score(new_test_id.clone()).await {
                 Ok(_) => {
-                    log::info!("Successfully updated assessment scores for test: {}", new_test_id);
+                    log::info!(
+                        "Successfully updated assessment scores for test: {}",
+                        new_test_id
+                    );
                 }
                 Err(e) => {
                     log::error!("Failed to update assessment scores: {:?}", e);
@@ -536,13 +521,19 @@ pub fn TestBuilder() -> impl IntoView {
                                         "Test Grade Level"
                                     </label>
                                     <select
+                                        required
                                         class="w-full px-4 py-3 rounded-md border border-gray-300 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                                        prop:value=grade_level
-                                        on:input=move |event| {
-                                            set_grade_level(event_target_value(&event));
+                                        prop:value={move || grade_level.get().map(|g| g.to_string()).unwrap_or_else(|| "None".to_string())}
+                                        on:change=move |event| {
+                                            let value = event_target_value(&event);
+                                            match value.parse::<GradeEnum>() {
+                                                Ok(grade_enum) => set_grade_level(Some(grade_enum)),
+                                                Err(_) => ()
+                                            }
                                         }
                                     >
                                         <option value="">Select Grade</option>
+                                        <option value="None">"None"</option>
                                         {GradeEnum::iter().map(|grade| view! {
                                             <option value=format!("{}", grade)>
                                                 {format!("{}", grade)}
