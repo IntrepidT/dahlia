@@ -51,6 +51,45 @@ cfg_if::cfg_if! {
             Ok(tests)
         }
 
+        pub async fn get_tests_batch(test_ids: Vec<Uuid>, pool: &sqlx::PgPool) -> Result<Vec<Test>, ServerFnError> {
+            let rows = sqlx::query("SELECT name, score, comments, testarea, school_year, benchmark_categories, test_variant, grade_level, test_id::text FROM tests WHERE test_id = ANY($1)")
+                .bind(&test_ids)
+                .fetch_all(pool)
+                .await?;
+
+            let tests: Vec<Test> = rows
+                .into_iter()
+                .map(|row| {
+                    let name: String = row.get("name");
+                    let score: i32 = row.get("score");
+                    let comments: String = row.get("comments");
+                    let testarea: TestType = row.get("testarea");
+                    let school_year: Option<String> = row.get("school_year");
+                    let test_variant: i32 = row.get("test_variant");
+                    let grade_level: Option<GradeEnum> = row.get("grade_level");
+                    let test_id  = row.get::<String,_>("test_id");
+
+                    let benchmark_categories: Option<Vec<BenchmarkCategory>> = match row.try_get::<Option<Json<Vec<BenchmarkCategory>>>, _>("benchmark_categories") {
+                        Ok(Some(json)) => Some(json.0),
+                        _ => None,
+                    };
+
+                    Test {
+                        name,
+                        score,
+                        comments,
+                        testarea,
+                        school_year,
+                        benchmark_categories,
+                        test_variant,
+                        grade_level,
+                        test_id
+                    }
+                })
+                .collect();
+            Ok(tests)
+        }
+
         pub async fn get_test(test_id: String, pool: &sqlx::PgPool) -> Result<Test, ServerFnError> {
             let ID = Uuid::parse_str(&test_id).map_err(|e| ServerFnError::new(format!("Invalid UUID: {}", e)))?;
             let row = sqlx::query("SELECT name, score, comments, testarea, school_year, benchmark_categories, test_variant, grade_level, test_id::text FROM tests WHERE test_id::text = $1")

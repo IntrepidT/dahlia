@@ -46,6 +46,42 @@ cfg_if::cfg_if! {
             Ok(scores)
         }
 
+        pub async fn get_scores_by_test(test_ids: Vec<Uuid>, pool: &PgPool) -> Result<Vec<Score>, ServerFnError> {
+            let row = sqlx::query("SELECT student_id, date_administered, test_id::text, test_scores, comments, test_variant, evaluator, attempt FROM scores WHERE test_id = ANY($1) ORDER BY date_administered DESC")
+                .bind(&test_ids)
+                .fetch_all(pool)
+                .await?;
+
+            let scores: Vec<Score> = row
+                .into_iter()
+                .map(|row| {
+
+                    let naive_datetime: NaiveDateTime = row.get("date_administered");
+
+                    let student_id: i32 =  row.get("student_id");
+                    let date_administered: DateTime<Utc> = DateTime::<Utc>::from_naive_utc_and_offset(naive_datetime, Utc);
+                    let test_id: String = row.get("test_id");
+                    let test_scores: Vec<i32> = row.get("test_scores");
+                    let comments: Vec<String> = row.get("comments");
+                    let test_variant: i32 = row.get("test_variant");
+                    let evaluator: String = row.get("evaluator");
+                    let attempt: i32 = row.get("attempt");
+
+                   Score {
+                       student_id,
+                       date_administered,
+                       test_id,
+                       test_scores,
+                       comments,
+                       test_variant,
+                       evaluator,
+                       attempt,
+                   }
+                })
+                .collect();
+            Ok(scores)
+        }
+
         pub async fn get_score(student_id: i32, test_id: String, test_variant: i32, attempt: i32, pool: &PgPool)-> Result<Score, ServerFnError> {
             let ID = Uuid::parse_str(&test_id).expect("Invalid UUID format");
 

@@ -348,7 +348,7 @@ pub async fn get_student_results(student_id: i32) -> Result<StudentResultsSummar
             };
 
             assessment_summaries.push(AssessmentSummary {
-                assessment_id: assessment_id.clone(),
+                assessment_id: assessment_id.to_string(),
                 assessment_name: assessment.name.clone(),
                 subject: assessment.subject.to_string(),
                 total_possible,

@@ -2,10 +2,11 @@ use crate::app::models::test::BenchmarkCategory;
 use crate::app::models::TestType;
 use crate::app::models::{test::Test, CreateNewTestRequest, DeleteTestRequest, UpdateTestRequest};
 use leptos::*;
+use uuid::Uuid;
 #[cfg(feature = "ssr")]
 use {
     crate::app::db::database, crate::app::db::test_database, actix_web::web, chrono::Local,
-    sqlx::PgPool, std::error::Error, uuid::Uuid,
+    sqlx::PgPool, std::error::Error,
 };
 //this file contains a list of api functions that will be called on the server side
 //lowercase functions denot functions that are server side while upper/camel case functions
@@ -26,6 +27,32 @@ pub async fn get_tests() -> Result<Vec<Test>, ServerFnError> {
         match test_database::get_all_tests(&pool).await {
             Ok(tests) => {
                 log::info!("Successfully retrieved all tests from database");
+                Ok(tests)
+            }
+            Err(e) => {
+                log::error!("Database error: {}", e);
+                Err(ServerFnError::new(format!("Database error: {}", e)))
+            }
+        }
+    }
+}
+
+#[server(GetTestsBatch, "/api")]
+pub async fn get_tests_batch(test_ids: Vec<Uuid>) -> Result<Vec<Test>, ServerFnError> {
+    #[cfg(feature = "ssr")]
+    {
+        use actix_web::web;
+        use leptos_actix::extract;
+
+        let pool = extract::<web::Data<PgPool>>()
+            .await
+            .map_err(|e| ServerFnError::new(format!("Failed to extract pool: {}", e)))?;
+
+        log::info!("Attempting to retrieve a batch of tests from database");
+
+        match test_database::get_tests_batch(test_ids, &pool).await {
+            Ok(tests) => {
+                log::info!("Successfully retrieved a batch of tests from database");
                 Ok(tests)
             }
             Err(e) => {
@@ -144,10 +171,7 @@ pub async fn update_test(update_test_request: UpdateTestRequest) -> Result<Test,
             Ok(None) => Err(ServerFnError::new(format!(
                 "A None value was returned instead of an updated test"
             ))),
-            Err(e) => Err(ServerFnError::new(format!(
-                "Failed to update test: {}",
-                e
-            ))),
+            Err(e) => Err(ServerFnError::new(format!("Failed to update test: {}", e))),
         }
     }
 }

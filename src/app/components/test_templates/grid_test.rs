@@ -327,7 +327,7 @@ pub fn GridTest() -> impl IntoView {
                                                                 class:ring-blue-500=move || is_selected()
                                                                 on:click=move |_| toggle_answer(qnumber)
                                                             >
-                                                                <span class=format!("select-none font-medium {} px-1 py-1 text-center", current_cell_size)>{display_text}</span>
+                                                                <span class=format!("select-none font-medium {} px-1 py-1 text-center text-7xl", current_cell_size)>{display_text}</span>
                                                                 {move || if !is_correct() {
                                                                     view! {
                                                                         <span class="absolute top-0 right-0 text-xs bg-red-500 text-white rounded-full w-3 h-3 flex items-center justify-center">

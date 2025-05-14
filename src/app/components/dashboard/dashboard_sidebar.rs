@@ -155,7 +155,7 @@ pub fn DashboardSidebar(
                         // Transferred navigation items from header
                         <SidebarNavLink
                             icon=AiDashboardOutlined
-                            label="Dashboard"
+                            label="Dashboard (beta)"
                             path="/dashboard"
                             is_expanded=is_expanded.into()
                             is_active=Signal::derive(move || current_path().starts_with("/dashboard"))
@@ -195,7 +195,7 @@ pub fn DashboardSidebar(
                         />
                         <SidebarNavLink
                             icon=FiBook
-                            label="Gradebook"
+                            label="Gradebook (beta)"
                             path="/gradebook"
                             is_expanded=is_expanded.into()
                             is_active=Signal::derive(move || current_path().starts_with("/gradebook"))

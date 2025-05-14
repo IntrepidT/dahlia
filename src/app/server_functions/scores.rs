@@ -1,5 +1,6 @@
 use crate::app::models::score::*;
 use leptos::*;
+use uuid::Uuid;
 
 #[cfg(feature = "ssr")]
 use {
@@ -26,6 +27,31 @@ pub async fn get_scores() -> Result<Vec<Score>, ServerFnError> {
                     "Successfully retrieved {} scores from database",
                     scores.len()
                 );
+                Ok(scores)
+            }
+            Err(e) => {
+                log::error!("Database error: {}", e);
+                Err(ServerFnError::new(format!("Database error: {}", e)))
+            }
+        }
+    }
+}
+
+#[server(GetScoresByTest, "/api")]
+pub async fn get_scores_by_test(test_ids: Vec<Uuid>) -> Result<Vec<Score>, ServerFnError> {
+    #[cfg(feature = "ssr")]
+    {
+        use actix_web::web;
+        use leptos_actix::extract;
+        let pool = extract::<web::Data<PgPool>>()
+            .await
+            .map_err(|e| ServerFnError::new(format!("Failed to extract pool: {}", e)))?;
+
+        log::info!("Attempting to get scores based upon test IDs");
+
+        match score_database::get_scores_by_test(test_ids, &pool).await {
+            Ok(scores) => {
+                log::info!("Successfully retrieved scores from database");
                 Ok(scores)
             }
             Err(e) => {

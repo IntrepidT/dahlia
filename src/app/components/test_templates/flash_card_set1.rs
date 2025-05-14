@@ -267,7 +267,9 @@ pub fn FlashCardSet() -> impl IntoView {
                                         <div class="p-8 flex flex-col justify-start items-center w-full h-full overflow-y-auto">
                                             {/* Question Section */}
                                             <div class="text-center w-full overflow-auto mb-6">
-                                                <p class="text-4xl sm:text-3xl text-gray-800 break-words mb-8 font-custom font-bold">
+                                                //to fix the sizing for another user, we need to
+                                                //reduce the font size to text-4xl or smth for sm:
+                                                <p class="text-sm sm:text-9xl text-gray-800 break-words mb-8 font-custom font-bold">
                                                     {move || current_question().word_problem.clone()}
                                                 </p>
                                             </div>
