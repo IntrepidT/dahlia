@@ -47,6 +47,8 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     ca-certificates \
     libpq5 \
+    curl \
+    google-cloud-sdk \
     libc6 && \
     update-ca-certificates && \
     rm -rf /var/lib/apt/lists/*
@@ -61,6 +63,14 @@ COPY --from=builder /app/style/output /app/style/output
 COPY --from=builder /app/Cargo.toml /app/
 COPY --from=builder /root/.cargo/bin/sqlx /usr/local/bin/
 COPY --from=builder /app/migrations /app/migrations
+COPY --from=builder /app/static /app/static
+COPY --from=builder /app/.env /app/.env
+
+#Copy the secrets script
+COPY fetch-gcp-secrets.sh /app/
+
+#Ensure binary and script are executable
+RUN chmod +x /app/dahlia /app/fetch-gcp-secrets.sh
 
 # Ensure binary is executable
 RUN chmod +x /app/dahlia
@@ -78,4 +88,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8080/health || exit 1
 
 # Run the application
-CMD ["sh", "-c", "sqlx migrate run && /app/dahlia"]
+CMD ["/app/fetch-gcp-secrets.sh", "sh", "-c", "sqlx migrate run && /app/dahlia"]
