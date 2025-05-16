@@ -25,9 +25,9 @@ const TABLE_WRAPPER_STYLE: &str =
     "overflow-x-auto h-[calc(100vh-15rem)] md:h-[42rem] overflow-y-auto";
 const TABLE_STYLE: &str = "min-w-full divide-y divide-[#DADADA]";
 const HEADER_CELL_STYLE: &str =
-    "px-2 md:px-6 py-2 md:py-3 text-left text-xs font-medium text-[#2E3A59] uppercase tracking-wider";
+    "px-2 md:px-6 py-2 md:py-3 text-left text-sm font-medium text-[#2E3A59] uppercase tracking-wider";
 const CELL_STYLE: &str =
-    "px-2 md:px-6 py-2 md:py-4 whitespace-nowrap text-xs md:text-sm bg-[#F9F9F8]";
+    "px-2 md:px-6 py-2 md:py-4 whitespace-nowrap text-sm md:text-md bg-[#F9F9F8]";
 const SELECTED_ROW_STYLE: &str =
     "bg-[#DADADA] border-l-4 border-t-2 border-b-2 border-r-2 border-[#2E3A59]";
 
@@ -189,13 +189,13 @@ pub fn StudentTable(
                                                     <td class=CELL_STYLE>
                                                         { if student.iep {
                                                             view! {
-                                                                <span class="px-2 py-1 text-xs font-medium rounded-full bg-[#4CAF50] bg-opacity-40 text-[#2E3A59]">
+                                                                <span class="px-2 py-1 text-sm font-medium rounded-full bg-[#4CAF50] bg-opacity-40 text-[#2E3A59]">
                                                                     "Yes"
                                                                 </span>
                                                             }
                                                         } else {
                                                             view! {
-                                                                <span class="px-2 py-1 text-xs font-medium rounded-full bg-[#F44336] bg-opacity-40 text-[#2E3A59]">
+                                                                <span class="px-2 py-1 text-sm font-medium rounded-full bg-[#F44336] bg-opacity-40 text-[#2E3A59]">
                                                                     "No"
                                                                 </span>
                                                             }
@@ -206,13 +206,13 @@ pub fn StudentTable(
                                                     <td class=CELL_STYLE>
                                                         { if student.esl != ESLEnum::NotApplicable {
                                                             view! {
-                                                                <span class="px-2 py-1 text-xs font-medium rounded-full bg-[#4CAF50] bg-opacity-40 text-[#2E3A59]">
+                                                                <span class="px-2 py-1 text-sm font-medium rounded-full bg-[#4CAF50] bg-opacity-40 text-[#2E3A59]">
                                                                     {student.esl.to_string()}
                                                                 </span>
                                                             }
                                                         } else {
                                                             view! {
-                                                                <span class="px-2 py-1 text-xs font-medium rounded-full bg-[#F44336] bg-opacity-40 text-[#2E3A59]">
+                                                                <span class="px-2 py-1 text-sm font-medium rounded-full bg-[#F44336] bg-opacity-40 text-[#2E3A59]">
                                                                     "N/A"
                                                                 </span>
                                                             }
@@ -223,13 +223,13 @@ pub fn StudentTable(
                                                     <td class=CELL_STYLE>
                                                         { if let Some(intervention) = &student.intervention {
                                                             view! {
-                                                                <span class="px-2 py-1 text-xs font-medium rounded-full bg-[#4CAF50] bg-opacity-40 text-[#2E3A59]">
+                                                                <span class="px-2 py-1 text-sm font-medium rounded-full bg-[#4CAF50] bg-opacity-40 text-[#2E3A59]">
                                                                     {intervention.to_string()}
                                                                 </span>
                                                             }
                                                         } else {
                                                             view! {
-                                                                <span class="px-2 py-1 text-xs font-medium rounded-full bg-[#F44336] bg-opacity-40 text-[#2E3A59]">
+                                                                <span class="px-2 py-1 text-sm font-medium rounded-full bg-[#F44336] bg-opacity-40 text-[#2E3A59]">
                                                                     "None"
                                                                 </span>
                                                             }
@@ -240,13 +240,13 @@ pub fn StudentTable(
                                                     <td class=CELL_STYLE>
                                                         { if student.student_504 {
                                                             view! {
-                                                                <span class="px-2 py-1 text-xs font-medium rounded-full bg-[#4CAF50] bg-opacity-40 text-[#2E3A59]">
+                                                                <span class="px-2 py-1 text-sm font-medium rounded-full bg-[#4CAF50] bg-opacity-40 text-[#2E3A59]">
                                                                     "Yes"
                                                                 </span>
                                                             }
                                                         } else {
                                                             view! {
-                                                                <span class="px-2 py-1 text-xs font-medium rounded-full bg-[#F44336] bg-opacity-40 text-[#2E3A59]">
+                                                                <span class="px-2 py-1 text-sm font-medium rounded-full bg-[#F44336] bg-opacity-40 text-[#2E3A59]">
                                                                     "No"
                                                                 </span>
                                                             }
@@ -257,13 +257,13 @@ pub fn StudentTable(
                                                     <td class=CELL_STYLE>
                                                         { if student.readplan {
                                                             view! {
-                                                                <span class="px-2 py-1 text-xs font-medium rounded-full bg-[#4CAF50] bg-opacity-40 text-[#2E3A59]">
+                                                                <span class="px-2 py-1 text-sm font-medium rounded-full bg-[#4CAF50] bg-opacity-40 text-[#2E3A59]">
                                                                     "Yes"
                                                                 </span>
                                                             }
                                                         } else {
                                                             view! {
-                                                                <span class="px-2 py-1 text-xs font-medium rounded-full bg-[#F44336] bg-opacity-40 text-[#2E3A59]">
+                                                                <span class="px-2 py-1 text-sm font-medium rounded-full bg-[#F44336] bg-opacity-40 text-[#2E3A59]">
                                                                     "No"
                                                                 </span>
                                                             }
@@ -274,13 +274,13 @@ pub fn StudentTable(
                                                     <td class=CELL_STYLE>
                                                         { if student.gt {
                                                             view! {
-                                                                <span class="px-2 py-1 text-xs font-medium rounded-full bg-[#4CAF50] bg-opacity-40 text-[#2E3A59]">
+                                                                <span class="px-2 py-1 text-sm font-medium rounded-full bg-[#4CAF50] bg-opacity-40 text-[#2E3A59]">
                                                                     "Yes"
                                                                 </span>
                                                             }
                                                         } else {
                                                             view! {
-                                                                <span class="px-2 py-1 text-xs font-medium rounded-full bg-[#F44336] bg-opacity-40 text-[#2E3A59]">
+                                                                <span class="px-2 py-1 text-sm font-medium rounded-full bg-[#F44336] bg-opacity-40 text-[#2E3A59]">
                                                                     "No"
                                                                 </span>
                                                             }
@@ -291,13 +291,13 @@ pub fn StudentTable(
                                                     <td class=CELL_STYLE>
                                                         { if student.bip {
                                                             view! {
-                                                                <span class="px-2 py-1 text-xs font-medium rounded-full bg-[#4CAF50] bg-opacity-40 text-[#2E3A59]">
+                                                                <span class="px-2 py-1 text-sm font-medium rounded-full bg-[#4CAF50] bg-opacity-40 text-[#2E3A59]">
                                                                     "Yes"
                                                                 </span>
                                                           }
                                                         } else {
                                                             view! {
-                                                                <span class="px-2 py-1 text-xs font-medium rounded-full bg-[#4CAF50] bg-opacity-40 text-[#2E3A59]">
+                                                                <span class="px-2 py-1 text-sm font-medium rounded-full bg-[#F44336] bg-opacity-40 text-[#2E3A59]">
                                                                     "No"
                                                                 </span>
                                                             }

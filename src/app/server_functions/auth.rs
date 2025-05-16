@@ -278,3 +278,183 @@ pub async fn register(
         Err(ServerFnError::ServerError("Not implemented".to_string()))
     }
 }
+
+#[server(RequestPasswordReset, "/api")]
+pub async fn request_password_reset(email: String) -> Result<AuthResponse, ServerFnError> {
+    #[cfg(feature = "ssr")]
+    {
+        use actix_web::web;
+        use leptos_actix::extract;
+        use rand::{distributions::Alphanumeric, Rng};
+        use chrono::{Utc, Duration};
+        use crate::app::services::email_service;
+        
+        log::info!("Password reset requested for email: {}", email);
+        
+        let pool = extract::<web::Data<PgPool>>()
+            .await
+            .map_err(|e| ServerFnError::new(format!("Failed to extract pool: {}", e)))?;
+        
+        // Check if the user exists
+        let user_result = user_database::get_user_by_email(&pool, &email).await;
+        
+        match user_result {
+            Ok(Some(user)) => {
+                // Generate a random token
+                let token: String = rand::thread_rng()
+                    .sample_iter(&Alphanumeric)
+                    .take(64)
+                    .map(char::from)
+                    .collect();
+                
+                // Set expiration time (24 hours from now)
+                let expires = Utc::now() + Duration::hours(24);
+                
+                // Update the user in the database with the reset token and expiration
+                match user_database::set_password_reset_token(&pool, user.id, &token, expires).await {
+                    Ok(_) => {
+                        // Send an email with the password reset link
+                        if let Err(e) = email_service::send_reset_email(&email, &token).await {
+                            log::error!("Failed to send password reset email: {}", e);
+                            // Continue the process even if email sending fails
+                            // We'll still return success to the user
+                        }
+                        
+                        Ok(AuthResponse {
+                            success: true,
+                            message: "Password reset instructions sent to your email".to_string(),
+                            user: None,
+                        })
+                    },
+                    Err(e) => {
+                        log::error!("Failed to set password reset token: {:?}", e);
+                        Ok(AuthResponse {
+                            success: false,
+                            message: "Failed to initiate password reset".to_string(),
+                            user: None,
+                        })
+                    }
+                }
+            },
+            Ok(None) => {
+                // Don't reveal that the email doesn't exist for security reasons
+                // Instead, pretend we sent the email anyway
+                log::info!("Password reset requested for non-existent email: {}", email);
+                Ok(AuthResponse {
+                    success: true,
+                    message: "If this email is registered, password reset instructions have been sent".to_string(),
+                    user: None,
+                })
+            },
+            Err(e) => {
+                log::error!("Database error looking up user by email: {:?}", e);
+                Ok(AuthResponse {
+                    success: false,
+                    message: "An error occurred processing your request".to_string(),
+                    user: None,
+                })
+            }
+        }
+    }
+
+    #[cfg(not(feature = "ssr"))]
+    {
+        Err(ServerFnError::ServerError("Not implemented".to_string()))
+    }
+}
+
+#[server(ValidateResetToken, "/api")]
+pub async fn validate_reset_token(token: String) -> Result<bool, ServerFnError> {
+    #[cfg(feature = "ssr")]
+    {
+        use actix_web::web;
+        use leptos_actix::extract;
+        
+        let pool = extract::<web::Data<PgPool>>()
+            .await
+            .map_err(|e| ServerFnError::new(format!("Failed to extract pool: {}", e)))?;
+        
+        // Check if the token exists and is not expired
+        match user_database::validate_password_reset_token(&pool, &token).await {
+            Ok(valid) => Ok(valid),
+            Err(e) => {
+                log::error!("Error validating reset token: {:?}", e);
+                Err(ServerFnError::new("Database error".to_string()))
+            }
+        }
+    }
+
+    #[cfg(not(feature = "ssr"))]
+    {
+        Err(ServerFnError::ServerError("Not implemented".to_string()))
+    }
+}
+
+#[server(ResetPassword, "/api")]
+pub async fn reset_password(token: String, new_password: String) -> Result<AuthResponse, ServerFnError> {
+    #[cfg(feature = "ssr")]
+    {
+        use actix_web::web;
+        use leptos_actix::extract;
+        
+        let pool = extract::<web::Data<PgPool>>()
+            .await
+            .map_err(|e| ServerFnError::new(format!("Failed to extract pool: {}", e)))?;
+        
+        // Validate token again before proceeding
+        if let Ok(true) = user_database::validate_password_reset_token(&pool, &token).await {
+            // Get the user associated with this token
+            match user_database::get_user_by_reset_token(&pool, &token).await {
+                Ok(Some(user)) => {
+                    // Hash the new password
+                    let password_hash = user_database::hash_password(&new_password)?;
+                    
+                    // Update the user's password and clear the reset token
+                    match user_database::update_password_and_clear_token(&pool, user.id, &password_hash).await {
+                        Ok(_) => {
+                            Ok(AuthResponse {
+                                success: true,
+                                message: "Password successfully reset".to_string(),
+                                user: None,
+                            })
+                        },
+                        Err(e) => {
+                            log::error!("Failed to update password: {:?}", e);
+                            Ok(AuthResponse {
+                                success: false,
+                                message: "Failed to reset password".to_string(),
+                                user: None,
+                            })
+                        }
+                    }
+                },
+                Ok(None) => {
+                    Ok(AuthResponse {
+                        success: false,
+                        message: "Invalid reset token".to_string(),
+                        user: None,
+                    })
+                },
+                Err(e) => {
+                    log::error!("Database error looking up user by reset token: {:?}", e);
+                    Ok(AuthResponse {
+                        success: false,
+                        message: "An error occurred processing your request".to_string(),
+                        user: None,
+                    })
+                }
+            }
+        } else {
+            Ok(AuthResponse {
+                success: false,
+                message: "Invalid or expired reset token".to_string(),
+                user: None,
+            })
+        }
+    }
+
+    #[cfg(not(feature = "ssr"))]
+    {
+        Err(ServerFnError::ServerError("Not implemented".to_string()))
+    }
+}

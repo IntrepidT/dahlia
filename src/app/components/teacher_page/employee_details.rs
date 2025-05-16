@@ -10,7 +10,7 @@ const THEME_GRAY_BG: &str = "#F0F2F5";
 
 // Improved consistent styling with better naming
 const CARD_CONTAINER: &str =
-    "h-full bg-[#F9F9F8] p-6 border-t-8 border-[#2E3A59] shadow-md rounded-lg flex flex-col";
+    "h-[95%] bg-[#F9F9F8] p-3 sm:mb-3 mb-2 pb-2 border-t-8 border-[#2E3A59] shadow-md rounded-lg flex flex-col";
 const SECTION_CONTAINER: &str = "bg-white p-5 rounded-lg border border-[#DADADA] shadow-sm";
 const SECTION_TITLE: &str =
     "text-sm font-semibold text-[#2E3A59] mb-3 pb-2 border-b border-[#DADADA]";

@@ -37,12 +37,21 @@ pub fn LoginPage() -> impl IntoView {
                         <LoginForm />
                         <div class="mt-4 text-center">
                             <span>"Don't have an account? "</span>
-                            <button
-                                class="text-blue-500 hover:underline"
-                                on:click=move |_| set_show_register.set(true)
-                            >
-                                "Register"
-                            </button>
+                            <div class="flex justify-center">
+                                <button
+                                    class="text-blue-500 hover:underline"
+                                    on:click=move |_| set_show_register.set(true)
+                                >
+                                    "Register"
+                                </button>
+                                <a href="/forgot-password">
+                                    <button
+                                        class="text-red-500 hover:underline ml-4"
+                                    >
+                                        "Forgot Password?"
+                                    </button>
+                                </a>
+                            </div>
                         </div>
                     }
                 }

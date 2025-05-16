@@ -3,6 +3,12 @@ use crate::app::server_functions::auth::{get_current_user, login, logout, regist
 use leptos::*;
 use leptos_router::use_navigate;
 use log::{debug, error, log};
+use serde::Serialize;
+#[cfg(feature = "ssr")]
+use {
+    lettre::transport::smtp::authentication::Credentials,
+    lettre::{message::Message, SmtpTransport, Transport},
+};
 
 #[component]
 pub fn AuthProvider(children: Children) -> impl IntoView {
@@ -400,5 +406,59 @@ pub fn RequireRole(
                 view! { <div></div> }
             }
         }}
+    }
+}
+
+#[derive(Serialize)]
+struct EmailContext {
+    reset_link: String,
+    // Add more fields as needed for your template
+}
+
+#[cfg(feature = "ssr")]
+pub async fn send_reset_email(email: &str, reset_token: &str) -> Result<(), String> {
+    // Configuration - in production these should come from environment variables
+    let smtp_server =
+        std::env::var("SMTP_SERVER").unwrap_or_else(|_| "smtp.example.com".to_string());
+    let smtp_username = std::env::var("SMTP_USERNAME").unwrap_or_else(|_| "username".to_string());
+    let smtp_password = std::env::var("SMTP_PASSWORD").unwrap_or_else(|_| "password".to_string());
+    let app_url = std::env::var("APP_URL").unwrap_or_else(|_| "https://yourapp.com".to_string());
+
+    // Create the reset link
+    let reset_link = format!("{}/reset-password/{}", app_url, reset_token);
+
+    // Create the email
+    let email_message = match Message::builder()
+        .from("noreply@yourapp.com".parse().unwrap())
+        .to(email.parse().unwrap())
+        .subject("Password Reset Instructions")
+        .body(format!(
+            "Click the link below to reset your password:\n\n{}\n\nThis link will expire in 24 hours.",
+            reset_link
+        )) {
+            Ok(email) => email,
+            Err(e) => return Err(format!("Failed to create email: {}", e)),
+        };
+
+    log::info!("Sending password reset email to {}", email);
+
+    let creds = Credentials::new(smtp_username, smtp_password);
+
+    // Open a connection to the SMTP server
+    let mailer = match SmtpTransport::relay(&smtp_server) {
+        Ok(builder) => builder.credentials(creds).build(),
+        Err(e) => return Err(format!("Failed to create SMTP transport: {}", e)),
+    };
+
+    // Send the email
+    match mailer.send(&email_message) {
+        Ok(_) => {
+            log::info!("Password reset email sent successfully to {}", email);
+            Ok(())
+        }
+        Err(e) => {
+            error!("Failed to send email: {}", e);
+            Err(format!("Failed to send email: {}", e))
+        }
     }
 }

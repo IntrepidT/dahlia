@@ -8,6 +8,7 @@ use leptos_router::*;
 pub mod pages;
 pub mod websockets;
 use components::live_test::RealtimeTestSession;
+use components::login_components::{RequestPasswordResetForm, ResetPasswordForm};
 use components::test_templates::{FlashCardSet, GridTest};
 use pages::{
     AdministerTest, Assessment, AssessmentPage, Dashboard, Gradebook, HomePage, LoginPage,
@@ -17,6 +18,7 @@ use pages::{
 pub mod components;
 use components::auth::*;
 pub mod middleware;
+pub mod services;
 
 #[component]
 pub fn App() -> impl IntoView {
@@ -98,6 +100,16 @@ pub fn App() -> impl IntoView {
                         <Route path="/login" view=|| {
                             view!{
                                 <LoginPage />
+                            }
+                        }/>
+                        <Route path="/forgot-password" view=|| {
+                            view!{
+                                <RequestPasswordResetForm />
+                            }
+                        }/>
+                        <Route path="/reset-password/:token" view=|| {
+                            view!{
+                                <ResetPasswordForm />
                             }
                         }/>
                         <Route path="/gradebook" view=|| {

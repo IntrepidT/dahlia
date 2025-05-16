@@ -9,7 +9,7 @@ const TABLE_HEADER_STYLE: &str =
 const TABLE_WRAPPER_STYLE: &str = "overflow-x-auto h-[34rem]";
 const TABLE_STYLE: &str = "min-w-full divide-y divide-[#DADADA]";
 const HEADER_CELL_STYLE: &str =
-    "px-6 py-3 text-left text-xs font-medium text-[#2E3A59] uppercase tracking-wider";
+    "px-6 py-3 text-left text-sm font-medium text-[#2E3A59] uppercase tracking-wider";
 const CELL_STYLE: &str = "px-6 py-4 whitespace-nowrap text-sm bg-[#F9F9F8]";
 const SELECTED_ROW_STYLE: &str =
     "bg-[#DADADA] border-l-4 border-r-2 border-t-2 border-b-2 border-[#2E3A59]";
@@ -50,10 +50,16 @@ pub fn EmployeeTable(
     let container_class = create_memo(move |_| {
         if is_panel_expanded() {
             // Less width when panel is expanded
-            format!("{} transition-all duration-300 ease-in-out", TABLE_CONTAINER_STYLE)
+            format!(
+                "{} transition-all duration-300 ease-in-out",
+                TABLE_CONTAINER_STYLE
+            )
         } else {
             // Full width when panel is collapsed
-            format!("{} transition-all duration-300 ease-in-out", TABLE_CONTAINER_STYLE)
+            format!(
+                "{} transition-all duration-300 ease-in-out",
+                TABLE_CONTAINER_STYLE
+            )
         }
     });
 

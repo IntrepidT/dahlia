@@ -142,14 +142,14 @@ pub fn Gradebook() -> impl IntoView {
     );
 
     view! {
-        <div class="h-full bg-[#F9F9F8]">
+        <div class="h-screen flex flex-col bg-[#F9F9F8]">
             <Header />
-            <div class="flex h-full">
+            <div class="flex  flex-1 overflow-hidden">
                 <DashboardSidebar
                     selected_item=selected_view
                     set_selected_item=set_selected_view
                 />
-                <main class="flex-1 mt-16 ml-20 px-10">
+                <main class="flex-1 flex flex-col mt-16 ml-20 px-10 pb-6">
                     <h1 class="text-2xl font-bold mb-2 text-[#2E3A59]">"Gradebook"</h1>
 
                     <div class="flex justify-between items-center mb-2">
@@ -189,7 +189,7 @@ pub fn Gradebook() -> impl IntoView {
                             </select>
                         </div>
                     </div>
-                    <div class="flex-1 overflow-hidden rounded-md">
+                    <div class="flex-1 flex flex-col overflow-hidden rounded-md">
                         <div class="h-full overflow-auto">
                             <table class="min-w-full bg-[#F9F9F8] border border-gray-200 table-fixed divide-y divide-[#DADADA]">
                                 <thead class="sticky top-0 bg-[#DADADA]">
