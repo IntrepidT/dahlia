@@ -25,7 +25,7 @@ RUN curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain stable -y && \
 RUN . $HOME/.cargo/env && \
     npm install -g sass && \
     cargo install sqlx-cli --no-default-features --features postgres && \
-    cargo install cargo-leptos
+    cargo install --locked cargo-leptos
 
 WORKDIR /app
 
@@ -48,7 +48,6 @@ RUN apt-get update && \
     ca-certificates \
     libpq5 \
     curl \
-    google-cloud-sdk \
     libc6 && \
     update-ca-certificates && \
     rm -rf /var/lib/apt/lists/*
@@ -62,15 +61,6 @@ COPY --from=builder /app/assets /app/assets
 COPY --from=builder /app/style/output /app/style/output
 COPY --from=builder /app/Cargo.toml /app/
 COPY --from=builder /root/.cargo/bin/sqlx /usr/local/bin/
-COPY --from=builder /app/migrations /app/migrations
-COPY --from=builder /app/static /app/static
-COPY --from=builder /app/.env /app/.env
-
-#Copy the secrets script
-COPY fetch-gcp-secrets.sh /app/
-
-#Ensure binary and script are executable
-RUN chmod +x /app/dahlia /app/fetch-gcp-secrets.sh
 
 # Ensure binary is executable
 RUN chmod +x /app/dahlia

@@ -417,48 +417,80 @@ struct EmailContext {
 
 #[cfg(feature = "ssr")]
 pub async fn send_reset_email(email: &str, reset_token: &str) -> Result<(), String> {
-    // Configuration - in production these should come from environment variables
-    let smtp_server =
-        std::env::var("SMTP_SERVER").unwrap_or_else(|_| "smtp.example.com".to_string());
-    let smtp_username = std::env::var("SMTP_USERNAME").unwrap_or_else(|_| "username".to_string());
-    let smtp_password = std::env::var("SMTP_PASSWORD").unwrap_or_else(|_| "password".to_string());
-    let app_url = std::env::var("APP_URL").unwrap_or_else(|_| "https://yourapp.com".to_string());
+    use reqwest::Client;
+    use serde_json::{json, Value};
 
+    // Configuration - in production these should come from environment variables
+    let sendgrid_api_key = std::env::var("SENDGRID_API_KEY")
+        .map_err(|_| "SENDGRID_API_KEY environment variable not set".to_string())?;
+    let app_url = std::env::var("APP_URL")
+        .unwrap_or_else(|_| "https://yourapp.com".to_string());
+    let from_email = std::env::var("FROM_EMAIL")
+        .unwrap_or_else(|_| "noreply@yourapp.com".to_string());
+    
+    // Determine whether to use sandbox mode based on environment
+    let is_development = std::env::var("APP_ENV").unwrap_or_else(|_| "development".to_string()) != "production";
+    
     // Create the reset link
     let reset_link = format!("{}/reset-password/{}", app_url, reset_token);
 
-    // Create the email
-    let email_message = match Message::builder()
-        .from("noreply@yourapp.com".parse().unwrap())
-        .to(email.parse().unwrap())
-        .subject("Password Reset Instructions")
-        .body(format!(
-            "Click the link below to reset your password:\n\n{}\n\nThis link will expire in 24 hours.",
-            reset_link
-        )) {
-            Ok(email) => email,
-            Err(e) => return Err(format!("Failed to create email: {}", e)),
-        };
+    // Build the SendGrid API request payload
+    let mut payload = json!({
+        "personalizations": [{
+            "to": [{ "email": email }]
+        }],
+        "from": { "email": from_email },
+        "subject": "Password Reset Instructions",
+        "content": [{
+            "type": "text/plain",
+            "value": format!(
+                "Click the link below to reset your password:\n\n{}\n\nThis link will expire in 24 hours.",
+                reset_link
+            )
+        }]
+    });
+    
+    // Only enable sandbox mode for development environment
+    if is_development {
+        // Add sandbox mode setting for development
+        if let Some(payload_obj) = payload.as_object_mut() {
+            payload_obj.insert(
+                "mail_settings".to_string(),
+                json!({
+                    "sandbox_mode": {
+                        "enable": true
+                    }
+                })
+            );
+            log::info!("Sending password reset email to {} (sandbox mode)", email);
+        }
+    } else {
+        log::info!("Sending password reset email to {} (production mode)", email);
+    }
 
-    log::info!("Sending password reset email to {}", email);
+    // Send the request to SendGrid API
+    let client = Client::new();
+    let res = client
+        .post("https://api.sendgrid.com/v3/mail/send")
+        .header("Authorization", format!("Bearer {}", sendgrid_api_key))
+        .header("Content-Type", "application/json")
+        .json(&payload)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to send request to SendGrid: {}", e))?;
 
-    let creds = Credentials::new(smtp_username, smtp_password);
-
-    // Open a connection to the SMTP server
-    let mailer = match SmtpTransport::relay(&smtp_server) {
-        Ok(builder) => builder.credentials(creds).build(),
-        Err(e) => return Err(format!("Failed to create SMTP transport: {}", e)),
-    };
-
-    // Send the email
-    match mailer.send(&email_message) {
-        Ok(_) => {
+    // Check the response
+    if res.status().is_success() {
+        if is_development {
+            log::info!("Password reset email sent successfully to {} (sandbox mode)", email);
+        } else {
             log::info!("Password reset email sent successfully to {}", email);
-            Ok(())
         }
-        Err(e) => {
-            error!("Failed to send email: {}", e);
-            Err(format!("Failed to send email: {}", e))
-        }
+        Ok(())
+    } else {
+        let status = res.status();
+        let body = res.text().await.unwrap_or_else(|_| "No response body".to_string());
+        error!("Failed to send email. Status: {}, Body: {}", status, body);
+        Err(format!("Failed to send email. Status: {}", status))
     }
 }
