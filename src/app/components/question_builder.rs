@@ -31,7 +31,7 @@ pub fn BuildingQuestion(
                         "TrueFalse" => "True False",
                         _ => "",
                     })
-                    .unwrap_or(QuestionType::Selection);
+                    .unwrap_or(QuestionType::TrueFalse);
                     q.question_type = new_type.clone();
 
                     match new_type {
@@ -88,8 +88,8 @@ pub fn BuildingQuestion(
             >
                 <option value="">Please Select a Value</option>
                 <option value="MultipleChoice">Multiple Choice</option>
-                <option value="Written">Written</option>
-                <option value="Selection">Selection</option>
+                /*<option value="Written">Written</option>
+                <option value="Selection">Selection</option>*/
                 <option value="TrueFalse">True-False</option>
             </select>
             {move || match question_data.with(|q| q.question_type.clone()) {
@@ -148,13 +148,11 @@ pub fn MultipleChoice(
 
     // Create signals
     let (option_items, set_option_items) = create_signal(initial_options);
-    let (correct_answer, set_correct_answer) = create_signal(
-        if designated_answer.is_empty() {
-            option_items.with(|items| items.first().map(|(_, v)| v.clone()).unwrap_or_default())
-        } else {
-            designated_answer
-        }
-    );
+    let (correct_answer, set_correct_answer) = create_signal(if designated_answer.is_empty() {
+        option_items.with(|items| items.first().map(|(_, v)| v.clone()).unwrap_or_default())
+    } else {
+        designated_answer
+    });
 
     // Create a debounced update callback to reduce renders
     let debounced_update = store_value(move || {
@@ -178,6 +176,11 @@ pub fn MultipleChoice(
         set_option_items.update(|items| {
             if let Some(item) = items.iter_mut().find(|(item_id, _)| *item_id == id) {
                 item.1 = new_value.clone();
+
+                // If this was the correct answer, update the correct_answer signal
+                if correct_answer() == item.1 {
+                    set_correct_answer.set(new_value);
+                }
             }
         });
         // Don't update the parent on every keystroke
@@ -220,7 +223,7 @@ pub fn MultipleChoice(
                 .find(|(item_id, _)| *item_id == id)
                 .map(|(_, v)| v.clone())
         }) {
-            set_correct_answer.set(value.clone());
+            set_correct_answer.set(value);
             // Update callback after changing correct answer
             debounced_update.with_value(|update| update());
         }
@@ -234,7 +237,12 @@ pub fn MultipleChoice(
                key=|(id, _)| *id
                children=move |(id, value)| {
                    let option_id = id;
+                   // Clone the value for use in closures
                    let option_value = value.clone();
+                   let option_value_cloned = option_value.clone();
+
+                   // Create a derived signal that checks if this option is the correct answer
+                   let is_correct = create_memo(move |_| correct_answer() == option_value_cloned);
 
                    view! {
                        <div class="flex items-center gap-2">
@@ -250,7 +258,7 @@ pub fn MultipleChoice(
                            />
                            <button
                                class=move || {
-                                   if correct_answer() == option_value {
+                                   if is_correct() {
                                        "bg-green-500 text-white p-2 rounded"
                                    } else {
                                        "bg-gray-200 text-gray-700 p-2 rounded"

@@ -212,7 +212,12 @@ pub fn Dashboard() -> impl IntoView {
                             <div>
                                 <p>This is the gradebook component for viewing and managing student grades</p>
                             </div>
-                        }
+                        },
+                        SidebarSelected::Classroom => view! {
+                            <div>
+                                <p>This is the classroom component</p>
+                            </div>
+                        },
                     }}
                 </main>
             </div>

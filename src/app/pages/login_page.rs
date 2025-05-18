@@ -36,7 +36,6 @@ pub fn LoginPage() -> impl IntoView {
                     view! {
                         <LoginForm />
                         <div class="mt-4 text-center">
-                            <span>"Don't have an account? "</span>
                             <div class="flex justify-center">
                                 <button
                                     class="text-blue-500 hover:underline"

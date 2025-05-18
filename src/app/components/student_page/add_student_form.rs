@@ -316,6 +316,7 @@ pub fn AddStudentForm(
                                 <input
                                     type="number"
                                     id="pin"
+                                    min="0"
                                     class="mt-1 w-full rounded-md border p-2"
                                     on:input=move |ev| set_new_pin(event_target_value(&ev))
                                 />

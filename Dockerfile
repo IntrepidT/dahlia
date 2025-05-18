@@ -61,6 +61,7 @@ COPY --from=builder /app/assets /app/assets
 COPY --from=builder /app/style/output /app/style/output
 COPY --from=builder /app/Cargo.toml /app/
 COPY --from=builder /root/.cargo/bin/sqlx /usr/local/bin/
+COPY --from=builder /app/migrations /app/migrations
 
 # Ensure binary is executable
 RUN chmod +x /app/dahlia
@@ -69,6 +70,11 @@ RUN chmod +x /app/dahlia
 ENV RUST_LOG="info"
 ENV LEPTOS_SITE_ADDR="0.0.0.0:8080"
 ENV LEPTOS_SITE_ROOT="./site"
+ENV SMTP_SERVER=smtp.sendgrid.net 
+ENV SMTP_PORT=587 
+ENV SMTP_USERNAME=apikey 
+ENV APP_URL=https://www.teapottesting.com 
+ENV APP_ENV=production
 
 # Expose the application port
 EXPOSE 8080
@@ -78,4 +84,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8080/health || exit 1
 
 # Run the application
-CMD ["/app/fetch-gcp-secrets.sh", "sh", "-c", "sqlx migrate run && /app/dahlia"]
+CMD ["sh", "-c", "sqlx migrate run && /app/dahlia"]

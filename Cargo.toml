@@ -51,6 +51,7 @@ polars = { version = "0.46.0", optional = true, features = ["lazy", "random", "s
 rand = { version = "0.8.5", optional = true, features = ["getrandom"]}
 getrandom = {version = "0.3.3", optional = true, features = ["wasm_js"]}
 lettre = { version = "0.11.16", default-features = false, optional = true, features = ["tokio1", "smtp-transport", "tokio1-native-tls", "builder"]}
+leptos-use = "0.15.7"
 
 [features]
 csr = ["leptos/csr", "leptos_meta/csr", "leptos_router/csr"]

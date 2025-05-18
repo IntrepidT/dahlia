@@ -7,6 +7,7 @@ use crate::app::components::ShowAdministerTestModal;
 use icondata::{
     AiCoffeeOutlined,
     AiDashboardOutlined,
+    BiClipboardRegular,
     IoPeopleOutline,
     // Add pin/unpin icons
     IoPinOutline,
@@ -32,6 +33,7 @@ pub enum SidebarSelected {
     Live,
     Gradebook,
     Assessments,
+    Classroom,
 }
 const GRAY_COLOR: &str = "text-[#DADADA]";
 const BLUE_COLOR: &str = "text-[#2E3A59]";
@@ -178,6 +180,14 @@ pub fn DashboardSidebar(
                             is_small_screen=is_small_screen.into()
                         />
                         <SidebarNavLink
+                            icon=BiClipboardRegular
+                            label="Classroom"
+                            path="/classroom"
+                            is_expanded=is_expanded.into()
+                            is_active=Signal::derive(move || current_path().starts_with("/classrooms"))
+                            is_small_screen=is_small_screen.into()
+                        />
+                        <SidebarNavLink
                             icon=AiApiOutlined
                             label="Join Live Session"
                             path="/testsessions"
@@ -211,25 +221,13 @@ pub fn DashboardSidebar(
                                 icon=IoPricetagOutline
                                 class="w-6 h-6 flex-shrink-0 text-[#2E3A59]"
                             />
-                            <div class="overflow-hidden">
+                            <div class="overflow-hidden whitespace-nowrap">
                                 <Show
                                     when=move || is_expanded()
                                     fallback=|| view! { <></> }
                                 >
-                                    <div class="flex items-center justify-between w-full">
+                                    <div class="flex items-center justify-between ml-2 w-full">
                                         <span class="font-semibold text-sm sm:text-base">"Administer Test"</span>
-                                        <span>
-                                            <Show when=move || show_administer_modal()>
-                                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                                    <polyline points="18 15 12 9 6 15"></polyline>
-                                                </svg>
-                                            </Show>
-                                            <Show when=move || !show_administer_modal()>
-                                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                                    <polyline points="6 9 12 15 18 9"></polyline>
-                                                </svg>
-                                            </Show>
-                                        </span>
                                     </div>
                                 </Show>
                             </div>
@@ -266,7 +264,7 @@ pub fn DashboardSidebar(
                                 </span>
                             </Show>
                         </div>
-            </div>
+                    </div>
                 </div>
             </div>
 
@@ -318,12 +316,12 @@ fn SidebarItem(
                 icon=icon
                 class="w-6 h-6 text-[#2E3A59] flex-shrink-0"
             />
-            <div class="overflow-hidden">
+            <div class="overflow-hidden whitespace-nowrap">
                 <Show
                     when=move || is_expanded()
                     fallback=|| view! { <></> }
                 >
-                    <div class="flex flex-col">
+                    <div class="flex flex-col ml-2">
                         <span
                             class="font-semibold text-sm sm:text-base"
                             class:GRAY_COLOR=move || !is_selected.get()
@@ -364,15 +362,15 @@ fn SidebarNavLink(
             >
                 <Icon
                     icon=icon
-                    class="w-6 h-6 text-[#2E3A59] flex-shrink-0 mr-2"
+                    class="w-6 h-6 text-[#2E3A59] flex-shrink-0"
                 />
-                <div class="overflow-hidden">
+                <div class="overflow-hidden whitespace-nowrap">
                     <Show
                         when=move || is_expanded()
                         fallback=|| view! { <></> }
                     >
                         <span
-                            class="font-semibold text-sm sm:text-base"
+                            class="ml-2 font-semibold text-sm sm:text-base"
                             class:GRAY_COLOR=move || !is_active.get()
                             class:BLUE_COLOR=move || is_active.get()
                         >

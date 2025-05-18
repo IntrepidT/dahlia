@@ -22,7 +22,7 @@ const TABLE_CONTAINER_STYLE: &str =
 const TABLE_HEADER_STYLE: &str =
     "py-3 md:py-5 px-4 md:px-6 flex justify-between items-center bg-[#2E3A59] border-b border-[#2E3A59]";
 const TABLE_WRAPPER_STYLE: &str =
-    "overflow-x-auto h-[calc(100vh-15rem)] md:h-[42rem] overflow-y-auto";
+    "overflow-x-auto h-[calc(100vh-15rem)] md:h-[42rem] overflow-y-auto scroll-smooth";
 const TABLE_STYLE: &str = "min-w-full divide-y divide-[#DADADA]";
 const HEADER_CELL_STYLE: &str =
     "px-2 md:px-6 py-2 md:py-3 text-left text-sm font-medium text-[#2E3A59] uppercase tracking-wider";
@@ -127,7 +127,7 @@ pub fn StudentTable(
                 </span>
             </div>
             <div class=TABLE_WRAPPER_STYLE>
-                <div class="overflow-y-auto max-h-full">
+                <div class="overflow-y-auto h-full relative">
                     <table class=TABLE_STYLE>
                         <thead class="bg-[#DADADA] sticky top-0 z-10">
                             <tr>

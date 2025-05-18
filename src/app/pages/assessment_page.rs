@@ -506,6 +506,7 @@ pub fn AssessmentPage() -> impl IntoView {
                                             <input
                                                 type="number"
                                                 id="version"
+                                                min="0"
                                                 class="w-full px-3 py-2 border border-[#DADADA] rounded focus:outline-none focus:ring-1 focus:ring-[#2E3A59] focus:border-[#2E3A59]"
                                                 prop:value={move || version.get()}
                                                 on:input=move |ev| {
@@ -608,6 +609,7 @@ pub fn AssessmentPage() -> impl IntoView {
                                                 type="number"
                                                 class="w-20 px-2 py-1 text-sm border border-[#DADADA] rounded focus:outline-none focus:ring-1 focus:ring-[#2E3A59] focus:border-[#2E3A59]"
                                                 placeholder="Min"
+                                                min="0"
                                                 prop:value={move || risk_benchmark_min.get()}
                                                 on:input=move |ev| {
                                                     if let Ok(v) = event_target_value(&ev).parse::<i32>() {
@@ -622,6 +624,7 @@ pub fn AssessmentPage() -> impl IntoView {
                                                 type="number"
                                                 class="w-20 px-2 py-1 text-sm border border-[#DADADA] rounded focus:outline-none focus:ring-1 focus:ring-[#2E3A59] focus:border-[#2E3A59]"
                                                 placeholder="Max"
+                                                min="0"
                                                 prop:value={move || risk_benchmark_max.get()}
                                                 on:input=move |ev| {
                                                     if let Ok(v) = event_target_value(&ev).parse::<i32>() {
@@ -692,6 +695,7 @@ pub fn AssessmentPage() -> impl IntoView {
                                                 type="number"
                                                 class="w-20 px-2 py-1 text-sm border border-[#DADADA] rounded focus:outline-none focus:ring-1 focus:ring-[#2E3A59] focus:border-[#2E3A59]"
                                                 placeholder="Min"
+                                                min="0"
                                                 prop:value={move || natl_benchmark_min.get()}
                                                 on:input=move |ev| {
                                                     if let Ok(v) = event_target_value(&ev).parse::<i32>() {
@@ -704,6 +708,7 @@ pub fn AssessmentPage() -> impl IntoView {
                                             <label class="block text-xs mb-1">"Max"</label>
                                             <input
                                                 type="number"
+                                                min="0"
                                                 class="w-20 px-2 py-1 text-sm border border-[#DADADA] rounded focus:outline-none focus:ring-1 focus:ring-[#2E3A59] focus:border-[#2E3A59]"
                                                 placeholder="Max"
                                                 prop:value={move || natl_benchmark_max.get()}

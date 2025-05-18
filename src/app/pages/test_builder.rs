@@ -548,6 +548,7 @@ pub fn TestBuilder() -> impl IntoView {
                                     </label>
                                     <input
                                         type="number"
+                                        min="0"
                                         class="w-full px-4 py-3 rounded-md border border-gray-300 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
                                         value=move || test_variant().to_string()
                                         on:input=move |event| {
@@ -591,6 +592,7 @@ pub fn TestBuilder() -> impl IntoView {
                                                             <input
                                                                 type="number"
                                                                 placeholder="Min"
+                                                                min="0"
                                                                 class="w-full px-3 py-2 rounded-l border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                                                 value=min_score.to_string()
                                                                 on:input=move |ev| {
@@ -607,6 +609,7 @@ pub fn TestBuilder() -> impl IntoView {
                                                             <input
                                                                 type="number"
                                                                 placeholder="Max"
+                                                                min="0"
                                                                 class="w-full px-3 py-2 rounded-r border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                                                 value=max_score.to_string()
                                                                 on:input=move |ev| {

@@ -48,3 +48,6 @@ pub use settings::Settings;
 
 pub mod gradebook;
 pub use gradebook::Gradebook;
+
+pub mod classroom;
+pub use classroom::Classroom;
