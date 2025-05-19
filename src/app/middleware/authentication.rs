@@ -12,7 +12,7 @@ mod server {
     use std::sync::Arc;
     use std::task::{Context, Poll};
 
-    use crate::app::models::user::User;
+    use crate::app::models::user::UserJwt;
 
     pub struct Authentication {
         password_hash: Arc<String>,
@@ -102,10 +102,10 @@ mod server {
     }
 
     // Placeholder function to get user by ID
-    async fn get_user_by_id(user_id: i64) -> Option<User> {
+    async fn get_user_by_id(user_id: i64) -> Option<UserJwt> {
         // In a real application, look up user in database
         // For now, just return a placeholder user
-        Some(User {
+        Some(UserJwt {
             id: user_id,
             username: "test_user".to_string(),
             email: "test@example.com".to_string(),

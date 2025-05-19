@@ -1,6 +1,6 @@
 use crate::app::components::dashboard::dashboard_sidebar::{DashboardSidebar, SidebarSelected};
 use crate::app::components::header::Header;
-use crate::app::models::user::User;
+use crate::app::models::user::UserJwt;
 use crate::app::models::websocket_session::{SessionSummary, SessionType};
 use crate::app::server_functions::websocket_sessions;
 use chrono::{DateTime, Duration, Utc};
@@ -11,7 +11,7 @@ use std::collections::HashMap;
 
 #[component]
 pub fn TestSessionsList() -> impl IntoView {
-    let user = use_context::<ReadSignal<Option<User>>>().expect("AuthProvider not Found");
+    let user = use_context::<ReadSignal<Option<UserJwt>>>().expect("AuthProvider not Found");
     let navigate = use_navigate();
 
     // State for sessions

@@ -1,12 +1,12 @@
 use crate::app::components::auth::{LoginForm, RegisterForm};
-use crate::app::models::user::User;
+use crate::app::models::user::UserJwt;
 use leptos::*;
 use leptos_router::*;
 
 #[component]
 pub fn LoginPage() -> impl IntoView {
     let (show_register, set_show_register) = create_signal(false);
-    let current_user = use_context::<ReadSignal<Option<User>>>().unwrap();
+    let current_user = use_context::<ReadSignal<Option<UserJwt>>>().unwrap();
     let navigate = use_navigate();
 
     // If already logged in, redirect to home

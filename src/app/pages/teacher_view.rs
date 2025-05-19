@@ -1,13 +1,16 @@
 use crate::app::components::dashboard::dashboard_sidebar::{DashboardSidebar, SidebarSelected};
 use crate::app::components::header::Header;
 use crate::app::components::teacher_page::{
-    AddEmployeeForm, DeleteConfirmation, EmployeeDetails, EmployeeTable, SearchFilter, TeacherTable,
+    AddEmployeeForm, DeleteConfirmation, EmployeeDetails, EmployeeTable, SearchFilter,
+    TeacherTable, UserTable,
 };
 use crate::app::models::employee::{AddNewEmployeeRequest, Employee, EmployeeRole};
 use crate::app::models::student::GradeEnum;
+use crate::app::models::user::UserJwt;
 use crate::app::models::StatusEnum;
 use crate::app::server_functions::employees::{add_employee, get_employees};
 use crate::app::server_functions::teachers::get_teachers;
+use crate::app::server_functions::users::get_users;
 use leptos::ev::SubmitEvent;
 use leptos::*;
 use std::rc::Rc;
@@ -45,10 +48,11 @@ const BUTTON_CONTAINER_STYLE: &str =
 
 #[component]
 pub fn Teachers() -> impl IntoView {
+    let user = use_context::<ReadSignal<Option<UserJwt>>>().expect("AuthProvider not found");
     // Create resource for refreshing data
     let (refresh_trigger, set_refresh_trigger) = create_signal(0);
     let (selected_view, set_selected_view) = create_signal(SidebarSelected::TeacherView);
-    
+
     // Create resources for employees and teachers
     let employees = create_resource(
         move || refresh_trigger(),
@@ -76,6 +80,19 @@ pub fn Teachers() -> impl IntoView {
         },
     );
 
+    let users = create_resource(
+        move || refresh_trigger(),
+        |_| async move {
+            match get_users().await {
+                Ok(users) => Some(users),
+                Err(e) => {
+                    log::error!("Failed to fetch users: {}", e);
+                    Some(vec![])
+                }
+            }
+        },
+    );
+
     // Main UI state signals
     let (active_view, set_active_view) = create_signal(String::from("employees"));
     let (selected_employee, set_selected_employee) = create_signal(None::<Rc<Employee>>);
@@ -83,10 +100,10 @@ pub fn Teachers() -> impl IntoView {
     let (role_filter, set_role_filter) = create_signal(String::new());
     let (adding_employee, set_adding_employee) = create_signal(false);
     let (confirm_delete, set_confirm_delete) = create_signal(false);
-    
+
     // Panel visibility control
     let (show_side_panel, set_show_side_panel) = create_signal(false);
-    
+
     // Panel toggle for desktop view
     let (panel_expanded, set_panel_expanded) = create_signal(false);
 
@@ -101,6 +118,7 @@ pub fn Teachers() -> impl IntoView {
     // Tab view selection handlers
     let select_teachers_view = move |_| set_active_view(String::from("teachers"));
     let select_employees_view = move |_| set_active_view(String::from("employees"));
+    let select_users_view = move |_| set_active_view(String::from("users"));
 
     // Clear filters function
     let clear_filters = move |_| {
@@ -159,6 +177,14 @@ pub fn Teachers() -> impl IntoView {
                     >
                         "Teachers"
                     </button>
+                    <Show when=move || user.get().map_or(false, |u| u.role == "admin")>
+                        <button
+                            class=move || if active_view() == "users" { TAB_BUTTON_ACTIVE } else { TAB_BUTTON_INACTIVE }
+                            on:click=select_users_view
+                        >
+                            "Users"
+                        </button>
+                    </Show>
                 </div>
 
                 // Teachers Table
@@ -181,6 +207,15 @@ pub fn Teachers() -> impl IntoView {
                         role_filter=role_filter
                         selected_employee=selected_employee
                         set_selected_employee=set_selected_employee
+                        is_panel_expanded=Signal::derive(move || panel_expanded())
+                    />
+                </Show>
+
+                //Users Table
+                <Show when=move || active_view() =="users">
+                    <UserTable
+                        users=users
+                        search_term=search_term
                         is_panel_expanded=Signal::derive(move || panel_expanded())
                     />
                 </Show>

@@ -30,3 +30,6 @@ pub use assessments::get_assessments;
 
 pub mod data_wrappers;
 pub use data_wrappers::get_student_results_server;
+
+pub mod users;
+pub use users::get_users;

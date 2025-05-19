@@ -1,13 +1,13 @@
 use crate::app::components::auth::LogoutButton;
 use crate::app::components::Header;
-use crate::app::models::user::User;
+use crate::app::models::user::UserJwt;
 use crate::app::server_functions::auth::{get_current_user, Logout};
 use leptos::*;
 
 #[component]
 pub fn MyAccount() -> impl IntoView {
     // Get the current user from context (provided by AuthProvider)
-    let current_user = use_context::<ReadSignal<Option<User>>>()
+    let current_user = use_context::<ReadSignal<Option<UserJwt>>>()
         .expect("AuthProvider should provide current_user");
     let loading = use_context::<ReadSignal<bool>>().expect("AuthProvider should provide loading");
 

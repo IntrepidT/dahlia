@@ -1,4 +1,4 @@
-use crate::app::models::user::User;
+use crate::app::models::user::UserJwt;
 use crate::app::server_functions::auth::{get_current_user, login, logout, register};
 use leptos::*;
 use leptos_router::use_navigate;
@@ -12,7 +12,7 @@ use {
 
 #[component]
 pub fn AuthProvider(children: Children) -> impl IntoView {
-    let (current_user, set_current_user) = create_signal::<Option<User>>(None);
+    let (current_user, set_current_user) = create_signal::<Option<UserJwt>>(None);
     let (loading, set_loading) = create_signal(true);
 
     // Load the current user on component mount
@@ -53,7 +53,7 @@ pub fn LoginForm() -> impl IntoView {
     let (username, set_username) = create_signal("".to_string());
     let (password, set_password) = create_signal("".to_string());
     let (error, set_error) = create_signal::<Option<String>>(None);
-    let set_current_user = use_context::<WriteSignal<Option<User>>>().unwrap();
+    let set_current_user = use_context::<WriteSignal<Option<UserJwt>>>().unwrap();
 
     let handle_submit = create_action(move |_: &()| {
         let username = username.get();
@@ -163,7 +163,7 @@ pub fn RegisterForm() -> impl IntoView {
     let (password, set_password) = create_signal("".to_string());
     let (confirm_password, set_confirm_password) = create_signal("".to_string());
     let (error, set_error) = create_signal::<Option<String>>(None);
-    let set_current_user = use_context::<WriteSignal<Option<User>>>().unwrap();
+    let set_current_user = use_context::<WriteSignal<Option<UserJwt>>>().unwrap();
 
     let handle_submit = create_action(move |_: &()| {
         let username = username.get();
@@ -283,7 +283,7 @@ pub fn RegisterForm() -> impl IntoView {
 
 #[component]
 pub fn LogoutButton() -> impl IntoView {
-    let set_current_user = use_context::<WriteSignal<Option<User>>>().unwrap();
+    let set_current_user = use_context::<WriteSignal<Option<UserJwt>>>().unwrap();
 
     let handle_logout = create_action(move |_: &()| {
         async move {
@@ -319,7 +319,7 @@ pub fn LogoutButton() -> impl IntoView {
 
 #[component]
 pub fn RequireAuth(children: Children) -> impl IntoView {
-    let current_user = use_context::<ReadSignal<Option<User>>>().unwrap();
+    let current_user = use_context::<ReadSignal<Option<UserJwt>>>().unwrap();
     let loading = use_context::<ReadSignal<bool>>().unwrap();
 
     let rendered_children = children();
@@ -349,7 +349,7 @@ pub fn RequireRole(
     #[prop(default = "user".to_string())] role: String,
     children: Children,
 ) -> impl IntoView {
-    let current_user = use_context::<ReadSignal<Option<User>>>().unwrap();
+    let current_user = use_context::<ReadSignal<Option<UserJwt>>>().unwrap();
     let loading = use_context::<ReadSignal<bool>>().unwrap();
 
     let navigate = use_navigate();
@@ -423,14 +423,14 @@ pub async fn send_reset_email(email: &str, reset_token: &str) -> Result<(), Stri
     // Configuration - in production these should come from environment variables
     let sendgrid_api_key = std::env::var("SENDGRID_API_KEY")
         .map_err(|_| "SENDGRID_API_KEY environment variable not set".to_string())?;
-    let app_url = std::env::var("APP_URL")
-        .unwrap_or_else(|_| "https://yourapp.com".to_string());
-    let from_email = std::env::var("FROM_EMAIL")
-        .unwrap_or_else(|_| "noreply@yourapp.com".to_string());
-    
+    let app_url = std::env::var("APP_URL").unwrap_or_else(|_| "https://yourapp.com".to_string());
+    let from_email =
+        std::env::var("FROM_EMAIL").unwrap_or_else(|_| "noreply@yourapp.com".to_string());
+
     // Determine whether to use sandbox mode based on environment
-    let is_development = std::env::var("APP_ENV").unwrap_or_else(|_| "development".to_string()) != "production";
-    
+    let is_development =
+        std::env::var("APP_ENV").unwrap_or_else(|_| "development".to_string()) != "production";
+
     // Create the reset link
     let reset_link = format!("{}/reset-password/{}", app_url, reset_token);
 
@@ -449,7 +449,7 @@ pub async fn send_reset_email(email: &str, reset_token: &str) -> Result<(), Stri
             )
         }]
     });
-    
+
     // Only enable sandbox mode for development environment
     if is_development {
         // Add sandbox mode setting for development
@@ -460,12 +460,15 @@ pub async fn send_reset_email(email: &str, reset_token: &str) -> Result<(), Stri
                     "sandbox_mode": {
                         "enable": true
                     }
-                })
+                }),
             );
             log::info!("Sending password reset email to {} (sandbox mode)", email);
         }
     } else {
-        log::info!("Sending password reset email to {} (production mode)", email);
+        log::info!(
+            "Sending password reset email to {} (production mode)",
+            email
+        );
     }
 
     // Send the request to SendGrid API
@@ -482,14 +485,20 @@ pub async fn send_reset_email(email: &str, reset_token: &str) -> Result<(), Stri
     // Check the response
     if res.status().is_success() {
         if is_development {
-            log::info!("Password reset email sent successfully to {} (sandbox mode)", email);
+            log::info!(
+                "Password reset email sent successfully to {} (sandbox mode)",
+                email
+            );
         } else {
             log::info!("Password reset email sent successfully to {}", email);
         }
         Ok(())
     } else {
         let status = res.status();
-        let body = res.text().await.unwrap_or_else(|_| "No response body".to_string());
+        let body = res
+            .text()
+            .await
+            .unwrap_or_else(|_| "No response body".to_string());
         error!("Failed to send email. Status: {}, Body: {}", status, body);
         Err(format!("Failed to send email. Status: {}", status))
     }

@@ -1,14 +1,15 @@
 use crate::app::components::Header;
-use crate::app::models::user::User;
+use crate::app::models::user::UserJwt;
 use leptos::*;
 use leptos_router::*;
 
 #[component]
 pub fn HomePage() -> impl IntoView {
     // Access the auth context signals directly
-    let current_user = use_context::<ReadSignal<Option<User>>>().expect("Auth context not found");
+    let current_user =
+        use_context::<ReadSignal<Option<UserJwt>>>().expect("Auth context not found");
     let loading = use_context::<ReadSignal<bool>>().expect("Auth context not found");
-    
+
     // Create a view that will check authentication status and redirect if needed
     view! {
         <Suspense fallback=move || view! { <p>"Loading..."</p> }>
