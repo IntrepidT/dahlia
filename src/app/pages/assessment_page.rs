@@ -1,5 +1,6 @@
 use crate::app::components::dashboard::dashboard_sidebar::{DashboardSidebar, SidebarSelected};
 use crate::app::components::header::Header;
+use crate::app::components::test_item::TestItem;
 use crate::app::models::assessment::{
     Assessment, CreateNewAssessmentRequest, DeleteAssessmentRequest, RangeCategory, SubjectEnum,
     UpdateAssessmentRequest,
@@ -306,11 +307,16 @@ pub fn AssessmentPage() -> impl IntoView {
                                                                                     });
 
                                                                                     ordered_tests.into_iter().enumerate().map(|(index, test)| {
+                                                                                        let test_id = test.test_id.clone();
+                                                                                        let test_clone = test.clone();
                                                                                         let test_name = test.name.clone();
                                                                                         view! {
-                                                                                            <div class="flex items-center space-x-2 p-2 rounded bg-gray-50">
-                                                                                                <span class="text-sm font-medium mr-2">{index + 1}.</span>
-                                                                                                <span class="text-sm text-ellipsis overflow-hidden">{test_name}</span>
+                                                                                            <div class="mb-1">
+                                                                                                <TestItem
+                                                                                                    test=test_clone.clone()
+                                                                                                    test_id=test_id
+                                                                                                    test_name=test_name
+                                                                                                />
                                                                                             </div>
                                                                                         }
                                                                                     }).collect_view()

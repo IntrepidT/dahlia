@@ -2,7 +2,7 @@ use crate::app::models::question::QuestionType;
 use crate::app::models::score::CreateScoreRequest;
 use crate::app::models::student::Student;
 use crate::app::models::test::Test;
-use crate::app::models::user::User;
+use crate::app::models::user::UserJwt;
 use crate::app::server_functions::students::get_students;
 use crate::app::server_functions::{questions::get_questions, scores::add_score, tests::get_tests};
 use leptos::*;
@@ -21,7 +21,7 @@ pub fn FlashCardSet() -> impl IntoView {
     // Get test_id from URL parameters
     let params = use_params_map();
     let test_id = move || params.with(|params| params.get("test_id").cloned().unwrap_or_default());
-    let user = use_context::<ReadSignal<Option<User>>>().expect("AuthProvider not Found");
+    let user = use_context::<ReadSignal<Option<UserJwt>>>().expect("AuthProvider not Found");
 
     // Create resource to fetch test details
     let test_details = create_resource(test_id.clone(), move |tid| async move {

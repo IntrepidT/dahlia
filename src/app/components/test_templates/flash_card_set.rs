@@ -1,7 +1,7 @@
 use crate::app::models::question::QuestionType;
 use crate::app::models::score::CreateScoreRequest;
 use crate::app::models::student::Student;
-use crate::app::models::user::User;
+use crate::app::models::user::UserJwt;
 use crate::app::server_functions::students::get_students;
 use crate::app::server_functions::{questions::get_questions, scores::add_score};
 use chrono::Local;

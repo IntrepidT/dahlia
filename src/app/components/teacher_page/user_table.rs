@@ -124,20 +124,7 @@ pub fn UserTable(
                                                 <td class=format!("{} {}", CELL_STYLE, "font-medium text-[#2E3A59]")>{email}</td>
                                                 <td class=format!("{} {}", CELL_STYLE, "font-medium text-[#2E3A59]")>{phone}</td>
                                                 <td class=format!("{} {}", CELL_STYLE, "font-medium text-[#2E3A59]")>{status}</td>
-                                                {
-                                                    if user.get().role() == "admin" {
-                                                        view! {
-                                                            <td class=format!("{} {}", CELL_STYLE, "font-medium text-[#2E3A59]")>
-                                                                <select>
-                                                                </select>
-                                                            </td>
-                                                        }
-                                                    } else {
-                                                        view! {
-                                                            <td class=format!("{} {}", CELL_STYLE, "font-medium text-[#2E3A49]")>{role}</td>
-                                                        }
-                                                    }
-                                                }
+                                                <td class=format!("{} {}", CELL_STYLE, "font-medium text-[#2E3A59]")>{role}</td>
                                             </tr>
                                         }
                                     }).collect_view()
