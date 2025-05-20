@@ -88,6 +88,31 @@ cfg_if::cfg_if! {
             Ok(users)
         }
 
+        pub async fn get_user(id: i64, pool: &sqlx::PgPool) -> Result<User, ServerFnError> {
+            let row = sqlx::query("SELECT id, username, email, password_hash, role, password_salt, account_status::text, email_verified, phone_number, phone_verified, display_name, first_name, last_name FROM users WHERE id = $1")
+                .bind(id)
+                .fetch_one(pool)
+                .await
+                .map_err(|e| ServerFnError::new(format!("Database error: {}", e)))?;
+
+            let user = User {
+                id: row.get("id"),
+                username: row.get("username"),
+                email: row.get("email"),
+                password_hash: row.get("password_hash"),
+                role: row.get("role"),
+                password_salt: row.try_get("password_salt").unwrap_or(None),
+                account_status: AccountStatus::from_str(row.get("account_status")),
+                email_verified: row.get("email_verified"),
+                phone_number: row.try_get("phone_number").unwrap_or(None),
+                phone_verified: row.get("phone_verified"),
+                display_name: row.try_get("display_name").unwrap_or(None),
+                first_name: row.try_get("first_name").unwrap_or(None),
+                last_name: row.try_get("last_name").unwrap_or(None),
+            };
+            Ok(user)
+        }
+
         // Get a user by username
         pub async fn get_user_by_username(
             pool: &Pool<Postgres>,
@@ -338,6 +363,35 @@ cfg_if::cfg_if! {
             .map_err(|e| ServerFnError::new(format!("Failed to update password: {}", e)))?;
 
             Ok(())
+        }
+
+        pub async fn update_user_data(new_user_data: User, pool: &sqlx::PgPool) -> Result<User, ServerFnError> {
+            let row = sqlx::query("UPDATE users SET username = $1, phone_number = $2, first_name =$3, last_name=$4 WHERE id = $5 RETURNING id, username, email, password_hash, role, password_salt, account_status::text, email_verified, phone_number, phone_verified, display_name, first_name, last_name")
+                .bind(new_user_data.username)
+                .bind(new_user_data.phone_number)
+                .bind(new_user_data.first_name)
+                .bind(new_user_data.last_name)
+                .bind(new_user_data.id)
+                .fetch_one(pool)
+                .await
+                .map_err(|e| ServerFnError::new(format!("Failed to update user: {}", e)))?;
+
+            let user = User {
+                id: row.get("id"),
+                username: row.get("username"),
+                email: row.get("email"),
+                password_hash: row.get("password_hash"),
+                role: row.get("role"),
+                password_salt: row.try_get("password_salt").unwrap_or(None),
+                account_status: AccountStatus::from_str(row.get("account_status")),
+                email_verified: row.get("email_verified"),
+                phone_number: row.try_get("phone_number").unwrap_or(None),
+                phone_verified: row.get("phone_verified"),
+                display_name: row.try_get("display_name").unwrap_or(None),
+                first_name: row.try_get("first_name").unwrap_or(None),
+                last_name: row.try_get("last_name").unwrap_or(None),
+            };
+            Ok(user)
         }
     }
 }

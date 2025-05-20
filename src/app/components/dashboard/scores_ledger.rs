@@ -278,6 +278,7 @@ pub fn ScoresLedger() -> impl IntoView {
                                                     let test_id = score.test_id.clone();
                                                     let test_variant = score.test_variant;
                                                     let attempt = score.attempt;
+                                                   
 
                                                     // Create delete request for this score
                                                     let delete_req = DeleteScoreRequest {

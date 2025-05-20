@@ -8,6 +8,7 @@ use crate::app::server_functions::questions::get_questions;
 use crate::app::server_functions::scores::add_score;
 use crate::app::server_functions::students::get_students;
 use crate::app::server_functions::tests::get_test;
+use crate::app::server_functions::users::get_user;
 use crate::app::server_functions::{tests::get_tests, websocket_sessions};
 use chrono::{DateTime, Duration, Utc};
 use leptos::ev::ErrorEvent;
@@ -55,6 +56,21 @@ pub fn RealtimeTestSession() -> impl IntoView {
     let params = use_params_map();
     let test_id = move || params.with(|params| params.get("test_id").cloned().unwrap_or_default());
     let user = use_context::<ReadSignal<Option<User>>>().expect("AuthProvider not Found");
+    let user_data = create_resource(
+        move || user.get().map(|u| u.id),
+        move |id| async move {
+            match id {
+                Some(user_id) => match get_user(user_id).await {
+                    Ok(user) => Some(user),
+                    Err(e) => {
+                        log::error!("Failed to fetch user from database: {}", e);
+                        None
+                    }
+                },
+                None => None,
+            }
+        },
+    );
 
     // WebSocket state
     let (ws, set_ws) = create_signal::<Option<WebSocket>>(None);

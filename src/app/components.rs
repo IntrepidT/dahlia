@@ -56,3 +56,6 @@ pub use login_components::*;
 
 pub mod test_item;
 pub use test_item::*;
+
+pub mod update_user_modal;
+pub use update_user_modal::*;

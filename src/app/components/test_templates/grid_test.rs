@@ -4,7 +4,9 @@ use crate::app::models::student::Student;
 use crate::app::models::test::Test;
 use crate::app::models::user::UserJwt;
 use crate::app::server_functions::students::get_students;
-use crate::app::server_functions::{questions::get_questions, scores::add_score, tests::get_tests};
+use crate::app::server_functions::{
+    questions::get_questions, scores::add_score, tests::get_tests, users::get_user,
+};
 use leptos::*;
 use leptos_router::*;
 use std::collections::HashMap;
@@ -22,7 +24,21 @@ pub fn GridTest() -> impl IntoView {
     let params = use_params_map();
     let test_id = move || params.with(|params| params.get("test_id").cloned().unwrap_or_default());
     let user = use_context::<ReadSignal<Option<UserJwt>>>().expect("AuthProvider not Found");
-
+    let user_resource = create_resource(
+        move || user.get().map(|u| u.id),
+        move |id| async move {
+            match id {
+                Some(user_id) => match get_user(user_id).await {
+                    Ok(user) => Some(user),
+                    Err(e) => {
+                        log::error!("Failed to fetch user from database: {}", e);
+                        None
+                    }
+                },
+                None => None,
+            }
+        },
+    );
     // Create resource to fetch test details
     let test_details = create_resource(test_id.clone(), move |tid| async move {
         if tid.is_empty() {
@@ -241,7 +257,11 @@ pub fn GridTest() -> impl IntoView {
                     </div>
                     <div class="text-sm text-gray-600 font-medium">
                         {"Evaluator: "}
-                        {evaluator_id}
+                        {move || match user_resource.get() {
+                            Some(Some(user)) => format!("{} {}", user.first_name.unwrap_or("None".to_string()), user.last_name.unwrap_or("None".to_string())),
+                            Some(None) => evaluator_id(),
+                            None => "Loading...".to_string(),
+                        }}
                     </div>
                 </div>
 

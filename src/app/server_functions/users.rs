@@ -27,3 +27,62 @@ pub async fn get_users() -> Result<Vec<User>, ServerFnError> {
         }
     }
 }
+
+#[server(GetUser, "/api")]
+pub async fn get_user(id: i64) -> Result<User, ServerFnError> {
+    #[cfg(feature = "ssr")]
+    {
+        use actix_web::web;
+        use leptos_actix::extract;
+        use sqlx::PgPool;
+        let pool = extract::<web::Data<PgPool>>()
+            .await
+            .map_err(|e| ServerFnError::new(format!("Failed to extract pool: {}", e)))?;
+
+        log::info!("Fetching user with ID {} from the database", id);
+
+        match user_database::get_user(id, &pool).await {
+            Ok(user) => {
+                log::info!(
+                    "Successfully retrieved user with ID {} from the database",
+                    id
+                );
+                Ok(user)
+            }
+            Err(e) => {
+                log::error!("Database error: {}", e);
+                Err(ServerFnError::new(format!("Database error: {}", e)))
+            }
+        }
+    }
+}
+
+#[server(UpdateUser, "/api")]
+pub async fn update_user(new_user_data: User) -> Result<User, ServerFnError> {
+    #[cfg(feature = "ssr")]
+    {
+        use actix_web::web;
+        use leptos_actix::extract;
+        use sqlx::PgPool;
+        let pool = extract::<web::Data<PgPool>>()
+            .await
+            .map_err(|e| ServerFnError::new(format!("Failed to extract pool")))?;
+
+        /*log::info!(
+            "Updating data for user: {} {}",
+            new_user_data.first_name.unwrap_or("None".to_string()),
+            new_user_data.last_name.unwrap_or("None".to_string())
+        );*/
+
+        match user_database::update_user_data(new_user_data, &pool).await {
+            Ok(user) => {
+                log::info!("Successfully updated user data");
+                Ok(user)
+            }
+            Err(e) => {
+                log::error!("Database error: {}", e);
+                Err(ServerFnError::new(format!("Database error: {}", e)))
+            }
+        }
+    }
+}
