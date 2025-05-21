@@ -2,13 +2,16 @@ use crate::app::components::dashboard_sidebar::{DashboardSidebar, SidebarSelecte
 use crate::app::components::data_processing::{
     AssessmentSummary, Progress, StudentResultsSummary, TestDetail,
 };
+use crate::app::components::gradebook_side_panel::{ScorePanelType, StudentScorePanel};
 use crate::app::components::header::Header;
 use crate::app::models::assessment::Assessment;
+use crate::app::models::student::Student;
 use crate::app::server_functions::assessments::get_assessments;
 use crate::app::server_functions::data_wrappers::get_student_results_batch;
 use crate::app::server_functions::scores::get_scores_by_test;
 use crate::app::server_functions::students::get_students;
 use crate::app::server_functions::tests::get_tests_batch;
+use chrono::Utc;
 use icondata::{BiCheckboxCheckedRegular, BiCheckboxRegular, HiUserCircleOutlineLg};
 use leptos::*;
 use leptos_icons::Icon;
@@ -24,6 +27,17 @@ pub fn Gradebook() -> impl IntoView {
     // Store assessment ID instead of the whole assessment
     let (selected_assessment_id, set_selected_assessment_id) =
         create_signal(Option::<String>::None);
+
+    // Side panel state
+    let (show_side_panel, set_show_side_panel) = create_signal(false);
+    let (panel_type, set_panel_type) = create_signal(ScorePanelType::None);
+    let (selected_student, set_selected_student) = create_signal(Option::<Student>::None);
+
+    // Current assessment/test data for the side panel
+    let (current_assessment_data, set_current_assessment_data) =
+        create_signal(Option::<AssessmentSummary>::None);
+    let (current_test_data, set_current_test_data) = create_signal(Option::<TestDetail>::None);
+    let (next_test_id, set_next_test_id) = create_signal(Option::<String>::None);
 
     // Fetch students
     let students = create_resource(
@@ -141,10 +155,116 @@ pub fn Gradebook() -> impl IntoView {
         },
     );
 
+    // Helper function to find the next test ID - Defined before it's used
+    fn find_next_test_id(assessment: &AssessmentSummary) -> Option<String> {
+        if assessment.progress == Progress::Completed {
+            return None;
+        }
+
+        // Find the first test that isn't completed
+        assessment
+            .test_details
+            .iter()
+            .find(|test| test.score < test.total_possible)
+            .map(|test| test.test_id.clone())
+    }
+
+    // Handler for opening assessment side panel
+    let open_assessment_panel = move |assessment_id: String, student_id: i32| {
+        // Find the student data
+        if let Some(Some(students_list)) = students.get() {
+            if let Some(student) = students_list.iter().find(|s| s.student_id == student_id) {
+                set_selected_student(Some(student.clone()));
+
+                // Find the assessment data
+                let results_map = all_student_results.get().unwrap_or_default();
+                if let Some(student_results) = results_map.get(&student_id) {
+                    if let Some(summary) = student_results
+                        .assessment_summaries
+                        .iter()
+                        .find(|s| s.assessment_id == assessment_id)
+                    {
+                        // Set the panel data
+                        set_current_assessment_data(Some(summary.clone()));
+
+                        // Find the next test if any - using the regular function
+                        set_next_test_id(find_next_test_id(summary));
+
+                        // Show the panel
+                        set_panel_type(ScorePanelType::AssessmentScore(assessment_id));
+                        set_show_side_panel(true);
+                        return;
+                    }
+                }
+            }
+        }
+
+        // If we get here, we couldn't find all the data
+        log::error!("Failed to load assessment data for side panel");
+    };
+
+    // Handler for opening test side panel
+    let open_test_panel = move |test_id: String, student_id: i32, attempt: i32| {
+        // Find the student data
+        if let Some(Some(students_list)) = students.get() {
+            if let Some(student) = students_list.iter().find(|s| s.student_id == student_id) {
+                set_selected_student(Some(student.clone()));
+
+                // Get test data from already loaded tests instead of calling get_test_details
+                if let Some(Some(test_list)) = tests.get() {
+                    if let Some(test) = test_list.iter().find(|t| t.test_id == test_id) {
+                        // Create a TestDetail from the existing Test data
+                        let test_detail = TestDetail {
+                            test_id: test.test_id.clone(),
+                            test_name: test.name.clone(),
+                            test_area: test.testarea.clone().to_string(),
+                            score: 0, // We'll get this from scores
+                            total_possible: test.score,
+                            performance_class: "Not available".to_string(),
+                            date_administered: Utc::now(), // Default to now since we don't have the actual date
+                            attempt: 0,                    //We'll also get this from scores
+                            test_variant: 0,               // Get variant from the score
+                        };
+
+                        // Update score if available
+                        if let Some(Some(score_data)) = scores.get() {
+                            if let Some(score) = score_data.iter().find(|s| {
+                                s.student_id == student_id
+                                    && s.test_id == test_id
+                                    && s.attempt == attempt
+                            }) {
+                                let test_detail = TestDetail {
+                                    score: score.get_total(),
+                                    performance_class: if score.get_total() >= (test.score / 2) {
+                                        "Satisfactory".to_string()
+                                    } else {
+                                        "Needs Improvement".to_string()
+                                    },
+                                    attempt: score.attempt,
+                                    test_variant: score.test_variant,
+                                    ..test_detail
+                                };
+                                set_current_test_data(Some(test_detail));
+                                set_panel_type(ScorePanelType::TestScore(
+                                    test_id, student_id, attempt,
+                                ));
+                                set_show_side_panel(true);
+                            }
+                        } else {
+                            set_current_test_data(Some(test_detail));
+                            set_panel_type(ScorePanelType::TestScore(test_id, student_id, attempt));
+                            set_show_side_panel(true);
+                        }
+                    }
+                }
+            }
+        }
+    };
+
     view! {
         <div class="h-screen flex flex-col bg-[#F9F9F8]">
             <Header />
-            <div class="flex  flex-1 overflow-hidden">
+            <div class="flex flex-1 overflow-hidden">
                 <DashboardSidebar
                     selected_item=selected_view
                     set_selected_item=set_selected_view
@@ -280,18 +400,18 @@ pub fn Gradebook() -> impl IntoView {
                                                                                     } else {
                                                                                         "bg-yellow-100"
                                                                                     };
-                                                                                    let icon_val = if summary.progress == Progress::Completed {
-                                                                                        BiCheckboxCheckedRegular
-                                                                                    } else {
-                                                                                        BiCheckboxRegular
-                                                                                    };
+
+                                                                                    // Clone for the handler
+                                                                                    let assessment_id = assessment.id.to_string();
+                                                                                    let student_id = student.student_id;
+                                                                                    let open_assessment = open_assessment_panel.clone();
+
                                                                                     view! {
-                                                                                        <td class="px-2 py-2 border whitespace-nowrap text-center">
+                                                                                        <td
+                                                                                            class=format!("{} px-2 py-2 border whitespace-nowrap text-center cursor-pointer hover:bg-gray-100", progression_color)
+                                                                                            on:click=move |_| open_assessment(assessment_id.clone(), student_id)
+                                                                                        >
                                                                                             {format!("{} / {}", score, total)}
-                                                                                            <Icon
-                                                                                                icon=icon_val
-                                                                                                class=format!("w-6 h-6 text-[#2E3A59] inline-block ml-2 {}", progression_color)
-                                                                                            />
                                                                                         </td>
                                                                                     }.into_view()
                                                                                 } else {
@@ -318,24 +438,30 @@ pub fn Gradebook() -> impl IntoView {
                                                                     match tests.get() {
                                                                         Some(Some(test_list)) => {
                                                                             let score_data = scores.get().unwrap_or(None).unwrap_or_default();
+                                                                            let student_clone = student.clone();
 
                                                                             test_list.iter().map(|test| {
                                                                                 let score = score_data
                                                                                     .iter()
                                                                                     .find(|s| s.student_id == student.student_id && s.test_id == test.test_id);
 
+                                                                                // Clone for the handler
+                                                                                let test_id = test.test_id.clone();
+                                                                                let student_id = student_clone.student_id;
+                                                                                let open_test = open_test_panel.clone();
+                                                                                let attempt_clone = match score {
+                                                                                    Some(s) => s.attempt.clone(),
+                                                                                    None => 0,
+                                                                                };
+
                                                                                 view! {
                                                                                     <td class="px-2 py-2 border whitespace-nowrap text-center">
                                                                                         {
                                                                                             match score {
                                                                                                 Some(s) => view! {
-                                                                                                    {s.get_total().to_string()}
-
-                                                                                                    <a href=format!("/reviewtest/{}/{}/{}/{}", test.test_id, student.student_id, test.test_variant, s.attempt) class="inline-block ml-2">
-                                                                                                        <button class="bg-blue-500 text-white px-3 py-1 hover:bg-blue-600 rounded-lg">
-                                                                                                            "Review"
-                                                                                                        </button>
-                                                                                                    </a>
+                                                                                                    <span class="cursor-pointer hover:text-indigo-600" on:click=move |_| open_test(test_id.clone(), student_id, attempt_clone)>
+                                                                                                        {s.get_total().to_string()}
+                                                                                                    </span>
                                                                                                 }.into_view(),
                                                                                                 None => view!{"-"}.into_view(),
                                                                                             }
@@ -359,6 +485,16 @@ pub fn Gradebook() -> impl IntoView {
                         </div>
                     </div>
                 </main>
+
+                <StudentScorePanel
+                    show=show_side_panel
+                    panel_type=panel_type
+                    set_show=set_show_side_panel
+                    student=selected_student
+                    assessment_data=current_assessment_data
+                    test_data=current_test_data
+                    next_test=next_test_id
+                />
             </div>
         </div>
     }

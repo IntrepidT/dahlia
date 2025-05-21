@@ -181,7 +181,7 @@ pub fn DashboardSidebar(
                         />
                         <SidebarNavLink
                             icon=BiClipboardRegular
-                            label="Classroom"
+                            label="Classroom (beta)"
                             path="/classroom"
                             is_expanded=is_expanded.into()
                             is_active=Signal::derive(move || current_path().starts_with("/classrooms"))
@@ -235,7 +235,7 @@ pub fn DashboardSidebar(
 
                         <SidebarNavLink
                             icon=IoSettingsOutline
-                            label="Settings"
+                            label="Settings (beta)"
                             path="/settings"
                             is_expanded=is_expanded.into()
                             is_active=Signal::derive(move || current_path().starts_with("/settings"))

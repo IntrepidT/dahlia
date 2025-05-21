@@ -43,6 +43,7 @@ pub struct TestHistoryEntry {
     pub date_administered: DateTime<Utc>,
     pub performance_class: String,
     pub evaluator: String,
+    pub attempt: i32,
 }
 
 // New structures to represent pre-processed data for efficient rendering
@@ -80,7 +81,9 @@ pub struct TestDetail {
     pub test_area: String,
     pub date_administered: DateTime<Utc>,
     pub performance_class: String, //this would be the categorization of the student according to
-                                   //the benchmark categories for a specific test
+    //the benchmark categories for a specific test
+    pub attempt: i32,
+    pub test_variant: i32,
 }
 
 #[cfg(feature = "ssr")]
@@ -208,6 +211,7 @@ pub fn scores_to_dataframe(scores: Vec<Score>) -> Result<DataFrame, PolarsError>
         .iter()
         .map(|s| s.evaluator.clone())
         .collect::<Vec<_>>();
+    let attempts = scores.iter().map(|s| s.attempt).collect::<Vec<_>>();
 
     df![
         "test id" => test_id,
@@ -216,6 +220,7 @@ pub fn scores_to_dataframe(scores: Vec<Score>) -> Result<DataFrame, PolarsError>
         "comments" => comments,
         "test variant" => test_variant,
         "evaluator" => evaluator,
+        "attempt" => attempts,
     ]
 }
 
@@ -258,6 +263,7 @@ pub async fn get_student_results(student_id: i32) -> Result<StudentResultsSummar
                 date_administered: score.date_administered,
                 performance_class,
                 evaluator: score.evaluator.clone(),
+                attempt: score.attempt,
             });
         }
     }
@@ -292,6 +298,8 @@ pub async fn get_student_results(student_id: i32) -> Result<StudentResultsSummar
                 test_area: test.testarea.to_string(),
                 date_administered: score.date_administered,
                 performance_class,
+                attempt: score.attempt,
+                test_variant: score.test_variant,
             });
         }
     }
@@ -440,6 +448,26 @@ fn group_tests_by_name(
     for entry in test_history {
         grouped_tests
             .entry(entry.test_name.clone())
+            .or_insert_with(Vec::new)
+            .push(entry);
+    }
+
+    for entries in grouped_tests.values_mut() {
+        entries.sort_by(|a, b| a.date_administered.cmp(&b.date_administered));
+    }
+
+    grouped_tests
+}
+
+#[cfg(feature = "ssr")]
+fn group_tests_by_name_and_attempt(
+    test_history: &[TestHistoryEntry],
+) -> HashMap<(String, i32), Vec<&TestHistoryEntry>> {
+    let mut grouped_tests: HashMap<(String, i32), Vec<&TestHistoryEntry>> = HashMap::new();
+
+    for entry in test_history {
+        grouped_tests
+            .entry((entry.test_name.clone(), entry.attempt))
             .or_insert_with(Vec::new)
             .push(entry);
     }

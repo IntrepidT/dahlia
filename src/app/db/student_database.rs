@@ -14,7 +14,7 @@ cfg_if::cfg_if! {
         use sqlx::prelude::*;
 
         pub async fn get_all_students(pool: &PgPool) -> Result<Vec<Student>, ServerFnError>{
-            let rows  = sqlx::query("SELECT firstname, lastname, preferred, gender, date_of_birth, student_id, esl, grade, teacher, iep, bip, student_504, readplan, gt, intervention, eye_glasses, notes, pin FROM students")
+            let rows  = sqlx::query("SELECT firstname, lastname, preferred, gender, date_of_birth, student_id, esl, grade, teacher, iep, bip, student_504, readplan, gt, intervention, eye_glasses, notes, pin FROM students ORDER BY lastname")
                 .fetch_all(pool)
                 .await?;
 

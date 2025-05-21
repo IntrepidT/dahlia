@@ -59,3 +59,6 @@ pub use test_item::*;
 
 pub mod update_user_modal;
 pub use update_user_modal::*;
+
+pub mod gradebook;
+pub use gradebook::*;

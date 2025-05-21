@@ -14,7 +14,8 @@ cfg_if::cfg_if! {
             let rows = sqlx::query(
                 "SELECT id, firstname, lastname, status, grade
                  FROM employees 
-                 WHERE role = 'Teacher'::employee_role"
+                 WHERE role = 'Teacher'::employee_role
+                 ORDER BY firstname"
             )
             .fetch_all(pool)
             .await?;
