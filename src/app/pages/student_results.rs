@@ -61,7 +61,7 @@ pub fn TestResultsPage() -> impl IntoView {
                                     </div>
                                     <div class="bg-gray-50 p-4 rounded">
                                         <h3 class="font-semibold text-gray-700">"Grade Level"</h3>
-                                        <p>{results.student.grade.to_string()}</p>
+                                        <p>{results.student.current_grade_level.to_string()}</p>
                                     </div>
                                     <div class="bg-gray-50 p-4 rounded">
                                         <h3 class="font-semibold text-gray-700">"School Year"</h3>

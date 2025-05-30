@@ -20,7 +20,7 @@ pub struct StudentCsvRow {
     //same as above
     pub esl: String,
     //same as above
-    pub grade: String,
+    pub current_grade_level: String,
     pub teacher: String,
     pub iep: bool,
     pub bip: bool,
@@ -32,3 +32,10 @@ pub struct StudentCsvRow {
     pub notes: String,
     pub pin: i32,
 }
+
+/*#[derive(Debug, Deserialize, Serialize)]
+pub struct BulkStudentEnrollmentRequest {
+    pub enrollments: Vec<Enrollment>,
+}
+
+#[derive(Debug, Deserialize)]*/

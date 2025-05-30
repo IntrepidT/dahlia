@@ -172,7 +172,7 @@ pub fn AddStudentForm(
                 }
             },
             esl: convert_esl_to_enum,
-            grade: convert_grade_to_enum,
+            current_grade_level: convert_grade_to_enum,
             teacher: new_teacher(),
             iep: new_iep(),
             bip: new_bip(),

@@ -1,5 +1,6 @@
 pub mod assessment_database;
 pub mod database;
+pub mod enrollment_database;
 pub mod question_database;
 pub mod score_database;
 pub mod student_database;
@@ -10,6 +11,7 @@ pub mod websocket_session_database;
 
 pub use assessment_database::*;
 pub use database::*;
+pub use enrollment_database::*;
 pub use question_database::*;
 pub use score_database::*;
 pub use student_database::*;

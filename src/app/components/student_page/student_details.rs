@@ -130,7 +130,7 @@ pub fn StudentDetails(
                     {move || format!("{} {}", student_memo().firstname, student_memo().lastname)}
                 </h2>
                 <div class="px-2 sm:px-3 py-0.5 sm:py-1 rounded-full bg-[#2E3A59] text-white text-xs font-medium">
-                    {move || student_memo().grade.to_string()}
+                    {move || student_memo().current_grade_level.to_string()}
                 </div>
             </div>
 

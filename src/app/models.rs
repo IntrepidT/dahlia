@@ -39,6 +39,10 @@ pub mod bulk_student;
 pub use bulk_student::BulkStudentImportRequest;
 pub use bulk_student::StudentCsvRow;
 
+pub mod bulk_enrollment;
+pub use bulk_enrollment::BulkEnrollmentImportRequest;
+pub use bulk_enrollment::EnrollmentCsvRow;
+
 pub mod websocket_session;
 pub use websocket_session::CreateSessionRequest;
 pub use websocket_session::Session;
@@ -50,3 +54,6 @@ pub use assessment::CreateNewAssessmentRequest;
 pub use assessment::DeleteAssessmentRequest;
 pub use assessment::UpdateAssessmentRequest;
 pub use assessment::{RangeCategory, SubjectEnum};
+
+pub mod enrollment;
+pub use enrollment::Enrollment;

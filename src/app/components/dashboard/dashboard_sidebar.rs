@@ -1,3 +1,4 @@
+use crate::app::components::settings_modal::SettingsModal;
 use icondata::IoChatbubbleEllipsesOutline;
 use icondata::{
     AiApiOutlined, AiBarChartOutlined, AiHomeOutlined, AiSettingOutlined, ChStack, FiBook,
@@ -47,6 +48,7 @@ pub fn DashboardSidebar(
 ) -> impl IntoView {
     let (is_expanded, set_is_expanded) = create_signal(false);
     let (show_administer_modal, set_show_administer_modal) = create_signal(false);
+    let (show_settings, set_show_settings) = create_signal(false);
 
     // New signal for pinned state
     let (is_pinned_closed, set_is_pinned_closed) = create_signal(false);
@@ -233,14 +235,34 @@ pub fn DashboardSidebar(
                             </div>
                         </div>
 
-                        <SidebarNavLink
+                        <button
+                            class="flex items-center cursor-pointer hover:bg-[#DADADA] p-2 rounded-md transition-colors"
+                            on:click=move |_| set_show_settings.set(true)
+                        >
+                            <Icon
+                                icon=IoSettingsOutline
+                                class="w-6 h-6 text[#2E3A59] flex-shrink-0"
+                            />
+                            <div class="overflow-hidden whitespace-nowrap">
+                                <Show
+                                    when=move || is_expanded()
+                                    fallback=|| view! { <></> }
+                                >
+                                    <span class="ml-2 font-semibold text-sm sm:text-base">
+                                        {"Settings (beta)"}
+                                    </span>
+                                </Show>
+                            </div>
+                        </button>
+
+                        /*<SidebarNavLink
                             icon=IoSettingsOutline
                             label="Settings (beta)"
                             path="/settings"
                             is_expanded=is_expanded.into()
                             is_active=Signal::derive(move || current_path().starts_with("/settings"))
                             is_small_screen=is_small_screen.into()
-                        />
+                        />*/
 
                         // Divider
                         <div class="border-t border-[#DADADA] my-2"></div>
@@ -291,6 +313,13 @@ pub fn DashboardSidebar(
                 >
                     <ShowAdministerTestModal set_if_show_modal=set_show_administer_modal />
                 </div>
+            </Show>
+
+            <Show when=move || show_settings()>
+                <SettingsModal
+                    show=show_settings
+                    on_close=move |_| set_show_settings.set(false)
+                />
             </Show>
         </div>
     }

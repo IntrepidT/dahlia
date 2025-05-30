@@ -28,7 +28,8 @@ pub fn UpdateStudent(
     let (gender, set_gender) = create_signal(student.gender.clone().to_string());
     let (date_of_birth, set_date_of_birth) = create_signal(student.date_of_birth);
     let (student_id, set_student_id) = create_signal(student.student_id.clone().to_string());
-    let (grade, set_grade) = create_signal(student.grade.clone().to_string());
+    let (current_grade_level, set_current_grade_level) =
+        create_signal(student.current_grade_level.clone().to_string());
     let (teacher, set_teacher) = create_signal(student.teacher.clone());
     let (yes_no_esl, set_yes_no_esl) = if student.esl.to_string() == "Not Applicable" {
         create_signal(false)
@@ -74,7 +75,7 @@ pub fn UpdateStudent(
 
     // Create a derived signal for filtered teachers based on selected grade
     let filtered_teachers = create_memo(move |_| {
-        let grade_str = grade();
+        let grade_str = current_grade_level();
         if grade_str.is_empty() {
             return Vec::new(); // Return empty if no grade selected yet
         }
@@ -144,7 +145,7 @@ pub fn UpdateStudent(
         };
 
         // Convert grade string to enum
-        let convert_grade_to_enum = match GradeEnum::from_str(&grade()) {
+        let convert_grade_to_enum = match GradeEnum::from_str(&current_grade_level()) {
             Ok(grade_enum) => grade_enum,
             Err(_) => {
                 log::error!("Invalid grade value submitted for update");
@@ -191,7 +192,7 @@ pub fn UpdateStudent(
             date_of_birth: date_of_birth(),
             student_id: validated_student_id,
             esl: convert_esl_to_enum,
-            grade: convert_grade_to_enum,
+            current_grade_level: convert_grade_to_enum,
             teacher: teacher(),
             iep: iep(),
             bip: bip(),
@@ -309,11 +310,11 @@ pub fn UpdateStudent(
                                     required
                                     id="grade"
                                     class="mt-1 w-full rounded-md border p-2"
-                                    on:change=move |ev| set_grade(event_target_value(&ev))
+                                    on:change=move |ev| set_current_grade_level(event_target_value(&ev))
                                 >
                                     <option value="">"Please select a value"</option>
                                     {GradeEnum::iter().map(|g| view! {
-                                        <option value=format!("{}", g) selected=g.to_string() == grade()>
+                                        <option value=format!("{}", g) selected=g.to_string() == current_grade_level()>
                                             {format!("{}", g)}
                                         </option>
                                     }).collect::<Vec<_>>()}
@@ -359,7 +360,7 @@ pub fn UpdateStudent(
                                 >
                                     <option value="">"Please select a value"</option>
                                     {move || {
-                                        if grade().is_empty() {
+                                        if current_grade_level().is_empty() {
                                             vec![view! { <option disabled>"First select a grade"</option> }].into_iter().collect_view()
                                         } else {
                                             let filtered = filtered_teachers();

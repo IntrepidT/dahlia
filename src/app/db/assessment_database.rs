@@ -96,12 +96,12 @@ cfg_if::cfg_if! {
 
         pub async fn add_assessment(new_assessment: &Assessment, pool: &PgPool) -> Result<Assessment, ServerFnError> {
             let risk_benchmarks = match &new_assessment.risk_benchmarks {
-                Some(categories) => Json(categories.clone()),
-                None => Json(Vec::new()),
+                Some(categories) if !categories.is_empty() => Json(categories.clone()),
+                _ => Json(Vec::<RangeCategory>::new()),
             };
             let national_benchmarks = match &new_assessment.national_benchmarks {
-                Some(categories) => Json(categories.clone()),
-                None => Json(Vec::new()),
+                Some(categories) if !categories.is_empty() => Json(categories.clone()),
+                _ => Json(Vec::<RangeCategory>::new()),
             };
 
             let row = sqlx::query("INSERT INTO assessments (name, frequency, grade, version, id, tests, composite_score, risk_benchmarks, national_benchmarks, subject) VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING name, frequency, grade, version, id, tests, composite_score, risk_benchmarks, national_benchmarks, subject")
@@ -119,13 +119,27 @@ cfg_if::cfg_if! {
                 .await
                 .map_err(|e| ServerFnError::new(format!("Database error: {}", e)))?;
 
-            let risk_benchmarks: Option<Vec<RangeCategory>> = match row.try_get::<Option<Json<Vec<RangeCategory>>>, _>("risk_benchmarks") {
-                Ok(Some(json)) => Some(json.0),
-                _ => None,
+            // Fixed parsing logic to handle empty arrays
+            let risk_benchmarks: Option<Vec<RangeCategory>> = match row.try_get::<Json<Vec<RangeCategory>>, _>("risk_benchmarks") {
+                Ok(json) => {
+                    if json.0.is_empty() {
+                        None
+                    } else {
+                        Some(json.0)
+                    }
+                },
+                Err(_) => None,
             };
-            let national_benchmarks: Option<Vec<RangeCategory>> = match row.try_get::<Option<Json<Vec<RangeCategory>>>, _>("national_benchmarks") {
-                Ok(Some(json)) => Some(json.0),
-                _ => None,
+            
+            let national_benchmarks: Option<Vec<RangeCategory>> = match row.try_get::<Json<Vec<RangeCategory>>, _>("national_benchmarks") {
+                Ok(json) => {
+                    if json.0.is_empty() {
+                        None
+                    } else {
+                        Some(json.0)
+                    }
+                },
+                Err(_) => None,
             };
 
             let id: Uuid = row.get("id");
