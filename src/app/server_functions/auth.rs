@@ -1,7 +1,7 @@
 use crate::app::db::user_database;
-use crate::app::models::user::UserJwt;
+use crate::app::models::user::{UserJwt, UserRole};
 #[cfg(feature = "ssr")]
-use actix_web::{cookie::Cookie, http::header, HttpRequest};
+use actix_web::{cookie::Cookie, http::header, HttpRequest, HttpResponse};
 use leptos::*;
 #[cfg(feature = "ssr")]
 use leptos_actix::{extract, ResponseOptions};
@@ -23,17 +23,12 @@ pub async fn login(username: String, password: String) -> Result<AuthResponse, S
     {
         log::info!("Login attempt for user: {}", username);
 
-        // Get the database connection pool
         use actix_web::web;
         use leptos_actix::extract;
-        let pool = match extract::<web::Data<PgPool>>().await {
-            Ok(pool) => pool,
-            Err(e) => {
-                let err_msg = format!("Failed to extract pool: {}", e);
-                log::error!("{}", err_msg);
-                return Err(ServerFnError::new(err_msg));
-            }
-        };
+
+        let pool = extract::<web::Data<PgPool>>()
+            .await
+            .map_err(|e| ServerFnError::new(format!("Failed to extract pool: {}", e)))?;
 
         // Check if the user exists
         log::info!("Looking up user in database: {}", username);
@@ -54,7 +49,7 @@ pub async fn login(username: String, password: String) -> Result<AuthResponse, S
                             response.insert_header(
                                 header::SET_COOKIE,
                                 header::HeaderValue::from_str(&format!(
-                                    "session={}; Path=/; HttpOnly; SameSite=Strict; Max-Age=604800",
+                                    "session={}; Path=/; HttpOnly; SameSite=Strict; Max-Age=604800; Secure",
                                     session_token
                                 ))
                                 .expect("Failed to create header value"),
@@ -82,7 +77,7 @@ pub async fn login(username: String, password: String) -> Result<AuthResponse, S
                     log::info!("Invalid password for user: {}", username);
                     Ok(AuthResponse {
                         success: false,
-                        message: "Invalid password".to_string(),
+                        message: "Invalid credentials".to_string(),
                         user: None,
                     })
                 }
@@ -91,7 +86,7 @@ pub async fn login(username: String, password: String) -> Result<AuthResponse, S
                 log::info!("User not found: {}", username);
                 Ok(AuthResponse {
                     success: false,
-                    message: "User not found".to_string(),
+                    message: "Invalid credentials".to_string(),
                     user: None,
                 })
             }
@@ -117,16 +112,30 @@ pub async fn login(username: String, password: String) -> Result<AuthResponse, S
 pub async fn logout() -> Result<AuthResponse, ServerFnError> {
     #[cfg(feature = "ssr")]
     {
-        // Get the database connection pool
         use actix_web::web;
         use leptos_actix::extract;
+
+        // Extract pool and request in separate statements to avoid borrow conflicts
         let pool = extract::<web::Data<PgPool>>()
             .await
             .map_err(|e| ServerFnError::new(format!("Failed to extract pool: {}", e)))?;
 
-        // Get the session token from the cookie
-        let req = expect_context::<HttpRequest>();
-        let cookies = req.cookies().unwrap();
+        let req = extract::<HttpRequest>()
+            .await
+            .map_err(|e| ServerFnError::new(format!("Failed to extract request: {}", e)))?;
+
+        // Now we can safely use both without borrow conflicts
+        let cookies = match req.cookies() {
+            Ok(cookies) => cookies,
+            Err(e) => {
+                log::error!("Failed to extract cookies: {:?}", e);
+                return Ok(AuthResponse {
+                    success: false,
+                    message: "Failed to parse cookies".to_string(),
+                    user: None,
+                });
+            }
+        };
 
         // Find the session cookie
         let session_token_opt = cookies
@@ -135,8 +144,9 @@ pub async fn logout() -> Result<AuthResponse, ServerFnError> {
             .map(|c| c.value().to_string());
 
         if let Some(session_token) = session_token_opt {
-            // Delete the session
-            if let Err(_) = user_database::delete_session(&pool, &session_token).await {
+            // Delete the session from database
+            if let Err(e) = user_database::delete_session(&pool, &session_token).await {
+                log::error!("Failed to delete session from database: {:?}", e);
                 return Ok(AuthResponse {
                     success: false,
                     message: "Failed to delete session".to_string(),
@@ -149,8 +159,10 @@ pub async fn logout() -> Result<AuthResponse, ServerFnError> {
         let response = expect_context::<ResponseOptions>();
         response.insert_header(
             header::SET_COOKIE,
-            header::HeaderValue::from_str("session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0")
-                .expect("Failed to create header value"),
+            header::HeaderValue::from_str(
+                "session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0; Secure",
+            )
+            .expect("Failed to create header value"),
         );
 
         Ok(AuthResponse {
@@ -170,17 +182,28 @@ pub async fn logout() -> Result<AuthResponse, ServerFnError> {
 pub async fn get_current_user() -> Result<Option<UserJwt>, ServerFnError> {
     #[cfg(feature = "ssr")]
     {
-        // Get the database connection pool
         use actix_web::web;
         use leptos_actix::extract;
+
+        // Extract pool and request separately to avoid borrow conflicts
         let pool = extract::<web::Data<PgPool>>()
             .await
             .map_err(|e| ServerFnError::new(format!("Failed to extract pool: {}", e)))?;
 
-        // Get the session token from the cookie
-        let req = expect_context::<HttpRequest>();
-        let cookies = req.cookies().unwrap();
+        let req = extract::<HttpRequest>()
+            .await
+            .map_err(|e| ServerFnError::new(format!("Failed to extract request: {}", e)))?;
+
+        let cookies = match req.cookies() {
+            Ok(cookies) => cookies,
+            Err(e) => {
+                log::error!("Failed to extract cookies: {:?}", e);
+                return Ok(None);
+            }
+        };
+
         log::info!("Attempting to find session cookie");
+
         // Find the session cookie
         let session_token_opt = cookies
             .iter()
@@ -188,14 +211,22 @@ pub async fn get_current_user() -> Result<Option<UserJwt>, ServerFnError> {
             .map(|c| c.value().to_string());
 
         if let Some(session_token) = session_token_opt {
-            // Get the user from the session
-            log::info!("Attempting to match user with database via session");
-            match user_database::get_user_by_session(&pool, &session_token).await {
+            log::info!("Session cookie found, validating with database");
+            // Use validate_session instead of get_user_by_session for consistency
+            match user_database::validate_session(&pool, &session_token).await {
                 Ok(Some(user)) => {
+                    log::info!("Valid session found for user: {}", user.username);
                     return Ok(Some(user));
                 }
-                _ => {}
+                Ok(None) => {
+                    log::info!("Invalid or expired session");
+                }
+                Err(e) => {
+                    log::error!("Error validating session: {:?}", e);
+                }
             }
+        } else {
+            log::info!("No session cookie found");
         }
 
         Ok(None)
@@ -215,14 +246,24 @@ pub async fn register(
 ) -> Result<AuthResponse, ServerFnError> {
     #[cfg(feature = "ssr")]
     {
-        // Get the database connection pool
+        // Basic validation
+        if username.trim().is_empty() || email.trim().is_empty() || password.len() < 8 {
+            return Ok(AuthResponse {
+                success: false,
+                message: "Invalid input: username and email cannot be empty, password must be at least 8 characters".to_string(),
+                user: None,
+            });
+        }
+
         use actix_web::web;
         use leptos_actix::extract;
+
         let pool = extract::<web::Data<PgPool>>()
             .await
             .map_err(|e| ServerFnError::new(format!("Failed to extract pool: {}", e)))?;
 
-        log::info!("Attempting to determine whether username exists");
+        log::info!("Registration attempt for username: {}", username);
+
         // Check if the username already exists
         if let Ok(Some(_)) = user_database::get_user_by_username(&pool, &username).await {
             return Ok(AuthResponse {
@@ -232,20 +273,32 @@ pub async fn register(
             });
         }
 
-        log::info!("Attempting to create new user");
+        // Check if the email already exists
+        if let Ok(Some(_)) = user_database::get_user_by_email(&pool, &email).await {
+            return Ok(AuthResponse {
+                success: false,
+                message: "Email already exists".to_string(),
+                user: None,
+            });
+        }
+
+        log::info!("Creating new user: {}", username);
         // Create the user
-        match user_database::create_user(&pool, username, email, password, "user".to_string()).await
+        match user_database::create_user(&pool, username.clone(), email, password, UserRole::Guest)
+            .await
         {
             Ok(user) => {
+                log::info!("User created successfully: {}", username);
                 // Create a session
                 match user_database::create_session(&pool, user.id).await {
                     Ok(session_token) => {
+                        log::info!("Session created for new user: {}", username);
                         // Set the session cookie
                         let response = expect_context::<ResponseOptions>();
                         response.insert_header(
                             header::SET_COOKIE,
                             header::HeaderValue::from_str(&format!(
-                                "session={}; Path=/; HttpOnly; SameSite=Strict; Max-Age=604800",
+                                "session={}; Path=/; HttpOnly; SameSite=Strict; Max-Age=604800; Secure",
                                 session_token
                             ))
                             .expect("Failed to create header value"),
@@ -258,18 +311,24 @@ pub async fn register(
                             user: Some(user),
                         })
                     }
-                    Err(_) => Ok(AuthResponse {
-                        success: false,
-                        message: "Failed to create session".to_string(),
-                        user: None,
-                    }),
+                    Err(e) => {
+                        log::error!("Failed to create session for new user: {:?}", e);
+                        Ok(AuthResponse {
+                            success: false,
+                            message: "Failed to create session".to_string(),
+                            user: None,
+                        })
+                    }
                 }
             }
-            Err(_) => Ok(AuthResponse {
-                success: false,
-                message: "Failed to create user".to_string(),
-                user: None,
-            }),
+            Err(e) => {
+                log::error!("Failed to create user: {:?}", e);
+                Ok(AuthResponse {
+                    success: false,
+                    message: "Failed to create user".to_string(),
+                    user: None,
+                })
+            }
         }
     }
 
@@ -317,8 +376,6 @@ pub async fn request_password_reset(email: String) -> Result<AuthResponse, Serve
                         // Send an email with the password reset link
                         if let Err(e) = email_service::send_reset_email(&email, &token).await {
                             log::error!("Failed to send password reset email: {}", e);
-                            // Continue the process even if email sending fails
-                            // We'll still return success to the user
                         }
 
                         Ok(AuthResponse {
@@ -339,7 +396,6 @@ pub async fn request_password_reset(email: String) -> Result<AuthResponse, Serve
             }
             Ok(None) => {
                 // Don't reveal that the email doesn't exist for security reasons
-                // Instead, pretend we sent the email anyway
                 log::info!("Password reset requested for non-existent email: {}", email);
                 Ok(AuthResponse {
                     success: true,
@@ -402,6 +458,14 @@ pub async fn reset_password(
     {
         use actix_web::web;
         use leptos_actix::extract;
+
+        if new_password.len() < 8 {
+            return Ok(AuthResponse {
+                success: false,
+                message: "Password must be at least 8 characters long".to_string(),
+                user: None,
+            });
+        }
 
         let pool = extract::<web::Data<PgPool>>()
             .await

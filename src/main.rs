@@ -58,7 +58,7 @@ async fn main() -> std::io::Result<()> {
             //make chat server available to app
             .app_data(chat_server_clone.clone())
             // Authentication middleware
-            .wrap(Authentication::new(secret_key.clone()))
+            .wrap(Authentication::new())
             // serve JS/WASM/CSS from `pkg`
             .service(Files::new("/pkg", format!("{site_root}/pkg")))
             // serve other assets from the `assets` directory

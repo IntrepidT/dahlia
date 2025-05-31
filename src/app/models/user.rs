@@ -1,6 +1,17 @@
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "ssr")]
 use sqlx::FromRow;
+use std::fmt::{self, Display};
+use std::str::FromStr;
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum UserRole {
+    Admin,
+    Teacher,
+    Guest,
+    User,
+    SuperAdmin,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum AccountStatus {
@@ -9,6 +20,35 @@ pub enum AccountStatus {
     Suspended,
     Deleted,
 }
+
+impl FromStr for UserRole {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "admin" => Ok(UserRole::Admin),
+            "teacher" => Ok(UserRole::Teacher),
+            "guest" => Ok(UserRole::Guest),
+            "user" => Ok(UserRole::User),
+            "superadmin" => Ok(UserRole::SuperAdmin),
+            _ => Err(()),
+        }
+    }
+}
+
+impl fmt::Display for UserRole {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let role_str = match self {
+            UserRole::Admin => "admin",
+            UserRole::Teacher => "teacher",
+            UserRole::Guest => "guest",
+            UserRole::User => "user",
+            UserRole::SuperAdmin => "superadmin",
+        };
+        write!(f, "{}", role_str)
+    }
+}
+
 impl AccountStatus {
     pub fn to_string(&self) -> String {
         match self {
@@ -20,7 +60,7 @@ impl AccountStatus {
     }
 
     pub fn from_str(status: &str) -> Self {
-        match status {
+        match status.to_lowercase().as_str() {
             "pending" => AccountStatus::Pending,
             "active" => AccountStatus::Active,
             "suspended" => AccountStatus::Suspended,
@@ -36,15 +76,16 @@ pub struct UserJwt {
     pub username: String,
     pub email: String,
     pub password_hash: String,
-    pub role: String,
+    pub role: UserRole,
 }
+
 impl UserJwt {
     pub fn new(
         id: i64,
         username: String,
         email: String,
         password_hash: String,
-        role: String,
+        role: UserRole,
     ) -> Self {
         UserJwt {
             id,
@@ -54,12 +95,29 @@ impl UserJwt {
             role,
         }
     }
+    pub fn is_user(&self) -> bool {
+        self.role == UserRole::User
+            || self.role == UserRole::Teacher
+            || self.role == UserRole::Admin
+            || self.role == UserRole::SuperAdmin
+    }
+
     pub fn is_admin(&self) -> bool {
-        self.role == "admin"
+        self.role == UserRole::Admin || self.role == UserRole::SuperAdmin
     }
 
     pub fn is_teacher(&self) -> bool {
-        self.role == "teacher" || self.role == "admin"
+        self.role == UserRole::Teacher
+            || self.role == UserRole::Admin
+            || self.role == UserRole::SuperAdmin
+    }
+
+    pub fn is_super(&self) -> bool {
+        self.role == UserRole::SuperAdmin
+    }
+
+    pub fn is_guest(&self) -> bool {
+        self.role == UserRole::Guest
     }
 }
 
@@ -70,7 +128,7 @@ pub struct User {
     pub email: String,
     #[serde(skip_serializing, default)]
     pub password_hash: String,
-    pub role: String,
+    pub role: UserRole,
     pub password_salt: Option<String>,
     pub account_status: AccountStatus,
     pub email_verified: bool,
@@ -82,11 +140,57 @@ pub struct User {
 }
 
 impl User {
+    pub fn is_user(&self) -> bool {
+        self.role == UserRole::User
+            || self.role == UserRole::Teacher
+            || self.role == UserRole::Admin
+            || self.role == UserRole::SuperAdmin
+    }
+
     pub fn is_admin(&self) -> bool {
-        self.role == "admin"
+        self.role == UserRole::Admin || self.role == UserRole::SuperAdmin
     }
 
     pub fn is_teacher(&self) -> bool {
-        self.role == "teacher" || self.role == "admin"
+        self.role == UserRole::Teacher
+            || self.role == UserRole::Admin
+            || self.role == UserRole::SuperAdmin
+    }
+
+    pub fn is_super(&self) -> bool {
+        self.role == UserRole::SuperAdmin
+    }
+
+    pub fn is_guest(&self) -> bool {
+        self.role == UserRole::Guest
+    }
+}
+
+cfg_if::cfg_if! {
+    if #[cfg(feature = "ssr")] {
+        use sqlx::{Postgres, Encode, Decode, Type, postgres::{PgTypeInfo, PgValueRef, PgArgumentBuffer}, encode::IsNull};
+        use sqlx::prelude::*;
+
+        impl<'q> sqlx::encode::Encode<'q, sqlx::Postgres> for UserRole {
+            fn encode_by_ref(&self, buf: &mut PgArgumentBuffer) -> Result<IsNull, sqlx::error::BoxDynError> {
+                let role_str = self.to_string();
+                Encode::<Postgres>::encode_by_ref(&role_str, buf)
+            }
+        }
+
+        impl <'r> sqlx::decode::Decode<'r, Postgres> for UserRole {
+            fn decode(value: PgValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
+                let role_str: String = Decode::<Postgres>::decode(value)?;
+                role_str.parse().map_err(|_| {
+                    sqlx::error::BoxDynError::from(format!("Invalid UserRole: {}", role_str))
+                })
+            }
+        }
+
+        impl Type<Postgres> for UserRole {
+            fn type_info() -> PgTypeInfo {
+                PgTypeInfo::with_name("user_role_enum")
+            }
+        }
     }
 }

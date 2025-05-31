@@ -42,7 +42,7 @@ pub fn UserTable(
                         .unwrap_or(false)
                     || user.email.to_lowercase().contains(&search)
                     || user.username.to_lowercase().contains(&search)
-                    || user.role.to_lowercase().contains(&search)
+                    || user.role.to_string().to_lowercase().contains(&search)
                     || user
                         .account_status
                         .to_string()
@@ -124,7 +124,7 @@ pub fn UserTable(
                                                 <td class=format!("{} {}", CELL_STYLE, "font-medium text-[#2E3A59]")>{email}</td>
                                                 <td class=format!("{} {}", CELL_STYLE, "font-medium text-[#2E3A59]")>{phone}</td>
                                                 <td class=format!("{} {}", CELL_STYLE, "font-medium text-[#2E3A59]")>{status}</td>
-                                                <td class=format!("{} {}", CELL_STYLE, "font-medium text-[#2E3A59]")>{role}</td>
+                                                <td class=format!("{} {}", CELL_STYLE, "font-medium text-[#2E3A59]")>{role.to_string()}</td>
                                             </tr>
                                         }
                                     }).collect_view()

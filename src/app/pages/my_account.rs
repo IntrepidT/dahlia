@@ -105,7 +105,7 @@ pub fn MyAccount() -> impl IntoView {
                                             <div class="mb-2">
                                                 <label class="block text-gray-600 text-sm font-medium">"Role:"</label>
                                                 <p class="font-medium text-[#2E3A59]">
-                                                    {user.role.clone()}
+                                                    {user.role.to_string().clone()}
                                                     <span class="ml-2 text-xs bg-blue-100 text-blue-800 py-1 px-2 rounded-full">
                                                         {
                                                             if user.is_admin() {

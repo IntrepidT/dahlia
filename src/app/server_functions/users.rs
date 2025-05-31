@@ -1,5 +1,5 @@
 use crate::app::db::user_database;
-use crate::app::models::user::User;
+use crate::app::models::user::{User, UserRole};
 use leptos::*;
 
 #[server(GetUsers, "/api")]
@@ -48,6 +48,32 @@ pub async fn get_user(id: i64) -> Result<User, ServerFnError> {
                     id
                 );
                 Ok(user)
+            }
+            Err(e) => {
+                log::error!("Database error: {}", e);
+                Err(ServerFnError::new(format!("Database error: {}", e)))
+            }
+        }
+    }
+}
+
+#[server(UpdateUserPermissions, "/api")]
+pub async fn update_user_permissions(user_id: i64, role: UserRole) -> Result<(), ServerFnError> {
+    #[cfg(feature = "ssr")]
+    {
+        use actix_web::web;
+        use leptos_actix::extract;
+        use sqlx::PgPool;
+        let pool = extract::<web::Data<PgPool>>()
+            .await
+            .map_err(|e| ServerFnError::new(format!("Failed to extract pool: {}", e)))?;
+
+        log::info!("Updating user permissions in the database");
+
+        match user_database::update_permissions(user_id, role, &pool).await {
+            Ok(_) => {
+                log::info!("Successfully updated user permissions");
+                Ok(())
             }
             Err(e) => {
                 log::error!("Database error: {}", e);

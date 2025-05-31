@@ -1,28 +1,25 @@
-use crate::app::models::user::User;
-
 // Server-specific implementation gated behind "ssr" feature
 #[cfg(feature = "ssr")]
 mod server {
     use actix_web::{
         dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform},
-        Error, HttpMessage,
+        web, Error, HttpMessage,
     };
     use futures::future::{ready, LocalBoxFuture, Ready};
+    use log::{debug, error, info};
+    use sqlx::PgPool;
     use std::rc::Rc;
     use std::sync::Arc;
     use std::task::{Context, Poll};
 
-    use crate::app::models::user::UserJwt;
+    use crate::app::db::user_database;
+    use crate::app::models::user::{User, UserJwt, UserRole};
 
-    pub struct Authentication {
-        password_hash: Arc<String>,
-    }
+    pub struct Authentication;
 
     impl Authentication {
-        pub fn new(password_hash: String) -> Self {
-            Authentication {
-                password_hash: Arc::new(password_hash),
-            }
+        pub fn new() -> Self {
+            Authentication
         }
     }
 
@@ -41,14 +38,12 @@ mod server {
         fn new_transform(&self, service: S) -> Self::Future {
             ready(Ok(AuthenticationMiddleware {
                 service: Rc::new(service),
-                password_hash: self.password_hash.clone(),
             }))
         }
     }
 
     pub struct AuthenticationMiddleware<S> {
         service: Rc<S>,
-        password_hash: Arc<String>,
     }
 
     impl<S, B> Service<ServiceRequest> for AuthenticationMiddleware<S>
@@ -65,56 +60,81 @@ mod server {
 
         fn call(&self, req: ServiceRequest) -> Self::Future {
             let service = self.service.clone();
-            let password_hash = self.password_hash.clone();
 
             Box::pin(async move {
-                // Get session from request extensions
-                if let Some(session) = req.extensions().get::<Arc<String>>() {
-                    // Verify session token
-                    // For now, just check if the session exists
-                    let user_id = validate_session(session.to_string()).await;
-                    if let Some(user_id) = user_id {
-                        // Load user from database
-                        let user = get_user_by_id(user_id).await;
-                        if let Some(user) = user {
-                            // Add user to request extensions
-                            req.extensions_mut().insert(user);
+                // Store user data outside the extensions borrow scope
+                let mut authenticated_user: Option<UserJwt> = None;
+
+                // Try to extract the database pool
+                let pool = req.app_data::<web::Data<PgPool>>();
+
+                if let Some(pool) = pool {
+                    // Get session cookie from request
+                    if let Some(cookies) = req.cookies().ok() {
+                        if let Some(session_cookie) = cookies.iter().find(|c| c.name() == "session")
+                        {
+                            let session_token = session_cookie.value();
+
+                            // Validate session using the actual database function
+                            match user_database::validate_session(&pool, session_token).await {
+                                Ok(Some(user)) => {
+                                    debug!("Valid session found for user: {}", user.username);
+                                    authenticated_user = Some(user);
+                                }
+                                Ok(None) => {
+                                    debug!("Invalid or expired session token");
+                                }
+                                Err(e) => {
+                                    error!("Error validating session: {:?}", e);
+                                }
+                            }
                         }
                     }
+                } else {
+                    error!("Database pool not found in middleware");
                 }
 
-                // Continue with the request
+                // Only insert into extensions if we have a valid user
+                // and do it in a separate, scoped block
+                if let Some(user) = authenticated_user {
+                    // Carefully scope the mutable borrow to avoid conflicts
+                    {
+                        let mut extensions = req.extensions_mut();
+                        extensions.insert(user);
+                    } // Borrow is dropped here
+                    debug!("User successfully added to request extensions");
+                }
+
+                // Continue with the request regardless of authentication status
                 let res = service.call(req).await?;
                 Ok(res)
             })
         }
     }
 
-    // Placeholder function to validate a session
-    async fn validate_session(session_token: String) -> Option<i64> {
-        // In a real application, look up session in database
-        // For now, just return a placeholder user ID if the session is not empty
-        if !session_token.is_empty() {
-            Some(1)
-        } else {
-            None
-        }
+    // Helper function to extract current user from request extensions
+    pub fn get_current_user_from_request(req: &ServiceRequest) -> Option<UserJwt> {
+        req.extensions().get::<UserJwt>().cloned()
     }
 
-    // Placeholder function to get user by ID
-    async fn get_user_by_id(user_id: i64) -> Option<UserJwt> {
-        // In a real application, look up user in database
-        // For now, just return a placeholder user
-        Some(UserJwt {
-            id: user_id,
-            username: "test_user".to_string(),
-            email: "test@example.com".to_string(),
-            password_hash: "hashed_password".to_string(),
-            role: "user".to_string(),
-        })
+    // Helper function to check if user has required role
+    pub fn user_has_role(user: &UserJwt, required_role: UserRole) -> bool {
+        match required_role {
+            UserRole::Guest => true, // All users can access guest-level content
+            UserRole::User => matches!(
+                user.role,
+                UserRole::User | UserRole::Admin | UserRole::SuperAdmin
+            ),
+            UserRole::Admin => matches!(user.role, UserRole::Admin | UserRole::SuperAdmin),
+            UserRole::SuperAdmin => matches!(user.role, UserRole::SuperAdmin),
+            UserRole::Teacher => matches!(
+                user.role,
+                UserRole::Teacher | UserRole::Admin | UserRole::SuperAdmin
+            ),
+        }
     }
 }
 
-//Reexport server types when "ssr" feature is enabled
+// Reexport server types when "ssr" feature is enabled
 #[cfg(feature = "ssr")]
 pub use server::*;

@@ -177,7 +177,7 @@ pub fn Teachers() -> impl IntoView {
                     >
                         "Teachers"
                     </button>
-                    <Show when=move || user.get().map_or(false, |u| u.role == "admin")>
+                    <Show when=move || user.get().map_or(false, |u| u.is_admin())>
                         <button
                             class=move || if active_view() == "users" { TAB_BUTTON_ACTIVE } else { TAB_BUTTON_INACTIVE }
                             on:click=select_users_view
