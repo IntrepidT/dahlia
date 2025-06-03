@@ -4,8 +4,8 @@ use leptos::*;
 use leptos_router::*;
 
 #[component]
-pub fn Classroom() -> impl IntoView {
-    let (selected_view, set_selected_view) = create_signal(SidebarSelected::Classroom);
+pub fn AdminDashboard() -> impl IntoView {
+    let (selected_view, set_selected_view) = create_signal(SidebarSelected::AdminDashboard);
     view! {
         <div class="min-h-screen bg-[#F9F9F8]">
             <Header />

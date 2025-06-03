@@ -2,7 +2,7 @@ use leptos::*;
 
 // More responsive container style with padding adjustments for small screens
 const SEARCH_CONTAINER_STYLE: &str =
-    "md:mt-16 mt-14 mb-4 flex flex-grow gap-2 sm:gap-4 items-center w-full justify-between";
+    "md:mt-16 mt-14 mb-4 flex gap-2 sm:gap-4 items-center w-full justify-between";
 // Improved input style with better handling for small screens
 const INPUT_STYLE: &str = "focus:ring-indigo-500 focus:border-indigo-500 block w-full pl-3 pr-3 text-xs sm:text-sm border-gray-300 rounded-md h-8 sm:h-10 border";
 // Responsive select style

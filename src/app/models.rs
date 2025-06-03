@@ -57,3 +57,7 @@ pub use assessment::{RangeCategory, SubjectEnum};
 
 pub mod enrollment;
 pub use enrollment::Enrollment;
+
+pub mod setting_data;
+pub use setting_data::UserSettings;
+pub use setting_data::UserSettingsUpdate;

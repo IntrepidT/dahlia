@@ -5,6 +5,8 @@ use icondata::{
 };
 // Add new imports for additional icons, including pin/unpin icons
 use crate::app::components::ShowAdministerTestModal;
+use crate::app::models::{setting_data::UserSettings, user::UserJwt};
+use crate::app::server_functions::user_settings::get_user_settings;
 use icondata::{
     AiCoffeeOutlined,
     AiDashboardOutlined,
@@ -20,6 +22,7 @@ use leptos::ev::MouseEvent;
 use leptos::*;
 use leptos_icons::Icon;
 use leptos_router::*;
+use std::time::Duration;
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum SidebarSelected {
@@ -31,10 +34,10 @@ pub enum SidebarSelected {
     StudentView,
     TeacherView,
     AdministerTest,
+    AdminDashboard,
     Live,
     Gradebook,
     Assessments,
-    Classroom,
 }
 const GRAY_COLOR: &str = "text-[#DADADA]";
 const BLUE_COLOR: &str = "text-[#2E3A59]";
@@ -46,15 +49,26 @@ pub fn DashboardSidebar(
     selected_item: ReadSignal<SidebarSelected>,
     set_selected_item: WriteSignal<SidebarSelected>,
 ) -> impl IntoView {
-    let (is_expanded, set_is_expanded) = create_signal(false);
-    let (show_administer_modal, set_show_administer_modal) = create_signal(false);
-    let (show_settings, set_show_settings) = create_signal(false);
-
-    // New signal for pinned state
-    let (is_pinned_closed, set_is_pinned_closed) = create_signal(false);
-
-    // Handle window size for responsive behavior
-    let (is_small_screen, set_is_small_screen) = create_signal(false);
+    // Get the current user ID from use_context
+    let current_user =
+        use_context::<ReadSignal<Option<UserJwt>>>().expect("AuthProvider not Found");
+    let user_settings_resource = create_resource(
+        move || current_user.get().map(|user| user.id),
+        move |id| async move {
+            match id {
+                Some(user_id) => match get_user_settings(user_id).await {
+                    Ok(settings) => Some(settings),
+                    Err(e) => {
+                        log::error!("Failed to fetch user settings: {}", e);
+                        // Return default settings if fetch fails
+                        Some(UserSettings::default())
+                    }
+                },
+                None => Some(UserSettings::default()), // Default settings for no user
+            }
+        },
+    );
+    let user_id = current_user.get().map(|user| user.id).unwrap_or_default();
 
     // Handle current route for active styling
     let (current_path, set_current_path) = create_signal(String::new());
@@ -67,6 +81,32 @@ pub fn DashboardSidebar(
             set_current_path(String::from("/"));
         }
     });
+
+    let (is_expanded, set_is_expanded) = create_signal(false);
+    let (is_navigating, set_is_navigating) = create_signal(false);
+    create_effect(move |_| {
+        let _current_path = current_path();
+        set_is_navigating.set(true);
+        set_timeout(
+            move || {
+                set_is_navigating.set(false);
+            },
+            Duration::from_millis(500),
+        );
+    });
+    let (show_administer_modal, set_show_administer_modal) = create_signal(false);
+    let (show_settings, set_show_settings) = create_signal(false);
+
+    // New signal for pinned state
+    let (is_pinned_closed, set_is_pinned_closed) = create_signal(false);
+    create_effect(move |_| {
+        if let Some(Some(settings)) = user_settings_resource.get() {
+            set_is_pinned_closed.set(settings.ui.pinned_sidebar);
+        }
+    });
+
+    // Handle window size for responsive behavior
+    let (is_small_screen, set_is_small_screen) = create_signal(false);
 
     // Handle window resize events
     let window = window();
@@ -87,20 +127,29 @@ pub fn DashboardSidebar(
         check_screen_size();
     });
 
-    // We don't need an explicit on_cleanup as the WindowListenerHandle will be dropped automatically
-
     // Computed position for dropdown modal based on screen size
     let modal_position = move || {
-        if is_small_screen() {
-            "left: 12rem; top: 12rem;" // Adjusted position for small screens
+        let base_left = if is_pinned_closed() {
+            if is_small_screen() {
+                "5rem"
+            } else {
+                "5.5rem"
+            }
         } else {
-            "left: 16rem; top: 12rem;" // Original position
-        }
+            if is_small_screen() {
+                "12rem"
+            } else {
+                "16rem"
+            }
+        };
+
+        format!("left: {}; top: 12rem;", base_left)
     };
 
     // Handle mouseenter event with consideration for pinned state
     let handle_mouseenter = move |_| {
-        if !is_pinned_closed() {
+        if !is_pinned_closed.get() && !is_navigating.get() && user_settings_resource.get().is_some()
+        {
             set_is_expanded(true);
         }
     };
@@ -108,7 +157,7 @@ pub fn DashboardSidebar(
     // Handle mouseleave event with consideration for pinned state
     let handle_mouseleave = move |_| {
         // Only close the sidebar if we're not hovering the modal and not pinned
-        if !show_administer_modal() && !is_pinned_closed() {
+        if !show_administer_modal.get() && !is_pinned_closed.get() {
             set_is_expanded(false);
         }
     };
@@ -118,29 +167,15 @@ pub fn DashboardSidebar(
         let new_value = !is_pinned_closed.get();
         set_is_pinned_closed.set(new_value);
 
-        // If unpinning, we immediately expand the sidebar
-        if !new_value {
-            set_is_expanded(true);
-        } else {
-            // If pinning closed, we collapse the sidebar
-            set_is_expanded(false);
-            // Also hide the modal if it's currently shown
-            if show_administer_modal() {
-                set_show_administer_modal(false);
-            }
+        if new_value {
+            set_is_expanded.set(false);
+            set_show_administer_modal.set(false);
         }
     };
 
     // Handle administer test click with consideration for pinned state
     let handle_administer_click = move |_| {
-        if is_pinned_closed() {
-            // When pinned closed, we need to temporarily expand to show the modal
-            set_is_expanded(true);
-            set_show_administer_modal(true);
-        } else {
-            // Normal toggle behavior when not pinned closed
-            set_show_administer_modal.update(|v| *v = !*v);
-        }
+        set_show_administer_modal.update(|v| *v = !*v);
     };
 
     view! {
@@ -181,14 +216,16 @@ pub fn DashboardSidebar(
                             is_active=Signal::derive(move || current_path().starts_with("/teachers"))
                             is_small_screen=is_small_screen.into()
                         />
-                        <SidebarNavLink
-                            icon=BiClipboardRegular
-                            label="Classroom (beta)"
-                            path="/classroom"
-                            is_expanded=is_expanded.into()
-                            is_active=Signal::derive(move || current_path().starts_with("/classrooms"))
-                            is_small_screen=is_small_screen.into()
-                        />
+                        <Show when=move || current_user.get().map(|user| user.is_admin()).unwrap_or(false)>
+                            <SidebarNavLink
+                                icon=BiClipboardRegular
+                                label="Admin Dashboard (beta)"
+                                path="/admindashboard"
+                                is_expanded=is_expanded.into()
+                                is_active=Signal::derive(move || current_path().starts_with("/classrooms"))
+                                is_small_screen=is_small_screen.into()
+                            />
+                        </Show>
                         <SidebarNavLink
                             icon=AiApiOutlined
                             label="Join Live Session"
@@ -235,27 +272,7 @@ pub fn DashboardSidebar(
                             </div>
                         </div>
 
-                        <button
-                            class="flex items-center cursor-pointer hover:bg-[#DADADA] p-2 rounded-md transition-colors"
-                            on:click=move |_| set_show_settings.set(true)
-                        >
-                            <Icon
-                                icon=IoSettingsOutline
-                                class="w-6 h-6 text[#2E3A59] flex-shrink-0"
-                            />
-                            <div class="overflow-hidden whitespace-nowrap">
-                                <Show
-                                    when=move || is_expanded()
-                                    fallback=|| view! { <></> }
-                                >
-                                    <span class="ml-2 font-semibold text-sm sm:text-base">
-                                        {"Settings (beta)"}
-                                    </span>
-                                </Show>
-                            </div>
-                        </button>
-
-                        /*<SidebarNavLink
+                    /*<SidebarNavLink
                             icon=IoSettingsOutline
                             label="Settings (beta)"
                             path="/settings"
@@ -286,6 +303,27 @@ pub fn DashboardSidebar(
                                 </span>
                             </Show>
                         </div>
+
+                        <button
+                            class="flex items-center cursor-pointer hover:bg-[#DADADA] p-2 rounded-md transition-colors"
+                            on:click=move |_| set_show_settings.set(true)
+                        >
+                            <Icon
+                                icon=IoSettingsOutline
+                                class="w-6 h-6 text[#2E3A59] flex-shrink-0"
+                            />
+                            <div class="overflow-hidden whitespace-nowrap">
+                                <Show
+                                    when=move || is_expanded()
+                                    fallback=|| view! { <></> }
+                                >
+                                    <span class="ml-2 font-semibold text-sm sm:text-base">
+                                        {"Settings (beta)"}
+                                    </span>
+                                </Show>
+                            </div>
+                        </button>
+
                     </div>
                 </div>
             </div>
@@ -297,17 +335,15 @@ pub fn DashboardSidebar(
                     style=move || modal_position()
                     on:mouseenter=move |_| {
                         // Keep sidebar expanded when hovering modal
-                        set_is_expanded(true);
+                        if !is_pinned_closed() {
+                            set_show_administer_modal(true);
+                        }
                     }
                     on:mouseleave=move |_| {
                         // If pinned closed, hide modal but keep sidebar collapsed
-                        if is_pinned_closed() {
-                            set_show_administer_modal(false);
+                        set_show_administer_modal(false);
+                        if !is_pinned_closed() {
                             set_is_expanded(false);
-                        } else {
-                            // Normal behavior when not pinned
-                            set_is_expanded(false);
-                            set_show_administer_modal(false);
                         }
                     }
                 >
@@ -319,6 +355,7 @@ pub fn DashboardSidebar(
                 <SettingsModal
                     show=show_settings
                     on_close=move |_| set_show_settings.set(false)
+                    user_id=user_id
                 />
             </Show>
         </div>

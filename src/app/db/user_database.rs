@@ -11,6 +11,7 @@ cfg_if::cfg_if! {
         use sqlx::Row;
         use chrono::{DateTime, Utc};
         use crate::app::models::user::AccountStatus;
+        use crate::app::models::setting_data::{UserSettings, UserSettingsUpdate};
 
         // Hash a password
         pub fn hash_password(password: &str) -> Result<String, ServerFnError> {
@@ -124,6 +125,23 @@ cfg_if::cfg_if! {
             Ok(user)
         }
 
+        //Get user settings
+        pub async fn get_user_settings(
+            pool: &Pool<Postgres>,
+            user_id: i64
+        ) -> Result<UserSettings, ServerFnError> {
+            let row = sqlx::query("SELECT settings FROM users WHERE id = $1")
+                .bind(user_id)
+                .fetch_one(pool)
+                .await
+                .map_err(|e| ServerFnError::new(format!("Database error: {}", e)))?;
+
+            let settings_json: serde_json::Value = row.get("settings");
+            let settings: UserSettings = serde_json::from_value(settings_json).unwrap_or_else(|_| UserSettings::default());
+
+            Ok(settings)
+        }
+
         // Get user by username (returns lightweight UserJwt)
         pub async fn get_user_by_username(
             pool: &Pool<Postgres>,
@@ -209,6 +227,51 @@ cfg_if::cfg_if! {
                 },
                 None => Ok(None),
             }
+        }
+
+        //Update user settings
+        pub async fn update_user_settings(pool: &Pool<Postgres>, user_id: i64, settings_update: UserSettingsUpdate) -> Result<UserSettings, ServerFnError> {
+            let current_settings = get_user_settings(pool, user_id).await?;
+
+            //apply settings
+            let mut new_settings = current_settings;
+
+            if let Some(ui_update) = settings_update.ui {
+                if let Some(dark_mode) = ui_update.dark_mode {
+                    new_settings.ui.dark_mode = dark_mode;
+                }
+                if let Some(pinned_sidebar) = ui_update.pinned_sidebar {
+                    new_settings.ui.pinned_sidebar = pinned_sidebar;
+                }
+            }
+
+            let settings_json = serde_json::to_value(&new_settings)
+                .map_err(|e| ServerFnError::new(format!("Failed to serialize settings: {}", e)))?;
+
+            sqlx::query("UPDATE users SET settings = $1 WHERE id = $2")
+                .bind(&settings_json)
+                .bind(user_id)
+                .execute(pool)
+                .await
+                .map_err(|e| ServerFnError::new(format!("Failed to update user settings: {}", e)))?;
+
+            Ok(new_settings)
+        }
+
+        //Reset user settings to default
+        pub async fn reset_user_settings(pool: &Pool<Postgres>, user_id: i64) -> Result<UserSettings, ServerFnError> {
+            let default_settings = UserSettings::default();
+            let settings_json = serde_json::to_value(&default_settings)
+                .map_err(|e| ServerFnError::new(format!("Failed to serialize default settings: {}", e)))?;
+
+            sqlx::query("UPDATE users SET settings = $1 WHERE id = $2")
+                .bind(&settings_json)
+                .bind(user_id)
+                .execute(pool)
+                .await
+                .map_err(|e| ServerFnError::new(format!("Failed to reset user settings: {}", e)))?;
+
+            Ok(default_settings)
         }
 
         // Session Management

@@ -1,12 +1,24 @@
 use crate::app::components::settings::bulk_enrollment_modal::BulkUploadModal;
+use crate::app::models::setting_data::UserSettings;
+use crate::app::models::user::UserJwt;
+use crate::app::server_functions::user_settings::{
+    get_user_settings, update_dark_mode, update_pinned_sidebar,
+};
 use leptos::*;
 
 #[component]
 pub fn SettingsModal(
     #[prop(into)] show: ReadSignal<bool>,
     #[prop(into)] on_close: Callback<()>,
+    #[prop(into)] user_id: i64,
 ) -> impl IntoView {
     let (selected_tab, set_selected_tab) = create_signal("General".to_string());
+
+    // Load user settings
+    let user_settings_resource = create_resource(
+        move || user_id,
+        |user_id| async move { get_user_settings(user_id).await },
+    );
 
     view! {
         <Show when=move || show.get()>
@@ -114,7 +126,28 @@ pub fn SettingsModal(
 
                         // Content Body
                         <div class="flex-1 p-6 overflow-y-auto">
-                            <SettingsContent selected_tab=selected_tab />
+                            <Suspense fallback=move || view! {
+                                <div class="flex items-center justify-center h-32">
+                                    <div class="text-gray-400">"Loading settings..."</div>
+                                </div>
+                            }>
+                                {move || {
+                                    user_settings_resource.get().map(|settings_result| {
+                                        match settings_result {
+                                            Ok(settings) => view! {
+                                                <SettingsContent
+                                                    selected_tab=selected_tab
+                                                    user_settings=settings
+                                                    user_id=user_id
+                                                />
+                                            }.into_view(),
+                                            Err(_) => view! {
+                                                <div class="text-red-400">"Error loading settings"</div>
+                                            }.into_view()
+                                        }
+                                    })
+                                }}
+                            </Suspense>
                         </div>
                     </div>
                 </div>
@@ -153,11 +186,45 @@ fn SettingsNavButton(
 }
 
 #[component]
-fn SettingsContent(selected_tab: ReadSignal<String>) -> impl IntoView {
-    let (dark_mode, set_dark_mode) = create_signal(false);
-    let (notifications, set_notification) = create_signal(true);
+fn SettingsContent(
+    selected_tab: ReadSignal<String>,
+    user_settings: UserSettings,
+    user_id: i64,
+) -> impl IntoView {
     let (show_bulk_upload_modal, set_show_bulk_upload_modal) = create_signal(false);
     let (refresh_trigger, set_refresh_trigger) = create_signal(0);
+
+    // Create reactive signals for settings that sync with server
+    let (dark_mode, set_dark_mode) = create_signal(user_settings.ui.dark_mode);
+    let (pin_sidebar, set_pin_sidebar) = create_signal(user_settings.ui.pinned_sidebar);
+
+    // Server actions for updating settings
+    let update_dark_mode_action = create_action(move |&new_value: &bool| async move {
+        match update_dark_mode(user_id, new_value).await {
+            Ok(_) => {
+                set_dark_mode.set(new_value);
+                Ok(())
+            }
+            Err(e) => {
+                log::error!("Failed to update dark mode: {}", e);
+                Err(e)
+            }
+        }
+    });
+
+    let update_pin_sidebar_action = create_action(move |&new_value: &bool| async move {
+        match update_pinned_sidebar(user_id, new_value).await {
+            Ok(_) => {
+                set_pin_sidebar.set(new_value);
+                Ok(())
+            }
+            Err(e) => {
+                log::error!("Failed to update pinned sidebar: {}", e);
+                Err(e)
+            }
+        }
+    });
+
     view! {
         <div class="space-y-6">
             {move || match selected_tab.get().as_str() {
@@ -171,6 +238,16 @@ fn SettingsContent(selected_tab: ReadSignal<String>) -> impl IntoView {
                         <SettingsSection title="Startup">
                             <SettingsButton label="Open last vault" />
                             <SettingsButton label="Show welcome screen" />
+                        </SettingsSection>
+                        <SettingsSection title="Preferences">
+                            <ToggleSwitch
+                                label="Permanently pin sidebar"
+                                checked=pin_sidebar
+                                on_toggle=Callback::new(move |value| {
+                                    update_pin_sidebar_action.dispatch(value);
+                                })
+                                description="Keep the sidebar closed always until setting turned off"
+                            />
                         </SettingsSection>
                     </div>
                 }.into_view(),
@@ -208,9 +285,10 @@ fn SettingsContent(selected_tab: ReadSignal<String>) -> impl IntoView {
                         <SettingsSection title="Theme">
                             <ToggleSwitch
                                 label="Dark mode"
-                                checked=dark_mode //Replace with actual dark
-                                                                        //mode signal eventually
-                                on_toggle=move |value| set_dark_mode.set(value)
+                                checked=dark_mode
+                                on_toggle=Callback::new(move |value| {
+                                    update_dark_mode_action.dispatch(value);
+                                })
                                 description="Toggle dark mode theme"
                             />
                             <SettingsButton label="Light mode" />

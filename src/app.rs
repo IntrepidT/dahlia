@@ -11,7 +11,7 @@ use components::live_test::RealtimeTestSession;
 use components::login_components::{RequestPasswordResetForm, ResetPasswordForm};
 use components::test_templates::{FlashCardSet, GridTest};
 use pages::{
-    AdministerTest, Assessment, AssessmentPage, Classroom, Dashboard, Gradebook, HomePage,
+    AdminDashboard, AdministerTest, Assessment, AssessmentPage, Dashboard, Gradebook, HomePage,
     LoginPage, MathTesting, MyAccount, ReadingTesting, ReviewTest, Settings, StudentView, Teachers,
     TestBuilder, TestResultsPage, TestSessionsList,
 };
@@ -76,12 +76,10 @@ pub fn App() -> impl IntoView {
                                 </RequireRole>
                             }
                         }/>
-                        <Route path="/classroom" view=move || {
+                        <Route path="/admindashboard" view=move || {
                             view! {
                                 <RequireRole role="admin".to_string()>
-                                    <RequireRole role="teacher".to_string()>
-                                        <Classroom />
-                                    </RequireRole>
+                                    <AdminDashboard />
                                 </RequireRole>
                             }
                         }/>

@@ -36,3 +36,6 @@ pub use data_wrappers::get_student_results_server;
 
 pub mod users;
 pub use users::get_users;
+
+pub mod user_settings;
+pub use user_settings::get_user_settings;
