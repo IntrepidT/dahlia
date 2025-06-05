@@ -15,9 +15,6 @@ pub use test_display::MathTestDisplay;
 pub mod show_test_modal;
 pub use show_test_modal::ShowTestModal;
 
-pub mod edit_test_modal;
-pub use edit_test_modal::EditTestModal;
-
 pub mod question_builder;
 pub use question_builder::BuildingQuestion;
 

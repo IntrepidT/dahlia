@@ -106,6 +106,8 @@ pub async fn add_assessment(
             add_assessment_request.risk_benchmarks,
             add_assessment_request.national_benchmarks,
             add_assessment_request.subject,
+            add_assessment_request.scope,
+            add_assessment_request.course_id,
         );
 
         assessment_database::add_assessment(&buffer_assessment, &pool)
@@ -174,11 +176,12 @@ pub async fn update_assessment_score(test_id: String) -> Result<(), ServerFnErro
         match assessment_database::update_all_assessments_referencing_test(&test_id, &pool).await {
             Ok(()) => Ok(()),
             Err(e) => Err(ServerFnError::new(format!(
-                "Failed to update assessment scores: {}", e
+                "Failed to update assessment scores: {}",
+                e
             ))),
         }
     }
-    
+
     #[cfg(not(feature = "ssr"))]
     {
         Err(ServerFnError::new(
@@ -213,6 +216,8 @@ pub async fn update_assessment(
             update_assessment_request.risk_benchmarks,
             update_assessment_request.national_benchmarks,
             update_assessment_request.subject,
+            update_assessment_request.scope,
+            update_assessment_request.course_id,
         );
 
         match assessment_database::update_assessment(&buffer_assessment, &pool).await {

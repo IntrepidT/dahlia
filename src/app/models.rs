@@ -61,3 +61,8 @@ pub use enrollment::Enrollment;
 pub mod setting_data;
 pub use setting_data::UserSettings;
 pub use setting_data::UserSettingsUpdate;
+
+pub mod course;
+pub use course::Course;
+pub use course::CreateCourseRequest;
+pub use course::UpdateCourseRequest;

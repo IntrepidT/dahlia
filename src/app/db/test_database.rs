@@ -1,10 +1,11 @@
-use leptos::ServerFnError;
-
-use crate::app::models::student::GradeEnum;
-use crate::app::models::test::BenchmarkCategory;
 cfg_if::cfg_if! {
 
     if #[cfg(feature = "ssr")] {
+
+        use leptos::ServerFnError;
+        use crate::app::models::assessment::ScopeEnum;
+        use crate::app::models::student::GradeEnum;
+        use crate::app::models::test::BenchmarkCategory;
         use crate::app::models::{Test, TestType};
         use crate::app::errors::{ErrorMessageTest, TestError};
         use uuid::Uuid;
@@ -14,7 +15,7 @@ cfg_if::cfg_if! {
         use sqlx::prelude::*;
 
         pub async fn get_all_tests(pool: &sqlx::PgPool) -> Result<Vec<Test>, ServerFnError>{
-           let rows = sqlx::query("SELECT name, score, comments, testarea, school_year, benchmark_categories, test_variant, grade_level, test_id::text FROM tests ORDER BY name DESC")
+           let rows = sqlx::query("SELECT name, score, comments, testarea, school_year, benchmark_categories, test_variant, grade_level, test_id::text, scope, course_id FROM tests ORDER BY name DESC")
                .fetch_all(pool)
                .await?;
 
@@ -29,6 +30,8 @@ cfg_if::cfg_if! {
                     let test_variant: i32 = row.get("test_variant");
                     let grade_level: Option<GradeEnum> = row.get("grade_level");
                     let test_id  = row.get::<String,_>("test_id");
+                    let scope: Option<ScopeEnum> = row.get("scope");
+                    let course_id: Option<i32> = row.get("course_id");
 
                     let benchmark_categories: Option<Vec<BenchmarkCategory>> = match row.try_get::<Option<Json<Vec<BenchmarkCategory>>>, _>("benchmark_categories") {
                         Ok(Some(json)) => Some(json.0),
@@ -44,7 +47,9 @@ cfg_if::cfg_if! {
                         benchmark_categories,
                         test_variant,
                         grade_level,
-                        test_id
+                        test_id,
+                        scope,
+                        course_id,
                     }
                 })
                 .collect();
@@ -52,7 +57,7 @@ cfg_if::cfg_if! {
         }
 
         pub async fn get_tests_batch(test_ids: Vec<Uuid>, pool: &sqlx::PgPool) -> Result<Vec<Test>, ServerFnError> {
-            let rows = sqlx::query("SELECT name, score, comments, testarea, school_year, benchmark_categories, test_variant, grade_level, test_id::text FROM tests WHERE test_id = ANY($1)")
+            let rows = sqlx::query("SELECT name, score, comments, testarea, school_year, benchmark_categories, test_variant, grade_level, test_id::text, scope, course_id FROM tests WHERE test_id = ANY($1)")
                 .bind(&test_ids)
                 .fetch_all(pool)
                 .await?;
@@ -68,6 +73,8 @@ cfg_if::cfg_if! {
                     let test_variant: i32 = row.get("test_variant");
                     let grade_level: Option<GradeEnum> = row.get("grade_level");
                     let test_id  = row.get::<String,_>("test_id");
+                    let scope: Option<ScopeEnum> = row.get("scope");
+                    let course_id: Option<i32> = row.get("course_id");
 
                     let benchmark_categories: Option<Vec<BenchmarkCategory>> = match row.try_get::<Option<Json<Vec<BenchmarkCategory>>>, _>("benchmark_categories") {
                         Ok(Some(json)) => Some(json.0),
@@ -83,7 +90,9 @@ cfg_if::cfg_if! {
                         benchmark_categories,
                         test_variant,
                         grade_level,
-                        test_id
+                        test_id,
+                        scope,
+                        course_id,
                     }
                 })
                 .collect();
@@ -92,7 +101,7 @@ cfg_if::cfg_if! {
 
         pub async fn get_test(test_id: String, pool: &sqlx::PgPool) -> Result<Test, ServerFnError> {
             let ID = Uuid::parse_str(&test_id).map_err(|e| ServerFnError::new(format!("Invalid UUID: {}", e)))?;
-            let row = sqlx::query("SELECT name, score, comments, testarea, school_year, benchmark_categories, test_variant, grade_level, test_id::text FROM tests WHERE test_id::text = $1")
+            let row = sqlx::query("SELECT name, score, comments, testarea, school_year, benchmark_categories, test_variant, grade_level, test_id::text, scope, course_id FROM tests WHERE test_id::text = $1")
                 .bind(&test_id)
                 .fetch_one(pool)
                 .await
@@ -113,6 +122,8 @@ cfg_if::cfg_if! {
                 test_variant: row.get("test_variant"),
                 grade_level: row.get("grade_level"),
                 test_id: row.get("test_id"),
+                scope: row.get("scope"),
+                course_id: row.get("course_id"),
             };
 
             Ok(test)
@@ -129,7 +140,7 @@ cfg_if::cfg_if! {
                 None => Json(Vec::new()),
             };
 
-            let row = sqlx::query("INSERT INTO tests (name, score, comments, testarea, school_year, benchmark_categories, test_variant, grade_level, test_id) VALUES($1, $2, $3, $4::testarea_enum, $5, $6, $7, $8, $9::uuid) RETURNING name, score, comments, testarea, school_year, benchmark_categories, test_variant, grade_level, test_id::text") .bind(&new_test.name).bind(&new_test.score).bind(&new_test.comments).bind(&new_test.testarea.to_string()).bind(&new_test.school_year).bind(benchmark_json).bind(&new_test.test_variant).bind(&new_test.grade_level).bind(&ID)
+            let row = sqlx::query("INSERT INTO tests (name, score, comments, testarea, school_year, benchmark_categories, test_variant, grade_level, test_id, scope, course_id) VALUES($1, $2, $3, $4::testarea_enum, $5, $6, $7, $8, $9::uuid, $10, $11) RETURNING name, score, comments, testarea, school_year, benchmark_categories, test_variant, grade_level, test_id::text, scope, course_id") .bind(&new_test.name).bind(&new_test.score).bind(&new_test.comments).bind(&new_test.testarea.to_string()).bind(&new_test.school_year).bind(benchmark_json).bind(&new_test.test_variant).bind(&new_test.grade_level).bind(&ID).bind(&new_test.scope).bind(&new_test.course_id)
                 .fetch_one(pool)
                 .await
                 .map_err(|e| ServerFnError::new(format!("Database error: {}", e)))?;
@@ -149,6 +160,8 @@ cfg_if::cfg_if! {
                     test_variant: row.get("test_variant"),
                     grade_level: row.get("grade_level"),
                     test_id: row.get("test_id"),
+                    scope: row.get("scope"),
+                    course_id: row.get("course_id"),
             };
 
             Ok(test)
@@ -162,7 +175,7 @@ cfg_if::cfg_if! {
                 None => Json(Vec::new()),
             };
 
-            let row = sqlx::query("UPDATE tests SET name =$1, score =$2, comments =$3, testarea =$4::testarea_enum, school_year =$5, benchmark_categories=$6, test_variant=$7, grade_level=$8 WHERE test_id =$9 RETURNING name, score, comments, testarea, school_year, benchmark_categories, test_variant, grade_level, test_id::text")
+            let row = sqlx::query("UPDATE tests SET name =$1, score =$2, comments =$3, testarea =$4::testarea_enum, school_year =$5, benchmark_categories=$6, test_variant=$7, grade_level=$8, scope =$9, course_id=$10 WHERE test_id =$11 RETURNING name, score, comments, testarea, school_year, benchmark_categories, test_variant, grade_level, test_id::text, scope, course_id")
                 .bind(&test.name)
                 .bind(&test.score)
                 .bind(&test.comments)
@@ -171,6 +184,8 @@ cfg_if::cfg_if! {
                 .bind(benchmark_json)
                 .bind(&test.test_variant)
                 .bind(&test.grade_level)
+                .bind(&test.scope)
+                .bind(&test.course_id)
                 .bind(ID)
                 .fetch_one(pool)
                 .await?;
@@ -192,6 +207,8 @@ cfg_if::cfg_if! {
                 test_variant: row.get("test_variant"),
                 grade_level: row.get("grade_level"),
                 test_id: row.get("test_id"),
+                scope: row.get("scope"),
+                course_id: row.get("course_id"),
             };
 
             Ok(Some(test))
@@ -199,7 +216,7 @@ cfg_if::cfg_if! {
 
         pub async fn delete_test(test_id: String, pool: &sqlx::PgPool) -> Result<Test, ServerFnError> {
             let ID = Uuid::parse_str(&test_id).expect("The test_id did not correctly become a UUID");
-            let row = sqlx::query("DELETE FROM tests WHERE test_id = $1 RETURNING name, score, comments, testarea, school_year, benchmark_categories, test_variant, grade_level, test_id::text")
+            let row = sqlx::query("DELETE FROM tests WHERE test_id = $1 RETURNING name, score, comments, testarea, school_year, benchmark_categories, test_variant, grade_level, test_id::text, scope, course_id")
                 .bind(ID)
                 .fetch_one(pool)
                 .await
@@ -221,6 +238,8 @@ cfg_if::cfg_if! {
                 test_variant: row.get("test_variant"),
                 grade_level: row.get("grade_level"),
                 test_id: row.get("test_id"),
+                scope: row.get("scope"),
+                course_id: row.get("course_id"),
             };
 
             Ok(test)
@@ -229,7 +248,7 @@ cfg_if::cfg_if! {
         pub async fn score_override(test_id: String, score: i32, pool: &sqlx::PgPool) -> Result<Test, ServerFnError> {
             let ID = Uuid::parse_str(&test_id).expect("The test id was not correctly converted to UUID");
 
-            let row = sqlx::query("UPDATE tests SET score = $1 WHERE test_id = $2 RETURNING name, score, comments, testarea, school_year, benchmark_categories, test_variant, grade_level, test_id::text")
+            let row = sqlx::query("UPDATE tests SET score = $1 WHERE test_id = $2 RETURNING name, score, comments, testarea, school_year, benchmark_categories, test_variant, grade_level, test_id::text, scope, course_id")
                 .bind(score)
                 .bind(ID)
                 .fetch_one(pool)
@@ -251,6 +270,8 @@ cfg_if::cfg_if! {
                 test_variant: row.get("test_variant"),
                 grade_level: row.get("grade_level"),
                 test_id: row.get("test_id"),
+                scope: row.get("scope"),
+                course_id: row.get("course_id"),
             };
 
             Ok(test)

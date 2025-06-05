@@ -1,3 +1,4 @@
+use crate::app::models::assessment::ScopeEnum;
 use crate::app::models::student::GradeEnum;
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Debug};
@@ -54,6 +55,8 @@ pub struct Test {
     pub test_variant: i32,
     pub grade_level: Option<GradeEnum>,
     pub test_id: String,
+    pub scope: Option<ScopeEnum>,
+    pub course_id: Option<i32>,
 }
 
 impl Test {
@@ -67,6 +70,8 @@ impl Test {
         test_variant: i32,
         grade_level: Option<GradeEnum>,
         test_id: String,
+        scope: Option<ScopeEnum>,
+        course_id: Option<i32>,
     ) -> Test {
         Test {
             name,
@@ -78,6 +83,8 @@ impl Test {
             test_variant,
             grade_level,
             test_id,
+            scope,
+            course_id,
         }
     }
 }
@@ -94,6 +101,8 @@ pub struct CreateNewTestRequest {
     pub benchmark_categories: Option<Vec<BenchmarkCategory>>,
     pub test_variant: i32,
     pub grade_level: Option<GradeEnum>,
+    pub scope: Option<ScopeEnum>,
+    pub course_id: Option<i32>,
 }
 
 impl CreateNewTestRequest {
@@ -106,6 +115,8 @@ impl CreateNewTestRequest {
         benchmark_categories: Option<Vec<BenchmarkCategory>>,
         test_variant: i32,
         grade_level: Option<GradeEnum>,
+        scope: Option<ScopeEnum>,
+        course_id: Option<i32>,
     ) -> CreateNewTestRequest {
         CreateNewTestRequest {
             name,
@@ -116,6 +127,8 @@ impl CreateNewTestRequest {
             benchmark_categories,
             test_variant,
             grade_level,
+            scope,
+            course_id,
         }
     }
 }
@@ -133,6 +146,8 @@ pub struct UpdateTestRequest {
     pub test_variant: i32,
     pub grade_level: Option<GradeEnum>,
     pub test_id: String,
+    pub scope: Option<ScopeEnum>,
+    pub course_id: Option<i32>,
 }
 
 impl UpdateTestRequest {
@@ -146,6 +161,8 @@ impl UpdateTestRequest {
         test_variant: i32,
         grade_level: Option<GradeEnum>,
         test_id: String,
+        scope: Option<ScopeEnum>,
+        course_id: Option<i32>,
     ) -> UpdateTestRequest {
         UpdateTestRequest {
             name,
@@ -157,6 +174,8 @@ impl UpdateTestRequest {
             test_variant,
             grade_level,
             test_id,
+            scope,
+            course_id,
         }
     }
 }
@@ -226,7 +245,7 @@ cfg_if::cfg_if! {
         // Create a newtype wrapper for Vec<BenchmarkCategory> to solve the orphan rule issue
         #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
         pub struct BenchmarkCategories(pub Vec<BenchmarkCategory>);
-        
+
         impl<'q> sqlx::encode::Encode<'q, sqlx::Postgres> for BenchmarkCategories {
             fn encode_by_ref(&self, buf: &mut PgArgumentBuffer) -> Result<IsNull, Box<dyn std::error::Error + Send + Sync>> {
                 Json(&self.0).encode_by_ref(buf)

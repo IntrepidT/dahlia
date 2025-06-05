@@ -39,3 +39,9 @@ pub use users::get_users;
 
 pub mod user_settings;
 pub use user_settings::get_user_settings;
+
+pub mod courses;
+pub use courses::get_courses;
+
+pub mod enrollments;
+pub use enrollments::get_enrollments;

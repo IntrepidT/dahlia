@@ -2,14 +2,15 @@ use crate::app::components::dashboard::dashboard_sidebar::{DashboardSidebar, Sid
 use crate::app::components::header::Header;
 use crate::app::components::test_item::TestItem;
 use crate::app::models::assessment::{
-    Assessment, CreateNewAssessmentRequest, DeleteAssessmentRequest, RangeCategory, SubjectEnum,
-    UpdateAssessmentRequest,
+    Assessment, CreateNewAssessmentRequest, DeleteAssessmentRequest, RangeCategory, ScopeEnum,
+    SubjectEnum, UpdateAssessmentRequest,
 };
 use crate::app::models::student::GradeEnum;
 use crate::app::models::test::Test;
 use crate::app::server_functions::assessments::{
     add_assessment, delete_assessment, get_assessment, get_assessments, update_assessment,
 };
+use crate::app::server_functions::courses::get_courses;
 use crate::app::server_functions::tests::get_tests;
 use leptos::*;
 use strum::IntoEnumIterator;
@@ -23,6 +24,7 @@ pub fn AssessmentPage() -> impl IntoView {
 
     // Resource to load all tests
     let tests_resource = create_resource(|| (), |_| async move { get_tests().await });
+    let courses_resource = create_resource(|| (), |_| async move { get_courses().await });
 
     // State for assessment form
     let (show_form, set_show_form) = create_signal(false);
@@ -48,6 +50,8 @@ pub fn AssessmentPage() -> impl IntoView {
     let (natl_benchmark_min, set_natl_benchmark_min) = create_signal(0);
     let (natl_benchmark_max, set_natl_benchmark_max) = create_signal(0);
     let (natl_benchmark_label, set_natl_benchmark_label) = create_signal(String::new());
+    let (scope, set_scope) = create_signal::<Option<ScopeEnum>>(None);
+    let (course_id, set_course_id) = create_signal::<Option<i32>>(None);
 
     // Action to handle form submission
     let submit_form = create_action(move |_: &()| {
@@ -59,6 +63,11 @@ pub fn AssessmentPage() -> impl IntoView {
         let subject_val = subject.get();
         let risk_val = risk_benchmarks.get();
         let natl_val = national_benchmarks.get();
+        let scope = scope.get();
+        if scope != Some(ScopeEnum::Course) {
+            set_course_id(None); // Reset course_id if scope is not Course
+        }
+        let course_id = course_id.get();
 
         // Calculate composite score from selected tests
         let composite = if tests_val.is_empty() {
@@ -102,6 +111,8 @@ pub fn AssessmentPage() -> impl IntoView {
                     risk_val,
                     natl_val,
                     subject_val,
+                    scope,
+                    course_id,
                 );
                 update_assessment(request).await
             } else {
@@ -116,6 +127,8 @@ pub fn AssessmentPage() -> impl IntoView {
                     risk_val,
                     natl_val,
                     subject_val,
+                    scope,
+                    course_id,
                 );
                 add_assessment(request).await
             }
@@ -141,6 +154,8 @@ pub fn AssessmentPage() -> impl IntoView {
         set_subject(SubjectEnum::Other);
         set_risk_benchmarks(None);
         set_national_benchmarks(None);
+        set_scope(None);
+        set_course_id(None);
         set_editing(false);
         set_selected_assessment_id(None);
     };
@@ -155,6 +170,8 @@ pub fn AssessmentPage() -> impl IntoView {
         set_subject(assessment.subject);
         set_risk_benchmarks(assessment.risk_benchmarks);
         set_national_benchmarks(assessment.national_benchmarks);
+        set_scope(assessment.scope);
+        set_course_id(assessment.course_id);
         set_editing(true);
         set_selected_assessment_id(Some(assessment.id));
         set_show_form(true);
@@ -466,20 +483,22 @@ pub fn AssessmentPage() -> impl IntoView {
                                     <div>
                                         <label for="grade" class="block text-sm font-medium mb-1">"Grade"</label>
                                         <select
-                                            required
                                             id="grade"
                                             class="w-full px-3 py-2 border border-[#DADADA] rounded focus:outline-none focus:ring-1 focus:ring-[#2E3A59] focus:border-[#2E3A59] bg-white"
-                                            prop:value={move || grade.get().map(|g| g.to_string()).unwrap_or_else(|| "None".to_string())}
+                                            prop:value={move || grade.get().map(|g| g.to_string()).unwrap_or_else(|| "".to_string())}
                                             on:change=move |ev| {
                                                 let value = event_target_value(&ev);
-                                                match value.parse::<GradeEnum>() {
-                                                    Ok(grade_enum) => set_grade(Some(grade_enum)),
-                                                    Err(_) => ()
+                                                if value.is_empty() {
+                                                    set_grade(None);
+                                                } else {
+                                                    match value.parse::<GradeEnum>() {
+                                                        Ok(grade_enum) => set_grade(Some(grade_enum)),
+                                                        Err(_) => set_grade(None)
+                                                    }
                                                 }
                                             }
                                         >
                                             <option value="">"Please select a value"</option>
-                                            <option value="None">"None"</option>
                                             {GradeEnum::iter().map(|grade| view! {
                                                 <option value=format!("{}", grade)>
                                                     {format!("{}", grade)}
@@ -523,6 +542,74 @@ pub fn AssessmentPage() -> impl IntoView {
                                                 min="1"
                                                 required
                                             />
+                                        </div>
+
+                                        <div>
+                                            <label for="scope" class="block text-sm font-medium mb-1">"Scope"</label>
+                                            <select
+                                                id="scope"
+                                                class="w-full px-3 py-2 border border-[#DADADA] rounded focus:outline-none focus:ring-1 focus:ring-[#2E3A59] focus:border-[#2E3A59] bg-white"
+                                                prop:value={move || scope.get().map(|s| s.to_string()).unwrap_or_else(|| "None".to_string())}
+                                                on:change=move |ev| {
+                                                    let value = event_target_value(&ev);
+                                                    match value.parse::<ScopeEnum>() {
+                                                        Ok(scope_enum) => set_scope(Some(scope_enum)),
+                                                        Err(_) => set_scope(None)
+                                                    }
+                                                }
+                                            >
+                                                <option value="None">"None"</option>
+                                                {ScopeEnum::iter().map(|option| view! {
+                                                    <option value=format!("{}", option)>
+                                                        {format!("{}", option)}
+                                                    </option>
+                                                }).collect::<Vec<_>>()}
+                                            </select>
+                                           <Show when=move || matches!(scope(), Some(ScopeEnum::Course))>
+                                               <div class="mt-2">
+                                                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                                                        "Course"
+                                                    </label>
+                                                    <Suspense fallback=move || view! {
+                                                        <div class="w-full px-4 py-3 rounded-md border border-gray-300 bg-gray-100 text-gray-500">
+                                                            "Loading courses..."
+                                                        </div>
+                                                    }>
+                                                        <select
+                                                            class="w-full px-4 py-3 rounded-md border border-gray-300 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                                                            prop:value=move || course_id().map(|id| id.to_string()).unwrap_or_default()
+                                                            on:change=move |event| {
+                                                                let value = event_target_value(&event);
+                                                                if value.is_empty() {
+                                                                    set_course_id(None);
+                                                                } else if let Ok(id) = value.parse::<i32>() {
+                                                                    set_course_id(Some(id));
+                                                                }
+                                                            }
+                                                        >
+                                                            <option value="">"Select a Course"</option>
+                                                            {move || {
+                                                                courses_resource.get()
+                                                                    .map(|result| {
+                                                                        match result {
+                                                                            Ok(courses) => {
+                                                                                courses.into_iter().map(|course| {
+                                                                                    view! {
+                                                                                        <option value=course.id.to_string()>
+                                                                                            {course.name.clone()}
+                                                                                        </option>
+                                                                                    }
+                                                                                }).collect::<Vec<_>>()
+                                                                            },
+                                                                            Err(_) => vec![]
+                                                                        }
+                                                                    })
+                                                                    .unwrap_or_default()
+                                                            }}
+                                                        </select>
+                                                    </Suspense>
+                                                </div>
+                                            </Show>
                                         </div>
                                     </div>
                                 </div>

@@ -1,10 +1,12 @@
 use crate::app::components::header::Header;
 use crate::app::components::question_builder::BuildingQuestion;
+use crate::app::models::assessment::ScopeEnum;
 use crate::app::models::student::GradeEnum;
 use crate::app::models::test::BenchmarkCategory;
 use crate::app::models::test::{CreateNewTestRequest, TestType, UpdateTestRequest};
 use crate::app::models::{CreateNewQuestionRequest, Question, QuestionType};
 use crate::app::server_functions::assessments::update_assessment_score;
+use crate::app::server_functions::courses::get_courses;
 use crate::app::server_functions::questions::{add_question, delete_questions, get_questions};
 use crate::app::server_functions::tests::{add_test, get_test, score_overrider, update_test};
 use leptos::prelude::*;
@@ -37,6 +39,19 @@ pub fn TestBuilder() -> impl IntoView {
         },
     );
 
+    let courses_resource = create_resource(
+        || (),
+        |_| async move {
+            match get_courses().await {
+                Ok(courses) => courses,
+                Err(e) => {
+                    log::error!("Failed to load courses: {:?}", e);
+                    Vec::new()
+                }
+            }
+        },
+    );
+
     let (selected_tab, set_selected_tab) = create_signal(0);
     let (test_title, set_test_title) = create_signal(String::new());
     let (test_instructions, set_test_instructions) = create_signal(String::new());
@@ -48,6 +63,8 @@ pub fn TestBuilder() -> impl IntoView {
     let (test_variant, set_test_variant) = create_signal(0);
     let (test_comments, set_test_comments) = create_signal(String::new());
     let (test_id, set_test_id) = create_signal(String::new());
+    let (scope, set_scope) = create_signal::<Option<ScopeEnum>>(None);
+    let (course_id, set_course_id) = create_signal::<Option<i32>>(None);
     let (error_message, set_error_message) = create_signal(String::new());
     let (show_error, set_show_error) = create_signal(false);
     let (is_submitting, set_is_submitting) = create_signal(false);
@@ -116,6 +133,8 @@ pub fn TestBuilder() -> impl IntoView {
             set_school_year(test.school_year.clone().unwrap_or_default());
             set_test_comments(test.comments.clone());
             set_test_variant(test.test_variant);
+            set_scope(test.scope.clone());
+            set_course_id(test.course_id.clone());
 
             // Convert BenchmarkCategory to our internal tuple representation
             let categories = test.benchmark_categories.clone().unwrap_or_default();
@@ -255,6 +274,13 @@ pub fn TestBuilder() -> impl IntoView {
             )
         };
 
+        //Convert scope back to Enum and course_id to i32
+        let scope_value = scope();
+        if scope_value != Some(ScopeEnum::Course) && course_id().is_some() {
+            set_course_id(None);
+        };
+        let course_id_value = course_id();
+
         // Create the test request, whether for new or update
         let add_test_request = CreateNewTestRequest::new(
             test_title(),
@@ -265,6 +291,8 @@ pub fn TestBuilder() -> impl IntoView {
             converted_cats.clone(),
             test_variant(),
             grade_level(),
+            scope_value.clone(),
+            course_id_value.clone(),
         );
 
         let converted_clone = converted_cats.clone();
@@ -284,6 +312,8 @@ pub fn TestBuilder() -> impl IntoView {
                     test_variant(),
                     grade_level(),
                     test_id(),
+                    scope_value,
+                    course_id_value,
                 );
                 // For now, we'll assume we're just keeping the same test_id
                 log::info!("Updating test with ID: {}", current_test_id);
@@ -557,6 +587,77 @@ pub fn TestBuilder() -> impl IntoView {
                                             }
                                         }
                                     />
+                                </div>
+
+                                <div class="form-group">
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                                        "Scope"
+                                    </label>
+                                    <select
+                                        class="w-full px-4 py-3 rounded-md border border-gray-300 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                                        prop:value={move ||  match scope() {
+                                            Some(s) => s.to_string(),
+                                            None => "none".to_string()
+                                        }}
+                                        on:change=move |event| {
+                                            let value = event_target_value(&event);
+                                            if value == "none" {
+                                                set_scope(None);
+                                            } else {
+                                                match ScopeEnum::from_str(&value) {
+                                                    Ok(scope_enum) => set_scope(Some(scope_enum)),
+                                                    Err(_) => set_scope(None),
+                                                }
+                                            }
+                                        }
+                                    >
+                                        <option value="none">"None"</option>
+                                        {
+                                            ScopeEnum::iter().map(|scope_enum| {
+                                                view! {
+                                                    <option value=scope_enum.to_string()>
+                                                        {scope_enum.to_string()}
+                                                    </option>
+                                                }
+                                            }).collect::<Vec<_>>()
+                                        }
+                                    </select>
+                                    <Show when=move || matches!(scope(),Some(ScopeEnum::Course))>
+                                        <div class="mt-2">
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">
+                                                "Course"
+                                            </label>
+                                            <Suspense fallback=move || view! {
+                                                <div class="w-full px-4 py-3 rounded-md border border-gray-300 bg-gray-100 text-gray-500">
+                                                    "Loading courses..."
+                                                </div>
+                                            }>
+                                                <select
+                                                    class="w-full px-4 py-3 rounded-md border border-gray-300 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                                                    prop:value=move || course_id().map(|id| id.to_string()).unwrap_or_default()
+                                                    on:change=move |event| {
+                                                        let value = event_target_value(&event);
+                                                        if value.is_empty() {
+                                                            set_course_id(None);
+                                                        } else if let Ok(id) = value.parse::<i32>() {
+                                                            set_course_id(Some(id));
+                                                        }
+                                                    }
+                                                >
+                                                    <option value="">"Select a Course"</option>
+                                                    {move || {
+                                                        courses_resource.get().unwrap_or_default().into_iter().map(|course| {
+                                                            view! {
+                                                                <option value=course.id.to_string()>
+                                                                    {course.name.clone()}
+                                                                </option>
+                                                            }
+                                                        }).collect::<Vec<_>>()
+                                                    }}
+                                                </select>
+                                            </Suspense>
+                                        </div>
+                                    </Show>
                                 </div>
                             </div>
 
@@ -833,43 +934,5 @@ pub fn TestBuilder() -> impl IntoView {
                 }}
             </div>
         </main>
-    }
-}
-#[component]
-fn TinyMCEEditor() -> impl IntoView {
-    view! {
-        <html lang="en">
-        <head>
-            <script
-                type="text/javascript"
-                src="/static/tinymce/tinymce.min.js"
-                referrerpolicy="origin">
-            </script>
-            <script type="text/javascript">
-            tinymce.init({
-                selector: "#myTextarea",
-                width: 1200,
-                height: 500,
-                plugins: [
-                    "advlist", "autosave", "autolink", "link", "image", "lists", "charmap", "preview", "anchor", "pagebreak",
-                    "wordcount", "visualblocks", "visualchars", "insertdatetime",
-                    "media", "table", "save"
-                ],
-                toolbar: "undo redo | styles | bold italic | alignleft aligncenter alignright alignjustify | " +
-                    "bullist numlist outdent indent | link image | " +
-                    "forecolor backcolor save",
-                autosave_ask_before_unload: true,
-                menubar: "file edit view insert format tools table",
-                autosave_interval: "10s",
-                autosave_restore_when_empty: true,
-                license_key: "gpl",
-            });
-            </script>
-        </head>
-
-        <body>
-            <textarea id="myTextarea" placeholder="Please Write Your Instructions Here" class="border-[#00356b] border"></textarea>
-        </body>
-        </html>
     }
 }

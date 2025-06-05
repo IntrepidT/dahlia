@@ -6,6 +6,41 @@ use strum_macros::{EnumIter, EnumString};
 use uuid::Uuid;
 use validator::Validate;
 
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, EnumIter)]
+pub enum ScopeEnum {
+    #[strum(to_string = "course")]
+    Course,
+    #[strum(to_string = "grade_level")]
+    GradeLevel,
+    #[strum(to_string = "all-required")]
+    AllRequired,
+}
+impl fmt::Display for ScopeEnum {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                ScopeEnum::Course => "course".to_string(),
+                ScopeEnum::GradeLevel => "grade_level".to_string(),
+                ScopeEnum::AllRequired => "all-required".to_string(),
+            }
+        )
+    }
+}
+impl FromStr for ScopeEnum {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "course" => Ok(ScopeEnum::Course),
+            "grade_level" => Ok(ScopeEnum::GradeLevel),
+            "all-required" => Ok(ScopeEnum::AllRequired),
+            _ => Err(format!("Invalid scope value: {}", s)),
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct RangeCategory {
     pub min: i32,
@@ -85,6 +120,8 @@ pub struct Assessment {
     pub risk_benchmarks: Option<Vec<RangeCategory>>,
     pub national_benchmarks: Option<Vec<RangeCategory>>,
     pub subject: SubjectEnum,
+    pub scope: Option<ScopeEnum>,
+    pub course_id: Option<i32>,
 }
 impl Assessment {
     pub fn new(
@@ -98,6 +135,8 @@ impl Assessment {
         risk_benchmarks: Option<Vec<RangeCategory>>,
         national_benchmarks: Option<Vec<RangeCategory>>,
         subject: SubjectEnum,
+        scope: Option<ScopeEnum>,
+        course_id: Option<i32>,
     ) -> Assessment {
         Assessment {
             name,
@@ -110,6 +149,8 @@ impl Assessment {
             risk_benchmarks,
             national_benchmarks,
             subject,
+            scope,
+            course_id,
         }
     }
 }
@@ -126,6 +167,8 @@ pub struct CreateNewAssessmentRequest {
     pub risk_benchmarks: Option<Vec<RangeCategory>>,
     pub national_benchmarks: Option<Vec<RangeCategory>>,
     pub subject: SubjectEnum,
+    pub scope: Option<ScopeEnum>,
+    pub course_id: Option<i32>,
 }
 impl CreateNewAssessmentRequest {
     pub fn new(
@@ -138,6 +181,8 @@ impl CreateNewAssessmentRequest {
         risk_benchmarks: Option<Vec<RangeCategory>>,
         national_benchmarks: Option<Vec<RangeCategory>>,
         subject: SubjectEnum,
+        scope: Option<ScopeEnum>,
+        course_id: Option<i32>,
     ) -> CreateNewAssessmentRequest {
         CreateNewAssessmentRequest {
             name,
@@ -149,6 +194,8 @@ impl CreateNewAssessmentRequest {
             risk_benchmarks,
             national_benchmarks,
             subject,
+            scope,
+            course_id,
         }
     }
 }
@@ -166,6 +213,8 @@ pub struct UpdateAssessmentRequest {
     pub risk_benchmarks: Option<Vec<RangeCategory>>,
     pub national_benchmarks: Option<Vec<RangeCategory>>,
     pub subject: SubjectEnum,
+    pub scope: Option<ScopeEnum>,
+    pub course_id: Option<i32>,
 }
 impl UpdateAssessmentRequest {
     pub fn new(
@@ -179,6 +228,8 @@ impl UpdateAssessmentRequest {
         risk_benchmarks: Option<Vec<RangeCategory>>,
         national_benchmarks: Option<Vec<RangeCategory>>,
         subject: SubjectEnum,
+        scope: Option<ScopeEnum>,
+        course_id: Option<i32>,
     ) -> UpdateAssessmentRequest {
         UpdateAssessmentRequest {
             name,
@@ -191,6 +242,8 @@ impl UpdateAssessmentRequest {
             risk_benchmarks,
             national_benchmarks,
             subject,
+            scope,
+            course_id,
         }
     }
 }
@@ -249,6 +302,23 @@ cfg_if::cfg_if! {
         impl sqlx::postgres::PgHasArrayType for RangeCategory {
             fn array_type_info() -> sqlx::postgres::PgTypeInfo {
                 sqlx::postgres::PgTypeInfo::with_name("_jsonb")
+            }
+        }
+        impl <'q> sqlx::encode::Encode<'q, sqlx::Postgres> for ScopeEnum {
+            fn encode_by_ref(&self, buf: &mut PgArgumentBuffer) -> Result<IsNull, Box<dyn std::error::Error + Send + Sync>> {
+                let s = self.to_string();
+                <&str as Encode<Postgres>>::encode(&s.as_str(), buf)
+            }
+        }
+        impl<'r> sqlx::decode::Decode<'r, sqlx::Postgres> for ScopeEnum {
+            fn decode(value: sqlx::postgres::PgValueRef<'r>) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+                let s: &str = Decode::<sqlx::Postgres>::decode(value)?;
+                ScopeEnum::from_str(s).map_err(|_| format!("Invalid ScopeEnum: {}", s).into())
+            }
+        }
+        impl sqlx::Type<sqlx::Postgres> for ScopeEnum {
+            fn type_info() -> sqlx::postgres::PgTypeInfo {
+                sqlx::postgres::PgTypeInfo::with_name("assessment_scope_enum")
             }
         }
 

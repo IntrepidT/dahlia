@@ -45,7 +45,7 @@ pub fn ShowAdministerTestModal(set_if_show_modal: WriteSignal<bool>) -> impl Int
                 <p class="text-sm text-gray-500">"Choose which assessment you'd like to administer"</p>
             </div>
             
-            <div class="grid grid-cols-3 gap-4">
+            <div class="grid grid-cols-2 gap-4">
                 <A href="/mathtesting" class=CARD_STYLE on:click=close_modal>
                     <div class=ICON_STYLE>
                         <img src="/assets/calculator.png" class="h-6 w-6" />
@@ -60,14 +60,6 @@ pub fn ShowAdministerTestModal(set_if_show_modal: WriteSignal<bool>) -> impl Int
                     <span class=BUTTON_TEXT_STYLE>Reading</span>
                 </A>
 
-                <A href="https://dibels.amplify.com" class=CARD_STYLE on:click=close_modal>
-                    <div class=ICON_STYLE>
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                    </div>
-                    <span class=BUTTON_TEXT_STYLE>Dibels</span>
-                </A>
             </div>
         </div>
     }

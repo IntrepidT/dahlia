@@ -89,9 +89,9 @@ fn parse_and_validate_enrollments(file_contents: &str) -> Result<Vec<Enrollment>
 }
 
 fn parse_enrollment_record(
-    record: EnrollmentCsvRow, 
-    row_num: usize, 
-    current_date: NaiveDate
+    record: EnrollmentCsvRow,
+    row_num: usize,
+    current_date: NaiveDate,
 ) -> Result<Enrollment, String> {
     let academic_year = AcademicYear::from_str(&record.academic_year).map_err(|e| {
         format!(
@@ -114,7 +114,7 @@ fn parse_enrollment_record(
     let enrollment_date = current_date;
 
     // For bulk uploads, status_change_date defaults to current date - ignore CSV field
-    let status_change_date = current_date;
+    let status_change_date = Some(current_date);
 
     let notes = if record.notes.trim().is_empty() {
         None

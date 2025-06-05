@@ -24,7 +24,7 @@ cfg_if::cfg_if! {
                     let teacher_id: i32 = row.get("teacher_id");
                     let status: EnrollmentStatus = row.get("status");
                     let enrollment_date: chrono::NaiveDate = row.get("enrollment_date");
-                    let status_change_date: chrono::NaiveDate = row.get("status_change_date");
+                    let status_change_date: Option<chrono::NaiveDate> = row.get("status_change_date");
                     let notes: Option<String> = row.get("notes");
 
                     Enrollment {
@@ -64,6 +64,32 @@ cfg_if::cfg_if! {
                 })
                 .collect();
             Ok(enrollments)
+        }
+
+        pub async fn get_enrollment_by_student_and_year(
+            pool: &PgPool,
+            student_id: i32,
+            academic_year: AcademicYear,
+        ) -> Result<Enrollment, ServerFnError> {
+            let row = sqlx::query("SELECT student_id, academic_year, grade_level, teacher_id, status, enrollment_date, status_change_date, notes FROM student_enrollments WHERE student_id = $1 AND academic_year = $2 LIMIT 1")
+                .bind(student_id)
+                .bind(academic_year)
+                .fetch_one(pool)
+                .await
+                .map_err(|e| ServerFnError::new(format!("Database error: {}", e)))?;
+
+            let enrollment = Enrollment {
+                student_id: row.get("student_id"),
+                academic_year: row.get("academic_year"),
+                grade_level: row.get("grade_level"),
+                teacher_id: row.get("teacher_id"),
+                status: row.get("status"),
+                enrollment_date: row.get("enrollment_date"),
+                status_change_date: row.get("status_change_date"),
+                notes: row.get("notes"),
+            };
+
+            Ok(enrollment)
         }
 
         pub async fn get_enrollments_by_academic_year(academic_year: &AcademicYear, pool: &PgPool) -> Result<Vec<Enrollment>, ServerFnError> {
@@ -207,7 +233,7 @@ cfg_if::cfg_if! {
             teacher_id: i32,
             status: EnrollmentStatus,
             enrollment_date: NaiveDate,
-            status_change_date: NaiveDate,
+            status_change_date: Option<NaiveDate>,
             notes: Option<String>,
             pool: &PgPool
         ) -> Result<Option<Enrollment>, ServerFnError> {
@@ -243,8 +269,8 @@ cfg_if::cfg_if! {
         }
 
         pub async fn delete_enrollment(
-            student_id: &i32,
-            academic_year: &AcademicYear,
+            student_id: i32,
+            academic_year: AcademicYear,
             pool: &PgPool
         ) -> Result<Option<Enrollment>, ServerFnError> {
             let row = sqlx::query("DELETE FROM student_enrollments WHERE student_id = $1 AND academic_year = $2::school_year_enum RETURNING student_id, academic_year, grade_level, teacher_id, status, enrollment_date, status_change_date, notes")
@@ -272,13 +298,11 @@ cfg_if::cfg_if! {
             }
         }
 
-        // Bulk insert function for CSV imports
         pub async fn bulk_insert_enrollments(pool: &PgPool, enrollments: &[Enrollment]) -> Result<usize, ServerFnError> {
             if enrollments.is_empty() {
                 return Ok(0);
             }
 
-            // Start a database transaction
             let mut tx = pool.begin().await?;
 
             let result = bulk_insert_with_unnest(enrollments, &mut tx).await;
@@ -295,7 +319,6 @@ cfg_if::cfg_if! {
             }
         }
 
-        // Alternative batch method for better compatibility
         pub async fn bulk_insert_enrollments_batch(pool: &PgPool, enrollments: &[Enrollment]) -> Result<usize, ServerFnError> {
             if enrollments.is_empty() {
                 return Ok(0);
@@ -379,7 +402,7 @@ cfg_if::cfg_if! {
                  .push_bind(enrollment.teacher_id)
                  .push_bind(&enrollment.status)
                  .push_bind(enrollment.enrollment_date)
-                 .push_bind(enrollment.status_change_date)
+                 .push_bind(&enrollment.status_change_date)
                  .push_bind(&enrollment.notes);
             });
 
@@ -389,7 +412,6 @@ cfg_if::cfg_if! {
             Ok(result.rows_affected() as usize)
         }
 
-        // Utility functions for reporting and analytics
         pub async fn get_enrollment_counts_by_grade(
             academic_year: &AcademicYear,
             pool: &PgPool
@@ -415,7 +437,7 @@ cfg_if::cfg_if! {
             academic_year: &AcademicYear,
             pool: &PgPool
         ) -> Result<Vec<(i32, i64)>, ServerFnError> {
-            let rows = sqlx::query("SELECT teacher_id, COUNT(*) as count FROM student_enrollments WHERE academic_year = $1 AND status = 'Active' GROUP BY teacher_id ORDER BY teacher_id")
+            let rows = sqlx::query("SELECT teacher_id, COUNT(*) as count FROM student_enrollments WHERE academic_year = $1 AND status = 'active' GROUP BY teacher_id ORDER BY teacher_id")
                 .bind(academic_year)
                 .fetch_all(pool)
                 .await?;

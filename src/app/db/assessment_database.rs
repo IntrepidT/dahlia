@@ -1,4 +1,5 @@
 use crate::app::models::assessment::RangeCategory;
+use crate::app::models::assessment::ScopeEnum;
 use crate::app::models::student::GradeEnum;
 use leptos::ServerFnError;
 use uuid::Uuid;
@@ -12,7 +13,7 @@ cfg_if::cfg_if! {
         use sqlx::prelude::*;
 
         pub async fn get_all_assessments(pool: &sqlx::PgPool) -> Result<Vec<Assessment>, ServerFnError> {
-            let rows = sqlx::query("SELECT name, frequency, grade, version, id, tests, composite_score, risk_benchmarks, national_benchmarks, subject FROM assessments ORDER BY name ASC")
+            let rows = sqlx::query("SELECT name, frequency, grade, version, id, tests, composite_score, risk_benchmarks, national_benchmarks, subject, scope, course_id FROM assessments ORDER BY name ASC")
                 .fetch_all(pool)
                 .await
                 .map_err(|e| ServerFnError::new(format!("Database error: {}", e)))?;
@@ -37,6 +38,8 @@ cfg_if::cfg_if! {
                         _ => None,
                     };
                     let subject: SubjectEnum = row.get("subject");
+                    let scope: Option<ScopeEnum> = row.get("scope");
+                    let course_id: Option<i32> = row.get("course_id");
 
                     Assessment {
                         name,
@@ -49,6 +52,8 @@ cfg_if::cfg_if! {
                         risk_benchmarks,
                         national_benchmarks,
                         subject,
+                        scope,
+                        course_id,
                     }
                 })
                 .collect();
@@ -60,7 +65,7 @@ cfg_if::cfg_if! {
             let uuid = Uuid::parse_str(&id)
                 .map_err(|e| ServerFnError::new(format!("Invalid UUID: {}", e)))?;
 
-            let row = sqlx::query("SELECT name, frequency, grade, version, id, tests, composite_score, risk_benchmarks, national_benchmarks, subject FROM assessments WHERE id = $1")
+            let row = sqlx::query("SELECT name, frequency, grade, version, id, tests, composite_score, risk_benchmarks, national_benchmarks, subject, scope, course_id FROM assessments WHERE id = $1")
                 .bind(&uuid)
                 .fetch_one(pool)
                 .await
@@ -88,6 +93,8 @@ cfg_if::cfg_if! {
                 risk_benchmarks,
                 national_benchmarks,
                 subject: row.get("subject"),
+                scope: row.get("scope"),
+                course_id: row.get("course_id"),
             };
 
             Ok(assessment)
@@ -104,7 +111,7 @@ cfg_if::cfg_if! {
                 _ => Json(Vec::<RangeCategory>::new()),
             };
 
-            let row = sqlx::query("INSERT INTO assessments (name, frequency, grade, version, id, tests, composite_score, risk_benchmarks, national_benchmarks, subject) VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING name, frequency, grade, version, id, tests, composite_score, risk_benchmarks, national_benchmarks, subject")
+            let row = sqlx::query("INSERT INTO assessments (name, frequency, grade, version, id, tests, composite_score, risk_benchmarks, national_benchmarks, subject, scope, course_id) VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING name, frequency, grade, version, id, tests, composite_score, risk_benchmarks, national_benchmarks, subject, scope, course_id")
                 .bind(&new_assessment.name)
                 .bind(&new_assessment.frequency)
                 .bind(&new_assessment.grade)
@@ -115,6 +122,8 @@ cfg_if::cfg_if! {
                 .bind(&risk_benchmarks)
                 .bind(&national_benchmarks)
                 .bind(&new_assessment.subject)
+                .bind(&new_assessment.scope)
+                .bind(&new_assessment.course_id)
                 .fetch_one(pool)
                 .await
                 .map_err(|e| ServerFnError::new(format!("Database error: {}", e)))?;
@@ -130,7 +139,7 @@ cfg_if::cfg_if! {
                 },
                 Err(_) => None,
             };
-            
+
             let national_benchmarks: Option<Vec<RangeCategory>> = match row.try_get::<Json<Vec<RangeCategory>>, _>("national_benchmarks") {
                 Ok(json) => {
                     if json.0.is_empty() {
@@ -155,6 +164,8 @@ cfg_if::cfg_if! {
                 risk_benchmarks,
                 national_benchmarks,
                 subject: row.get("subject"),
+                scope: row.get("scope"),
+                course_id: row.get("course_id"),
             };
             Ok(assessment)
         }
@@ -214,7 +225,7 @@ cfg_if::cfg_if! {
                 None => Json(Vec::new()),
             };
 
-            let row = sqlx::query("UPDATE assessments SET name = $1, frequency = $2, grade = $3, version = $4, tests = $5, composite_score = $6, risk_benchmarks = $7, national_benchmarks = $8, subject = $9 WHERE id = $10 RETURNING name, frequency, grade, version, id, tests, composite_score, risk_benchmarks, national_benchmarks, subject")
+            let row = sqlx::query("UPDATE assessments SET name = $1, frequency = $2, grade = $3, version = $4, tests = $5, composite_score = $6, risk_benchmarks = $7, national_benchmarks = $8, subject = $9, scope = $10, course_id = $11 WHERE id = $12 RETURNING name, frequency, grade, version, id, tests, composite_score, risk_benchmarks, national_benchmarks, subject, scope, course_id")
                 .bind(&assessment.name)
                 .bind(&assessment.frequency)
                 .bind(&assessment.grade)
@@ -224,6 +235,8 @@ cfg_if::cfg_if! {
                 .bind(&risk_benchmarks)
                 .bind(&national_benchmarks)
                 .bind(&assessment.subject)
+                .bind(&assessment.scope)
+                .bind(&assessment.course_id)
                 .bind(&assessment.id)
                 .fetch_one(pool)
                 .await
@@ -251,6 +264,8 @@ cfg_if::cfg_if! {
                 risk_benchmarks,
                 national_benchmarks,
                 subject: row.get("subject"),
+                scope: row.get("scope"),
+                course_id: row.get("course_id"),
             };
 
             Ok(assessment)
@@ -261,7 +276,7 @@ cfg_if::cfg_if! {
             let uuid = Uuid::parse_str(&id)
                 .map_err(|e| ServerFnError::new(format!("Invalid UUID: {}", e)))?;
 
-            let row = sqlx::query("DELETE from assessments WHERE id = $1 RETURNING name, frequency, grade, version, id, tests, composite_score, risk_benchmarks, national_benchmarks, subject")
+            let row = sqlx::query("DELETE from assessments WHERE id = $1 RETURNING name, frequency, grade, version, id, tests, composite_score, risk_benchmarks, national_benchmarks, subject, scope, course_id")
                 .bind(&uuid)
                 .fetch_one(pool)
                 .await
@@ -289,6 +304,8 @@ cfg_if::cfg_if! {
                 risk_benchmarks,
                 national_benchmarks,
                 subject: row.get("subject"),
+                scope: row.get("scope"),
+                course_id: row.get("course_id"),
             };
 
             Ok(assessment)

@@ -45,7 +45,7 @@ impl fmt::Display for EnrollmentStatus {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, EnumIter)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, EnumIter, Hash)]
 pub enum AcademicYear {
     Year2023_2024,
     Year2024_2025,
@@ -97,7 +97,7 @@ pub struct Enrollment {
     pub teacher_id: i32,
     pub status: EnrollmentStatus,
     pub enrollment_date: NaiveDate,
-    pub status_change_date: NaiveDate,
+    pub status_change_date: Option<NaiveDate>, // Changed to Option<NaiveDate> to match database
     pub notes: Option<String>,
 }
 
@@ -109,11 +109,87 @@ impl Enrollment {
         teacher_id: i32,
         status: EnrollmentStatus,
         enrollment_date: NaiveDate,
-        status_change_date: NaiveDate,
+        status_change_date: Option<NaiveDate>, // Changed to Option<NaiveDate>
         notes: Option<String>,
     ) -> Self {
         Enrollment {
             student_id,
+            academic_year,
+            grade_level,
+            teacher_id,
+            status,
+            enrollment_date,
+            status_change_date,
+            notes,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
+pub struct CreateEnrollmentRequest {
+    pub student_id: i32,
+    pub course_id: i32,
+    pub academic_year: AcademicYear,
+    pub grade_level: GradeEnum,
+    pub teacher_id: i32,
+    pub status: EnrollmentStatus,
+    pub enrollment_date: NaiveDate,
+    pub status_change_date: Option<NaiveDate>, // Changed to Option<NaiveDate>
+    pub notes: Option<String>,
+}
+impl CreateEnrollmentRequest {
+    pub fn new(
+        student_id: i32,
+        course_id: i32,
+        academic_year: AcademicYear,
+        grade_level: GradeEnum,
+        teacher_id: i32,
+        status: EnrollmentStatus,
+        enrollment_date: NaiveDate,
+        status_change_date: Option<NaiveDate>, // Changed to Option<NaiveDate>
+        notes: Option<String>,
+    ) -> Self {
+        CreateEnrollmentRequest {
+            student_id,
+            course_id,
+            academic_year,
+            grade_level,
+            teacher_id,
+            status,
+            enrollment_date,
+            status_change_date,
+            notes,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
+pub struct UpdateEnrollmentRequest {
+    pub student_id: i32,
+    pub course_id: i32,
+    pub academic_year: AcademicYear,
+    pub grade_level: GradeEnum,
+    pub teacher_id: i32,
+    pub status: EnrollmentStatus,
+    pub enrollment_date: NaiveDate,
+    pub status_change_date: Option<NaiveDate>, // Changed to Option<NaiveDate>
+    pub notes: Option<String>,
+}
+impl UpdateEnrollmentRequest {
+    pub fn new(
+        student_id: i32,
+        course_id: i32,
+        academic_year: AcademicYear,
+        grade_level: GradeEnum,
+        teacher_id: i32,
+        status: EnrollmentStatus,
+        enrollment_date: NaiveDate,
+        status_change_date: Option<NaiveDate>, // Changed to Option<NaiveDate>
+        notes: Option<String>,
+    ) -> Self {
+        UpdateEnrollmentRequest {
+            student_id,
+            course_id,
             academic_year,
             grade_level,
             teacher_id,

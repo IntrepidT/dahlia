@@ -112,6 +112,8 @@ pub async fn add_test(add_test_request: CreateNewTestRequest) -> Result<Test, Se
             add_test_request.test_variant,
             add_test_request.grade_level,
             ID,
+            add_test_request.scope,
+            add_test_request.course_id,
         );
         test_database::add_test(&bufferTest, &pool)
             .await
@@ -164,6 +166,8 @@ pub async fn update_test(update_test_request: UpdateTestRequest) -> Result<Test,
             update_test_request.test_variant,
             update_test_request.grade_level,
             update_test_request.test_id,
+            update_test_request.scope,
+            update_test_request.course_id,
         );
 
         match test_database::update_test(&buffer_test, &pool).await {
