@@ -128,13 +128,14 @@ pub async fn update_global_setting_api(
 #[server(ToggleStudentProtection, "/api")]
 pub async fn toggle_student_protection(
     enable: bool,
-    mapping_key: Option<String>, // Required when disabling protection
+    mapping_key: Option<String>,
 ) -> Result<String, ServerFnError> {
     #[cfg(feature = "ssr")]
     {
         use crate::app::server_functions::auth::get_current_user;
         use actix_web::web;
         use leptos_actix::extract;
+        use std::path::Path;
         use std::process::Command;
 
         let current_user = get_current_user().await?;
@@ -150,7 +151,23 @@ pub async fn toggle_student_protection(
                 .map_err(|e| ServerFnError::new(format!("Failed to extract pool: {}", e)))?;
 
             if enable {
-                // First, update the global setting to track protection status
+                // Check if script file exists
+                let script_paths = vec![
+                    "./scripts/remove_pii_data.sql",
+                    "/app/scripts/remove_pii_data.sql",
+                    "scripts/remove_pii_data.sql",
+                ];
+
+                let script_path = script_paths
+                    .iter()
+                    .find(|&path| Path::new(path).exists())
+                    .ok_or_else(|| {
+                        ServerFnError::new(
+                            "Cannot find remove_pii_data.sql script file".to_string(),
+                        )
+                    })?;
+
+                // Update global setting first
                 global_database::update_global_setting(
                     &pool,
                     "student_protections",
@@ -162,11 +179,25 @@ pub async fn toggle_student_protection(
                 .await
                 .map_err(|e| ServerFnError::new(format!("Failed to update setting: {}", e)))?;
 
+                // Check if psql is available
+                let psql_check = Command::new("which").arg("psql").output().map_err(|e| {
+                    ServerFnError::new(format!("Failed to check psql availability: {}", e))
+                })?;
+
+                if !psql_check.status.success() {
+                    return Err(ServerFnError::new(
+                        "psql command not found. PostgreSQL client tools not installed."
+                            .to_string(),
+                    ));
+                }
+
                 // Execute the remove PII script
                 let output = Command::new("psql")
-                    .arg(env::var("DATABASE_URL").unwrap())
+                    .arg(&env::var("DATABASE_URL").map_err(|_| {
+                        ServerFnError::new("DATABASE_URL environment variable not set".to_string())
+                    })?)
                     .arg("-f")
-                    .arg("./scripts/remove_pii_data.sql")
+                    .arg(script_path)
                     .output()
                     .map_err(|e| {
                         ServerFnError::new(format!("Failed to execute PII removal: {}", e))
@@ -182,114 +213,92 @@ pub async fn toggle_student_protection(
                     )));
                 }
 
-                // Check if the CSV file was created in /tmp/
-                let csv_check = Command::new("test")
-                    .arg("-f")
-                    .arg("/tmp/student_id_mapping.csv")
-                    .status()
-                    .map_err(|e| ServerFnError::new(format!("Failed to check CSV file: {}", e)))?;
+                // Try to create CSV in multiple locations
+                let csv_locations = vec![
+                    "/tmp/student_id_mapping.csv",
+                    "./student_id_mapping.csv",
+                    "/app/student_id_mapping.csv",
+                ];
 
-                if !csv_check.success() {
-                    // CSV wasn't created by SQL script, let's create it manually using psql
-                    let csv_creation = Command::new("psql")
-                        .arg(env::var("DATABASE_URL").unwrap())
-                        .arg("-c")
-                        .arg("COPY (SELECT new_student_id as app_id, old_student_id as student_id, created_at FROM student_id_mapping ORDER BY new_student_id) TO '/tmp/student_id_mapping.csv' WITH CSV HEADER;")
-                        .output()
-                        .map_err(|e| ServerFnError::new(format!("Failed to create CSV manually: {}", e)))?;
-
-                    if !csv_creation.status.success() {
-                        let csv_stderr = String::from_utf8_lossy(&csv_creation.stderr);
-                        let csv_stdout = String::from_utf8_lossy(&csv_creation.stdout);
-
-                        // If that also fails, try creating the CSV in current directory directly
-                        let direct_csv = Command::new("psql")
-                            .arg(env::var("DATABASE_URL").unwrap())
-                            .arg("-c")
-                            .arg("COPY (SELECT new_student_id as app_id, old_student_id as student_id, created_at FROM student_id_mapping ORDER BY new_student_id) TO './student_id_mapping.csv' WITH CSV HEADER;")
-                            .output()
-                            .map_err(|e| ServerFnError::new(format!("Failed to create CSV in current dir: {}", e)))?;
-
-                        if !direct_csv.status.success() {
-                            let direct_stderr = String::from_utf8_lossy(&direct_csv.stderr);
-                            return Err(ServerFnError::new(format!(
-                                "Failed to create CSV file. Original SQL output - STDOUT: {} STDERR: {}. Manual CSV creation - STDOUT: {} STDERR: {}. Direct CSV creation error: {}",
-                                stdout, stderr, csv_stdout, csv_stderr, direct_stderr
-                            )));
+                let mut csv_created = false;
+                for csv_path in csv_locations {
+                    if Path::new(csv_path).exists() {
+                        csv_created = true;
+                        // Try to copy to current directory if not already there
+                        if csv_path != "./student_id_mapping.csv" {
+                            let _ = Command::new("cp")
+                                .arg(csv_path)
+                                .arg("./student_id_mapping.csv")
+                                .output();
                         }
-
-                        // If direct creation worked, we're done
-                        return Ok("Student protection enabled. Mapping key saved to ./student_id_mapping.csv".to_string());
+                        break;
                     }
                 }
 
-                // If we get here, CSV should exist in /tmp/, so move it
-                let csv_move_result = Command::new("cp")
-                    .arg("/tmp/student_id_mapping.csv")
-                    .arg("./student_id_mapping.csv")
-                    .output()
-                    .map_err(|e| ServerFnError::new(format!("Failed to copy CSV file: {}", e)))?;
+                if !csv_created {
+                    // Manually create CSV using psql
+                    let csv_creation = Command::new("psql")
+                        .arg(&env::var("DATABASE_URL").unwrap())
+                        .arg("-c")
+                        .arg("COPY (SELECT new_student_id as app_id, old_student_id as student_id, created_at FROM student_id_mapping ORDER BY new_student_id) TO '/tmp/student_id_mapping.csv' WITH CSV HEADER;")
+                        .output()
+                        .map_err(|e| ServerFnError::new(format!("Failed to create CSV: {}", e)))?;
 
-                if !csv_move_result.status.success() {
-                    let move_stderr = String::from_utf8_lossy(&csv_move_result.stderr);
-                    return Err(ServerFnError::new(format!(
-                        "Failed to move CSV file to current directory: {}",
-                        move_stderr
-                    )));
+                    if csv_creation.status.success() {
+                        let _ = Command::new("cp")
+                            .arg("/tmp/student_id_mapping.csv")
+                            .arg("./student_id_mapping.csv")
+                            .output();
+                    }
                 }
 
-                // Set proper permissions
-                let _ = Command::new("chmod")
-                    .arg("644")
-                    .arg("./student_id_mapping.csv")
-                    .output();
-
                 Ok(
-                    "Student protection enabled. Mapping key saved to ./student_id_mapping.csv"
+                    "Student protection enabled. Check for student_id_mapping.csv file."
                         .to_string(),
                 )
             } else {
-                // Validate mapping key is provided
+                // Disable protection logic (restore functionality)
                 let _key = mapping_key.ok_or_else(|| {
                     ServerFnError::new(
                         "Mapping key required to disable student protection".to_string(),
                     )
                 })?;
 
-                // Check if the CSV file exists before attempting restoration
-                let csv_check = Command::new("test")
-                    .arg("-f")
-                    .arg("./student_id_mapping.csv")
-                    .status()
-                    .map_err(|e| ServerFnError::new(format!("Failed to check CSV file: {}", e)))?;
+                // Check for restore script
+                let restore_script_paths = vec![
+                    "./scripts/restore_pii_data.sql",
+                    "/app/scripts/restore_pii_data.sql",
+                    "scripts/restore_pii_data.sql",
+                ];
 
-                if !csv_check.success() {
+                let restore_script_path = restore_script_paths
+                    .iter()
+                    .find(|&path| Path::new(path).exists())
+                    .ok_or_else(|| {
+                        ServerFnError::new(
+                            "Cannot find restore_pii_data.sql script file".to_string(),
+                        )
+                    })?;
+
+                // Check for CSV file
+                if !Path::new("./student_id_mapping.csv").exists() {
                     return Err(ServerFnError::new(
-                        "Mapping CSV file not found. Cannot restore student IDs without mapping data.".to_string()
+                        "Mapping CSV file not found. Cannot restore without mapping data."
+                            .to_string(),
                     ));
                 }
 
-                // Copy the CSV file to /tmp for the SQL script to access
-                let csv_copy_result = Command::new("cp")
+                // Copy CSV to /tmp for script access
+                let _ = Command::new("cp")
                     .arg("./student_id_mapping.csv")
                     .arg("/tmp/student_id_mapping.csv")
-                    .output()
-                    .map_err(|e| {
-                        ServerFnError::new(format!("Failed to copy CSV file to /tmp: {}", e))
-                    })?;
+                    .output();
 
-                if !csv_copy_result.status.success() {
-                    return Err(ServerFnError::new(format!(
-                        "Failed to copy CSV file: {}",
-                        String::from_utf8_lossy(&csv_copy_result.stderr)
-                    )));
-                }
-
-                // Execute the restore PII script
+                // Execute restore script
                 let output = Command::new("psql")
-                    .arg("postgresql://postgres:IntrepidTh13n32!@localhost/dahlia")
+                    .arg(&env::var("DATABASE_URL").unwrap())
                     .arg("-f")
-                    .arg("./scripts/restore_pii_data.sql")
+                    .arg(restore_script_path)
                     .output()
                     .map_err(|e| {
                         ServerFnError::new(format!("Failed to execute PII restoration: {}", e))
@@ -316,7 +325,7 @@ pub async fn toggle_student_protection(
                 .await
                 .map_err(|e| ServerFnError::new(format!("Failed to update setting: {}", e)))?;
 
-                // Clean up temporary files
+                // Clean up
                 let _ = Command::new("rm")
                     .arg("/tmp/student_id_mapping.csv")
                     .output();

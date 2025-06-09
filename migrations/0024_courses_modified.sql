@@ -1,0 +1,1 @@
+ALTER TABLE courses ALTER COLUMN course_code TYPE VARCHAR(50);

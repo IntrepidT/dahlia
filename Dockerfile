@@ -47,6 +47,7 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     ca-certificates \
     libpq5 \
+    postgresql-client \
     curl \
     libc6 && \
     update-ca-certificates && \
