@@ -127,8 +127,8 @@ pub fn StudentView() -> impl IntoView {
             Ok(validated_delete_two) => {
                 if validated_delete_two == student_to_be_deleted.student_id {
                     let delete_student_request = DeleteStudentRequest::new(
-                        student_to_be_deleted.firstname.clone(),
-                        student_to_be_deleted.lastname.clone(),
+                        student_to_be_deleted.firstname.clone().unwrap(),
+                        student_to_be_deleted.lastname.clone().unwrap(),
                         validated_delete_two,
                     );
 

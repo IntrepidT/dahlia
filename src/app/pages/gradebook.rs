@@ -122,8 +122,18 @@ pub fn Gradebook() -> impl IntoView {
             .into_iter()
             .filter(|student| {
                 search.is_empty()
-                    || student.firstname.to_lowercase().contains(&search)
-                    || student.lastname.to_lowercase().contains(&search)
+                    || student
+                        .firstname
+                        .as_ref()
+                        .unwrap()
+                        .to_lowercase()
+                        .contains(&search)
+                    || student
+                        .lastname
+                        .as_ref()
+                        .unwrap()
+                        .to_lowercase()
+                        .contains(&search)
             })
             .collect::<Vec<_>>()
     });
@@ -374,7 +384,7 @@ pub fn Gradebook() -> impl IntoView {
                                                                     icon=HiUserCircleOutlineLg
                                                                     class="w-4 h-4 text-[#2E3A59] inline-block mr-2"
                                                                 />
-                                                                {format!("{} {}", &student.firstname, &student.lastname)}
+                                                                {format!("{} {}", &student.firstname.as_ref().unwrap(), &student.lastname.as_ref().unwrap())}
                                                             </a>
                                                         </td>
                                                         <td class="px-2 py-2 border whitespace-nowrap text-center">{&student.student_id.to_string()}</td>

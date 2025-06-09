@@ -97,8 +97,8 @@ pub async fn add_student(add_student_request: AddStudentRequest) -> Result<Stude
 
         log::info!("Attempting to add new student to the database");
         let bufferStudent = Student::new(
-            add_student_request.firstname,
-            add_student_request.lastname,
+            Some(add_student_request.firstname),
+            Some(add_student_request.lastname),
             add_student_request.preferred,
             add_student_request.gender,
             add_student_request.date_of_birth,
@@ -114,7 +114,7 @@ pub async fn add_student(add_student_request: AddStudentRequest) -> Result<Stude
             add_student_request.intervention,
             add_student_request.eye_glasses,
             add_student_request.notes,
-            add_student_request.pin,
+            Some(add_student_request.pin),
         );
 
         match student_database::add_student(&bufferStudent, &pool).await {

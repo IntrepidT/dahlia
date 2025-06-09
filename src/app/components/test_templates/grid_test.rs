@@ -488,7 +488,7 @@ pub fn StudentSelect(set_selected_student_id: WriteSignal<Option<i32>>) -> impl 
                 {move || students.get().into_iter().map(|student| {
                     view! {
                         <option value={student.student_id.to_string()}>
-                            {format!("{} {} - {}", student.firstname, student.lastname, student.student_id)}
+                            {format!("{} {} - {}", student.firstname.unwrap(), student.lastname.unwrap(), student.student_id)}
                         </option>
                     }
                 }).collect_view()}

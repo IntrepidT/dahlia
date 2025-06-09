@@ -1,7 +1,7 @@
 use crate::app::models::student::{DeleteStudentRequest, Student};
 use crate::app::server_functions::students::delete_student;
-use leptos::*;
 use leptos::ev::SubmitEvent;
+use leptos::*;
 use std::rc::Rc;
 
 #[component]
@@ -15,16 +15,16 @@ pub fn DeleteStudentConfirmation(
 
     let handle_delete_student = move |ev: SubmitEvent| {
         ev.prevent_default();
-        
+
         if let Some(student_to_be_deleted) = student() {
             let validated_confirm_id = confirm_id()
                 .parse::<i32>()
                 .expect("Delete confirmation ID was processed correctly");
-                
+
             if validated_confirm_id == student_to_be_deleted.student_id {
                 let delete_student_request = DeleteStudentRequest::new(
-                    student_to_be_deleted.firstname.clone(),
-                    student_to_be_deleted.lastname.clone(),
+                    student_to_be_deleted.firstname.clone().unwrap(),
+                    student_to_be_deleted.lastname.clone().unwrap(),
                     validated_confirm_id,
                 );
 

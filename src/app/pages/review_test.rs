@@ -93,8 +93,8 @@ pub fn ReviewTest() -> impl IntoView {
                 Err(e) => {
                     log::error!("Failed to fetch student: {}", e);
                     Student::new(
-                        String::from("Unknown"),
-                        String::from("Student"),
+                        Some(String::from("Unknown")),
+                        Some(String::from("Student")),
                         String::new(),
                         GenderEnum::Male,
                         chrono::NaiveDate::from_ymd_opt(2000, 1, 1).unwrap(),
@@ -110,7 +110,7 @@ pub fn ReviewTest() -> impl IntoView {
                         None,
                         false,
                         String::new(),
-                        0,
+                        Some(0),
                     )
                 }
             }
@@ -148,7 +148,7 @@ pub fn ReviewTest() -> impl IntoView {
                                                     student.get().map(|student_data| {
                                                         view! {
                                                             <p class="text-gray-600">
-                                                                Student: {&student_data.firstname}{" "}{&student_data.lastname}
+                                                                Student: {&student_data.firstname.unwrap()}{" "}{&student_data.lastname.unwrap()}
                                                             </p>
                                                         }
                                                     })

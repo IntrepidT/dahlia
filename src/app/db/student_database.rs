@@ -5,7 +5,7 @@ use crate::app::models::student;
 cfg_if::cfg_if! {
     if #[cfg(feature = "ssr")]{
 
-        use crate::app::models::Student;
+        use crate::app::models::{Student, AddStudentRequest};
         use crate::app::models::student::{GradeEnum, ESLEnum, GenderEnum, InterventionEnum};
         use log::{debug, error, info, warn};
         use chrono::NaiveDate;
@@ -21,8 +21,8 @@ cfg_if::cfg_if! {
             let students: Vec<Student> = rows
                 .into_iter()
                 .map(|row| {
-                    let firstname: String = row.get("firstname");
-                    let lastname: String = row.get("lastname");
+                    let firstname: Option<String> = row.get("firstname");
+                    let lastname: Option<String> = row.get("lastname");
                     let preferred: String = row.get("preferred");
                     let gender: GenderEnum = row.get("gender");
                     let date_of_birth: chrono::NaiveDate = row.get::<NaiveDate, _>("date_of_birth");
@@ -38,7 +38,7 @@ cfg_if::cfg_if! {
                     let intervention: Option<InterventionEnum> = row.get("intervention");
                     let eye_glasses: bool = row.get("eye_glasses");
                     let notes: String = row.get("notes");
-                    let pin: i32 = row.get("pin");
+                    let pin: Option<i32> = row.get("pin");
 
                     Student {
                         firstname,
@@ -227,7 +227,7 @@ cfg_if::cfg_if! {
             Ok(Some(student))
         }
 
-        pub async fn bulk_insert_students(students: Vec<Student>, pool: &PgPool) -> Result<Vec<Student>, ServerFnError> {
+        pub async fn bulk_insert_students(students: Vec<AddStudentRequest>, pool: &PgPool) -> Result<Vec<Student>, ServerFnError> {
             // Start a database transaction for bulk insert
             let mut tx = pool.begin().await?;
 
@@ -289,7 +289,7 @@ cfg_if::cfg_if! {
             Ok(inserted_students)
         }
 
-        pub async fn bulk_insert_students_optimized(students: Vec<Student>, pool: &PgPool) -> Result<usize, ServerFnError> {
+        pub async fn bulk_insert_students_optimized(students: Vec<AddStudentRequest>, pool: &PgPool) -> Result<usize, ServerFnError> {
             if students.is_empty() {
                 return Ok(0);
             }
@@ -313,7 +313,7 @@ cfg_if::cfg_if! {
         }
 
         // Alternative method using batch inserts if UNNEST doesn't work
-        pub async fn bulk_insert_students_batch(students: Vec<Student>, pool: &PgPool) -> Result<usize, ServerFnError> {
+        pub async fn bulk_insert_students_batch(students: Vec<AddStudentRequest>, pool: &PgPool) -> Result<usize, ServerFnError> {
             if students.is_empty() {
                 return Ok(0);
             }
@@ -331,7 +331,7 @@ cfg_if::cfg_if! {
             Ok(total_inserted)
         }
 
-        async fn bulk_insert_with_unnest(students: &[Student], tx: &mut sqlx::Transaction<'_, sqlx::Postgres>) -> Result<usize, sqlx::Error> {
+        async fn bulk_insert_with_unnest(students: &[AddStudentRequest], tx: &mut sqlx::Transaction<'_, sqlx::Postgres>) -> Result<usize, sqlx::Error> {
             let mut firstnames = Vec::new();
             let mut lastnames = Vec::new();
             let mut preferreds = Vec::new();
@@ -428,7 +428,7 @@ cfg_if::cfg_if! {
             Ok(result.rows_affected() as usize)
         }
 
-        async fn insert_batch(students: &[Student], tx: &mut sqlx::Transaction<'_, sqlx::Postgres>) -> Result<usize, sqlx::Error> {
+        async fn insert_batch(students: &[AddStudentRequest], tx: &mut sqlx::Transaction<'_, sqlx::Postgres>) -> Result<usize, sqlx::Error> {
             let mut query_builder = sqlx::QueryBuilder::new(
                 "INSERT INTO students (firstname, lastname, preferred, gender, date_of_birth, student_id, esl, current_grade_level, teacher, iep, bip, student_504, readplan, gt, intervention, eye_glasses, notes, pin) "
             );

@@ -127,7 +127,7 @@ pub fn StudentDetails(
         <div class=CARD_CONTAINER>
             <div class="flex items-center justify-between mb-3 sm:mb-6">
                 <h2 class="text-lg sm:text-xl font-bold text-[#2E3A59]">
-                    {move || format!("{} {}", student_memo().firstname, student_memo().lastname)}
+                    {move || format!("{} {}", student_memo().firstname.as_ref().unwrap(), student_memo().lastname.as_ref().unwrap())}
                 </h2>
                 <div class="px-2 sm:px-3 py-0.5 sm:py-1 rounded-full bg-[#2E3A59] text-white text-xs font-medium">
                     {move || student_memo().current_grade_level.to_string()}
@@ -161,7 +161,7 @@ pub fn StudentDetails(
                             </div>
                             <div class=INFO_GROUP>
                                 <div class=INFO_TITLE>"Student Pin"</div>
-                                <div class=INFO_VALUE>{move || format!("{}", student_memo().pin)}</div>
+                                <div class=INFO_VALUE>{move || format!("{}", student_memo().pin.unwrap())}</div>
                             </div>
                         </div>
                     </div>

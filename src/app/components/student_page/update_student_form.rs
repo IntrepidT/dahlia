@@ -22,8 +22,8 @@ pub fn UpdateStudent(
     #[prop(optional)] on_update_success: Option<Callback<Student>>,
 ) -> impl IntoView {
     // Create signals for each field
-    let (firstname, set_firstname) = create_signal(student.firstname.clone());
-    let (lastname, set_lastname) = create_signal(student.lastname.clone());
+    let (firstname, set_firstname) = create_signal(student.firstname.clone().unwrap());
+    let (lastname, set_lastname) = create_signal(student.lastname.clone().unwrap());
     let (preferred, set_preferred) = create_signal(student.preferred.clone());
     let (gender, set_gender) = create_signal(student.gender.clone().to_string());
     let (date_of_birth, set_date_of_birth) = create_signal(student.date_of_birth);
@@ -53,7 +53,7 @@ pub fn UpdateStudent(
     // Additional information
     let (eye_glasses, set_eye_glasses) = create_signal(student.eye_glasses);
     let (notes, set_notes) = create_signal(student.notes.clone());
-    let (pin, set_pin) = create_signal(student.pin.clone().to_string());
+    let (pin, set_pin) = create_signal(student.pin.clone().unwrap().to_string());
     // For handling form submission
     let (is_submitting, set_is_submitting) = create_signal(false);
     let (error_message, set_error_message) = create_signal(String::new());

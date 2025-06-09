@@ -1,0 +1,3 @@
+ALTER TABLE global_settings
+ALTER COLUMN updated_at TYPE TIMESTAMPTZ
+USING updated_at AT TIME ZONE 'UTC';

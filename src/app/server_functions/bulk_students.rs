@@ -1,5 +1,7 @@
 use crate::app::models::bulk_student::StudentCsvRow;
-use crate::app::models::student::{ESLEnum, GenderEnum, GradeEnum, InterventionEnum, Student};
+use crate::app::models::student::{
+    AddStudentRequest, ESLEnum, GenderEnum, GradeEnum, InterventionEnum,
+};
 use chrono::NaiveDate;
 use csv::ReaderBuilder;
 use leptos::*;
@@ -40,7 +42,9 @@ pub async fn upload_students_bulk(file_contents: String) -> Result<usize, Server
 }
 
 // Separate parsing logic for reusability and better error handling
-fn parse_and_validate_students(file_contents: &str) -> Result<Vec<Student>, ServerFnError> {
+fn parse_and_validate_students(
+    file_contents: &str,
+) -> Result<Vec<AddStudentRequest>, ServerFnError> {
     let mut rdr = ReaderBuilder::new()
         .has_headers(true)
         .from_reader(file_contents.as_bytes());
@@ -84,7 +88,10 @@ fn parse_and_validate_students(file_contents: &str) -> Result<Vec<Student>, Serv
     Ok(students)
 }
 
-fn parse_student_record(record: StudentCsvRow, row_num: usize) -> Result<Student, String> {
+fn parse_student_record(
+    record: StudentCsvRow,
+    row_num: usize,
+) -> Result<AddStudentRequest, String> {
     let gender = GenderEnum::from_str(&record.gender)
         .map_err(|e| format!("Row {}: Invalid gender '{}': {}", row_num, record.gender, e))?;
 
@@ -119,7 +126,7 @@ fn parse_student_record(record: StudentCsvRow, row_num: usize) -> Result<Student
     let esl = ESLEnum::from_str(&record.esl)
         .map_err(|e| format!("Row {}: Invalid ESL value '{}': {}", row_num, record.esl, e))?;
 
-    Ok(Student {
+    Ok(AddStudentRequest {
         firstname: record.firstname.trim().to_string(),
         lastname: record.lastname.trim().to_string(),
         preferred: record.preferred.trim().to_string(),

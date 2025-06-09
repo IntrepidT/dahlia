@@ -7,6 +7,7 @@ use leptos_meta::*;
 use leptos_router::*;
 pub mod pages;
 pub mod websockets;
+use crate::app::middleware::global_settings::SettingsProvider;
 use components::live_test::RealtimeTestSession;
 use components::login_components::{RequestPasswordResetForm, ResetPasswordForm};
 use components::test_templates::{FlashCardSet, GridTest};
@@ -38,167 +39,169 @@ pub fn App() -> impl IntoView {
         // Wrap everything in the AuthProvider
         <AuthProvider>
             // content for this welcome page
-            <Router>
-                <main>
-                    <Body />
-                    <Routes>
-                        <Route path="/" view=move || {
-                            view! {
-                                <HomePage />
-                            }
-                        }/>
-                        <Route path="/dashboard" view=move || {
-                            view! {
-                                <RequireAuth>
-                                    <Dashboard />
-                                </RequireAuth>
-                            }
-                        }/>
-                        <Route path="/studentview" view=move || {
-                            view!{
-                                <RequireRole role="admin".to_string()>
-                                    <StudentView />
-                                </RequireRole>
-                            }
-                        }/>
-                        <Route path="/studentview/:student_id/results" view=TestResultsPage />
-                        <Route path="/admintest" view=move || {
-                            view!{
-                                <RequireRole role="teacher".to_string()>
-                                    <AdministerTest />
-                                </RequireRole>
-                            }
-                        }/>
-                        <Route path="/teachers" view=move || {
-                            view! {
-                                <RequireRole role="admin".to_string()>
-                                    <Teachers />
-                                </RequireRole>
-                            }
-                        }/>
-                        <Route path="/admindashboard" view=move || {
-                            view! {
-                                <RequireRole role="admin".to_string()>
-                                    <AdminDashboard />
-                                </RequireRole>
-                            }
-                        }/>
-                        <Route path="/assessments" view=move || {
-                            view! {
-                                <RequireRole role="admin".to_string()>
-                                    <AssessmentPage />
-                                </RequireRole>
-                            }
-                        }/>
-                        <Route path="/myaccount" view=|| {
-                            view!{
-                                <RequireAuth>
-                                    <MyAccount />
-                                </RequireAuth>
-                            }
-                        }/>
-                        <Route path="/settings" view=|| {
-                            view! {
-                                <RequireAuth>
-                                    <Settings />
-                                </RequireAuth>
-                            }
-                        }/>
-                        <Route path="/login" view=|| {
-                            view!{
-                                <LoginPage />
-                            }
-                        }/>
-                        <Route path="/forgot-password" view=|| {
-                            view!{
-                                <RequestPasswordResetForm />
-                            }
-                        }/>
-                        <Route path="/reset-password/:token" view=|| {
-                            view!{
-                                <ResetPasswordForm />
-                            }
-                        }/>
-                        <Route path="/gradebook" view=|| {
-                            view!{
-                                <RequireRole role="admin".to_string()>
-                                    <RequireRole role="teacher".to_string()>
-                                        <Gradebook />
-                                    </RequireRole>
-                                </RequireRole>
-                            }
-                        }/>
-                        <Route path="/mathtesting" view=|| {
-                            view!{
-                                <RequireRole role="admin".to_string()>
-                                    <RequireRole role="teacher".to_string()>
-                                        <MathTesting />
-                                    </RequireRole>
-                                </RequireRole>
-                            }
-                        }/>
-                        <Route path="/readingtesting" view=|| {
-                            view!{
-                                <RequireRole role="admin".to_string()>
-                                    <RequireRole role="teacher".to_string()>
-                                        <ReadingTesting />
-                                    </RequireRole>
-                                </RequireRole>
-                            }
-                        }/>
-                        <Route path="/testbuilder" view=|| {
-                            view!{
-                                <RequireRole role="teacher".to_string()>
+            <SettingsProvider>
+                <Router>
+                    <main>
+                        <Body />
+                        <Routes>
+                            <Route path="/" view=move || {
+                                view! {
+                                    <HomePage />
+                                }
+                            }/>
+                            <Route path="/dashboard" view=move || {
+                                view! {
+                                    <RequireAuth>
+                                        <Dashboard />
+                                    </RequireAuth>
+                                }
+                            }/>
+                            <Route path="/studentview" view=move || {
+                                view!{
                                     <RequireRole role="admin".to_string()>
-                                        <TestBuilder />
+                                        <StudentView />
                                     </RequireRole>
-                                </RequireRole>
-                            }
-                        }/>
-                        <Route path="/testbuilder/:test_id" view= || {
-                            view!{
-                                <RequireRole role="admin".to_string()>
+                                }
+                            }/>
+                            <Route path="/studentview/:student_id/results" view=TestResultsPage />
+                            <Route path="/admintest" view=move || {
+                                view!{
                                     <RequireRole role="teacher".to_string()>
-                                        <TestBuilder />
+                                        <AdministerTest />
                                     </RequireRole>
-                                </RequireRole>
-                            }
-                        }/>
-                        <Route path="/assessment/:test_id" view=|| {
-                            view!{
-                                <RequireRole role="teacher".to_string()>
+                                }
+                            }/>
+                            <Route path="/teachers" view=move || {
+                                view! {
                                     <RequireRole role="admin".to_string()>
-                                        <Assessment />
+                                        <Teachers />
                                     </RequireRole>
-                                </RequireRole>
-                            }
-                        }/>
-                        <Route path="/flashcardset/:test_id" view=|| {
-                            view!{
-                                <RequireRole role="teacher".to_string()>
+                                }
+                            }/>
+                            <Route path="/admindashboard" view=move || {
+                                view! {
                                     <RequireRole role="admin".to_string()>
-                                        <FlashCardSet />
+                                        <AdminDashboard />
                                     </RequireRole>
-                                </RequireRole>
-                            }
-                        }/>
-                        <Route path="/reviewtest/:test_id/:student_id/:test_variant/:attempt" view=|| {
-                            view! {
-                                <RequireRole role="teacher".to_string()>
+                                }
+                            }/>
+                            <Route path="/assessments" view=move || {
+                                view! {
                                     <RequireRole role="admin".to_string()>
-                                        <ReviewTest />
+                                        <AssessmentPage />
                                     </RequireRole>
-                                </RequireRole>
-                            }
-                        }/>
-                        <Route path="/test-session/:test_id" view=RealtimeTestSession/>
-                        <Route path="/tests/:test_id/sessions/:session_id" view=RealtimeTestSession/>
-                        <Route path="/testsessions" view=TestSessionsList/>
-                        <Route path="/gridtest/:test_id" view=GridTest/>
-                        <Route path="/*any" view=NotFound/>
-                    </Routes>
-                </main>
-            </Router>
+                                }
+                            }/>
+                            <Route path="/myaccount" view=|| {
+                                view!{
+                                    <RequireAuth>
+                                        <MyAccount />
+                                    </RequireAuth>
+                                }
+                            }/>
+                            <Route path="/settings" view=|| {
+                                view! {
+                                    <RequireAuth>
+                                        <Settings />
+                                    </RequireAuth>
+                                }
+                            }/>
+                            <Route path="/login" view=|| {
+                                view!{
+                                    <LoginPage />
+                                }
+                            }/>
+                            <Route path="/forgot-password" view=|| {
+                                view!{
+                                    <RequestPasswordResetForm />
+                                }
+                            }/>
+                            <Route path="/reset-password/:token" view=|| {
+                                view!{
+                                    <ResetPasswordForm />
+                                }
+                            }/>
+                            <Route path="/gradebook" view=|| {
+                                view!{
+                                    <RequireRole role="admin".to_string()>
+                                        <RequireRole role="teacher".to_string()>
+                                            <Gradebook />
+                                        </RequireRole>
+                                    </RequireRole>
+                                }
+                            }/>
+                            <Route path="/mathtesting" view=|| {
+                                view!{
+                                    <RequireRole role="admin".to_string()>
+                                        <RequireRole role="teacher".to_string()>
+                                            <MathTesting />
+                                        </RequireRole>
+                                    </RequireRole>
+                                }
+                            }/>
+                            <Route path="/readingtesting" view=|| {
+                                view!{
+                                    <RequireRole role="admin".to_string()>
+                                        <RequireRole role="teacher".to_string()>
+                                            <ReadingTesting />
+                                        </RequireRole>
+                                    </RequireRole>
+                                }
+                            }/>
+                            <Route path="/testbuilder" view=|| {
+                                view!{
+                                    <RequireRole role="teacher".to_string()>
+                                        <RequireRole role="admin".to_string()>
+                                            <TestBuilder />
+                                        </RequireRole>
+                                    </RequireRole>
+                                }
+                            }/>
+                            <Route path="/testbuilder/:test_id" view= || {
+                                view!{
+                                    <RequireRole role="admin".to_string()>
+                                        <RequireRole role="teacher".to_string()>
+                                            <TestBuilder />
+                                        </RequireRole>
+                                    </RequireRole>
+                                }
+                            }/>
+                            <Route path="/assessment/:test_id" view=|| {
+                                view!{
+                                    <RequireRole role="teacher".to_string()>
+                                        <RequireRole role="admin".to_string()>
+                                            <Assessment />
+                                        </RequireRole>
+                                    </RequireRole>
+                                }
+                            }/>
+                            <Route path="/flashcardset/:test_id" view=|| {
+                                view!{
+                                    <RequireRole role="teacher".to_string()>
+                                        <RequireRole role="admin".to_string()>
+                                            <FlashCardSet />
+                                        </RequireRole>
+                                    </RequireRole>
+                                }
+                            }/>
+                            <Route path="/reviewtest/:test_id/:student_id/:test_variant/:attempt" view=|| {
+                                view! {
+                                    <RequireRole role="teacher".to_string()>
+                                        <RequireRole role="admin".to_string()>
+                                            <ReviewTest />
+                                        </RequireRole>
+                                    </RequireRole>
+                                }
+                            }/>
+                            <Route path="/test-session/:test_id" view=RealtimeTestSession/>
+                            <Route path="/tests/:test_id/sessions/:session_id" view=RealtimeTestSession/>
+                            <Route path="/testsessions" view=TestSessionsList/>
+                            <Route path="/gridtest/:test_id" view=GridTest/>
+                            <Route path="/*any" view=NotFound/>
+                        </Routes>
+                    </main>
+                </Router>
+            </SettingsProvider>
         </AuthProvider>
     }
 }

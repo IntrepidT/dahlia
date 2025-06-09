@@ -1,10 +1,18 @@
 use crate::app::components::settings::bulk_enrollment_modal::BulkUploadModal;
+use crate::app::middleware::global_settings::{try_use_settings, try_use_settings_loading};
+use crate::app::models::global::{GlobalSetting, SettingsCache};
 use crate::app::models::setting_data::UserSettings;
 use crate::app::models::user::UserJwt;
+use crate::app::server_functions::globals::{
+    get_global_settings, restore_student_ids_from_file, toggle_student_protection,
+};
 use crate::app::server_functions::user_settings::{
     get_user_settings, update_dark_mode, update_pinned_sidebar,
 };
 use leptos::*;
+use wasm_bindgen::closure::Closure;
+use wasm_bindgen::JsCast;
+use web_sys::{Event, FileList, HtmlInputElement};
 
 #[component]
 pub fn SettingsModal(
@@ -102,7 +110,7 @@ pub fn SettingsModal(
                                             on_select=set_selected_tab
                                         />
                                         <SettingsNavButton
-                                            label="Developer"
+                                            label="Developer Settings"
                                             selected=selected_tab
                                             on_select=set_selected_tab
                                         />
@@ -191,6 +199,7 @@ fn SettingsContent(
     user_settings: UserSettings,
     user_id: i64,
 ) -> impl IntoView {
+    let user = use_context::<ReadSignal<Option<UserJwt>>>().expect("AuthProvider not Found");
     let (show_bulk_upload_modal, set_show_bulk_upload_modal) = create_signal(false);
     let (refresh_trigger, set_refresh_trigger) = create_signal(0);
 
@@ -321,6 +330,16 @@ fn SettingsContent(
                     </div>
                 }.into_view(),
 
+                "Developer Settings" => view! {
+                    <div class="space-y-4">
+                        <SettingsSection title="Developer Settings">
+                            <Show when=move || user.get().map(|u| u.is_super_admin()).unwrap_or(false)>
+                                <StudentProtectionToggleSafe />
+                            </Show>
+                        </SettingsSection>
+                    </div>
+                }.into_view(),
+
                 _ => view! {
                     <div class="space-y-4">
                         <SettingsSection title=&selected_tab.get()>
@@ -398,5 +417,296 @@ fn ToggleSwitch(
                 />
             </button>
         </div>
+    }
+}
+
+#[component]
+fn StudentProtectionToggleInner(settings: ReadSignal<SettingsCache>) -> impl IntoView {
+    let (show_key_modal, set_show_key_modal) = create_signal(false);
+    let (show_file_modal, set_show_file_modal) = create_signal(false); // NEW
+    let (mapping_key, set_mapping_key) = create_signal(String::new());
+    let (selected_file, set_selected_file) = create_signal(Option::<String>::None); // NEW
+    let (is_processing, set_is_processing) = create_signal(false);
+    let (status_message, set_status_message) = create_signal(Option::<String>::None);
+
+    // Create a local signal to track the toggle state that can be updated
+    let (protection_enabled, set_protection_enabled) =
+        create_signal(settings.get().student_protections);
+
+    // Update local state when settings change
+    create_effect(move |_| {
+        set_protection_enabled.set(settings.get().student_protections);
+    });
+
+    let toggle_protection_action = create_action(move |(enable, key): &(bool, Option<String>)| {
+        let enable = *enable;
+        let key = key.clone();
+        async move {
+            set_is_processing.set(true);
+            set_status_message.set(None);
+
+            match toggle_student_protection(enable, key).await {
+                Ok(message) => {
+                    set_status_message.set(Some(message.clone()));
+                    set_protection_enabled.set(enable);
+
+                    if !enable && message.contains("mapping") {
+                        set_status_message.set(Some(format!("{}\n\nPlease check your downloads folder or server logs for the mapping file location.", message)));
+                    }
+                }
+                Err(e) => {
+                    set_status_message.set(Some(format!("Error: {}", e)));
+                }
+            }
+
+            set_is_processing.set(false);
+            set_show_key_modal.set(false);
+            set_mapping_key.set(String::new());
+        }
+    });
+
+    // NEW: File upload action
+    let restore_from_file_action = create_action(move |file_content: &String| {
+        let file_content = file_content.clone();
+        async move {
+            set_is_processing.set(true);
+            set_status_message.set(None);
+
+            match restore_student_ids_from_file(file_content).await {
+                Ok(message) => {
+                    set_status_message.set(Some(message));
+                    set_protection_enabled.set(false);
+                }
+                Err(e) => {
+                    set_status_message.set(Some(format!("Error: {}", e)));
+                }
+            }
+
+            set_is_processing.set(false);
+            set_show_file_modal.set(false);
+            set_selected_file.set(None);
+        }
+    });
+
+    // File change handler with better error handling
+    let handle_file_change = move |event: Event| {
+        let input = event
+            .target()
+            .unwrap()
+            .dyn_into::<HtmlInputElement>()
+            .unwrap();
+
+        if let Some(files) = input.files() {
+            if files.length() > 0 {
+                if let Some(file) = files.get(0) {
+                    let file_name = file.name();
+
+                    // Validate file type
+                    if !file_name.ends_with(".csv") {
+                        set_status_message.set(Some("Error: Please select a CSV file".to_string()));
+                        return;
+                    }
+
+                    set_selected_file.set(Some(file_name.clone()));
+                    set_status_message.set(Some(format!("Selected file: {}", file_name)));
+
+                    // Read file content
+                    let file_reader = web_sys::FileReader::new().unwrap();
+                    let reader_clone = file_reader.clone();
+
+                    let onload = Closure::wrap(Box::new(move |_: Event| {
+                        if let Ok(content) = reader_clone.result() {
+                            if let Some(text) = content.as_string() {
+                                // Validate CSV content has expected headers
+                                let lines: Vec<&str> = text.lines().collect();
+                                if lines.is_empty() {
+                                    set_status_message
+                                        .set(Some("Error: CSV file is empty".to_string()));
+                                    return;
+                                }
+
+                                let header = lines[0].to_lowercase();
+                                if !header.contains("app_id") || !header.contains("student_id") {
+                                    set_status_message.set(Some("Error: CSV file must contain 'app_id' and 'student_id' columns".to_string()));
+                                    return;
+                                }
+
+                                if lines.len() < 2 {
+                                    set_status_message.set(Some(
+                                        "Error: CSV file contains no data rows".to_string(),
+                                    ));
+                                    return;
+                                }
+
+                                set_status_message.set(Some(format!(
+                                    "File validated. Found {} data rows. Ready to restore.",
+                                    lines.len() - 1
+                                )));
+                                restore_from_file_action.dispatch(text);
+                            }
+                        }
+                    }) as Box<dyn FnMut(_)>);
+
+                    file_reader.set_onload(Some(onload.as_ref().unchecked_ref()));
+                    onload.forget();
+
+                    let onerror = Closure::wrap(Box::new(move |_: Event| {
+                        set_status_message.set(Some("Error: Failed to read file".to_string()));
+                    }) as Box<dyn FnMut(_)>);
+
+                    file_reader.set_onerror(Some(onerror.as_ref().unchecked_ref()));
+                    onerror.forget();
+
+                    let _ = file_reader.read_as_text(&file);
+                }
+            }
+        }
+    };
+
+    let handle_toggle = move |enable: bool| {
+        if enable {
+            toggle_protection_action.dispatch((true, None));
+        } else {
+            set_show_key_modal.set(true);
+        }
+    };
+
+    view! {
+        <div class="space-y-4">
+            <div class="p-4 bg-red-900 border border-red-700 rounded-lg">
+                <div class="flex items-start space-x-3">
+                    <svg class="w-6 h-6 text-red-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.728-.833-2.498 0L3.316 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                    </svg>
+                    <div>
+                        <h3 class="text-lg font-medium text-red-200">"DANGER ZONE"</h3>
+                        <p class="text-sm text-red-300 mt-1">
+                            "Student Data Protection Mode will replace all student IDs with anonymized app IDs. This operation affects the entire database and requires a mapping key to restore."
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <ToggleSwitch
+                label="Student Data Protection Mode"
+                checked=protection_enabled
+                on_toggle=Callback::new(move |value| {
+                    handle_toggle(value);
+                })
+                description="When enabled, replaces student IDs with anonymized app IDs"
+            />
+
+            // NEW: File upload button (only show when protection is enabled)
+            <Show when=move || protection_enabled.get()>
+                <div class="p-4 bg-blue-900 border border-blue-700 rounded-lg">
+                    <h4 class="text-blue-200 font-medium mb-2">"Restore from Mapping File"</h4>
+                    <p class="text-sm text-blue-300 mb-3">
+                        "Upload the CSV mapping file that was exported when protection was enabled to restore original student IDs."
+                    </p>
+                    <button
+                        class="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded text-white transition-colors"
+                        on:click=move |_| set_show_file_modal.set(true)
+                    >
+                        "Upload Mapping File"
+                    </button>
+                </div>
+            </Show>
+
+            <Show when=move || status_message.get().is_some()>
+                <div class=move || {
+                    let msg = status_message.get().unwrap_or_default();
+                    if msg.starts_with("Error:") {
+                        "p-3 bg-red-900 border border-red-700 rounded text-red-200 text-sm whitespace-pre-line"
+                    } else {
+                        "p-3 bg-green-900 border border-green-700 rounded text-green-200 text-sm whitespace-pre-line"
+                    }
+                }>
+                    {move || status_message.get().unwrap_or_default()}
+                </div>
+            </Show>
+
+            <Show when=move || is_processing.get()>
+                <div class="p-3 bg-blue-900 border border-blue-700 rounded text-blue-200 text-sm">
+                    "Processing... This may take a few moments."
+                </div>
+            </Show>
+
+            <Show when=move || show_file_modal.get()>
+                <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div class="bg-gray-800 p-6 rounded-lg border border-gray-700 max-w-md w-full mx-4">
+                        <h3 class="text-lg font-semibold text-gray-100 mb-4">
+                            "Upload Mapping File"
+                        </h3>
+                        <p class="text-sm text-gray-300 mb-4">
+                            "Select the CSV file that was exported when student protection was enabled (student_id_mapping.csv)."
+                        </p>
+
+                        <div class="mb-4">
+                            <input
+                                type="file"
+                                accept=".csv"
+                                class="hidden"
+                                id="mapping-file-input"
+                                on:change=handle_file_change
+                            />
+                            <label
+                                for="mapping-file-input"
+                                class="block w-full p-3 border-2 border-dashed border-gray-600 rounded-lg text-center cursor-pointer hover:border-gray-500 transition-colors"
+                            >
+                                <svg class="w-8 h-8 text-gray-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                                </svg>
+                                <span class="text-gray-300">
+                                    {move || selected_file.get().unwrap_or_else(|| "Click to select CSV file".to_string())}
+                                </span>
+                            </label>
+                        </div>
+
+                        <div class="flex justify-end space-x-3">
+                            <button
+                                class="px-4 py-2 bg-gray-600 hover:bg-gray-500 rounded text-gray-100 transition-colors"
+                                on:click=move |_| {
+                                    set_show_file_modal.set(false);
+                                    set_selected_file.set(None);
+                                }
+                            >
+                                "Cancel"
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </Show>
+        </div>
+    }
+}
+
+#[component]
+fn StudentProtectionToggleSafe() -> impl IntoView {
+    // Try to get contexts safely
+    let settings_context = try_use_settings();
+    let loading_context = try_use_settings_loading();
+
+    // Handle the case where contexts are not available
+    match (settings_context, loading_context) {
+        (Some((settings, _)), Some(loading)) => view! {
+            {move || {
+                if loading.get() {
+                    view! {
+                        <div class="text-gray-400">"Loading protection settings..."</div>
+                    }.into_view()
+                } else {
+                    view! {
+                        <StudentProtectionToggleInner settings=settings />
+                    }.into_view()
+                }
+            }}
+        }
+        .into_view(),
+        _ => view! {
+            <div class="text-red-400">
+                "Settings context not available. Make sure SettingsProvider wraps this component."
+            </div>
+        }
+        .into_view(),
     }
 }

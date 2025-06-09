@@ -112,6 +112,11 @@ impl UserJwt {
             || self.role == UserRole::SuperAdmin
     }
 
+    pub fn is_super_admin(&self) -> bool {
+        // Implement based on your user role system
+        self.role == UserRole::SuperAdmin
+    }
+
     pub fn is_super(&self) -> bool {
         self.role == UserRole::SuperAdmin
     }

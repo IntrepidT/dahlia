@@ -75,7 +75,11 @@ pub fn ScoresLedger() -> impl IntoView {
     let get_student_name = move |student_id: i32| -> String {
         if let Some(Ok(students)) = students_resource.get() {
             if let Some(student) = students.iter().find(|s| s.student_id == student_id) {
-                return format!("{} {}", student.firstname, student.lastname);
+                return format!(
+                    "{} {}",
+                    student.firstname.as_ref().unwrap_or(&"Unknown".to_string()),
+                    student.lastname.as_ref().unwrap_or(&"Student".to_string())
+                );
             }
         }
         "Unknown Student".to_string()
@@ -278,7 +282,7 @@ pub fn ScoresLedger() -> impl IntoView {
                                                     let test_id = score.test_id.clone();
                                                     let test_variant = score.test_variant;
                                                     let attempt = score.attempt;
-                                                   
+
 
                                                     // Create delete request for this score
                                                     let delete_req = DeleteScoreRequest {

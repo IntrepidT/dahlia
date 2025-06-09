@@ -91,7 +91,7 @@ pub fn StudentScorePanel(
                                     />
                                     <div>
                                         <h3 class="text-lg font-semibold text-[#2E3A59]">
-                                            {move || student.get().map(|s| format!("{} {}", s.firstname, s.lastname)).unwrap_or_default()}
+                                            {move || student.get().map(|s| format!("{} {}", s.firstname.unwrap(), s.lastname.unwrap())).unwrap_or_default()}
                                         </h3>
                                         <div class="text-sm text-gray-600">
                                             <p>{"ID: "} {move || student.get().map(|s| s.student_id.to_string()).unwrap_or_default()}</p>

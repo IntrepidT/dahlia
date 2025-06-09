@@ -66,3 +66,5 @@ pub mod course;
 pub use course::Course;
 pub use course::CreateCourseRequest;
 pub use course::UpdateCourseRequest;
+
+pub mod global;

@@ -62,6 +62,7 @@ COPY --from=builder /app/style/output /app/style/output
 COPY --from=builder /app/Cargo.toml /app/
 COPY --from=builder /root/.cargo/bin/sqlx /usr/local/bin/
 COPY --from=builder /app/migrations /app/migrations
+COPY --from=builder /app/scripts /app/scripts
 
 # Ensure binary is executable
 RUN chmod +x /app/dahlia

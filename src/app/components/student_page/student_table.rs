@@ -68,8 +68,18 @@ pub fn StudentTable(
             .filter(|student| {
                 // Filter by search term
                 let matches_search = search.is_empty()
-                    || student.firstname.to_lowercase().contains(&search)
-                    || student.lastname.to_lowercase().contains(&search);
+                    || student
+                        .firstname
+                        .as_ref()
+                        .unwrap()
+                        .to_lowercase()
+                        .contains(&search)
+                    || student
+                        .lastname
+                        .as_ref()
+                        .unwrap()
+                        .to_lowercase()
+                        .contains(&search);
 
                 // Filter by grade
                 let matches_grade = current_grade_level.is_empty()
@@ -183,8 +193,8 @@ pub fn StudentTable(
                                                     }
                                                     on:click=move |_| set_selected_student(Some(student_rc.clone()))
                                                 >
-                                                    <td class=format!("{} {}", CELL_STYLE, "font-medium text-[#2E3A59]")>{&student.firstname}</td>
-                                                    <td class=format!("{} {}", CELL_STYLE, "font-medium text-[#2E3A59]")>{&student.lastname}</td>
+                                                    <td class=format!("{} {}", CELL_STYLE, "font-medium text-[#2E3A59]")>{&student.firstname.unwrap_or("Unknown".to_string())}</td>
+                                                    <td class=format!("{} {}", CELL_STYLE, "font-medium text-[#2E3A59]")>{&student.lastname.unwrap_or("Unknown".to_string())}</td>
                                                     <td class=format!("{} {}", CELL_STYLE, "text-[#2E3A59] text-opacity-70")>{&student.student_id.to_string()}</td>
                                                     <td class=format!("{} {}", CELL_STYLE, "text-[#2E3A59] text-opacity-70")>{&student.current_grade_level.to_string()}</td>
                                                     <td class=format!("{} {}", CELL_STYLE, "text-[#2E3A59] text-opacity-70")>{&student.teacher.to_string()}</td>

@@ -201,10 +201,9 @@ impl FromStr for InterventionEnum {
 //the database
 #[derive(Debug, Validate, Deserialize, Serialize, PartialEq, Eq, Clone)]
 pub struct Student {
-    #[validate(length(min = 1, message = "name is required"))]
-    pub firstname: String,
-    #[validate(length(min = 1, message = "name is required"))]
-    pub lastname: String,
+    pub firstname: Option<String>, //firstname, lastname, and pin are considered PII and need to
+    //have Option<> wrapper so they can be nulled out
+    pub lastname: Option<String>,
     pub preferred: String,
     pub gender: GenderEnum,
     pub date_of_birth: NaiveDate,
@@ -221,13 +220,13 @@ pub struct Student {
     pub intervention: Option<InterventionEnum>,
     pub eye_glasses: bool,
     pub notes: String,
-    pub pin: i32,
+    pub pin: Option<i32>,
 }
 
 impl Student {
     pub fn new(
-        firstname: String,
-        lastname: String,
+        firstname: Option<String>,
+        lastname: Option<String>,
         preferred: String,
         gender: GenderEnum,
         date_of_birth: NaiveDate,
@@ -243,7 +242,7 @@ impl Student {
         intervention: Option<InterventionEnum>,
         eye_glasses: bool,
         notes: String,
-        pin: i32,
+        pin: Option<i32>,
     ) -> Student {
         Student {
             firstname,

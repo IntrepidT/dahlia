@@ -45,3 +45,6 @@ pub use courses::get_courses;
 
 pub mod enrollments;
 pub use enrollments::get_enrollments;
+
+pub mod globals;
+pub use globals::get_global_settings;
