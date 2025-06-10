@@ -1,4 +1,4 @@
-use crate::app::components::auth::LogoutButton;
+use crate::app::components::auth::login_form::LogoutButton;
 use crate::app::models::user::User;
 use leptos::*;
 use leptos_router::*;

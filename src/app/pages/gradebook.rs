@@ -2,8 +2,12 @@ use crate::app::components::dashboard_sidebar::{DashboardSidebar, SidebarSelecte
 use crate::app::components::data_processing::{
     AssessmentSummary, Progress, StudentResultsSummary, TestDetail,
 };
+use crate::app::components::enhanced_login_form::{
+    use_student_mapping_service, DeAnonymizedStudent, StudentMappingService,
+};
 use crate::app::components::gradebook_side_panel::{ScorePanelType, StudentScorePanel};
 use crate::app::components::header::Header;
+use crate::app::middleware::global_settings::use_settings;
 use crate::app::models::assessment::Assessment;
 use crate::app::models::student::Student;
 use crate::app::server_functions::assessments::get_assessments;
@@ -39,6 +43,13 @@ pub fn Gradebook() -> impl IntoView {
     let (current_test_data, set_current_test_data) = create_signal(Option::<TestDetail>::None);
     let (next_test_id, set_next_test_id) = create_signal(Option::<String>::None);
 
+    // Get global settings for anonymization
+    let (settings, _) = use_settings();
+    let anonymization_enabled = move || settings.get().student_protections;
+
+    // Get the student mapping service
+    let (student_mapping_service, _) = use_student_mapping_service();
+
     // Fetch students
     let students = create_resource(
         move || refresh_trigger(),
@@ -52,6 +63,52 @@ pub fn Gradebook() -> impl IntoView {
             }
         },
     );
+
+    // Create de-anonymized students resource
+    let de_anonymized_students = create_memo(move |_| {
+        if let Some(Some(student_list)) = students.get() {
+            let mapping_service = student_mapping_service.get();
+
+            student_list
+                .into_iter()
+                .map(|student| {
+                    DeAnonymizedStudent::from_student_with_mapping(
+                        &student,
+                        mapping_service.as_ref(),
+                    )
+                })
+                .collect::<Vec<_>>()
+        } else {
+            vec![]
+        }
+    });
+
+    // Helper function to get display name and ID
+    let get_student_display = move |student: &Student| -> (String, String) {
+        if anonymization_enabled() {
+            if let Some(service) = student_mapping_service.get() {
+                if let Some(mapping) = service.get_original_student_info(student.student_id) {
+                    return (
+                        format!("{} {}", mapping.firstname, mapping.lastname),
+                        mapping.original_student_id.to_string(),
+                    );
+                }
+            }
+        }
+
+        // Fallback to anonymized or regular display
+        (
+            format!(
+                "{} {}",
+                student.firstname.as_deref().unwrap_or("Student"),
+                student
+                    .lastname
+                    .as_deref()
+                    .unwrap_or(&format!("#{}", student.student_id))
+            ),
+            student.student_id.to_string(),
+        )
+    };
 
     // Fetch assessment list
     let assessment_list = create_resource(move || (), |_| async move { get_assessments().await });
@@ -111,7 +168,7 @@ pub fn Gradebook() -> impl IntoView {
         },
     );
 
-    // Filter students based on search term
+    // Filter students based on search term using de-anonymized data
     let filtered_students = create_memo(move |_| {
         let search = search_term().trim().to_lowercase();
 
@@ -121,19 +178,14 @@ pub fn Gradebook() -> impl IntoView {
             .unwrap_or_default()
             .into_iter()
             .filter(|student| {
-                search.is_empty()
-                    || student
-                        .firstname
-                        .as_ref()
-                        .unwrap()
-                        .to_lowercase()
-                        .contains(&search)
-                    || student
-                        .lastname
-                        .as_ref()
-                        .unwrap()
-                        .to_lowercase()
-                        .contains(&search)
+                if search.is_empty() {
+                    return true;
+                }
+
+                let (display_name, display_id) = get_student_display(student);
+
+                display_name.to_lowercase().contains(&search)
+                    || display_id.to_lowercase().contains(&search)
             })
             .collect::<Vec<_>>()
     });
@@ -280,13 +332,40 @@ pub fn Gradebook() -> impl IntoView {
                     set_selected_item=set_selected_view
                 />
                 <main class="flex-1 flex flex-col mt-16 ml-20 px-10 pb-6">
-                    <h1 class="text-2xl font-bold mb-2 text-[#2E3A59]">"Gradebook"</h1>
+                    <h1 class="text-2xl font-bold mb-2 text-[#2E3A59]">
+                        "Gradebook"
+                        {move || {
+                            if anonymization_enabled() {
+                                if student_mapping_service.get().is_some() {
+                                    view! {
+                                        <span class="ml-2 px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
+                                            "De-anonymized"
+                                        </span>
+                                    }.into_view()
+                                } else {
+                                    view! {
+                                        <span class="ml-2 px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full">
+                                            "Anonymized"
+                                        </span>
+                                    }.into_view()
+                                }
+                            } else {
+                                view! { <span></span> }.into_view()
+                            }
+                        }}
+                    </h1>
 
                     <div class="flex justify-between items-center mb-2">
                         <div class="w-[40rem] mr-4">
                             <input
                                 type="text"
-                                placeholder="Search students..."
+                                placeholder={move || {
+                                    if anonymization_enabled() && student_mapping_service.get().is_some() {
+                                        "Search students by real name or ID..."
+                                    } else {
+                                        "Search students..."
+                                    }
+                                }}
                                 prop:value={move || search_term.get()}
                                 class="border border-gray-300 rounded px-3 py-1 w-full text-sm"
                                 on:input=move |ev| set_search_term(event_target_value(&ev))
@@ -325,7 +404,15 @@ pub fn Gradebook() -> impl IntoView {
                                 <thead class="sticky top-0 bg-[#DADADA]">
                                     <tr>
                                         <th class="px-2 py-4 border text-center font-medium text-[#2E3A59] text-md uppercase tracking-wider">"Student Name"</th>
-                                        <th class="px-2 py-4 border text-center font-medium text-[#2E3A59] text-md uppercase tracking-wider">"ID"</th>
+                                        <th class="px-2 py-4 border text-center font-medium text-[#2E3A59] text-md uppercase tracking-wider">
+                                            {move || {
+                                                if anonymization_enabled() && student_mapping_service.get().is_some() {
+                                                    "Original ID"
+                                                } else {
+                                                    "ID"
+                                                }
+                                            }}
+                                        </th>
                                         {
                                             move || {
                                                 if selected_assessment_id.get().is_none() {
@@ -376,6 +463,8 @@ pub fn Gradebook() -> impl IntoView {
                                             students.into_iter().map(|student| {
                                                 let student_id = student.student_id;
                                                 let student_results = results_map.get(&student_id);
+                                                let (display_name, display_id) = get_student_display(&student);
+
                                                 view! {
                                                     <tr>
                                                         <td class="px-2 py-2 border whitespace-nowrap text-indigo-500">
@@ -384,10 +473,10 @@ pub fn Gradebook() -> impl IntoView {
                                                                     icon=HiUserCircleOutlineLg
                                                                     class="w-4 h-4 text-[#2E3A59] inline-block mr-2"
                                                                 />
-                                                                {format!("{} {}", &student.firstname.as_ref().unwrap(), &student.lastname.as_ref().unwrap())}
+                                                                {display_name}
                                                             </a>
                                                         </td>
-                                                        <td class="px-2 py-2 border whitespace-nowrap text-center">{&student.student_id.to_string()}</td>
+                                                        <td class="px-2 py-2 border whitespace-nowrap text-center">{display_id}</td>
                                                         {
                                                             move || {
                                                                 let student_results_map = all_student_results.get().unwrap_or_default();

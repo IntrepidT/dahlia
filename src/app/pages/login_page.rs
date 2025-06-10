@@ -1,4 +1,6 @@
-use crate::app::components::auth::{LoginForm, RegisterForm};
+use crate::app::components::auth::enhanced_login_form::EnhancedLoginForm;
+use crate::app::components::auth::login_form::{LoginForm, RegisterForm};
+use crate::app::middleware::global_settings::use_settings;
 use crate::app::models::user::UserJwt;
 use leptos::*;
 use leptos_router::*;
@@ -8,6 +10,10 @@ pub fn LoginPage() -> impl IntoView {
     let (show_register, set_show_register) = create_signal(false);
     let current_user = use_context::<ReadSignal<Option<UserJwt>>>().unwrap();
     let navigate = use_navigate();
+
+    // Get settings to check if student protections are enabled
+    let (settings, _) = use_settings();
+    let student_protections_enabled = move || settings.get().student_protections;
 
     // If already logged in, redirect to home
     create_effect(move |_| {
@@ -31,10 +37,18 @@ pub fn LoginPage() -> impl IntoView {
                                 "Login"
                             </button>
                         </div>
-                    }
+                    }.into_view()
                 } else {
                     view! {
-                        <LoginForm />
+                        // Conditionally render the appropriate login form
+                        {move || {
+                            if student_protections_enabled() {
+                                view! { <EnhancedLoginForm /> }.into_view()
+                            } else {
+                                view! { <LoginForm /> }.into_view()
+                            }
+                        }}
+
                         <div class="mt-4 text-center">
                             <div class="flex justify-center">
                                 <button
@@ -52,7 +66,7 @@ pub fn LoginPage() -> impl IntoView {
                                 </a>
                             </div>
                         </div>
-                    }
+                    }.into_view()
                 }
             }}
         </div>

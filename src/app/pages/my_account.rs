@@ -1,4 +1,4 @@
-use crate::app::components::auth::LogoutButton;
+use crate::app::components::auth::login_form::LogoutButton;
 use crate::app::components::update_user_modal::UpdateProfileModal; // Import the new modal component
 use crate::app::components::Header;
 use crate::app::models::user::User;

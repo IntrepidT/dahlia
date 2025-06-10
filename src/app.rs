@@ -8,6 +8,7 @@ use leptos_router::*;
 pub mod pages;
 pub mod websockets;
 use crate::app::middleware::global_settings::SettingsProvider;
+use components::enhanced_login_form::provide_student_mapping_service;
 use components::live_test::RealtimeTestSession;
 use components::login_components::{RequestPasswordResetForm, ResetPasswordForm};
 use components::test_templates::{FlashCardSet, GridTest};
@@ -17,7 +18,7 @@ use pages::{
     TestBuilder, TestResultsPage, TestSessionsList,
 };
 pub mod components;
-use components::auth::*;
+use components::auth::authorization_components::{AuthProvider, RequireAuth, RequireRole};
 pub mod middleware;
 pub mod services;
 
@@ -25,6 +26,9 @@ pub mod services;
 pub fn App() -> impl IntoView {
     // Provides context that manages stylesheets, titles, meta tags, etc.
     provide_meta_context();
+
+    let student_mapping_context = provide_student_mapping_service();
+    provide_context(student_mapping_context);
     view! {
         // injects a stylesheet into the document <head>
         // id=leptos means cargo-leptos will hot-reload this stylesheet

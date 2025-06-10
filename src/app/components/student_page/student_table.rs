@@ -1,3 +1,7 @@
+use crate::app::components::enhanced_login_form::{
+    use_student_mapping_service, DeAnonymizedStudent,
+};
+use crate::app::middleware::global_settings::use_settings;
 use crate::app::models::student::ESLEnum;
 use crate::app::models::student::Student;
 use leptos::*;
@@ -48,6 +52,36 @@ pub fn StudentTable(
     #[prop(into)] selected_student: Signal<Option<Rc<Student>>>,
     #[prop(into)] set_selected_student: WriteSignal<Option<Rc<Student>>>,
 ) -> impl IntoView {
+    //get settings
+    let (settings, _) = use_settings();
+    let anonymization_enabled = move || settings.get().student_protections;
+
+    // Get mapping service for de-anonymization
+    let (mapping_service, _) = use_student_mapping_service();
+
+    // Create enhanced student data with de-anonymization info
+    let enhanced_students = create_memo(move |_| {
+        let students_data = students.get().unwrap_or(None).unwrap_or_default();
+
+        if anonymization_enabled() {
+            students_data
+                .into_iter()
+                .map(|student| {
+                    let de_anon = DeAnonymizedStudent::from_student_with_mapping(
+                        &student,
+                        mapping_service.get().as_ref(),
+                    );
+                    (student, Some(de_anon))
+                })
+                .collect::<Vec<_>>()
+        } else {
+            students_data
+                .into_iter()
+                .map(|student| (student, None))
+                .collect::<Vec<_>>()
+        }
+    });
+
     let filtered_students = create_memo(move |_| {
         let search = search_term().trim().to_lowercase();
         let current_grade_level = grade_filter();
@@ -60,26 +94,39 @@ pub fn StudentTable(
         let show_gt = gt_filter();
         let show_bip = bip_filter();
 
-        students
-            .get()
-            .unwrap_or(None)
-            .unwrap_or_default()
+        enhanced_students()
             .into_iter()
-            .filter(|student| {
-                // Filter by search term
+            .filter(|(student, de_anon_opt)| {
+                // Use de-anonymized data for search if available
+                let (search_firstname, search_lastname, search_id) = if let Some(de_anon) =
+                    de_anon_opt
+                {
+                    // Extract first and last name from display_name
+                    let name_parts: Vec<&str> = de_anon.display_name.split_whitespace().collect();
+                    let first = name_parts.get(0).unwrap_or(&"").to_string();
+                    let last = name_parts.get(1).unwrap_or(&"").to_string();
+                    (first, last, de_anon.display_id.clone())
+                } else {
+                    (
+                        student
+                            .firstname
+                            .as_ref()
+                            .unwrap_or(&"Unknown".to_string())
+                            .clone(),
+                        student
+                            .lastname
+                            .as_ref()
+                            .unwrap_or(&"Unknown".to_string())
+                            .clone(),
+                        student.student_id.to_string(),
+                    )
+                };
+
+                // Filter by search term (now using de-anonymized data when available)
                 let matches_search = search.is_empty()
-                    || student
-                        .firstname
-                        .as_ref()
-                        .unwrap()
-                        .to_lowercase()
-                        .contains(&search)
-                    || student
-                        .lastname
-                        .as_ref()
-                        .unwrap()
-                        .to_lowercase()
-                        .contains(&search);
+                    || search_firstname.to_lowercase().contains(&search)
+                    || search_lastname.to_lowercase().contains(&search)
+                    || search_id.to_lowercase().contains(&search);
 
                 // Filter by grade
                 let matches_grade = current_grade_level.is_empty()
@@ -163,7 +210,7 @@ pub fn StudentTable(
                         </thead>
                         <Suspense fallback=move || view! {
                             <tr>
-                                <td colspan="11" class="text-center p-8">
+                                <td colspan="12" class="text-center p-8">
                                     <div class="inline-block h-6 w-6 animate-spin rounded-full border-2 border-[#DADADA] border-t-[#2E3A59]"></div>
                                 </td>
                             </tr>
@@ -174,16 +221,36 @@ pub fn StudentTable(
                                     if students.is_empty() {
                                         view! {
                                             <tr>
-                                                <td colspan="11" class="px-6 py-12 text-center text-sm text-[#2E3A59] text-opacity-70">
+                                                <td colspan="12" class="px-6 py-12 text-center text-sm text-[#2E3A59] text-opacity-70">
                                                     "No students match your search criteria"
                                                 </td>
                                             </tr>
                                         }.into_view()
                                     } else {
-                                        students.into_iter().map(|student| {
+                                        students.into_iter().map(|(student, de_anon_opt)| {
                                             let student_rc = Rc::new(student.clone());
                                             let student_cmp = Rc::new(student.clone());
                                             let is_selected = move || selected_student() == Some(student_cmp.clone());
+
+                                            // Determine display values based on anonymization status
+                                            let (display_first, display_last, display_id) = if let Some(de_anon) = &de_anon_opt {
+                                                // Split the display_name for first and last name
+                                                let name_parts: Vec<&str> = de_anon.display_name.split_whitespace().collect();
+                                                let first = name_parts.get(0).unwrap_or(&"Unknown").to_string();
+                                                let last = if name_parts.len() > 1 {
+                                                    name_parts[1..].join(" ")
+                                                } else {
+                                                    "Unknown".to_string()
+                                                };
+                                                (first, last, de_anon.display_id.clone())
+                                            } else {
+                                                (
+                                                    student.firstname.as_ref().unwrap_or(&"Unknown".to_string()).clone(),
+                                                    student.lastname.as_ref().unwrap_or(&"Unknown".to_string()).clone(),
+                                                    student.student_id.to_string()
+                                                )
+                                            };
+
                                             view! {
                                                 <tr
                                                     class=move || if is_selected() {
@@ -193,9 +260,9 @@ pub fn StudentTable(
                                                     }
                                                     on:click=move |_| set_selected_student(Some(student_rc.clone()))
                                                 >
-                                                    <td class=format!("{} {}", CELL_STYLE, "font-medium text-[#2E3A59]")>{&student.firstname.unwrap_or("Unknown".to_string())}</td>
-                                                    <td class=format!("{} {}", CELL_STYLE, "font-medium text-[#2E3A59]")>{&student.lastname.unwrap_or("Unknown".to_string())}</td>
-                                                    <td class=format!("{} {}", CELL_STYLE, "text-[#2E3A59] text-opacity-70")>{&student.student_id.to_string()}</td>
+                                                    <td class=format!("{} {}", CELL_STYLE, "font-medium text-[#2E3A59]")>{display_first}</td>
+                                                    <td class=format!("{} {}", CELL_STYLE, "font-medium text-[#2E3A59]")>{display_last}</td>
+                                                    <td class=format!("{} {}", CELL_STYLE, "text-[#2E3A59] text-opacity-70")>{display_id}</td>
                                                     <td class=format!("{} {}", CELL_STYLE, "text-[#2E3A59] text-opacity-70")>{&student.current_grade_level.to_string()}</td>
                                                     <td class=format!("{} {}", CELL_STYLE, "text-[#2E3A59] text-opacity-70")>{&student.teacher.to_string()}</td>
 

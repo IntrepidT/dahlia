@@ -1,4 +1,6 @@
 use crate::app::models::student::Student;
+use crate::app::middleware::global_settings::use_settings;
+use crate::app::components::auth::enhanced_login_form::{use_student_mapping_service, DeAnonymizedStudent};
 use leptos::*;
 use leptos_router::*;
 use std::rc::Rc;
@@ -30,8 +32,65 @@ pub fn StudentDetails(
     #[prop()] student: Rc<Student>,
     #[prop(optional)] on_edit_student: Option<Callback<()>>,
 ) -> impl IntoView {
+    // Get global settings
+    let (settings, _) = use_settings();
+    let anonymization_enabled = move || settings.get().student_protections;
+    
+    // Get the mapping service
+    let (student_mapping_service, _) = use_student_mapping_service();
+    
+    // Clone the student Rc for use in closures
+    let student_for_deanonymization = student.clone();
+    let student_for_memo = student.clone();
+    
+    // Create a memo for the de-anonymized student info
+    let de_anonymized_student = create_memo(move |_| {
+        let mapping_service = student_mapping_service.get();
+        DeAnonymizedStudent::from_student_with_mapping(
+            &student_for_deanonymization.as_ref(), 
+            mapping_service.as_ref()
+        )
+    });
+    
     // Create a memo for the student to ensure stable references
-    let student_memo = create_memo(move |_| student.clone());
+    let student_memo = create_memo(move |_| student_for_memo.clone());
+
+    // Function to get display name based on anonymization settings
+    let get_display_name = move || {
+        if anonymization_enabled() {
+            de_anonymized_student.get().display_name
+        } else {
+            format!(
+                "{} {}", 
+                student_memo().firstname.as_ref().unwrap_or(&"Unknown".to_string()), 
+                student_memo().lastname.as_ref().unwrap_or(&"Unknown".to_string())
+            )
+        }
+    };
+
+    // Function to get display ID based on anonymization settings
+    let get_display_id = move || {
+        if anonymization_enabled() {
+            de_anonymized_student.get().display_id
+        } else {
+            student_memo().student_id.to_string()
+        }
+    };
+
+    // Function to get student PIN with proper de-anonymization
+    let get_student_pin = move || {
+        if anonymization_enabled() {
+            if let Some(mapping_service) = student_mapping_service.get() {
+                if let Some(mapping) = mapping_service.get_original_student_info(student_memo().student_id) {
+                    return mapping.pin.clone();
+                }
+            }
+            // Fallback to anonymized display
+            "****".to_string()
+        } else {
+            student_memo().pin.unwrap_or(0).to_string()
+        }
+    };
 
     // Function to create support services view that doesn't borrow student directly
     let support_services_view = move || {
@@ -127,12 +186,43 @@ pub fn StudentDetails(
         <div class=CARD_CONTAINER>
             <div class="flex items-center justify-between mb-3 sm:mb-6">
                 <h2 class="text-lg sm:text-xl font-bold text-[#2E3A59]">
-                    {move || format!("{} {}", student_memo().firstname.as_ref().unwrap(), student_memo().lastname.as_ref().unwrap())}
+                    {get_display_name}
                 </h2>
                 <div class="px-2 sm:px-3 py-0.5 sm:py-1 rounded-full bg-[#2E3A59] text-white text-xs font-medium">
                     {move || student_memo().current_grade_level.to_string()}
                 </div>
             </div>
+
+            // Show anonymization status indicator
+            {move || {
+                if anonymization_enabled() {
+                    let has_mapping = student_mapping_service.get()
+                        .map(|service| service.has_mapping_for_app_id(student_memo().student_id))
+                        .unwrap_or(false);
+                    
+                    view! {
+                        <div class="mb-4 p-2 rounded-md border text-xs">
+                            {if has_mapping {
+                                view! {
+                                    <div class="flex items-center text-green-700 bg-green-50 border-green-200">
+                                        <div class="h-2 w-2 rounded-full bg-green-600 mr-2"></div>
+                                        "Student identity available - showing real information"
+                                    </div>
+                                }
+                            } else {
+                                view! {
+                                    <div class="flex items-center text-amber-700 bg-amber-50 border-amber-200">
+                                        <div class="h-2 w-2 rounded-full bg-amber-600 mr-2"></div>
+                                        "Student identity protected - showing anonymized information"
+                                    </div>
+                                }
+                            }}
+                        </div>
+                    }.into_any()
+                } else {
+                    view! { <span></span> }.into_any()
+                }
+            }}
 
             <div class="flex-grow overflow-y-auto space-y-4 sm:space-y-6">
                 // Basic Information Section
@@ -146,8 +236,12 @@ pub fn StudentDetails(
                             </div>
 
                             <div class=INFO_GROUP>
-                                <div class=INFO_TITLE>"Student ID"</div>
-                                <div class=INFO_VALUE>{move || format!("#{}", student_memo().student_id)}</div>
+                                <div class=INFO_TITLE>
+                                    {move || if anonymization_enabled() { "Student ID" } else { "Student ID" }}
+                                </div>
+                                <div class=INFO_VALUE>
+                                    {move || format!("#{}", get_display_id())}
+                                </div>
                             </div>
 
                             <div class=INFO_GROUP>
@@ -157,11 +251,27 @@ pub fn StudentDetails(
 
                             <div class=INFO_GROUP>
                                 <div class=INFO_TITLE>"Date of Birth"</div>
-                                <div class=INFO_VALUE>{move || format!("{}", student_memo().date_of_birth.format("%m-%d-%Y"))}</div>
+                                <div class=INFO_VALUE>
+                                    {move || {
+                                        if anonymization_enabled() {
+                                            let has_mapping = student_mapping_service.get()
+                                                .map(|service| service.has_mapping_for_app_id(student_memo().student_id))
+                                                .unwrap_or(false);
+                                            if has_mapping {
+                                                format!("{}", student_memo().date_of_birth.format("%m-%d-%Y"))
+                                            } else {
+                                                "Protected".to_string()
+                                            }
+                                        } else {
+                                            format!("{}", student_memo().date_of_birth.format("%m-%d-%Y"))
+                                        }
+                                    }}
+                                </div>
                             </div>
+                            
                             <div class=INFO_GROUP>
                                 <div class=INFO_TITLE>"Student Pin"</div>
-                                <div class=INFO_VALUE>{move || format!("{}", student_memo().pin.unwrap())}</div>
+                                <div class=INFO_VALUE>{get_student_pin}</div>
                             </div>
                         </div>
                     </div>
@@ -200,9 +310,6 @@ pub fn StudentDetails(
 
             // Button container at the bottom - stacked on mobile
             <div class=BUTTON_CONTAINER>
-                /*<button class=BUTTON_SECONDARY>
-                    "Next Student"
-                </button>*/
                 <button class=BUTTON_ACCENT
                     on:click=move |_| {
                         if let Some(callback) = on_edit_student {
