@@ -311,13 +311,6 @@ pub fn EnhancedLoginForm() -> impl IntoView {
                 return;
             }
 
-            if anonymization_enabled() && mapping_data_content.is_none() {
-                set_error.set(Some(
-                    "Student mapping file is required when anonymization is enabled".to_string(),
-                ));
-                return;
-            }
-
             logging::log!("Attempting login with username: {}", username);
 
             match login(username, password).await {
@@ -326,31 +319,32 @@ pub fn EnhancedLoginForm() -> impl IntoView {
                         logging::log!("Login successful, setting user");
                         set_current_user.set(response.user);
 
-                        // Set up mapping service if anonymization is enabled
-                        if anonymization_enabled() {
-                            if let Some(data_content) = mapping_data_content {
-                                match parse_csv_content(data_content) {
-                                    Ok(mapping_data) => {
-                                        let mapping_service =
-                                            StudentMappingService::new(mapping_data.mappings);
-                                        set_student_mapping_service.set(Some(mapping_service));
-                                        logging::log!(
-                                            "Student mapping service initialized successfully"
-                                        );
-                                    }
-                                    Err(e) => {
-                                        logging::log!(
-                                            "Failed to parse student mapping data: {}",
-                                            e
-                                        );
-                                        set_error.set(Some(format!(
-                                            "Failed to initialize mapping service: {}",
-                                            e
-                                        )));
-                                        return;
-                                    }
+                        // Set up mapping service only if a mapping file was provided
+                        if let Some(data_content) = mapping_data_content {
+                            match parse_csv_content(data_content) {
+                                Ok(mapping_data) => {
+                                    let mapping_service =
+                                        StudentMappingService::new(mapping_data.mappings);
+                                    set_student_mapping_service.set(Some(mapping_service));
+                                    logging::log!(
+                                        "Student mapping service initialized successfully"
+                                    );
+                                }
+                                Err(e) => {
+                                    logging::log!("Failed to parse student mapping data: {}", e);
+                                    set_error.set(Some(format!(
+                                        "Failed to initialize mapping service: {}",
+                                        e
+                                    )));
+                                    return;
                                 }
                             }
+                        } else {
+                            // No mapping file provided - clear any existing mapping service
+                            set_student_mapping_service.set(None);
+                            logging::log!(
+                                "No student mapping file provided - de-anonymization disabled"
+                            );
                         }
 
                         set_error.set(None);
@@ -411,7 +405,7 @@ pub fn EnhancedLoginForm() -> impl IntoView {
                                 <div class="mb-4">
                                     <label class="block text-gray-700 mb-2" for="student-mapping">
                                         "Student ID Mapping File (CSV)"
-                                        <span class="text-red-500">" *"</span>
+                                        <span class="text-sm text-gray-500">" (Optional)"</span>
                                     </label>
                                     <input
                                         id="student-mapping"
@@ -421,14 +415,14 @@ pub fn EnhancedLoginForm() -> impl IntoView {
                                         on:change=handle_file_upload
                                     />
                                     <p class="text-sm text-gray-500 mt-1">
-                                        "Upload a CSV file containing student ID mappings for de-anonymization"
+                                        "Upload a CSV file containing student ID mappings for de-anonymization. If not provided, student data will remain anonymized."
                                     </p>
                                     {move || {
                                         if let Some(status) = file_upload_status.get() {
                                             if status == "File loaded successfully" {
                                                 view! {
                                                     <p class="text-sm text-green-600 mt-1">
-                                                        "✓ "{status}
+                                                        "✓ "{status}" - De-anonymization will be enabled"
                                                     </p>
                                                 }.into_any()
                                             } else {
@@ -452,16 +446,11 @@ pub fn EnhancedLoginForm() -> impl IntoView {
                     <button
                         type="submit"
                         class="w-full p-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-400"
-                        prop:disabled=move || {
-                            handle_submit.pending().get() ||
-                            (anonymization_enabled() && student_mapping_file.get().is_none())
-                        }
+                        prop:disabled=move || handle_submit.pending().get()
                     >
                         {move || {
                             if handle_submit.pending().get() {
                                 "Logging in..."
-                            } else if anonymization_enabled() && student_mapping_file.get().is_none() {
-                                "Please upload CSV file first"
                             } else {
                                 "Login"
                             }
@@ -473,13 +462,19 @@ pub fn EnhancedLoginForm() -> impl IntoView {
                     if anonymization_enabled() {
                         view! {
                             <div class="mt-4 p-3 bg-gray-50 rounded">
-                                <h3 class="text-sm font-semibold text-gray-700 mb-2">"Example CSV Format:"</h3>
+                                <h3 class="text-sm font-semibold text-gray-700 mb-2">"CSV Format Information:"</h3>
+                                <p class="text-xs text-gray-600 mb-2">
+                                    "If you want to enable de-anonymization, upload a CSV file with the following format:"
+                                </p>
                                 <pre class="text-xs text-gray-600 overflow-x-auto">
     {r#"app_id,original_student_id,firstname,lastname,pin,created_at
 100000,12345,John,Doe,1234,2025-06-09 19:52:19.862183
 100001,52884,Thien,Le,1234,2025-06-09 19:52:19.862183
 100002,67890,Jane,Smith,6789,2025-06-09 19:52:19.862183"#}
                                 </pre>
+                                <p class="text-xs text-gray-500 mt-2">
+                                    "Without this file, students will be displayed with their anonymized IDs."
+                                </p>
                             </div>
                         }.into_any()
                     } else {
