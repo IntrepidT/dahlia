@@ -9,7 +9,7 @@ use leptos::*;
 pub fn ScoresLedger() -> impl IntoView {
     let navigate = leptos_router::use_navigate();
     // Create resource for fetching scores from the database
-    let scores_resource = create_resource(
+    let scores_resource = create_local_resource(
         || (),
         |_| async {
             match get_scores().await {
@@ -27,7 +27,7 @@ pub fn ScoresLedger() -> impl IntoView {
         },
     );
 
-    let students_resource = create_resource(
+    let students_resource = create_local_resource(
         || (),
         |_| async {
             match get_students().await {
@@ -40,7 +40,7 @@ pub fn ScoresLedger() -> impl IntoView {
         },
     );
 
-    let tests_resource = create_resource(
+    let tests_resource = create_local_resource(
         || (),
         |_| async {
             match get_tests().await {

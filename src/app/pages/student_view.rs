@@ -1,3 +1,4 @@
+use crate::app::components::auth::authorization_components::use_role_redirect;
 use crate::app::components::dashboard::dashboard_sidebar::{DashboardSidebar, SidebarSelected};
 use crate::app::components::header::Header;
 use crate::app::components::student_page::bulk_upload_modal::BulkUploadModal;
@@ -8,6 +9,7 @@ use crate::app::components::student_page::{
     add_student_form::AddStudentForm, student_details::StudentDetails,
 };
 use crate::app::models::student::{DeleteStudentRequest, ESLEnum, Student};
+use crate::app::models::user::UserJwt;
 use crate::app::server_functions::students::{delete_student, get_students};
 use crate::app::server_functions::teachers::get_teachers;
 use leptos::ev::SubmitEvent;
@@ -28,12 +30,14 @@ const TABLE_CONTAINER_STYLE_EXPANDED: &str = "w-full lg:w-[92%] fixed p-3 lg:p-5
 
 #[component]
 pub fn StudentView() -> impl IntoView {
+    let user = use_context::<ReadSignal<Option<UserJwt>>>().expect("AuthProvider not found");
+
     // Signals for gathering data from existing students
     let (refresh_trigger, set_refresh_trigger) = create_signal(0);
     let (selected_view, set_selected_view) = create_signal(SidebarSelected::StudentView);
 
     // Resource for fetching students
-    let students = create_resource(
+    let students = create_local_resource(
         move || refresh_trigger(),
         |_| async move {
             match get_students().await {
@@ -47,7 +51,7 @@ pub fn StudentView() -> impl IntoView {
     );
 
     // Resource for fetching teachers
-    let teachers = create_resource(
+    let teachers = create_local_resource(
         move || refresh_trigger(),
         |_| async move {
             match get_teachers().await {
@@ -94,7 +98,7 @@ pub fn StudentView() -> impl IntoView {
     let (show_bulk_upload_modal, set_show_bulk_upload_modal) = create_signal(false);
 
     // Panel visibility control
-    let (show_side_panel, set_show_side_panel) = create_signal(false);
+    let (show_side_panel, set_show_side_panel) = create_signal(true);
 
     // Panel toggle for desktop view
     let (panel_expanded, set_panel_expanded) = create_signal(false);
@@ -381,7 +385,7 @@ pub fn StudentView() -> impl IntoView {
                     when=move || selected_student().is_some() || adding_student() || editing()
                     fallback=|| view! {
                         <div class="hidden lg:flex items-center justify-center border-t-8 border-[#2E3A59] h-[95%] text-gray-500 rounded-lg shadow-lg bg-[#F9F9F8]">
-                            "Select a student to view details"
+                            <span>"Select a student to view details"</span>
                         </div>
                     }
                 >

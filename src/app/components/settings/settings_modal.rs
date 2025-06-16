@@ -10,9 +10,12 @@ use crate::app::server_functions::user_settings::{
     get_user_settings, update_dark_mode, update_pinned_sidebar,
 };
 use leptos::*;
-use wasm_bindgen::closure::Closure;
-use wasm_bindgen::JsCast;
-use web_sys::{Event, FileList, HtmlInputElement};
+#[cfg(feature = "hydrate")]
+use {
+    wasm_bindgen::closure::Closure,
+    wasm_bindgen::JsCast,
+    web_sys::{Event, FileList, HtmlInputElement},
+};
 
 #[component]
 pub fn SettingsModal(
@@ -489,6 +492,7 @@ fn StudentProtectionToggleInner(settings: ReadSignal<SettingsCache>) -> impl Int
     });
 
     // File change handler with better error handling
+    #[cfg(feature = "hydrate")]
     let handle_file_change = move |event: Event| {
         let input = event
             .target()
@@ -642,13 +646,20 @@ fn StudentProtectionToggleInner(settings: ReadSignal<SettingsCache>) -> impl Int
                         </p>
 
                         <div class="mb-4">
-                            <input
-                                type="file"
-                                accept=".csv"
-                                class="hidden"
-                                id="mapping-file-input"
-                                on:change=handle_file_change
-                            />
+                            {
+                                #[cfg(feature = "hydrate")]
+                                {
+                                    view! {
+                                        <input
+                                            type="file"
+                                            accept=".csv"
+                                            class="hidden"
+                                            id="mapping-file-input"
+                                            on:change=handle_file_change
+                                        />
+                                    }
+                                }
+                            }
                             <label
                                 for="mapping-file-input"
                                 class="block w-full p-3 border-2 border-dashed border-gray-600 rounded-lg text-center cursor-pointer hover:border-gray-500 transition-colors"

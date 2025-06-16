@@ -1,10 +1,14 @@
 use crate::app::server_functions::bulk_students::upload_students_bulk;
+use leptos::ev::{Event, MouseEvent};
+use leptos::*;
+
+#[cfg(feature = "hydrate")]
 use js_sys::Array;
-use leptos::ev::Event;
-use leptos::*;
-use leptos::*;
+#[cfg(feature = "hydrate")]
 use std::sync::mpsc;
+#[cfg(feature = "hydrate")]
 use wasm_bindgen::{closure::Closure, JsCast};
+#[cfg(feature = "hydrate")]
 use web_sys::{FileList, HtmlInputElement};
 
 #[component]
@@ -12,69 +16,81 @@ pub fn BulkUploadModal(
     set_show_modal: WriteSignal<bool>,
     set_refresh_trigger: WriteSignal<i32>,
 ) -> impl IntoView {
-    let (file, set_file) = create_signal::<Option<web_sys::File>>(None);
     let (upload_status, set_upload_status) = create_signal(String::new());
     let (is_uploading, set_is_uploading) = create_signal(false);
     let (imported_count, set_imported_count) = create_signal(0);
 
-    let on_file_change = move |ev: Event| {
-        let target = ev.target();
-        let input_element = target.and_then(|t| t.dyn_into::<HtmlInputElement>().ok());
+    #[cfg(feature = "hydrate")]
+    let (file, set_file) = create_signal::<Option<web_sys::File>>(None);
 
-        if let Some(input) = input_element {
-            let files = input.files();
-            if let Some(files) = files {
-                if files.length() > 0 {
-                    if let Some(first_file) = files.item(0) {
-                        set_file(Some(first_file));
+    let on_file_change = move |ev: Event| {
+        #[cfg(feature = "hydrate")]
+        {
+            let target = ev.target();
+            let input_element = target.and_then(|t| t.dyn_into::<HtmlInputElement>().ok());
+
+            if let Some(input) = input_element {
+                let files = input.files();
+                if let Some(files) = files {
+                    if files.length() > 0 {
+                        if let Some(first_file) = files.item(0) {
+                            set_file(Some(first_file));
+                        }
                     }
                 }
             }
         }
     };
 
-    let handle_upload = move |_| {
+    #[cfg(feature = "hydrate")]
+    let handle_upload = move |ev: MouseEvent| {
         set_is_uploading(true);
         set_upload_status(String::new());
         set_imported_count(0);
 
-        if let Some(selected_file) = file() {
-            spawn_local(async move {
-                match upload_file(selected_file).await {
-                    Ok(count) => {
-                        set_upload_status(format!("Successfully imported {} students", count));
-                        set_imported_count(count);
-                        set_refresh_trigger.update(|count| *count += 1);
-                        set_is_uploading(false);
-                        set_show_modal(false);
+        #[cfg(feature = "hydrate")]
+        {
+            if let Some(selected_file) = file() {
+                spawn_local(async move {
+                    match upload_file(selected_file).await {
+                        Ok(count) => {
+                            set_upload_status(format!("Successfully imported {} students", count));
+                            set_imported_count(count);
+                            set_refresh_trigger.update(|count| *count += 1);
+                            set_is_uploading(false);
+                            set_show_modal(false);
+                        }
+                        Err(e) => {
+                            set_upload_status(format!("Upload failed: {}", e));
+                            set_is_uploading(false);
+                        }
                     }
-                    Err(e) => {
-                        set_upload_status(format!("Upload failed: {}", e));
-                        set_is_uploading(false);
-                    }
-                }
-            });
-        } else {
-            set_upload_status("Please select a file first".to_string());
-            set_is_uploading(false);
+                });
+            } else {
+                set_upload_status("Please select a file first".to_string());
+                set_is_uploading(false);
+            }
         }
     };
 
     let download_template = move |_| {
-        let template_content = include_str!("student_csv_template.csv");
-        let blob = web_sys::Blob::new_with_str_sequence(&Array::of1(&template_content.into()))
-            .unwrap_or_else(|_| web_sys::Blob::new().unwrap());
+        #[cfg(feature = "hydrate")]
+        {
+            let template_content = include_str!("student_csv_template.csv");
+            let blob = web_sys::Blob::new_with_str_sequence(&Array::of1(&template_content.into()))
+                .unwrap_or_else(|_| web_sys::Blob::new().unwrap());
 
-        let url = web_sys::Url::create_object_url_with_blob(&blob).unwrap_or_default();
+            let url = web_sys::Url::create_object_url_with_blob(&blob).unwrap_or_default();
 
-        if let Some(window) = web_sys::window() {
-            if let Some(document) = window.document() {
-                if let Ok(a) = document.create_element("a") {
-                    let _ = a.set_attribute("href", &url);
-                    let _ = a.set_attribute("download", "student_template.csv");
+            if let Some(window) = web_sys::window() {
+                if let Some(document) = window.document() {
+                    if let Ok(a) = document.create_element("a") {
+                        let _ = a.set_attribute("href", &url);
+                        let _ = a.set_attribute("download", "student_template.csv");
 
-                    if let Some(html_element) = a.dyn_ref::<web_sys::HtmlElement>() {
-                        html_element.click();
+                        if let Some(html_element) = a.dyn_ref::<web_sys::HtmlElement>() {
+                            html_element.click();
+                        }
                     }
                 }
             }
@@ -134,20 +150,29 @@ pub fn BulkUploadModal(
                     >
                         "Cancel"
                     </button>
-                    <button
-                        type="button"
-                        class="px-4 py-2 bg-[#4CAF50] text-white rounded hover:bg-[#388E3C]"
-                        disabled=move || file().is_none() || is_uploading()
-                        on:click=handle_upload
-                    >
-                        {move || if is_uploading() { "Uploading..." } else { "Upload" }}
-                    </button>
+
+                    {
+                        #[cfg(feature = "hydrate")]
+                        {
+                            view! {
+                                <button
+                                    type="button"
+                                    class="px-4 py-2 bg-[#4CAF50] text-white rounded hover:bg-[#388E3C]"
+                                    disabled=move || file().is_none() || is_uploading()
+                                    on:click=handle_upload
+                                >
+                                    {move || if is_uploading() { "Uploading..." } else { "Upload" }}
+                                </button>
+                            }
+                        }
+                    }
                 </div>
             </div>
         </div>
     }
 }
 
+#[cfg(feature = "hydrate")]
 async fn upload_file(file: web_sys::File) -> Result<usize, String> {
     // Create a future that resolves when the file is read
     let file_content_future =

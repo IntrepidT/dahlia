@@ -1,12 +1,12 @@
 use crate::app::models::score::Score;
 use crate::app::models::test::Test;
-use gloo_utils::format::JsValueSerdeExt;
 use leptos::html;
 use leptos::*;
-use wasm_bindgen::prelude::*;
-use wasm_bindgen::JsValue;
+#[cfg(feature = "hydrate")]
+use {gloo_utils::format::JsValueSerdeExt, wasm_bindgen::prelude::*, wasm_bindgen::JsValue};
 
 // Import needed for Plotly
+#[cfg(feature = "hydrate")]
 #[wasm_bindgen]
 extern "C" {
     #[wasm_bindgen(js_namespace = Plotly)]
@@ -14,23 +14,49 @@ extern "C" {
 }
 
 // Define color scheme
-fn color_primary() -> &'static str { "rgb(255, 122, 89)" } // Warm orange/coral
-fn color_secondary() -> &'static str { "rgb(247, 148, 89)" } // Light orange
-fn color_tertiary() -> &'static str { "rgb(255, 172, 130)" } // Pale orange
-fn color_text() -> &'static str { "rgb(66, 71, 76)" } // Dark slate for text
-fn color_low() -> &'static str { "rgb(247, 114, 89)" } // Red-orange for low scores
-fn color_medium() -> &'static str { "rgb(255, 166, 77)" } // Medium orange for mid scores
-fn color_high() -> &'static str { "rgb(255, 145, 115)" } // Orange for high scores
+fn color_primary() -> &'static str {
+    "rgb(255, 122, 89)"
+} // Warm orange/coral
+fn color_secondary() -> &'static str {
+    "rgb(247, 148, 89)"
+} // Light orange
+fn color_tertiary() -> &'static str {
+    "rgb(255, 172, 130)"
+} // Pale orange
+fn color_text() -> &'static str {
+    "rgb(66, 71, 76)"
+} // Dark slate for text
+fn color_low() -> &'static str {
+    "rgb(247, 114, 89)"
+} // Red-orange for low scores
+fn color_medium() -> &'static str {
+    "rgb(255, 166, 77)"
+} // Medium orange for mid scores
+fn color_high() -> &'static str {
+    "rgb(255, 145, 115)"
+} // Orange for high scores
 
 // Common chart configuration
+#[cfg(feature = "hydrate")]
 fn get_common_config() -> JsValue {
     let config = js_sys::Object::new();
-    js_sys::Reflect::set(&config, &JsValue::from_str("displayModeBar"), &JsValue::from_bool(false)).unwrap();
-    js_sys::Reflect::set(&config, &JsValue::from_str("responsive"), &JsValue::from_bool(true)).unwrap();
+    js_sys::Reflect::set(
+        &config,
+        &JsValue::from_str("displayModeBar"),
+        &JsValue::from_bool(false),
+    )
+    .unwrap();
+    js_sys::Reflect::set(
+        &config,
+        &JsValue::from_str("responsive"),
+        &JsValue::from_bool(true),
+    )
+    .unwrap();
     config.into()
 }
 
 // Common chart layout settings
+#[cfg(feature = "hydrate")]
 fn apply_common_layout_settings(layout: &js_sys::Object) {
     // Set font family for the entire plot
     js_sys::Reflect::set(&layout, &JsValue::from_str("font"), &{
@@ -39,28 +65,33 @@ fn apply_common_layout_settings(layout: &js_sys::Object) {
             &font,
             &JsValue::from_str("family"),
             &JsValue::from_str("Inter, system-ui, sans-serif"),
-        ).unwrap();
+        )
+        .unwrap();
         js_sys::Reflect::set(
             &font,
             &JsValue::from_str("color"),
             &JsValue::from_str(color_text()),
-        ).unwrap();
+        )
+        .unwrap();
         font.into()
-    }).unwrap();
-    
+    })
+    .unwrap();
+
     // Set plot background color
     js_sys::Reflect::set(
         &layout,
         &JsValue::from_str("paper_bgcolor"),
         &JsValue::from_str("rgba(0,0,0,0)"),
-    ).unwrap();
-    
+    )
+    .unwrap();
+
     js_sys::Reflect::set(
         &layout,
         &JsValue::from_str("plot_bgcolor"),
         &JsValue::from_str("rgba(0,0,0,0)"),
-    ).unwrap();
-    
+    )
+    .unwrap();
+
     // Add subtle grid lines
     js_sys::Reflect::set(&layout, &JsValue::from_str("xaxis"), &{
         let axis = js_sys::Object::new();
@@ -68,70 +99,79 @@ fn apply_common_layout_settings(layout: &js_sys::Object) {
             &axis,
             &JsValue::from_str("showgrid"),
             &JsValue::from_bool(false),
-        ).unwrap();
+        )
+        .unwrap();
         js_sys::Reflect::set(
             &axis,
             &JsValue::from_str("zeroline"),
             &JsValue::from_bool(false),
-        ).unwrap();
+        )
+        .unwrap();
         js_sys::Reflect::set(
             &axis,
             &JsValue::from_str("showline"),
             &JsValue::from_bool(true),
-        ).unwrap();
+        )
+        .unwrap();
         js_sys::Reflect::set(
             &axis,
             &JsValue::from_str("linecolor"),
             &JsValue::from_str("rgba(0,0,0,0.1)"),
-        ).unwrap();
+        )
+        .unwrap();
         js_sys::Reflect::set(
             &axis,
             &JsValue::from_str("linewidth"),
             &JsValue::from_f64(1.0),
-        ).unwrap();
+        )
+        .unwrap();
         js_sys::Reflect::set(
             &axis,
             &JsValue::from_str("ticks"),
             &JsValue::from_str("outside"),
-        ).unwrap();
+        )
+        .unwrap();
         js_sys::Reflect::set(
             &axis,
             &JsValue::from_str("tickcolor"),
             &JsValue::from_str("rgba(0,0,0,0.1)"),
-        ).unwrap();
+        )
+        .unwrap();
         axis.into()
-    }).unwrap();
-    
+    })
+    .unwrap();
+
     js_sys::Reflect::set(&layout, &JsValue::from_str("yaxis"), &{
         let axis = js_sys::Object::new();
         js_sys::Reflect::set(
             &axis,
             &JsValue::from_str("showgrid"),
             &JsValue::from_bool(true),
-        ).unwrap();
+        )
+        .unwrap();
         js_sys::Reflect::set(
             &axis,
             &JsValue::from_str("gridcolor"),
             &JsValue::from_str("rgba(0,0,0,0.05)"),
-        ).unwrap();
+        )
+        .unwrap();
         js_sys::Reflect::set(
             &axis,
             &JsValue::from_str("zeroline"),
             &JsValue::from_bool(false),
-        ).unwrap();
+        )
+        .unwrap();
         js_sys::Reflect::set(
             &axis,
             &JsValue::from_str("showline"),
             &JsValue::from_bool(false),
-        ).unwrap();
-        js_sys::Reflect::set(
-            &axis,
-            &JsValue::from_str("ticks"),
-            &JsValue::from_str(""),
-        ).unwrap();
+        )
+        .unwrap();
+        js_sys::Reflect::set(&axis, &JsValue::from_str("ticks"), &JsValue::from_str("")).unwrap();
         axis.into()
-    }).unwrap();
-    
+    })
+    .unwrap();
+
     // Add padding
     js_sys::Reflect::set(&layout, &JsValue::from_str("margin"), &{
         let margin = js_sys::Object::new();
@@ -141,10 +181,12 @@ fn apply_common_layout_settings(layout: &js_sys::Object) {
         js_sys::Reflect::set(&margin, &JsValue::from_str("b"), &JsValue::from_f64(50.0)).unwrap();
         js_sys::Reflect::set(&margin, &JsValue::from_str("pad"), &JsValue::from_f64(0.0)).unwrap();
         margin.into()
-    }).unwrap();
+    })
+    .unwrap();
 }
 
 // Function to render test plot
+#[cfg(feature = "hydrate")]
 pub fn render_test_plot(
     test_id: String,
     test_name: String,
@@ -175,66 +217,69 @@ pub fn render_test_plot(
             &trace,
             &JsValue::from_str("x"),
             &JsValue::from_serde(&dates).unwrap(),
-        ).unwrap();
-        
+        )
+        .unwrap();
+
         js_sys::Reflect::set(
             &trace,
             &JsValue::from_str("y"),
             &JsValue::from_serde(&scores).unwrap(),
-        ).unwrap();
-        
+        )
+        .unwrap();
+
         js_sys::Reflect::set(
             &trace,
             &JsValue::from_str("type"),
             &JsValue::from_str("scatter"),
-        ).unwrap();
-        
+        )
+        .unwrap();
+
         js_sys::Reflect::set(
             &trace,
             &JsValue::from_str("mode"),
             &JsValue::from_str("lines+markers"),
-        ).unwrap();
-        
+        )
+        .unwrap();
+
         js_sys::Reflect::set(&trace, &JsValue::from_str("marker"), &{
             let marker = js_sys::Object::new();
             js_sys::Reflect::set(
                 &marker,
                 &JsValue::from_str("color"),
                 &JsValue::from_str(color_primary()),
-            ).unwrap();
-            js_sys::Reflect::set(
-                &marker,
-                &JsValue::from_str("size"),
-                &JsValue::from_f64(8.0),
-            ).unwrap();
+            )
+            .unwrap();
+            js_sys::Reflect::set(&marker, &JsValue::from_str("size"), &JsValue::from_f64(8.0))
+                .unwrap();
             marker.into()
-        }).unwrap();
-        
+        })
+        .unwrap();
+
         js_sys::Reflect::set(&trace, &JsValue::from_str("line"), &{
             let line = js_sys::Object::new();
             js_sys::Reflect::set(
                 &line,
                 &JsValue::from_str("color"),
                 &JsValue::from_str(color_primary()),
-            ).unwrap();
-            js_sys::Reflect::set(
-                &line,
-                &JsValue::from_str("width"),
-                &JsValue::from_f64(2.0),
-            ).unwrap();
+            )
+            .unwrap();
+            js_sys::Reflect::set(&line, &JsValue::from_str("width"), &JsValue::from_f64(2.0))
+                .unwrap();
             js_sys::Reflect::set(
                 &line,
                 &JsValue::from_str("shape"),
                 &JsValue::from_str("spline"),
-            ).unwrap();
+            )
+            .unwrap();
             line.into()
-        }).unwrap();
+        })
+        .unwrap();
 
         plot_data.push(&trace);
 
         // Create layout
         let layout = js_sys::Object::new();
-        
+
         // Add title with subtle styling
         js_sys::Reflect::set(&layout, &JsValue::from_str("title"), &{
             let title = js_sys::Object::new();
@@ -242,83 +287,81 @@ pub fn render_test_plot(
                 &title,
                 &JsValue::from_str("text"),
                 &JsValue::from_str(&format!("{} Progress", test_name_clone.clone())),
-            ).unwrap();
-            js_sys::Reflect::set(
-                &title,
-                &JsValue::from_str("font"),
-                &{
-                    let font = js_sys::Object::new();
-                    js_sys::Reflect::set(
-                        &font,
-                        &JsValue::from_str("size"),
-                        &JsValue::from_f64(16.0),
-                    ).unwrap();
-                    js_sys::Reflect::set(
-                        &font,
-                        &JsValue::from_str("color"),
-                        &JsValue::from_str(color_text()),
-                    ).unwrap();
-                    font.into()
-                },
-            ).unwrap();
+            )
+            .unwrap();
+            js_sys::Reflect::set(&title, &JsValue::from_str("font"), &{
+                let font = js_sys::Object::new();
+                js_sys::Reflect::set(&font, &JsValue::from_str("size"), &JsValue::from_f64(16.0))
+                    .unwrap();
+                js_sys::Reflect::set(
+                    &font,
+                    &JsValue::from_str("color"),
+                    &JsValue::from_str(color_text()),
+                )
+                .unwrap();
+                font.into()
+            })
+            .unwrap();
             title.into()
-        }).unwrap();
-        
+        })
+        .unwrap();
+
         // Apply common layout settings
         apply_common_layout_settings(&layout);
-        
+
         // Specific settings for this chart
         js_sys::Reflect::set(&layout, &JsValue::from_str("xaxis"), &{
             let axis = js_sys::Object::new();
-            js_sys::Reflect::set(
-                &axis,
-                &JsValue::from_str("title"),
-                &{
-                    let title = js_sys::Object::new();
-                    js_sys::Reflect::set(
-                        &title,
-                        &JsValue::from_str("text"),
-                        &JsValue::from_str("Date"),
-                    ).unwrap();
-                    js_sys::Reflect::set(
-                        &title,
-                        &JsValue::from_str("standoff"),
-                        &JsValue::from_f64(10.0),
-                    ).unwrap();
-                    title.into()
-                },
-            ).unwrap();
+            js_sys::Reflect::set(&axis, &JsValue::from_str("title"), &{
+                let title = js_sys::Object::new();
+                js_sys::Reflect::set(
+                    &title,
+                    &JsValue::from_str("text"),
+                    &JsValue::from_str("Date"),
+                )
+                .unwrap();
+                js_sys::Reflect::set(
+                    &title,
+                    &JsValue::from_str("standoff"),
+                    &JsValue::from_f64(10.0),
+                )
+                .unwrap();
+                title.into()
+            })
+            .unwrap();
             js_sys::Reflect::set(
                 &axis,
                 &JsValue::from_str("showgrid"),
                 &JsValue::from_bool(false),
-            ).unwrap();
+            )
+            .unwrap();
             axis.into()
-        }).unwrap();
-        
+        })
+        .unwrap();
+
         js_sys::Reflect::set(&layout, &JsValue::from_str("yaxis"), &{
             let axis = js_sys::Object::new();
-            js_sys::Reflect::set(
-                &axis,
-                &JsValue::from_str("title"),
-                &{
-                    let title = js_sys::Object::new();
-                    js_sys::Reflect::set(
-                        &title,
-                        &JsValue::from_str("text"),
-                        &JsValue::from_str("Score"),
-                    ).unwrap();
-                    title.into()
-                },
-            ).unwrap();
+            js_sys::Reflect::set(&axis, &JsValue::from_str("title"), &{
+                let title = js_sys::Object::new();
+                js_sys::Reflect::set(
+                    &title,
+                    &JsValue::from_str("text"),
+                    &JsValue::from_str("Score"),
+                )
+                .unwrap();
+                title.into()
+            })
+            .unwrap();
             axis.into()
-        }).unwrap();
-        
+        })
+        .unwrap();
+
         js_sys::Reflect::set(
             &layout,
             &JsValue::from_str("height"),
             &JsValue::from_f64(300.0),
-        ).unwrap();
+        )
+        .unwrap();
 
         // Get common config
         let config = get_common_config();
@@ -339,6 +382,7 @@ pub fn render_test_plot(
 }
 
 // Function to render test distribution chart
+#[cfg(feature = "hydrate")]
 pub fn render_test_distribution(
     assessment_id: String,
     scores: Vec<(Score, Test)>,
@@ -374,23 +418,26 @@ pub fn render_test_distribution(
             &trace,
             &JsValue::from_str("x"),
             &JsValue::from_serde(&test_names).unwrap(),
-        ).unwrap();
-        
+        )
+        .unwrap();
+
         js_sys::Reflect::set(
             &trace,
             &JsValue::from_str("y"),
             &JsValue::from_serde(&averages).unwrap(),
-        ).unwrap();
-        
+        )
+        .unwrap();
+
         js_sys::Reflect::set(
             &trace,
             &JsValue::from_str("type"),
             &JsValue::from_str("bar"),
-        ).unwrap();
-        
+        )
+        .unwrap();
+
         js_sys::Reflect::set(&trace, &JsValue::from_str("marker"), &{
             let marker = js_sys::Object::new();
-            
+
             // Create gradient colors for bars
             let colors = js_sys::Array::new();
             for (i, _) in test_names.iter().enumerate() {
@@ -402,27 +449,25 @@ pub fn render_test_distribution(
                 };
                 colors.push(&JsValue::from_str(color));
             }
-            
-            js_sys::Reflect::set(
-                &marker,
-                &JsValue::from_str("color"),
-                &colors,
-            ).unwrap();
-            
+
+            js_sys::Reflect::set(&marker, &JsValue::from_str("color"), &colors).unwrap();
+
             js_sys::Reflect::set(
                 &marker,
                 &JsValue::from_str("opacity"),
                 &JsValue::from_f64(0.9),
-            ).unwrap();
-            
+            )
+            .unwrap();
+
             marker.into()
-        }).unwrap();
+        })
+        .unwrap();
 
         plot_data.push(&trace);
 
         // Create layout
         let layout = js_sys::Object::new();
-        
+
         // Add title with subtle styling
         js_sys::Reflect::set(&layout, &JsValue::from_str("title"), &{
             let title = js_sys::Object::new();
@@ -430,84 +475,82 @@ pub fn render_test_distribution(
                 &title,
                 &JsValue::from_str("text"),
                 &JsValue::from_str("Test Score Distribution"),
-            ).unwrap();
-            js_sys::Reflect::set(
-                &title,
-                &JsValue::from_str("font"),
-                &{
-                    let font = js_sys::Object::new();
-                    js_sys::Reflect::set(
-                        &font,
-                        &JsValue::from_str("size"),
-                        &JsValue::from_f64(16.0),
-                    ).unwrap();
-                    js_sys::Reflect::set(
-                        &font,
-                        &JsValue::from_str("color"),
-                        &JsValue::from_str(color_text()),
-                    ).unwrap();
-                    font.into()
-                },
-            ).unwrap();
+            )
+            .unwrap();
+            js_sys::Reflect::set(&title, &JsValue::from_str("font"), &{
+                let font = js_sys::Object::new();
+                js_sys::Reflect::set(&font, &JsValue::from_str("size"), &JsValue::from_f64(16.0))
+                    .unwrap();
+                js_sys::Reflect::set(
+                    &font,
+                    &JsValue::from_str("color"),
+                    &JsValue::from_str(color_text()),
+                )
+                .unwrap();
+                font.into()
+            })
+            .unwrap();
             title.into()
-        }).unwrap();
-        
+        })
+        .unwrap();
+
         // Apply common layout settings
         apply_common_layout_settings(&layout);
-        
+
         // Specific settings for this chart
         js_sys::Reflect::set(&layout, &JsValue::from_str("xaxis"), &{
             let axis = js_sys::Object::new();
-            js_sys::Reflect::set(
-                &axis,
-                &JsValue::from_str("title"),
-                &{
-                    let title = js_sys::Object::new();
-                    js_sys::Reflect::set(
-                        &title,
-                        &JsValue::from_str("text"),
-                        &JsValue::from_str("Subject"),
-                    ).unwrap();
-                    js_sys::Reflect::set(
-                        &title,
-                        &JsValue::from_str("standoff"),
-                        &JsValue::from_f64(10.0),
-                    ).unwrap();
-                    title.into()
-                },
-            ).unwrap();
+            js_sys::Reflect::set(&axis, &JsValue::from_str("title"), &{
+                let title = js_sys::Object::new();
+                js_sys::Reflect::set(
+                    &title,
+                    &JsValue::from_str("text"),
+                    &JsValue::from_str("Subject"),
+                )
+                .unwrap();
+                js_sys::Reflect::set(
+                    &title,
+                    &JsValue::from_str("standoff"),
+                    &JsValue::from_f64(10.0),
+                )
+                .unwrap();
+                title.into()
+            })
+            .unwrap();
             axis.into()
-        }).unwrap();
-        
+        })
+        .unwrap();
+
         js_sys::Reflect::set(&layout, &JsValue::from_str("yaxis"), &{
             let axis = js_sys::Object::new();
-            js_sys::Reflect::set(
-                &axis,
-                &JsValue::from_str("title"),
-                &{
-                    let title = js_sys::Object::new();
-                    js_sys::Reflect::set(
-                        &title,
-                        &JsValue::from_str("text"),
-                        &JsValue::from_str("Average Score"),
-                    ).unwrap();
-                    title.into()
-                },
-            ).unwrap();
+            js_sys::Reflect::set(&axis, &JsValue::from_str("title"), &{
+                let title = js_sys::Object::new();
+                js_sys::Reflect::set(
+                    &title,
+                    &JsValue::from_str("text"),
+                    &JsValue::from_str("Average Score"),
+                )
+                .unwrap();
+                title.into()
+            })
+            .unwrap();
             axis.into()
-        }).unwrap();
-        
+        })
+        .unwrap();
+
         js_sys::Reflect::set(
             &layout,
             &JsValue::from_str("height"),
             &JsValue::from_f64(300.0),
-        ).unwrap();
-        
+        )
+        .unwrap();
+
         js_sys::Reflect::set(
             &layout,
             &JsValue::from_str("bargap"),
             &JsValue::from_f64(0.3),
-        ).unwrap();
+        )
+        .unwrap();
 
         // Get common config
         let config = get_common_config();
@@ -527,6 +570,7 @@ pub fn render_test_distribution(
 }
 
 // Function to render overall student progress chart
+#[cfg(feature = "hydrate")]
 pub fn render_overall_progress(scores: Vec<Score>) -> impl IntoView {
     let plot_div_id = "overall-progress-plot";
     let plot_div_ref = create_node_ref::<html::Div>();
@@ -565,78 +609,83 @@ pub fn render_overall_progress(scores: Vec<Score>) -> impl IntoView {
             &trace,
             &JsValue::from_str("x"),
             &JsValue::from_serde(&dates).unwrap(),
-        ).unwrap();
-        
+        )
+        .unwrap();
+
         js_sys::Reflect::set(
             &trace,
             &JsValue::from_str("y"),
             &JsValue::from_serde(&averages).unwrap(),
-        ).unwrap();
-        
+        )
+        .unwrap();
+
         js_sys::Reflect::set(
             &trace,
             &JsValue::from_str("type"),
             &JsValue::from_str("scatter"),
-        ).unwrap();
-        
+        )
+        .unwrap();
+
         js_sys::Reflect::set(
             &trace,
             &JsValue::from_str("mode"),
             &JsValue::from_str("lines+markers"),
-        ).unwrap();
-        
+        )
+        .unwrap();
+
         js_sys::Reflect::set(
             &trace,
             &JsValue::from_str("fill"),
             &JsValue::from_str("tozeroy"),
-        ).unwrap();
-        
+        )
+        .unwrap();
+
         js_sys::Reflect::set(
             &trace,
             &JsValue::from_str("fillcolor"),
             &JsValue::from_str("rgba(255, 122, 89, 0.1)"),
-        ).unwrap();
-        
+        )
+        .unwrap();
+
         js_sys::Reflect::set(&trace, &JsValue::from_str("marker"), &{
             let marker = js_sys::Object::new();
             js_sys::Reflect::set(
                 &marker,
                 &JsValue::from_str("color"),
                 &JsValue::from_str(color_primary()),
-            ).unwrap();
-            js_sys::Reflect::set(
-                &marker,
-                &JsValue::from_str("size"),
-                &JsValue::from_f64(8.0),
-            ).unwrap();
+            )
+            .unwrap();
+            js_sys::Reflect::set(&marker, &JsValue::from_str("size"), &JsValue::from_f64(8.0))
+                .unwrap();
             marker.into()
-        }).unwrap();
-        
+        })
+        .unwrap();
+
         js_sys::Reflect::set(&trace, &JsValue::from_str("line"), &{
             let line = js_sys::Object::new();
             js_sys::Reflect::set(
                 &line,
                 &JsValue::from_str("color"),
                 &JsValue::from_str(color_primary()),
-            ).unwrap();
-            js_sys::Reflect::set(
-                &line,
-                &JsValue::from_str("width"),
-                &JsValue::from_f64(2.5),
-            ).unwrap();
+            )
+            .unwrap();
+            js_sys::Reflect::set(&line, &JsValue::from_str("width"), &JsValue::from_f64(2.5))
+                .unwrap();
             js_sys::Reflect::set(
                 &line,
                 &JsValue::from_str("shape"),
                 &JsValue::from_str("spline"),
-            ).unwrap();
+            )
+            .unwrap();
             line.into()
-        }).unwrap();
+        })
+        .unwrap();
 
         plot_data.push(&trace);
 
         // Create layout
         let layout = js_sys::Object::new();
-        
+
         // Add title with subtle styling
         js_sys::Reflect::set(&layout, &JsValue::from_str("title"), &{
             let title = js_sys::Object::new();
@@ -644,78 +693,75 @@ pub fn render_overall_progress(scores: Vec<Score>) -> impl IntoView {
                 &title,
                 &JsValue::from_str("text"),
                 &JsValue::from_str("Performance Trend"),
-            ).unwrap();
-            js_sys::Reflect::set(
-                &title,
-                &JsValue::from_str("font"),
-                &{
-                    let font = js_sys::Object::new();
-                    js_sys::Reflect::set(
-                        &font,
-                        &JsValue::from_str("size"),
-                        &JsValue::from_f64(18.0),
-                    ).unwrap();
-                    js_sys::Reflect::set(
-                        &font,
-                        &JsValue::from_str("color"),
-                        &JsValue::from_str(color_text()),
-                    ).unwrap();
-                    font.into()
-                },
-            ).unwrap();
+            )
+            .unwrap();
+            js_sys::Reflect::set(&title, &JsValue::from_str("font"), &{
+                let font = js_sys::Object::new();
+                js_sys::Reflect::set(&font, &JsValue::from_str("size"), &JsValue::from_f64(18.0))
+                    .unwrap();
+                js_sys::Reflect::set(
+                    &font,
+                    &JsValue::from_str("color"),
+                    &JsValue::from_str(color_text()),
+                )
+                .unwrap();
+                font.into()
+            })
+            .unwrap();
             title.into()
-        }).unwrap();
-        
+        })
+        .unwrap();
+
         // Apply common layout settings
         apply_common_layout_settings(&layout);
-        
+
         // Specific settings for this chart
         js_sys::Reflect::set(&layout, &JsValue::from_str("xaxis"), &{
             let axis = js_sys::Object::new();
-            js_sys::Reflect::set(
-                &axis,
-                &JsValue::from_str("title"),
-                &{
-                    let title = js_sys::Object::new();
-                    js_sys::Reflect::set(
-                        &title,
-                        &JsValue::from_str("text"),
-                        &JsValue::from_str("Date"),
-                    ).unwrap();
-                    js_sys::Reflect::set(
-                        &title,
-                        &JsValue::from_str("standoff"),
-                        &JsValue::from_f64(10.0),
-                    ).unwrap();
-                    title.into()
-                },
-            ).unwrap();
+            js_sys::Reflect::set(&axis, &JsValue::from_str("title"), &{
+                let title = js_sys::Object::new();
+                js_sys::Reflect::set(
+                    &title,
+                    &JsValue::from_str("text"),
+                    &JsValue::from_str("Date"),
+                )
+                .unwrap();
+                js_sys::Reflect::set(
+                    &title,
+                    &JsValue::from_str("standoff"),
+                    &JsValue::from_f64(10.0),
+                )
+                .unwrap();
+                title.into()
+            })
+            .unwrap();
             axis.into()
-        }).unwrap();
-        
+        })
+        .unwrap();
+
         js_sys::Reflect::set(&layout, &JsValue::from_str("yaxis"), &{
             let axis = js_sys::Object::new();
-            js_sys::Reflect::set(
-                &axis,
-                &JsValue::from_str("title"),
-                &{
-                    let title = js_sys::Object::new();
-                    js_sys::Reflect::set(
-                        &title,
-                        &JsValue::from_str("text"),
-                        &JsValue::from_str("Average Score"),
-                    ).unwrap();
-                    title.into()
-                },
-            ).unwrap();
+            js_sys::Reflect::set(&axis, &JsValue::from_str("title"), &{
+                let title = js_sys::Object::new();
+                js_sys::Reflect::set(
+                    &title,
+                    &JsValue::from_str("text"),
+                    &JsValue::from_str("Average Score"),
+                )
+                .unwrap();
+                title.into()
+            })
+            .unwrap();
             axis.into()
-        }).unwrap();
-        
+        })
+        .unwrap();
+
         js_sys::Reflect::set(
             &layout,
             &JsValue::from_str("height"),
             &JsValue::from_f64(350.0),
-        ).unwrap();
+        )
+        .unwrap();
 
         // Get common config
         let config = get_common_config();
@@ -735,6 +781,7 @@ pub fn render_overall_progress(scores: Vec<Score>) -> impl IntoView {
 }
 
 // Function to render score distribution chart
+#[cfg(feature = "hydrate")]
 pub fn render_score_distribution(scores: Vec<Score>) -> impl IntoView {
     let plot_div_id = "score-distribution-plot";
     let plot_div_ref = create_node_ref::<html::Div>();
@@ -772,20 +819,23 @@ pub fn render_score_distribution(scores: Vec<Score>) -> impl IntoView {
             &trace,
             &JsValue::from_str("x"),
             &JsValue::from_serde(&range_labels).unwrap(),
-        ).unwrap();
-        
+        )
+        .unwrap();
+
         js_sys::Reflect::set(
             &trace,
             &JsValue::from_str("y"),
             &JsValue::from_serde(&score_ranges).unwrap(),
-        ).unwrap();
-        
+        )
+        .unwrap();
+
         js_sys::Reflect::set(
             &trace,
             &JsValue::from_str("type"),
             &JsValue::from_str("bar"),
-        ).unwrap();
-        
+        )
+        .unwrap();
+
         js_sys::Reflect::set(&trace, &JsValue::from_str("marker"), &{
             let marker = js_sys::Object::new();
             let colors = js_sys::Array::new();
@@ -794,18 +844,24 @@ pub fn render_score_distribution(scores: Vec<Score>) -> impl IntoView {
             colors.push(&JsValue::from_str(color_medium())); // Medium orange for 41-60
             colors.push(&JsValue::from_str(color_medium())); // Medium orange for 61-80
             colors.push(&JsValue::from_str(color_high())); // Orange for 81-100
-            
+
             js_sys::Reflect::set(&marker, &JsValue::from_str("color"), &colors).unwrap();
-            js_sys::Reflect::set(&marker, &JsValue::from_str("opacity"), &JsValue::from_f64(0.9)).unwrap();
-            
+            js_sys::Reflect::set(
+                &marker,
+                &JsValue::from_str("opacity"),
+                &JsValue::from_f64(0.9),
+            )
+            .unwrap();
+
             marker.into()
-        }).unwrap();
+        })
+        .unwrap();
 
         plot_data.push(&trace);
 
         // Create layout
         let layout = js_sys::Object::new();
-        
+
         // Add title with subtle styling
         js_sys::Reflect::set(&layout, &JsValue::from_str("title"), &{
             let title = js_sys::Object::new();
@@ -813,84 +869,82 @@ pub fn render_score_distribution(scores: Vec<Score>) -> impl IntoView {
                 &title,
                 &JsValue::from_str("text"),
                 &JsValue::from_str("Score Distribution"),
-            ).unwrap();
-            js_sys::Reflect::set(
-                &title,
-                &JsValue::from_str("font"),
-                &{
-                    let font = js_sys::Object::new();
-                    js_sys::Reflect::set(
-                        &font,
-                        &JsValue::from_str("size"),
-                        &JsValue::from_f64(16.0),
-                    ).unwrap();
-                    js_sys::Reflect::set(
-                        &font,
-                        &JsValue::from_str("color"),
-                        &JsValue::from_str(color_text()),
-                    ).unwrap();
-                    font.into()
-                },
-            ).unwrap();
+            )
+            .unwrap();
+            js_sys::Reflect::set(&title, &JsValue::from_str("font"), &{
+                let font = js_sys::Object::new();
+                js_sys::Reflect::set(&font, &JsValue::from_str("size"), &JsValue::from_f64(16.0))
+                    .unwrap();
+                js_sys::Reflect::set(
+                    &font,
+                    &JsValue::from_str("color"),
+                    &JsValue::from_str(color_text()),
+                )
+                .unwrap();
+                font.into()
+            })
+            .unwrap();
             title.into()
-        }).unwrap();
-        
+        })
+        .unwrap();
+
         // Apply common layout settings
         apply_common_layout_settings(&layout);
-        
+
         // Specific settings for this chart
         js_sys::Reflect::set(&layout, &JsValue::from_str("xaxis"), &{
             let axis = js_sys::Object::new();
-            js_sys::Reflect::set(
-                &axis,
-                &JsValue::from_str("title"),
-                &{
-                    let title = js_sys::Object::new();
-                    js_sys::Reflect::set(
-                        &title,
-                        &JsValue::from_str("text"),
-                        &JsValue::from_str("Score Range"),
-                    ).unwrap();
-                    js_sys::Reflect::set(
-                        &title,
-                        &JsValue::from_str("standoff"),
-                        &JsValue::from_f64(10.0),
-                    ).unwrap();
-                    title.into()
-                },
-            ).unwrap();
+            js_sys::Reflect::set(&axis, &JsValue::from_str("title"), &{
+                let title = js_sys::Object::new();
+                js_sys::Reflect::set(
+                    &title,
+                    &JsValue::from_str("text"),
+                    &JsValue::from_str("Score Range"),
+                )
+                .unwrap();
+                js_sys::Reflect::set(
+                    &title,
+                    &JsValue::from_str("standoff"),
+                    &JsValue::from_f64(10.0),
+                )
+                .unwrap();
+                title.into()
+            })
+            .unwrap();
             axis.into()
-        }).unwrap();
-        
+        })
+        .unwrap();
+
         js_sys::Reflect::set(&layout, &JsValue::from_str("yaxis"), &{
             let axis = js_sys::Object::new();
-            js_sys::Reflect::set(
-                &axis,
-                &JsValue::from_str("title"),
-                &{
-                    let title = js_sys::Object::new();
-                    js_sys::Reflect::set(
-                        &title,
-                        &JsValue::from_str("text"),
-                        &JsValue::from_str("Number of Tests"),
-                    ).unwrap();
-                    title.into()
-                },
-            ).unwrap();
+            js_sys::Reflect::set(&axis, &JsValue::from_str("title"), &{
+                let title = js_sys::Object::new();
+                js_sys::Reflect::set(
+                    &title,
+                    &JsValue::from_str("text"),
+                    &JsValue::from_str("Number of Tests"),
+                )
+                .unwrap();
+                title.into()
+            })
+            .unwrap();
             axis.into()
-        }).unwrap();
-        
+        })
+        .unwrap();
+
         js_sys::Reflect::set(
             &layout,
             &JsValue::from_str("height"),
             &JsValue::from_f64(350.0),
-        ).unwrap();
-        
+        )
+        .unwrap();
+
         js_sys::Reflect::set(
             &layout,
             &JsValue::from_str("bargap"),
             &JsValue::from_f64(0.3),
-        ).unwrap();
+        )
+        .unwrap();
 
         // Get common config
         let config = get_common_config();

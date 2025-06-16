@@ -1,12 +1,18 @@
+/*
 use leptos::*;
 use log::{error, info, warn};
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::rc::Rc;
 use uuid::Uuid;
-use wasm_bindgen::prelude::*;
-use wasm_bindgen::JsCast;
-use web_sys::{MessageEvent, WebSocket};
+
+#[cfg(feature = "hydrate")]
+use {
+    js_sys::Date,
+    wasm_bindgen::prelude::*,
+    wasm_bindgen::JsCast,
+    web_sys::{MessageEvent, WebSocket},
+};
 
 // Import the server functions
 use crate::app::models::websocket_session::{CreateSessionRequest, SessionSummary, SessionType};
@@ -48,12 +54,14 @@ pub fn Chat() -> impl IntoView {
     let (active_tab, set_active_tab) = create_signal("join"); // "join" or "create"
 
     // Create a shared reference to store the WebSocket
+    #[cfg(feature = "hydrate")]
     let socket_ref = Rc::new(RefCell::new(None::<WebSocket>));
     let socket_ref_for_cleanup = Rc::clone(&socket_ref);
     let socket_ref_for_send = Rc::clone(&socket_ref);
     let socket_ref_for_leave = Rc::clone(&socket_ref);
 
     // Define connect_to_websocket action before using it
+    #[cfg(feature = "hydrate")]
     let connect_to_websocket = create_action(move |room_id_str: &String| {
         let room_id_val = room_id_str.clone();
         let socket_ref_clone = Rc::clone(&socket_ref);
@@ -361,6 +369,7 @@ pub fn Chat() -> impl IntoView {
     });
 
     // Refresh active sessions periodically
+    #[cfg(feature = "hydrate")]
     let refresh_timer = use_interval(
         move || {
             if !is_in_room.get() {
@@ -806,6 +815,7 @@ pub fn Chat() -> impl IntoView {
     }
 }
 
+#[cfg(feature = "hydrate")]
 fn use_interval<F>(f: F, ms: u32) -> impl Drop
 where
     F: FnMut() + 'static,
@@ -829,13 +839,15 @@ where
     }
 }
 
+#[cfg(feature = "hydrate")]
 struct IntervalGuard {
     window: web_sys::Window,
     interval_id: i32,
 }
 
+#[cfg(feature = "hydrate")]
 impl Drop for IntervalGuard {
     fn drop(&mut self) {
         self.window.clear_interval_with_handle(self.interval_id);
     }
-}
+}*/

@@ -108,25 +108,6 @@ pub fn DashboardSidebar(
     // Handle window size for responsive behavior
     let (is_small_screen, set_is_small_screen) = create_signal(false);
 
-    // Handle window resize events
-    let window = window();
-
-    // Function to check screen size
-    let check_screen_size = move || {
-        // Direct usage of window without trying to unwrap Result
-        let width = window.inner_width().unwrap().as_f64().unwrap();
-        set_is_small_screen(width < 768.0); // 768px is typical md breakpoint
-    };
-
-    // Check screen size on mount
-    check_screen_size();
-
-    // Set up resize event listener - use window_event_listener instead of use_event_listener
-    // The returned handle will be automatically cleaned up when the component is removed
-    let _cleanup = window_event_listener(ev::resize, move |_| {
-        check_screen_size();
-    });
-
     // Computed position for dropdown modal based on screen size
     let modal_position = move || {
         let base_left = if is_pinned_closed() {
@@ -271,15 +252,6 @@ pub fn DashboardSidebar(
                                 </Show>
                             </div>
                         </div>
-
-                    /*<SidebarNavLink
-                            icon=IoSettingsOutline
-                            label="Settings (beta)"
-                            path="/settings"
-                            is_expanded=is_expanded.into()
-                            is_active=Signal::derive(move || current_path().starts_with("/settings"))
-                            is_small_screen=is_small_screen.into()
-                        />*/
 
                         // Divider
                         <div class="border-t border-[#DADADA] my-2"></div>

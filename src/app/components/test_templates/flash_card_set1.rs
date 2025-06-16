@@ -10,6 +10,8 @@ use crate::app::server_functions::{
 use leptos::*;
 use leptos_router::*;
 use std::collections::HashMap;
+
+#[cfg(feature = "hydrate")]
 use wasm_bindgen::JsCast;
 
 #[derive(Debug, Clone)]

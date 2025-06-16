@@ -13,10 +13,30 @@ cfg_if::cfg_if! {
         use std::env;
         use leptos::*;
         use tokio::*;
+        use std::sync::Once;
+
+        // Use Once to ensure dotenv is only called once
+        static INIT: Once = Once::new();
+
+        fn init_env() {
+            INIT.call_once(|| {
+                match dotenv() {
+                    Ok(_) => info!("Environment variables loaded from .env file"),
+                    Err(e) => {
+                        warn!("Could not load .env file: {}. Using system environment variables.", e);
+                    }
+                }
+            });
+        }
 
        pub async fn create_pool() -> sqlx::PgPool {
-           dotenv().ok();
-            let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set in .env");
+           // Initialize environment variables only once
+           init_env();
+
+            let database_url = env::var("DATABASE_URL")
+                .expect("DATABASE_URL must be set in environment variables or .env file");
+
+            info!("Creating database connection pool...");
 
             //create the connection pool using sqlx
             let pool = sqlx::postgres::PgPoolOptions::new()
@@ -25,10 +45,13 @@ cfg_if::cfg_if! {
             .await
             .expect("Failed to create PostgreSQL pool");
 
+            info!("Running database migrations...");
             sqlx::migrate!()
                 .run(&pool)
                 .await
                 .expect("migrations failed");
+
+            info!("Database pool and migrations completed successfully");
            pool
         }
 

@@ -18,7 +18,9 @@ use pages::{
     TestBuilder, TestResultsPage, TestSessionsList,
 };
 pub mod components;
-use components::auth::authorization_components::{AuthProvider, RequireAuth, RequireRole};
+use components::auth::authorization_components::{
+    AuthProvider, RequireAdminOrTeacher, RequireAuth, RequireRole,
+};
 pub mod middleware;
 pub mod services;
 
@@ -53,20 +55,8 @@ pub fn App() -> impl IntoView {
                                     <HomePage />
                                 }
                             }/>
-                            <Route path="/dashboard" view=move || {
-                                view! {
-                                    <RequireAuth>
-                                        <Dashboard />
-                                    </RequireAuth>
-                                }
-                            }/>
-                            <Route path="/studentview" view=move || {
-                                view!{
-                                    <RequireRole role="admin".to_string()>
-                                        <StudentView />
-                                    </RequireRole>
-                                }
-                            }/>
+                            <Route path="/dashboard" view=Dashboard />
+                            <Route path="/studentview" view=StudentView />
                             <Route path="/studentview/:student_id/results" view=TestResultsPage />
                             <Route path="/admintest" view=move || {
                                 view!{
@@ -125,76 +115,61 @@ pub fn App() -> impl IntoView {
                                     <ResetPasswordForm />
                                 }
                             }/>
+                            // Fixed: Use RequireAdminOrTeacher instead of nested RequireRole
                             <Route path="/gradebook" view=|| {
                                 view!{
-                                    <RequireRole role="admin".to_string()>
-                                        <RequireRole role="teacher".to_string()>
-                                            <Gradebook />
-                                        </RequireRole>
-                                    </RequireRole>
+                                    <RequireAdminOrTeacher>
+                                        <Gradebook />
+                                    </RequireAdminOrTeacher>
                                 }
                             }/>
                             <Route path="/mathtesting" view=|| {
                                 view!{
-                                    <RequireRole role="admin".to_string()>
-                                        <RequireRole role="teacher".to_string()>
-                                            <MathTesting />
-                                        </RequireRole>
-                                    </RequireRole>
+                                    <RequireAdminOrTeacher>
+                                        <MathTesting />
+                                    </RequireAdminOrTeacher>
                                 }
                             }/>
                             <Route path="/readingtesting" view=|| {
                                 view!{
-                                    <RequireRole role="admin".to_string()>
-                                        <RequireRole role="teacher".to_string()>
-                                            <ReadingTesting />
-                                        </RequireRole>
-                                    </RequireRole>
+                                    <RequireAdminOrTeacher>
+                                        <ReadingTesting />
+                                    </RequireAdminOrTeacher>
                                 }
                             }/>
                             <Route path="/testbuilder" view=|| {
                                 view!{
-                                    <RequireRole role="teacher".to_string()>
-                                        <RequireRole role="admin".to_string()>
-                                            <TestBuilder />
-                                        </RequireRole>
-                                    </RequireRole>
+                                    <RequireAdminOrTeacher>
+                                        <TestBuilder />
+                                    </RequireAdminOrTeacher>
                                 }
                             }/>
                             <Route path="/testbuilder/:test_id" view= || {
                                 view!{
-                                    <RequireRole role="admin".to_string()>
-                                        <RequireRole role="teacher".to_string()>
-                                            <TestBuilder />
-                                        </RequireRole>
-                                    </RequireRole>
+                                    <RequireAdminOrTeacher>
+                                        <TestBuilder />
+                                    </RequireAdminOrTeacher>
                                 }
                             }/>
                             <Route path="/assessment/:test_id" view=|| {
                                 view!{
-                                    <RequireRole role="teacher".to_string()>
-                                        <RequireRole role="admin".to_string()>
-                                            <Assessment />
-                                        </RequireRole>
-                                    </RequireRole>
+                                    <RequireAdminOrTeacher>
+                                        <Assessment />
+                                    </RequireAdminOrTeacher>
                                 }
                             }/>
                             <Route path="/flashcardset/:test_id" view=|| {
                                 view!{
-                                    <RequireRole role="teacher".to_string()>
-                                        <RequireRole role="admin".to_string()>
-                                            <FlashCardSet />
-                                        </RequireRole>
-                                    </RequireRole>
+                                    <RequireAdminOrTeacher>
+                                        <FlashCardSet />
+                                    </RequireAdminOrTeacher>
                                 }
                             }/>
                             <Route path="/reviewtest/:test_id/:student_id/:test_variant/:attempt" view=|| {
                                 view! {
-                                    <RequireRole role="teacher".to_string()>
-                                        <RequireRole role="admin".to_string()>
-                                            <ReviewTest />
-                                        </RequireRole>
-                                    </RequireRole>
+                                    <RequireAdminOrTeacher>
+                                        <ReviewTest />
+                                    </RequireAdminOrTeacher>
                                 }
                             }/>
                             <Route path="/test-session/:test_id" view=RealtimeTestSession/>

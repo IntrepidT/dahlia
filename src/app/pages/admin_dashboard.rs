@@ -12,6 +12,8 @@ use leptos_router::*;
 use rust_decimal::Decimal;
 use std::str::FromStr;
 use strum::IntoEnumIterator;
+
+#[cfg(feature = "hydrate")]
 use wasm_bindgen::JsCast;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -464,8 +466,11 @@ pub fn AdminDashboard() -> impl IntoView {
                                                                 <button
                                                                     class="text-red-600 hover:text-red-900"
                                                                     on:click=move |_| {
-                                                                        if window().confirm_with_message("Are you sure you want to delete this course?").unwrap_or(false) {
-                                                                            delete_course_action.dispatch(delete_course_id);
+                                                                        #[cfg(feature = "hydrate")]
+                                                                        {
+                                                                            if window().confirm_with_message("Are you sure you want to delete this course?").unwrap_or(false) {
+                                                                                delete_course_action.dispatch(delete_course_id);
+                                                                            }
                                                                         }
                                                                     }
                                                                 >
@@ -568,8 +573,11 @@ pub fn AdminDashboard() -> impl IntoView {
                                                                 <button
                                                                     class="text-red-600 hover:text-red-900"
                                                                     on:click=move |_| {
-                                                                        if window().confirm_with_message("Are you sure you want to delete this enrollment?").unwrap_or(false) {
-                                                                            delete_enrollment_action.dispatch((enrollment_clone_delete.student_id, enrollment_clone_delete.academic_year.clone()));
+                                                                        #[cfg(feature = "hydrate")]
+                                                                        {
+                                                                            if window().confirm_with_message("Are you sure you want to delete this enrollment?").unwrap_or(false) {
+                                                                                delete_enrollment_action.dispatch((enrollment_clone_delete.student_id, enrollment_clone_delete.academic_year.clone()));
+                                                                            }
                                                                         }
                                                                     }
                                                                 >
@@ -597,29 +605,33 @@ pub fn AdminDashboard() -> impl IntoView {
                                     </h3>
                                     <form on:submit=move |ev| {
                                         ev.prevent_default();
-                                        let form = ev.target().unwrap().dyn_into::<web_sys::HtmlFormElement>().unwrap();
-                                        let form_data = web_sys::FormData::new_with_form(&form).unwrap();
+                                        #[cfg(feature = "hydrate")]
+                                        {
+                                            let form = ev.target().unwrap().dyn_into::<web_sys::HtmlFormElement>().unwrap();
+                                            let form_data = web_sys::FormData::new_with_form(&form).unwrap();
 
-                                        let course_data = CourseFormData {
-                                            name: form_data.get("name").as_string().unwrap_or_default(),
-                                            subject: form_data.get("subject").as_string().unwrap_or_default(),
-                                            course_code: form_data.get("course_code").as_string().unwrap_or_default(),
-                                            course_level: form_data.get("course_level").as_string()
-                                                .and_then(|s| GradeEnum::iter().find(|g| g.to_string() == s))
-                                                .unwrap_or(GradeEnum::Kindergarten),
-                                            teacher_id: form_data.get("teacher_id").as_string().unwrap_or_default(),
-                                            academic_year: form_data.get("academic_year").as_string()
-                                                .and_then(|s| AcademicYear::iter().find(|y| y.to_string() == s))
-                                                .unwrap_or(AcademicYear::Year2024_2025),
-                                            semester_period: form_data.get("semester_period").as_string().unwrap_or_default(),
-                                            credits: form_data.get("credits").as_string().unwrap_or_default(),
-                                            description: form_data.get("description").as_string().unwrap_or_default(),
-                                            max_students: form_data.get("max_students").as_string().unwrap_or_default(),
-                                            room_number: form_data.get("room_number").as_string().unwrap_or_default(),
-                                        };
+                                            let course_data = CourseFormData {
+                                                name: form_data.get("name").as_string().unwrap_or_default(),
+                                                subject: form_data.get("subject").as_string().unwrap_or_default(),
+                                                course_code: form_data.get("course_code").as_string().unwrap_or_default(),
+                                                course_level: form_data.get("course_level").as_string()
+                                                    .and_then(|s| GradeEnum::iter().find(|g| g.to_string() == s))
+                                                    .unwrap_or(GradeEnum::Kindergarten),
+                                                teacher_id: form_data.get("teacher_id").as_string().unwrap_or_default(),
+                                                academic_year: form_data.get("academic_year").as_string()
+                                                    .and_then(|s| AcademicYear::iter().find(|y| y.to_string() == s))
+                                                    .unwrap_or(AcademicYear::Year2024_2025),
+                                                semester_period: form_data.get("semester_period").as_string().unwrap_or_default(),
+                                                credits: form_data.get("credits").as_string().unwrap_or_default(),
+                                                description: form_data.get("description").as_string().unwrap_or_default(),
+                                                max_students: form_data.get("max_students").as_string().unwrap_or_default(),
+                                                room_number: form_data.get("room_number").as_string().unwrap_or_default(),
+                                            };
 
-                                        let editing_id = editing_course.get().map(|c| c.id);
-                                        save_course_action.dispatch((course_data, editing_id));
+                                            let editing_id = editing_course.get().map(|c| c.id);
+                                            save_course_action.dispatch((course_data, editing_id));
+                                        }
+
                                     }>
                                         <div class="grid grid-cols-2 gap-4">
                                             <div>
@@ -808,32 +820,36 @@ pub fn AdminDashboard() -> impl IntoView {
 
                                     <form on:submit=move |ev| {
                                         ev.prevent_default();
-                                        let form = ev.target().unwrap().dyn_into::<web_sys::HtmlFormElement>().unwrap();
-                                        let form_data = web_sys::FormData::new_with_form(&form).unwrap();
+                                        #[cfg(feature = "hydrate")]
+                                        {
+                                            let form = ev.target().unwrap().dyn_into::<web_sys::HtmlFormElement>().unwrap();
+                                            let form_data = web_sys::FormData::new_with_form(&form).unwrap();
 
-                                        let enrollment_data = EnrollmentFormData {
-                                            student_id: form_data.get("student_id").as_string().unwrap_or_default(),
-                                            course_id: if let Some(course) = selected_course_for_enrollment.get() {
-                                                course.id.to_string()
-                                            } else {
-                                                form_data.get("course_id").as_string().unwrap_or_default()
-                                            },
-                                            academic_year: form_data.get("academic_year").as_string()
-                                                .and_then(|s| AcademicYear::iter().find(|y| y.to_string() == s))
-                                                .unwrap_or(AcademicYear::Year2024_2025),
-                                            grade_level: form_data.get("grade_level").as_string()
-                                                .and_then(|s| GradeEnum::iter().find(|g| g.to_string() == s))
-                                                .unwrap_or(GradeEnum::Kindergarten),
-                                            teacher_id: form_data.get("teacher_id").as_string().unwrap_or_default(),
-                                            status: form_data.get("status").as_string()
-                                                .and_then(|s| EnrollmentStatus::iter().find(|st| st.to_string() == s))
-                                                .unwrap_or(EnrollmentStatus::Active),
-                                            enrollment_date: Local::now().date_naive(),
-                                            status_change_date: Some(Local::now().date_naive()),
-                                            notes: Some(form_data.get("notes").as_string().unwrap_or_default()),
-                                        };
+                                            let enrollment_data = EnrollmentFormData {
+                                                student_id: form_data.get("student_id").as_string().unwrap_or_default(),
+                                                course_id: if let Some(course) = selected_course_for_enrollment.get() {
+                                                    course.id.to_string()
+                                                } else {
+                                                    form_data.get("course_id").as_string().unwrap_or_default()
+                                                },
+                                                academic_year: form_data.get("academic_year").as_string()
+                                                    .and_then(|s| AcademicYear::iter().find(|y| y.to_string() == s))
+                                                    .unwrap_or(AcademicYear::Year2024_2025),
+                                                grade_level: form_data.get("grade_level").as_string()
+                                                    .and_then(|s| GradeEnum::iter().find(|g| g.to_string() == s))
+                                                    .unwrap_or(GradeEnum::Kindergarten),
+                                                teacher_id: form_data.get("teacher_id").as_string().unwrap_or_default(),
+                                                status: form_data.get("status").as_string()
+                                                    .and_then(|s| EnrollmentStatus::iter().find(|st| st.to_string() == s))
+                                                    .unwrap_or(EnrollmentStatus::Active),
+                                                enrollment_date: Local::now().date_naive(),
+                                                status_change_date: Some(Local::now().date_naive()),
+                                                notes: Some(form_data.get("notes").as_string().unwrap_or_default()),
+                                            };
 
-                                        create_enrollment_action.dispatch(enrollment_data);
+                                            create_enrollment_action.dispatch(enrollment_data);
+                                        }
+
                                     }>
                                         <div class="grid grid-cols-2 gap-4">
                                             <div>

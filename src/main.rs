@@ -30,7 +30,7 @@ async fn main() -> std::io::Result<()> {
     let pool = web::Data::new(pool_one.clone());
 
     //Initialize the Chat server
-    let chat_server = web::Data::new(Lobby::default().start());
+    let chat_server = web::Data::new(Lobby::new(pool_one.clone()).start());
 
     // Generate the list of routes in your Leptos App
     let routes = generate_route_list(App);
@@ -85,7 +85,7 @@ async fn favicon(
     let leptos_options = leptos_options.into_inner();
     let site_root = &leptos_options.site_root;
     Ok(actix_files::NamedFile::open(format!(
-        "{site_root}/favicon.ico"
+        "{site_root}/assets/favicon.ico"
     ))?)
 }
 

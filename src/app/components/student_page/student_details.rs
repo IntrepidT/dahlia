@@ -208,19 +208,19 @@ pub fn StudentDetails(
                                         <div class="h-2 w-2 rounded-full bg-green-600 mr-2"></div>
                                         "Student identity available - showing real information"
                                     </div>
-                                }
+                                }.into_any()
                             } else {
                                 view! {
                                     <div class="flex items-center text-amber-700 bg-amber-50 border-amber-200">
                                         <div class="h-2 w-2 rounded-full bg-amber-600 mr-2"></div>
                                         "Student identity protected - showing anonymized information"
                                     </div>
-                                }
+                                }.into_any()
                             }}
                         </div>
                     }.into_any()
                 } else {
-                    view! { <span></span> }.into_any()
+                    view! { <div></div> }.into_any()
                 }
             }}
 

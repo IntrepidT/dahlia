@@ -1,3 +1,4 @@
+use crate::app::components::authorization_components::perform_post_login_redirect;
 use crate::app::models::user::UserJwt;
 use crate::app::server_functions::auth::{get_current_user, login, logout, register};
 use leptos::*;
@@ -45,6 +46,9 @@ pub fn LoginForm() -> impl IntoView {
                         logging::log!("Login successful, setting user");
                         set_current_user.set(response.user);
                         set_error.set(None);
+
+                        // Use the simple redirect function
+                        perform_post_login_redirect();
                     } else {
                         logging::log!("Login failed: {}", response.message);
                         set_error.set(Some(response.message));
@@ -52,7 +56,9 @@ pub fn LoginForm() -> impl IntoView {
                 }
                 Err(err) => {
                     logging::log!("Login error: {:?}", err);
-                    set_error.set(Some(format!("Error: {:?}", err)));
+                    set_error.set(Some(
+                        "Login failed. Please check your credentials and try again.".to_string(),
+                    ));
                 }
             }
         }
@@ -146,6 +152,9 @@ pub fn RegisterForm() -> impl IntoView {
                     if response.success {
                         set_current_user.set(response.user);
                         set_error.set(None);
+
+                        // Use the simple redirect function
+                        perform_post_login_redirect();
                     } else {
                         set_error.set(Some(response.message));
                     }

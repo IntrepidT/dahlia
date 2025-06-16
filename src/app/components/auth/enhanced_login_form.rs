@@ -1,9 +1,12 @@
+use crate::app::components::auth::authorization_components::perform_post_login_redirect;
 use crate::app::middleware::global_settings::use_settings;
 use crate::app::models::user::UserJwt;
 use crate::app::server_functions::auth::login;
 use leptos::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+
+#[cfg(feature = "hydrate")]
 use wasm_bindgen::{closure::Closure, JsCast};
 
 #[derive(Debug, Clone)]
@@ -41,6 +44,11 @@ impl StudentMappingService {
             app_id_to_original,
             original_to_app_id,
         }
+    }
+
+    // Fix: Add missing method
+    pub fn get_mapping_count(&self) -> usize {
+        self.app_id_to_original.len()
     }
 
     // De-anonymize: Convert app_id back to original student info
@@ -153,7 +161,10 @@ pub fn EnhancedLoginForm() -> impl IntoView {
     let (error, set_error) = create_signal::<Option<String>>(None);
     let (student_mapping_file, set_student_mapping_file) = create_signal::<Option<String>>(None);
     let (file_upload_status, set_file_upload_status) = create_signal::<Option<String>>(None);
+    let (is_submitting, set_is_submitting) = create_signal(false);
+
     let set_current_user = use_context::<WriteSignal<Option<UserJwt>>>().unwrap();
+    let redirect_after_login = perform_post_login_redirect();
 
     // Get the mapping service context
     let (_, set_student_mapping_service) = use_student_mapping_service();
@@ -169,7 +180,6 @@ pub fn EnhancedLoginForm() -> impl IntoView {
             return Err("Empty file".to_string());
         }
 
-        // Validate header line
         if lines.len() < 2 {
             return Err("File must contain header and at least one data row".to_string());
         }
@@ -193,7 +203,18 @@ pub fn EnhancedLoginForm() -> impl IntoView {
             ));
         }
 
-        // Skip header line and parse data
+        // Validate header names
+        for (i, expected) in expected_headers.iter().enumerate() {
+            if actual_headers.get(i).map(|h| h.to_lowercase()) != Some(expected.to_string()) {
+                return Err(format!(
+                    "Invalid header at position {}: expected '{}', found '{}'",
+                    i + 1,
+                    expected,
+                    actual_headers.get(i).unwrap_or(&"missing")
+                ));
+            }
+        }
+
         let data_lines = &lines[1..];
         let mut mappings = Vec::new();
 
@@ -224,6 +245,14 @@ pub fn EnhancedLoginForm() -> impl IntoView {
                 )
             })?;
 
+            // Validate that IDs are positive
+            if app_id <= 0 || original_student_id <= 0 {
+                return Err(format!(
+                    "Invalid ID values at line {}: IDs must be positive integers",
+                    line_num + 2
+                ));
+            }
+
             mappings.push(StudentMapping {
                 app_id,
                 original_student_id,
@@ -238,9 +267,26 @@ pub fn EnhancedLoginForm() -> impl IntoView {
             return Err("No valid data rows found in CSV file".to_string());
         }
 
+        // Check for duplicate app_ids or original_student_ids
+        let mut seen_app_ids = std::collections::HashSet::new();
+        let mut seen_original_ids = std::collections::HashSet::new();
+
+        for mapping in &mappings {
+            if !seen_app_ids.insert(mapping.app_id) {
+                return Err(format!("Duplicate app_id found: {}", mapping.app_id));
+            }
+            if !seen_original_ids.insert(mapping.original_student_id) {
+                return Err(format!(
+                    "Duplicate original_student_id found: {}",
+                    mapping.original_student_id
+                ));
+            }
+        }
+
         Ok(StudentMappingData { mappings })
     };
 
+    #[cfg(feature = "hydrate")]
     let handle_file_upload = move |ev: web_sys::Event| {
         let input = ev
             .target()
@@ -251,9 +297,24 @@ pub fn EnhancedLoginForm() -> impl IntoView {
         if let Some(files) = input.files() {
             if files.length() > 0 {
                 let file = files.get(0).unwrap();
-                let file_reader = web_sys::FileReader::new().unwrap();
 
+                // Validate file type
+                if !file.name().ends_with(".csv") {
+                    set_error.set(Some("Please select a CSV file".to_string()));
+                    set_file_upload_status.set(Some("Invalid file type".to_string()));
+                    return;
+                }
+
+                // Validate file size (e.g., max 10MB)
+                if file.size() > 10_000_000.0 {
+                    set_error.set(Some("File too large. Maximum size is 10MB".to_string()));
+                    set_file_upload_status.set(Some("File too large".to_string()));
+                    return;
+                }
+
+                let file_reader = web_sys::FileReader::new().unwrap();
                 set_file_upload_status.set(Some("Loading file...".to_string()));
+                set_error.set(None);
 
                 let onload = Closure::wrap(Box::new({
                     let set_student_mapping_file = set_student_mapping_file.clone();
@@ -271,33 +332,50 @@ pub fn EnhancedLoginForm() -> impl IntoView {
                         if let Ok(result) = file_reader.result() {
                             if let Some(content) = result.as_string() {
                                 match parse_csv_content(content.clone()) {
-                                    Ok(_) => {
+                                    Ok(mapping_data) => {
                                         set_student_mapping_file.set(Some(content));
                                         set_error.set(None);
-                                        set_file_upload_status
-                                            .set(Some("File loaded successfully".to_string()));
-                                        logging::log!("Student mapping file loaded successfully");
+                                        set_file_upload_status.set(Some(format!(
+                                            "File loaded successfully ({} mappings)",
+                                            mapping_data.mappings.len()
+                                        )));
+                                        logging::log!(
+                                            "Student mapping file loaded with {} mappings",
+                                            mapping_data.mappings.len()
+                                        );
                                     }
                                     Err(e) => {
                                         set_error.set(Some(format!("Invalid CSV format: {}", e)));
                                         set_file_upload_status
                                             .set(Some("Failed to load file".to_string()));
+                                        set_student_mapping_file.set(None);
                                         logging::log!("Invalid CSV in student mapping file: {}", e);
                                     }
                                 }
                             }
+                        } else {
+                            set_error.set(Some("Failed to read file".to_string()));
+                            set_file_upload_status.set(Some("Failed to read file".to_string()));
                         }
                     }
                 }) as Box<dyn Fn(web_sys::Event)>);
 
                 file_reader.set_onload(Some(onload.as_ref().unchecked_ref()));
                 onload.forget();
+
                 let _ = file_reader.read_as_text(&file);
             }
         } else {
             set_student_mapping_file.set(None);
             set_file_upload_status.set(None);
         }
+    };
+    #[cfg(not(feature = "hydrate"))]
+    let handle_file_upload = move |_| {
+        set_error.set(Some(
+            "File upload is not supported in this environment".to_string(),
+        ));
+        set_file_upload_status.set(None);
     };
 
     let handle_submit = create_action(move |_: &()| {
@@ -306,8 +384,11 @@ pub fn EnhancedLoginForm() -> impl IntoView {
         let mapping_data_content = student_mapping_file.get();
 
         async move {
+            set_is_submitting.set(true);
+
             if username.trim().is_empty() || password.trim().is_empty() {
                 set_error.set(Some("Username and password are required".to_string()));
+                set_is_submitting.set(false);
                 return;
             }
 
@@ -317,7 +398,7 @@ pub fn EnhancedLoginForm() -> impl IntoView {
                 Ok(response) => {
                     if response.success {
                         logging::log!("Login successful, setting user");
-                        set_current_user.set(response.user);
+                        set_current_user.set(response.user.clone());
 
                         // Set up mapping service only if a mapping file was provided
                         if let Some(data_content) = mapping_data_content {
@@ -325,9 +406,11 @@ pub fn EnhancedLoginForm() -> impl IntoView {
                                 Ok(mapping_data) => {
                                     let mapping_service =
                                         StudentMappingService::new(mapping_data.mappings);
+                                    let mapping_count = mapping_service.get_mapping_count();
                                     set_student_mapping_service.set(Some(mapping_service));
                                     logging::log!(
-                                        "Student mapping service initialized successfully"
+                                        "Student mapping service initialized with {} mappings",
+                                        mapping_count
                                     );
                                 }
                                 Err(e) => {
@@ -336,11 +419,11 @@ pub fn EnhancedLoginForm() -> impl IntoView {
                                         "Failed to initialize mapping service: {}",
                                         e
                                     )));
+                                    set_is_submitting.set(false);
                                     return;
                                 }
                             }
                         } else {
-                            // No mapping file provided - clear any existing mapping service
                             set_student_mapping_service.set(None);
                             logging::log!(
                                 "No student mapping file provided - de-anonymization disabled"
@@ -348,6 +431,9 @@ pub fn EnhancedLoginForm() -> impl IntoView {
                         }
 
                         set_error.set(None);
+
+                        // Use the redirect function from AuthProvider
+                        perform_post_login_redirect();
                     } else {
                         logging::log!("Login failed: {}", response.message);
                         set_error.set(Some(response.message));
@@ -355,132 +441,162 @@ pub fn EnhancedLoginForm() -> impl IntoView {
                 }
                 Err(err) => {
                     logging::log!("Login error: {:?}", err);
-                    set_error.set(Some(format!("Error: {:?}", err)));
+                    set_error.set(Some(
+                        "Login failed. Please check your credentials and try again.".to_string(),
+                    ));
                 }
             }
+
+            set_is_submitting.set(false);
         }
     });
 
     view! {
-            <div class="p-4 bg-white rounded shadow-md">
-                <h2 class="text-2xl font-bold mb-4">"Login"</h2>
+        <div class="p-6 bg-white rounded-lg shadow-md max-w-md mx-auto">
+            <h2 class="text-2xl font-bold mb-6 text-center text-gray-800">"Login"</h2>
 
-                {move || {
-                    error.get().map(|err| {
-                        view! {
-                            <div class="mb-4 p-2 bg-red-100 text-red-700 rounded">{err}</div>
-                        }
-                    })
-                }}
+            {move || {
+                error.get().map(|err| {
+                    view! {
+                        <div class="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-md">
+                            <div class="flex items-center">
+                                <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                                </svg>
+                                {err}
+                            </div>
+                        </div>
+                    }
+                })
+            }}
 
-                <form on:submit=move |ev| {
-                    ev.prevent_default();
+            <form on:submit=move |ev| {
+                ev.prevent_default();
+                if !is_submitting.get() {
                     handle_submit.dispatch(());
-                }>
-                    <div class="mb-4">
-                        <label class="block text-gray-700 mb-2" for="username">"Username"</label>
-                        <input
-                            id="username"
-                            type="text"
-                            class="w-full p-2 border rounded"
-                            prop:value=move || username.get()
-                            on:input=move |ev| set_username.set(event_target_value(&ev))
-                        />
-                    </div>
+                }
+            }>
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-medium mb-2" for="username">
+                        "Username"
+                    </label>
+                    <input
+                        id="username"
+                        type="text"
+                        class="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        prop:value=move || username.get()
+                        on:input=move |ev| set_username.set(event_target_value(&ev))
+                        prop:disabled=move || is_submitting.get()
+                        placeholder="Enter your username"
+                    />
+                </div>
 
-                    <div class="mb-4">
-                        <label class="block text-gray-700 mb-2" for="password">"Password"</label>
-                        <input
-                            id="password"
-                            type="password"
-                            class="w-full p-2 border rounded"
-                            prop:value=move || password.get()
-                            on:input=move |ev| set_password.set(event_target_value(&ev))
-                        />
-                    </div>
-
-                    {move || {
-                        if anonymization_enabled() {
-                            view! {
-                                <div class="mb-4">
-                                    <label class="block text-gray-700 mb-2" for="student-mapping">
-                                        "Student ID Mapping File (CSV)"
-                                        <span class="text-sm text-gray-500">" (Optional)"</span>
-                                    </label>
-                                    <input
-                                        id="student-mapping"
-                                        type="file"
-                                        accept=".csv"
-                                        class="w-full p-2 border rounded"
-                                        on:change=handle_file_upload
-                                    />
-                                    <p class="text-sm text-gray-500 mt-1">
-                                        "Upload a CSV file containing student ID mappings for de-anonymization. If not provided, student data will remain anonymized."
-                                    </p>
-                                    {move || {
-                                        if let Some(status) = file_upload_status.get() {
-                                            if status == "File loaded successfully" {
-                                                view! {
-                                                    <p class="text-sm text-green-600 mt-1">
-                                                        "✓ "{status}" - De-anonymization will be enabled"
-                                                    </p>
-                                                }.into_any()
-                                            } else {
-                                                view! {
-                                                    <p class="text-sm text-blue-600 mt-1">
-                                                        {status}
-                                                    </p>
-                                                }.into_any()
-                                            }
-                                        } else {
-                                            view! { <span></span> }.into_any()
-                                        }
-                                    }}
-                                </div>
-                            }.into_any()
-                        } else {
-                            view! { <span></span> }.into_any()
-                        }
-                    }}
-
-                    <button
-                        type="submit"
-                        class="w-full p-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-400"
-                        prop:disabled=move || handle_submit.pending().get()
-                    >
-                        {move || {
-                            if handle_submit.pending().get() {
-                                "Logging in..."
-                            } else {
-                                "Login"
-                            }
-                        }}
-                    </button>
-                </form>
+                <div class="mb-6">
+                    <label class="block text-gray-700 text-sm font-medium mb-2" for="password">
+                        "Password"
+                    </label>
+                    <input
+                        id="password"
+                        type="password"
+                        class="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        prop:value=move || password.get()
+                        on:input=move |ev| set_password.set(event_target_value(&ev))
+                        prop:disabled=move || is_submitting.get()
+                        placeholder="Enter your password"
+                    />
+                </div>
 
                 {move || {
                     if anonymization_enabled() {
                         view! {
-                            <div class="mt-4 p-3 bg-gray-50 rounded">
-                                <h3 class="text-sm font-semibold text-gray-700 mb-2">"CSV Format Information:"</h3>
-                                <p class="text-xs text-gray-600 mb-2">
-                                    "If you want to enable de-anonymization, upload a CSV file with the following format:"
+                            <div class="mb-6">
+                                <label class="block text-gray-700 text-sm font-medium mb-2" for="student-mapping">
+                                    "Student ID Mapping File"
+                                    <span class="text-sm text-gray-500 font-normal">" (Optional)"</span>
+                                </label>
+                                <input
+                                    id="student-mapping"
+                                    type="file"
+                                    accept=".csv"
+                                    class="w-full p-2 border border-gray-300 rounded-md file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                                    on:change=handle_file_upload
+                                    prop:disabled=move || is_submitting.get()
+                                />
+                                <p class="text-sm text-gray-600 mt-2">
+                                    "Upload a CSV file containing student ID mappings for de-anonymization."
                                 </p>
-                                <pre class="text-xs text-gray-600 overflow-x-auto">
-    {r#"app_id,original_student_id,firstname,lastname,pin,created_at
-100000,12345,John,Doe,1234,2025-06-09 19:52:19.862183
-100001,52884,Thien,Le,1234,2025-06-09 19:52:19.862183
-100002,67890,Jane,Smith,6789,2025-06-09 19:52:19.862183"#}
-                                </pre>
-                                <p class="text-xs text-gray-500 mt-2">
-                                    "Without this file, students will be displayed with their anonymized IDs."
-                                </p>
+                                {move || {
+                                    if let Some(status) = file_upload_status.get() {
+                                        if status.contains("successfully") {
+                                            view! {
+                                                <div class="flex items-center mt-2 text-sm text-green-600">
+                                                    <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                                                    </svg>
+                                                    {status}" - De-anonymization enabled"
+                                                </div>
+                                            }.into_view()
+                                        } else {
+                                            view! {
+                                                <p class="text-sm text-blue-600 mt-2">{status}</p>
+                                            }.into_view()
+                                        }
+                                    } else {
+                                        view! { <span></span> }.into_view()
+                                    }
+                                }}
                             </div>
-                        }.into_any()
+                        }.into_view()
                     } else {
-                        view! { <span></span> }.into_any()
+                        view! { <span></span> }.into_view()
                     }
                 }}
-            </div>
-        }
+
+                <button
+                    type="submit"
+                    class="w-full p-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors duration-200"
+                    prop:disabled=move || is_submitting.get()
+                >
+                    {move || {
+                        if is_submitting.get() {
+                            view! {
+                                <div class="flex items-center justify-center">
+                                    <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    "Logging in..."
+                                </div>
+                            }.into_view()
+                        } else {
+                            view! { "Login" }.into_view()
+                        }
+                    }}
+                </button>
+            </form>
+
+            {move || {
+                if anonymization_enabled() {
+                    view! {
+                        <div class="mt-6 p-4 bg-gray-50 rounded-md">
+                            <h3 class="text-sm font-semibold text-gray-700 mb-2">
+                                "CSV Format Requirements:"
+                            </h3>
+                            <p class="text-xs text-gray-600 mb-2">
+                                "For de-anonymization, upload a CSV file with this exact format:"
+                            </p>
+                            <div class="bg-gray-800 text-gray-100 p-3 rounded text-xs font-mono overflow-x-auto">
+                                <pre>{"app_id,original_student_id,firstname,lastname,pin,created_at\n100000,12345,John,Doe,1234,2025-06-09 19:52:19.862183\n100001,52884,Thien,Le,1234,2025-06-09 19:52:19.862183"}</pre>
+                            </div>
+                            <p class="text-xs text-gray-500 mt-2">
+                                "Without this file, students will be displayed with anonymized IDs."
+                            </p>
+                        </div>
+                    }.into_view()
+                } else {
+                    view! { <span></span> }.into_view()
+                }
+            }}
+        </div>
+    }
 }

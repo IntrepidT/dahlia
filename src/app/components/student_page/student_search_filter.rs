@@ -2,7 +2,7 @@ use leptos::*;
 
 // More responsive container style with padding adjustments for small screens
 const SEARCH_CONTAINER_STYLE: &str =
-    "md:mt-16 mt-14 mb-4 flex gap-2 sm:gap-4 items-center w-full justify-between";
+    "md:mt-16 mt-14 mb-4 flex flex-grow gap-2 items-center w-full justify-between";
 // Improved input style with better handling for small screens
 const INPUT_STYLE: &str = "focus:ring-indigo-500 focus:border-indigo-500 block w-full pl-3 pr-3 text-xs sm:text-sm border-gray-300 rounded-md h-8 sm:h-10 border";
 // Responsive select style
@@ -59,7 +59,7 @@ pub fn SearchFilter(
     view! {
         <div class=SEARCH_CONTAINER_STYLE>
             // Search input - adjusted to be less wide
-            <div class="flex-grow sm:w-64 md:w-72">
+            <div class="flex-grow sm:w-72 md:w-72">
                 <label for="search" class=LABEL_STYLE>"Search Students"</label>
                 <div class="relative rounded-md shadow-sm">
                     <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -82,7 +82,7 @@ pub fn SearchFilter(
             </div>
 
             // Grade filter dropdown - optimized width
-            <div class="flex-grow sm:w-32 md:w-36">
+            <div class="flex-grow sm:w-36 md:w-36">
                 <label for="grade-filter" class=LABEL_STYLE>"Grade"</label>
                 <select
                     id="grade-filter"
@@ -108,7 +108,7 @@ pub fn SearchFilter(
             </div>
 
             // Teacher filter dropdown - optimized width
-            <div class="flex-grow sm:w-32 md:w-36">
+            <div class="flex-grow sm:w-36 md:w-36">
                 <label for="teacher-filter" class=LABEL_STYLE>"Teacher"</label>
                 <select
                     id="teacher-filter"
@@ -131,7 +131,7 @@ pub fn SearchFilter(
             </div>
 
             // Intervention filter - optimized width
-            <div class="flex-grow sm:w-32 md:w-36">
+            <div class="flex-grow sm:w-36 md:w-36">
                 <label for="intervention-filter" class=LABEL_STYLE>"Intervention"</label>
                 <select
                     id="intervention-filter"
@@ -147,8 +147,8 @@ pub fn SearchFilter(
                 </select>
             </div>
 
-            // Checkboxes - consolidated for better fit
-            <div class="flex flex-grow items-center gap-3 mt-3 sm:mt-6">
+            // Always render all checkboxes but use CSS to control visibility
+            <div class="flex flex-grow items-center gap-3 mt-4 ml-2">
                 // IEP filter checkbox
                 <div class="flex items-center mr-2">
                     <input
@@ -185,55 +185,61 @@ pub fn SearchFilter(
                     <label for="504-filter" class="text-xs sm:text-sm text-gray-700">"504"</label>
                 </div>
 
-                // Additional filters that only show when panel is expanded
-                <Show when=move || !is_panel_expanded()>
-                    <div class=EXPANDED_FILTERS_STYLE>
-                        //Mom wanted removed but may be helpful to other users
-                        /*<div class="font-medium text-sm text-gray-700 mr-2 flex items-center">
-                            "Additional:"
-                        </div>*/
+                // Always render these but use conditional styling instead of conditional rendering
+                <div class=move || {
+                    if is_panel_expanded.get() {
+                        "hidden".to_string()
+                    } else {
+                        "flex items-center mr-2".to_string()
+                    }
+                }>
+                    <input
+                        type="checkbox"
+                        id="readplan-filter"
+                        class=CHECKBOX_STYLE
+                        on:change=move |ev| set_readplan_filter(event_target_checked(&ev))
+                        node_ref=readplan_checkbox_ref
+                    />
+                    <label for="readplan-filter" class="text-xs sm:text-sm text-gray-700">"Read Plan"</label>
+                </div>
 
-                        // Read Plan filter
-                        <div class="flex items-center mr-2">
-                            <input
-                                type="checkbox"
-                                id="readplan-filter"
-                                class=CHECKBOX_STYLE
-                                on:change=move |ev| set_readplan_filter(event_target_checked(&ev))
-                                node_ref=readplan_checkbox_ref
-                            />
-                            <label for="readplan-filter" class="text-xs sm:text-sm text-gray-700">"Read Plan"</label>
-                        </div>
+                <div class=move || {
+                    if is_panel_expanded.get() {
+                        "hidden".to_string()
+                    } else {
+                        "flex items-center mr-2".to_string()
+                    }
+                }>
+                    <input
+                        type="checkbox"
+                        id="gt-filter"
+                        class=CHECKBOX_STYLE
+                        on:change=move |ev| set_gt_filter(event_target_checked(&ev))
+                        node_ref=gt_checkbox_ref
+                    />
+                    <label for="gt-filter" class="text-xs sm:text-sm text-gray-700">"GT"</label>
+                </div>
 
-                        // GT filter
-                        <div class="flex items-center mr-2">
-                            <input
-                                type="checkbox"
-                                id="gt-filter"
-                                class=CHECKBOX_STYLE
-                                on:change=move |ev| set_gt_filter(event_target_checked(&ev))
-                                node_ref=gt_checkbox_ref
-                            />
-                            <label for="gt-filter" class="text-xs sm:text-sm text-gray-700">"GT"</label>
-                        </div>
-
-                        // BEH filter
-                        <div class="flex items-center mr-2">
-                            <input
-                                type="checkbox"
-                                id="bip-filter"
-                                class=CHECKBOX_STYLE
-                                on:change=move |ev| set_bip_filter(event_target_checked(&ev))
-                                node_ref=bip_checkbox_ref
-                            />
-                            <label for="bip-filter" class="text-xs sm:text-sm text-gray-700">"BEH"</label>
-                        </div>
-                    </div>
-                </Show>
+                <div class=move || {
+                    if is_panel_expanded.get() {
+                        "hidden".to_string()
+                    } else {
+                        "flex items-center mr-2".to_string()
+                    }
+                }>
+                    <input
+                        type="checkbox"
+                        id="bip-filter"
+                        class=CHECKBOX_STYLE
+                        on:change=move |ev| set_bip_filter(event_target_checked(&ev))
+                        node_ref=bip_checkbox_ref
+                    />
+                    <label for="bip-filter" class="text-xs sm:text-sm text-gray-700">"BEH"</label>
+                </div>
             </div>
 
             // Clear filters button
-            <div class="flex items-center mt-3 sm:mt-6">
+            <div class="flex items-center mt-3">
                 <button
                     type="button"
                     class="inline-flex justify-center items-center px-3 sm:px-4 py-1 sm:py-2 border border-gray-300 rounded-md shadow-sm text-xs sm:text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 h-8 sm:h-10"

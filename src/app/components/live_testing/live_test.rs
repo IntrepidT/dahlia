@@ -19,8 +19,12 @@ use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::time::Duration as StdDuration;
 use uuid::Uuid;
-use wasm_bindgen::{closure::Closure, JsCast, JsValue};
-use web_sys::{CloseEvent, MessageEvent, WebSocket};
+
+#[cfg(feature = "hydrate")]
+use {
+    wasm_bindgen::{closure::Closure, JsCast, JsValue},
+    web_sys::{CloseEvent, MessageEvent, WebSocket},
+};
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 enum ConnectionStatus {
@@ -73,7 +77,9 @@ pub fn RealtimeTestSession() -> impl IntoView {
     );
 
     // WebSocket state
+    #[cfg(feature = "hydrate")]
     let (ws, set_ws) = create_signal::<Option<WebSocket>>(None);
+
     let (room_id, set_room_id) = create_signal::<Option<Uuid>>(None);
     let (role, set_role) = create_signal(Role::Student);
     let (connected_students, set_connected_students) =
@@ -145,6 +151,297 @@ pub fn RealtimeTestSession() -> impl IntoView {
     });
 
     // Handle WebSocket connection
+    #[cfg(feature = "hydrate")]
+    let connect_to_session = create_action(move |session_id: &Uuid| {
+        let session_id = *session_id;
+        let protocol = if web_sys::window().unwrap().location().protocol().unwrap() == "https:" {
+            "wss"
+        } else {
+            "ws"
+        };
+        let host = web_sys::window().unwrap().location().host().unwrap();
+        let ws_url = format!("{protocol}://{host}/api/ws/{session_id}");
+
+        // Clone necessary signals for the async block
+        let set_role = set_role.clone();
+        let set_connected_students = set_connected_students.clone();
+        let set_responses = set_responses.clone();
+        let set_current_card_index = set_current_card_index.clone();
+        let set_remaining_time = set_remaining_time.clone();
+        let set_is_test_active = set_is_test_active.clone();
+        let set_is_submitted = set_is_submitted.clone();
+        let set_connection_status = set_connection_status.clone(); // Add a new signal for connection status
+        let set_error_message = set_error_message.clone(); // Add error message signal
+
+        async move {
+            log::info!("Connecting to WebSocket at: {}", ws_url);
+
+            // Close any existing connection
+            if let Some(ws) = ws.get_untracked() {
+                let _ = ws.close();
+            }
+
+            // Reset connection-dependent state
+            set_connection_status.set(ConnectionStatus::Connecting);
+            set_error_message.set(None);
+
+            match WebSocket::new(&ws_url) {
+                Ok(websocket) => {
+                    // Setup message handler
+                    let ws_clone = websocket.clone();
+                    let onmessage_callback = Closure::wrap(Box::new(move |e: MessageEvent| {
+                        if let Ok(text) = e.data().dyn_into::<js_sys::JsString>() {
+                            let message = text.as_string().unwrap();
+                            log::debug!("WebSocket message received: {}", message);
+
+                            match serde_json::from_str::<Value>(&message) {
+                                Ok(json_value) => {
+                                    if let Some(msg_type) =
+                                        json_value.get("type").and_then(|t| t.as_str())
+                                    {
+                                        match msg_type {
+                                            "role_assigned" => {
+                                                log::info!("Assigning role");
+                                                if let Some(role_str) =
+                                                    json_value.get("role").and_then(|r| r.as_str())
+                                                {
+                                                    match role_str {
+                                                        "teacher" => set_role.set(Role::Teacher),
+                                                        "student" => set_role.set(Role::Student),
+                                                        _ => set_role.set(Role::Unknown),
+                                                    }
+                                                }
+                                            }
+                                            "test_data" => {
+                                                if let Some(questions_array) = json_value
+                                                    .get("questions")
+                                                    .and_then(|q| q.as_array())
+                                                {
+                                                    let qs: Vec<
+                                                        crate::app::models::question::Question,
+                                                    > = questions_array
+                                                        .iter()
+                                                        .filter_map(|q| {
+                                                            serde_json::from_value(q.clone()).ok()
+                                                        })
+                                                        .collect();
+                                                }
+                                            }
+                                            "student_joined" | "user_joined" => {
+                                                let is_student = msg_type == "student_joined";
+                                                let log_msg = if is_student {
+                                                    "student joined"
+                                                } else {
+                                                    "user joined"
+                                                };
+                                                log::info!(
+                                                    "Received {} message {:?}",
+                                                    log_msg,
+                                                    json_value
+                                                );
+
+                                                // Extract ID field based on message type
+                                                let id_field =
+                                                    if is_student { "student_id" } else { "id" };
+                                                let data_field = if is_student {
+                                                    "student_data"
+                                                } else {
+                                                    "user_data"
+                                                };
+                                                let name_field =
+                                                    if is_student { "name" } else { "username" };
+
+                                                if let Some(user_id) = json_value
+                                                    .get(id_field)
+                                                    .and_then(|s| s.as_str())
+                                                {
+                                                    if let Some(user_data) =
+                                                        json_value.get(data_field)
+                                                    {
+                                                        let name = user_data
+                                                            .get(name_field)
+                                                            .and_then(|n| n.as_str())
+                                                            .unwrap_or("Unknown");
+
+                                                        set_connected_students.update(|students| {
+                                                            // Check if student already exists
+                                                            if let Some(pos) =
+                                                                students.iter().position(|s| {
+                                                                    s.student_id == user_id
+                                                                })
+                                                            {
+                                                                students[pos].status =
+                                                                    "Connected".to_string();
+                                                            } else {
+                                                                students.push(ConnectedStudent {
+                                                                    student_id: user_id.to_string(),
+                                                                    name: name.to_string(),
+                                                                    status: "Connected".to_string(),
+                                                                });
+                                                            }
+                                                        });
+                                                    }
+                                                }
+                                            }
+                                            "student_left" | "user_left" => {
+                                                let is_student = msg_type == "student_left";
+                                                let log_msg = if is_student {
+                                                    "student left"
+                                                } else {
+                                                    "user left"
+                                                };
+                                                log::info!(
+                                                    "Received {} message {:?}",
+                                                    log_msg,
+                                                    json_value
+                                                );
+
+                                                // Extract ID field based on message type
+                                                let id_field =
+                                                    if is_student { "student_id" } else { "id" };
+
+                                                if let Some(user_id) = json_value
+                                                    .get(id_field)
+                                                    .and_then(|s| s.as_str())
+                                                {
+                                                    set_connected_students.update(|students| {
+                                                        if let Some(pos) = students
+                                                            .iter()
+                                                            .position(|s| s.student_id == user_id)
+                                                        {
+                                                            students[pos].status =
+                                                                "Disconnected".to_string();
+                                                        }
+                                                    });
+                                                }
+                                            }
+                                            "student_answer" => {
+                                                if let Some(answer_data) =
+                                                    json_value.get("answer_data")
+                                                {
+                                                    if let (Some(qnumber), Some(answer)) = (
+                                                        answer_data
+                                                            .get("question_id")
+                                                            .and_then(|q| q.as_i64()),
+                                                        answer_data
+                                                            .get("answer")
+                                                            .and_then(|a| a.as_str()),
+                                                    ) {
+                                                        set_responses.update(|r| {
+                                                            let qnumber = qnumber as i32;
+                                                            let response = r
+                                                                .entry(qnumber)
+                                                                .or_insert(QuestionResponse {
+                                                                    answer: String::new(),
+                                                                    comment: String::new(),
+                                                                });
+                                                            response.answer = answer.to_string();
+                                                        });
+                                                    }
+                                                }
+                                            }
+                                            "focus_question" => {
+                                                if let Some(question_data) =
+                                                    json_value.get("question_data")
+                                                {
+                                                    if let Some(index) = question_data
+                                                        .get("index")
+                                                        .and_then(|i| i.as_i64())
+                                                    {
+                                                        set_current_card_index.set(index as usize);
+                                                    }
+                                                }
+                                            }
+                                            "time_update" => {
+                                                if let Some(time_data) = json_value.get("time_data")
+                                                {
+                                                    if let Some(remaining) = time_data
+                                                        .get("remaining")
+                                                        .and_then(|r| r.as_i64())
+                                                    {
+                                                        set_remaining_time
+                                                            .set(Some(remaining as i32));
+                                                    }
+                                                }
+                                            }
+                                            "test_started" => {
+                                                set_is_test_active.set(true);
+                                            }
+                                            "test_ended" => {
+                                                set_is_test_active.set(false);
+                                                set_is_submitted.set(true);
+                                            }
+                                            _ => {
+                                                log::debug!("Unhandled message type: {}", msg_type);
+                                            }
+                                        }
+                                    }
+                                }
+                                Err(err) => {
+                                    log::error!("Failed to parse WebSocket message: {:?}", err);
+                                }
+                            }
+                        }
+                    })
+                        as Box<dyn FnMut(MessageEvent)>);
+
+                    // Setup onopen handler
+                    let set_connection_status_clone = set_connection_status.clone();
+                    let onopen_callback = Closure::wrap(Box::new(move |_| {
+                        log::info!("WebSocket connection established");
+                        set_connection_status_clone.set(ConnectionStatus::Connected);
+                    })
+                        as Box<dyn FnMut(JsValue)>);
+
+                    // Setup onclose handler
+                    let set_connection_status_clone = set_connection_status.clone();
+                    let onclose_callback = Closure::wrap(Box::new(move |e: CloseEvent| {
+                        log::info!("WebSocket closed: {} - {}", e.code(), e.reason());
+                        set_connection_status_clone.set(ConnectionStatus::Disconnected);
+                    })
+                        as Box<dyn FnMut(CloseEvent)>);
+
+                    // Setup onerror handler
+                    let set_connection_status_clone = set_connection_status.clone();
+                    let set_error_message_clone = set_error_message.clone();
+                    let onerror_callback = Closure::wrap(Box::new(move |e: ErrorEvent| {
+                        let error_msg = e.message();
+                        log::error!("WebSocket error occurred: {}", error_msg);
+                        set_connection_status_clone.set(ConnectionStatus::Error);
+                        set_error_message_clone
+                            .set(Some(format!("Connection error: {}", error_msg)));
+                    })
+                        as Box<dyn FnMut(ErrorEvent)>);
+
+                    // Set event handlers
+                    websocket.set_onmessage(Some(onmessage_callback.as_ref().unchecked_ref()));
+                    websocket.set_onopen(Some(onopen_callback.as_ref().unchecked_ref()));
+                    websocket.set_onclose(Some(onclose_callback.as_ref().unchecked_ref()));
+                    websocket.set_onerror(Some(onerror_callback.as_ref().unchecked_ref()));
+
+                    // Store callbacks to prevent them from being dropped
+                    onmessage_callback.forget();
+                    onopen_callback.forget();
+                    onclose_callback.forget();
+                    onerror_callback.forget();
+
+                    // Store the websocket
+                    set_ws.set(Some(websocket));
+                    Ok(())
+                }
+                Err(err) => {
+                    let error_msg = format!("WebSocket connection failed: {:?}", err);
+                    log::error!("{}", error_msg);
+                    set_connection_status.set(ConnectionStatus::Error);
+                    set_error_message.set(Some(error_msg));
+                    Err(())
+                }
+            }
+        }
+    });
+
+    // Handle WebSocket connection
+    #[cfg(feature = "hydrate")]
     let connect_to_session = create_action(move |session_id: &Uuid| {
         let session_id = *session_id;
         let protocol = if web_sys::window().unwrap().location().protocol().unwrap() == "https:" {
@@ -454,6 +751,7 @@ pub fn RealtimeTestSession() -> impl IntoView {
                         }) {
                             // Join existing session
                             set_room_id.set(Some(active_session.id));
+                            #[cfg(feature = "hydrate")]
                             if let Some(session_uuid) = Some(active_session.id) {
                                 connect_to_session.dispatch(session_uuid);
                             }
@@ -476,6 +774,7 @@ pub fn RealtimeTestSession() -> impl IntoView {
                             match websocket_sessions::create_session(request).await {
                                 Ok(session) => {
                                     set_room_id.set(Some(session.id));
+                                    #[cfg(feature = "hydrate")]
                                     if let Some(session_uuid) = Some(session.id) {
                                         connect_to_session.dispatch(session_uuid);
                                     }
@@ -495,6 +794,7 @@ pub fn RealtimeTestSession() -> impl IntoView {
     });
 
     // Send message through WebSocket
+    #[cfg(feature = "hydrate")]
     let send_ws_message = move |message: String| {
         if let Some(socket) = ws.get() {
             let _ = socket.send_with_str(&message);
@@ -502,6 +802,7 @@ pub fn RealtimeTestSession() -> impl IntoView {
     };
 
     // Start test handler
+    #[cfg(feature = "hydrate")]
     let start_test = move |_| {
         if !test_id().is_empty() {
             let message = json!({
@@ -565,6 +866,7 @@ pub fn RealtimeTestSession() -> impl IntoView {
     };
 
     // End test handler
+    #[cfg(feature = "hydrate")]
     let end_test = move |_| {
         let end_message = json!({
             "type": "test_message",
@@ -591,6 +893,7 @@ pub fn RealtimeTestSession() -> impl IntoView {
     };
 
     // Navigation handlers for teacher
+    #[cfg(feature = "hydrate")]
     let go_to_next_card = move |_| {
         set_current_card_index.update(|index| {
             if let Some(questions_vec) = questions.get() {
@@ -611,6 +914,7 @@ pub fn RealtimeTestSession() -> impl IntoView {
         });
     };
 
+    #[cfg(feature = "hydrate")]
     let go_to_previous_card = move |_| {
         set_current_card_index.update(|index| {
             *index = index.saturating_sub(1);
@@ -630,6 +934,7 @@ pub fn RealtimeTestSession() -> impl IntoView {
     };
 
     // Handle answer submitted by student
+    #[cfg(feature = "hydrate")]
     let handle_answer_change = move |qnumber: i32, value: String| {
         // If student, send to teacher
         if matches!(role.get(), Role::Student) {
@@ -657,6 +962,7 @@ pub fn RealtimeTestSession() -> impl IntoView {
     };
 
     // Handle comment change
+    #[cfg(feature = "hydrate")]
     let handle_comment_change = move |qnumber: i32, value: String| {
         let value_clone = value.clone();
         set_responses.update(|r| {
@@ -684,6 +990,7 @@ pub fn RealtimeTestSession() -> impl IntoView {
     };
 
     // Submit handler for teacher
+    #[cfg(feature = "hydrate")]
     let handle_submit = create_action(move |_: &()| async move {
         let current_responses = responses.get();
         let current_test_id = test_id();
@@ -786,6 +1093,7 @@ pub fn RealtimeTestSession() -> impl IntoView {
     });
 
     // Cleanup on unmount
+    #[cfg(feature = "hydrate")]
     on_cleanup(move || {
         if let Some(socket) = ws.get() {
             socket.close().ok();
@@ -834,21 +1142,36 @@ pub fn RealtimeTestSession() -> impl IntoView {
                         <div class="w-full md:w-1/2 mb-4">
                             <StudentSelect set_selected_student_id=set_selected_student_id />
                         </div>
-                        <button
-                            class="px-5 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                            on:click=start_test
-                            disabled=move || selected_student_id.get().is_none()
-                        >
-                            "Start Test Session"
-                        </button>
+                        {
+                            #[cfg(feature = "hydrate")]
+                            {
+                                view! {
+
+                                    <button
+                                        class="px-5 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                                        on:click=start_test
+                                        disabled=move || selected_student_id.get().is_none()
+                                    >
+                                        "Start Test Session"
+                                    </button>
+                                }
+                            }
+                        }
                     </Show>
                     <Show when=move || is_test_active.get() && !is_submitted.get()>
-                        <button
-                            class="px-5 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                            on:click=move |_| end_test(())
-                        >
-                            "End Test Session"
-                        </button>
+                        {
+                            #[cfg(feature = "hydrate")]
+                            {
+                                view! {
+                                    <button
+                                        class="px-5 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                                        on:click=move |_| end_test(())
+                                    >
+                                        "End Test Session"
+                                    </button>
+                                }
+                            }
+                        }
                     </Show>
                 </div>
             </Show>
@@ -980,6 +1303,7 @@ pub fn RealtimeTestSession() -> impl IntoView {
 
                                                                             view! {
                                                                                 <label class="flex items-center p-3 rounded-lg border border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-colors cursor-pointer">
+                                                                                    #[cfg(feature = "hydrate")]
                                                                                     <input
                                                                                         type="radio"
                                                                                         name=format!("q_{}", qnumber)
@@ -988,9 +1312,12 @@ pub fn RealtimeTestSession() -> impl IntoView {
                                                                                         prop:checked=move || is_checked()
                                                                                         prop:disabled=should_disable_inputs.get()
                                                                                         on:change=move |ev| {
-                                                                                            if !should_disable_inputs.get() {
-                                                                                                let value = event_target_value(&ev);
-                                                                                                handle_answer_change(qnumber, value);
+                                                                                            #[cfg(feature = "hydrate")]
+                                                                                            {
+                                                                                                if !should_disable_inputs.get() {
+                                                                                                    let value = event_target_value(&ev);
+                                                                                                    handle_answer_change(qnumber, value);
+                                                                                                }
                                                                                             }
                                                                                         }
                                                                                     />
@@ -1020,6 +1347,7 @@ pub fn RealtimeTestSession() -> impl IntoView {
 
                                                                 view! {
                                                                     <div class="w-full flex flex-col sm:flex-row gap-4 items-center justify-center">
+                                                                        #[cfg(feature = "hydrate")]
                                                                         <button
                                                                             type="button"
                                                                             class="px-6 py-3 w-full rounded-lg font-medium text-center transition-colors"
@@ -1032,13 +1360,17 @@ pub fn RealtimeTestSession() -> impl IntoView {
                                                                             class:border-transparent={move || is_true()}
                                                                             class:cursor-not-allowd={should_disable_inputs()}
                                                                             on:click=move |_| {
-                                                                                if !should_disable_inputs.get() {
-                                                                                    handle_answer_change(qnumber, "true".to_string());
+                                                                                #[cfg(feature = "hydrate")]
+                                                                                {
+                                                                                    if !should_disable_inputs.get() {
+                                                                                        handle_answer_change(qnumber, "true".to_string());
+                                                                                    }
                                                                                 }
                                                                             }
                                                                         >
                                                                             "Yes"
                                                                         </button>
+                                                                        #[cfg(feature = "hydrate")]
                                                                         <button
                                                                             type="button"
                                                                             class="px-6 py-3 w-full rounded-lg font-medium text-center transition-colors"
@@ -1051,8 +1383,11 @@ pub fn RealtimeTestSession() -> impl IntoView {
                                                                             class:border-transparent={move || is_false()}
                                                                             class:cursor-not-allowed={should_disable_inputs()}
                                                                             on:click=move |_| {
-                                                                                if !should_disable_inputs.get() {
-                                                                                    handle_answer_change(qnumber, "false".to_string());
+                                                                                #[cfg(feature = "hydrate")]
+                                                                                {
+                                                                                    if !should_disable_inputs.get() {
+                                                                                        handle_answer_change(qnumber, "false".to_string());
+                                                                                    }
                                                                                 }
                                                                             }
                                                                         >
@@ -1073,14 +1408,18 @@ pub fn RealtimeTestSession() -> impl IntoView {
 
                                                                 view! {
                                                                     <div>
+                                                                        #[cfg(feature = "hydrate")]
                                                                         <textarea
                                                                             class="w-full p-3 border border-gray-200 rounded-lg focus:ring-blue-500 focus:border-blue-500"
                                                                             prop:value=move || answer_value()
                                                                             prop:disabled={should_disable_inputs()}
                                                                             on:input=move |ev| {
-                                                                                if !should_disable_inputs.get() {
-                                                                                    let value = event_target_value(&ev);
-                                                                                    handle_answer_change(qnumber, value);
+                                                                                #[cfg(feature = "hydrate")]
+                                                                                {
+                                                                                    if !should_disable_inputs.get() {
+                                                                                        let value = event_target_value(&ev);
+                                                                                        handle_answer_change(qnumber, value);
+                                                                                    }
                                                                                 }
                                                                             }
                                                                             placeholder="Enter your answer here..."
@@ -1111,12 +1450,16 @@ pub fn RealtimeTestSession() -> impl IntoView {
                                                         });
                                                         view! {
                                                             <div>
+                                                                #[cfg(feature = "hydrate")]
                                                                 <textarea
                                                                     class="w-full p-3 border border-gray-200 rounded-lg focus:ring-blue-500 focus:border-blue-500"
                                                                     prop:value=move || comment_value()
                                                                     on:input=move |ev| {
-                                                                        let value = event_target_value(&ev);
-                                                                        handle_comment_change(qnumber, value);
+                                                                        #[cfg(feature = "hydrate")]
+                                                                        {
+                                                                            let value = event_target_value(&ev);
+                                                                            handle_comment_change(qnumber, value);
+                                                                        }
                                                                     }
                                                                     placeholder="Add teacher comments or notes here..."
                                                                     rows="2"
@@ -1132,24 +1475,35 @@ pub fn RealtimeTestSession() -> impl IntoView {
                                     {/* Navigation Buttons */}
                                     <Show when=move || is_test_active.get() || matches!(role.get(), Role::Teacher)>
                                         <div class="flex flex-wrap items-center justify-center gap-4 mt-8">
-                                            <button
-                                                class="flex items-center justify-center px-5 py-2 bg-white border border-gray-200 rounded-lg shadow-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                                disabled=move || (current_card_index.get() == 0 || should_disable_inputs())
-                                                on:click=go_to_previous_card
-                                            >
-                                                <span class="mr-1">"←"</span>
-                                                "Previous"
-                                            </button>
+                                            {
+                                                #[cfg(feature = "hydrate")]
+                                                {
+                                                    view! {
+                                                        <button
+                                                            class="flex items-center justify-center px-5 py-2 bg-white border border-gray-200 rounded-lg shadow-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                                            disabled=move || (current_card_index.get() == 0 || should_disable_inputs())
+                                                            on:click=go_to_previous_card
+                                                        >
+                                                            <span class="mr-1">"←"</span>
+                                                            "Previous"
+                                                        </button>
+                                                    }
+                                                }
+                                            }
 
                                             {move || {
                                                 let is_last = current_card_index.get() == total_questions - 1;
 
                                                 if is_last && matches!(role.get(), Role::Teacher) && is_test_active.get() && !is_submitted.get() {
                                                     view! {
+                                                        #[cfg(feature = "hydrate")]
                                                         <button
                                                             class="flex items-center justify-center px-5 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg shadow-sm hover:from-blue-700 hover:to-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                                             on:click=move |_| {
-                                                                handle_submit.dispatch(());
+                                                                #[cfg(feature = "hydrate")]
+                                                                {
+                                                                    handle_submit.dispatch(());
+                                                                }
                                                             }
                                                             disabled=move || (selected_student_id.get().is_none() || should_disable_inputs())
                                                         >
@@ -1159,14 +1513,22 @@ pub fn RealtimeTestSession() -> impl IntoView {
                                                     }.into_view()
                                                 } else if !is_last {
                                                     view! {
-                                                        <button
-                                                            class="flex items-center justify-center px-5 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg shadow-sm hover:from-blue-700 hover:to-purple-700 transition-colors"
-                                                            on:click=go_to_next_card
-                                                            disabled=move || {should_disable_inputs}
-                                                        >
-                                                            "Next"
-                                                            <span class="ml-1">"→"</span>
-                                                        </button>
+                                                        {
+                                                            #[cfg(feature = "hydrate")]
+                                                            {
+                                                                view! {
+                                                                    <button
+                                                                        class="flex items-center justify-center px-5 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg shadow-sm hover:from-blue-700 hover:to-purple-700 transition-colors"
+                                                                        on:click=go_to_next_card
+                                                                        disabled=move || {should_disable_inputs}
+                                                                    >
+                                                                        "Next"
+                                                                        <span class="ml-1">"→"</span>
+                                                                    </button>
+                                                                }
+                                                            }
+                                                        }
+
                                                     }.into_view()
                                                 } else {
                                                     view! { <div></div> }.into_view()
@@ -1183,11 +1545,15 @@ pub fn RealtimeTestSession() -> impl IntoView {
                                                 "Assessment submitted successfully!"
                                             </div>
                                             <div>
+                                                #[cfg(feature = "hydrate")]
                                                 <button
                                                     class="px-5 py-2 mt-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-colors"
                                                     on:click=move |_| {
-                                                        let navigate=leptos_router::use_navigate();
-                                                        navigate("/dashboard", Default::default());
+                                                        #[cfg(feature = "hydrate")]
+                                                        {
+                                                            let navigate=leptos_router::use_navigate();
+                                                            navigate("/dashboard", Default::default());
+                                                        }
                                                     }
                                                 >
                                                     "Return to Dashboard"
@@ -1220,7 +1586,7 @@ pub fn RealtimeTestSession() -> impl IntoView {
     }
 }
 
-// Student select component remains the same from original flash card set
+// Student select component with hydrate gates
 #[component]
 pub fn StudentSelect(set_selected_student_id: WriteSignal<Option<i32>>) -> impl IntoView {
     let (students, set_students) = create_signal(Vec::new());
@@ -1249,11 +1615,15 @@ pub fn StudentSelect(set_selected_student_id: WriteSignal<Option<i32>>) -> impl 
     view! {
         <div class="mb-4 max-w-[20rem]">
             <label class="block text-sm font-medium mb-2">"Select Student:"</label>
+            #[cfg(feature = "hydrate")]
             <select
                 class="w-full p-2 border rounded-md"
                 on:change=move |ev| {
-                    let value = event_target_value(&ev).parse().ok();
-                    set_selected_student_id.set(value);
+                    #[cfg(feature = "hydrate")]
+                    {
+                        let value = event_target_value(&ev).parse().ok();
+                        set_selected_student_id.set(value);
+                    }
                 }
             >
                 <option value="">"Select a student..."</option>

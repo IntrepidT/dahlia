@@ -1,4 +1,5 @@
 use crate::app::components::dashboard::dashboard_sidebar::{DashboardSidebar, SidebarSelected};
+#[cfg(feature = "hydrate")]
 use crate::app::components::data_charts::{
     render_overall_progress, render_score_distribution, render_test_distribution, render_test_plot,
 };
