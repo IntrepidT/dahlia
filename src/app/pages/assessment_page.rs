@@ -1,3 +1,4 @@
+use crate::app::components::auth::server_auth_components::ServerAuthGuard;
 use crate::app::components::dashboard::dashboard_sidebar::{DashboardSidebar, SidebarSelected};
 use crate::app::components::header::Header;
 use crate::app::components::test_item::TestItem;
@@ -18,13 +19,23 @@ use uuid::Uuid;
 
 #[component]
 pub fn AssessmentPage() -> impl IntoView {
+    view! {
+        <ServerAuthGuard page_path="/assessments">
+            <AssessmentPageContent />
+        </ServerAuthGuard>
+    }
+}
+
+#[component]
+pub fn AssessmentPageContent() -> impl IntoView {
     let (selected_view, set_selected_view) = create_signal(SidebarSelected::Assessments);
     // Resource to load all assessments
-    let assessments_resource = create_resource(|| (), |_| async move { get_assessments().await });
+    let assessments_resource =
+        create_local_resource(|| (), |_| async move { get_assessments().await });
 
     // Resource to load all tests
-    let tests_resource = create_resource(|| (), |_| async move { get_tests().await });
-    let courses_resource = create_resource(|| (), |_| async move { get_courses().await });
+    let tests_resource = create_local_resource(|| (), |_| async move { get_tests().await });
+    let courses_resource = create_local_resource(|| (), |_| async move { get_courses().await });
 
     // State for assessment form
     let (show_form, set_show_form) = create_signal(false);

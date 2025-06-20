@@ -68,3 +68,6 @@ pub use course::CreateCourseRequest;
 pub use course::UpdateCourseRequest;
 
 pub mod global;
+
+pub mod auth;
+pub use auth::*;

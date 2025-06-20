@@ -2,7 +2,7 @@ use crate::app::components::settings::bulk_enrollment_modal::BulkUploadModal;
 use crate::app::middleware::global_settings::{try_use_settings, try_use_settings_loading};
 use crate::app::models::global::{GlobalSetting, SettingsCache};
 use crate::app::models::setting_data::UserSettings;
-use crate::app::models::user::UserJwt;
+use crate::app::models::user::SessionUser;
 use crate::app::server_functions::globals::{
     get_global_settings, restore_student_ids_from_file, toggle_student_protection,
 };
@@ -202,7 +202,7 @@ fn SettingsContent(
     user_settings: UserSettings,
     user_id: i64,
 ) -> impl IntoView {
-    let user = use_context::<ReadSignal<Option<UserJwt>>>().expect("AuthProvider not Found");
+    let user = use_context::<ReadSignal<Option<SessionUser>>>().expect("AuthProvider not Found");
     let (show_bulk_upload_modal, set_show_bulk_upload_modal) = create_signal(false);
     let (refresh_trigger, set_refresh_trigger) = create_signal(0);
 

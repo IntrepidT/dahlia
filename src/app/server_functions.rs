@@ -48,3 +48,9 @@ pub use enrollments::get_enrollments;
 
 pub mod globals;
 pub use globals::get_global_settings;
+
+pub mod authorization;
+pub use authorization::*;
+
+pub mod saml_auth;
+pub use saml_auth::*;

@@ -1,4 +1,4 @@
-use crate::app::models::user::{User, UserJwt};
+use crate::app::models::user::{SessionUser, User};
 use crate::app::server_functions::users::{get_user, update_user};
 use leptos::*;
 
@@ -9,7 +9,7 @@ pub fn UpdateProfileModal(
     #[prop(into)] on_success: Callback<()>,
 ) -> impl IntoView {
     // Get the current user from context (provided by AuthProvider)
-    let current_user = use_context::<ReadSignal<Option<UserJwt>>>()
+    let current_user = use_context::<ReadSignal<Option<SessionUser>>>()
         .expect("AuthProvider should provide current_user");
 
     // Create a derived signal for user_id to avoid unnecessary refetching

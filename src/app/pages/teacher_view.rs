@@ -1,3 +1,4 @@
+use crate::app::components::auth::server_auth_components::ServerAuthGuard;
 use crate::app::components::dashboard::dashboard_sidebar::{DashboardSidebar, SidebarSelected};
 use crate::app::components::header::Header;
 use crate::app::components::teacher_page::{
@@ -6,7 +7,7 @@ use crate::app::components::teacher_page::{
 };
 use crate::app::models::employee::{AddNewEmployeeRequest, Employee, EmployeeRole};
 use crate::app::models::student::GradeEnum;
-use crate::app::models::user::UserJwt;
+use crate::app::models::user::SessionUser;
 use crate::app::models::StatusEnum;
 use crate::app::server_functions::employees::{add_employee, get_employees};
 use crate::app::server_functions::teachers::get_teachers;
@@ -17,6 +18,15 @@ use std::rc::Rc;
 use std::str::FromStr;
 use strum::IntoEnumIterator;
 use validator::Validate;
+
+#[component]
+pub fn Teachers() -> impl IntoView {
+    view! {
+        <ServerAuthGuard page_path="/teachers">
+            <TeachersContent />
+        </ServerAuthGuard>
+    }
+}
 
 // Side panel styles - Updated for responsiveness and toggle behavior
 const SIDE_PANEL_STYLE: &str = "lg:w-[30%] w-full h-[calc(100vh-2rem)] fixed lg:right-0 right-0 top-0 mt-10 p-5 lg:p-10 z-20 lg:z-10 transform transition-transform duration-300 ease-in-out";
@@ -47,14 +57,14 @@ const BUTTON_CONTAINER_STYLE: &str =
     "mt-4 pt-4 flex border-t gap-2 justify-end sticky bottom-0 bg-white w-full";
 
 #[component]
-pub fn Teachers() -> impl IntoView {
-    let user = use_context::<ReadSignal<Option<UserJwt>>>().expect("AuthProvider not found");
+pub fn TeachersContent() -> impl IntoView {
+    let user = use_context::<ReadSignal<Option<SessionUser>>>().expect("AuthProvider not found");
     // Create resource for refreshing data
     let (refresh_trigger, set_refresh_trigger) = create_signal(0);
     let (selected_view, set_selected_view) = create_signal(SidebarSelected::TeacherView);
 
     // Create resources for employees and teachers
-    let employees = create_resource(
+    let employees = create_local_resource(
         move || refresh_trigger(),
         |_| async move {
             match get_employees().await {

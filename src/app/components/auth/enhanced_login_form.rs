@@ -1,6 +1,6 @@
 use crate::app::components::auth::authorization_components::perform_post_login_redirect;
 use crate::app::middleware::global_settings::use_settings;
-use crate::app::models::user::UserJwt;
+use crate::app::models::user::SessionUser;
 use crate::app::server_functions::auth::login;
 use leptos::*;
 use serde::{Deserialize, Serialize};
@@ -163,7 +163,7 @@ pub fn EnhancedLoginForm() -> impl IntoView {
     let (file_upload_status, set_file_upload_status) = create_signal::<Option<String>>(None);
     let (is_submitting, set_is_submitting) = create_signal(false);
 
-    let set_current_user = use_context::<WriteSignal<Option<UserJwt>>>().unwrap();
+    let set_current_user = use_context::<WriteSignal<Option<SessionUser>>>().unwrap();
     let redirect_after_login = perform_post_login_redirect();
 
     // Get the mapping service context

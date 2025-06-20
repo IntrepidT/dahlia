@@ -1,19 +1,17 @@
-// Server-specific implementation gated behind "ssr" feature
 #[cfg(feature = "ssr")]
 mod server {
     use actix_web::{
         dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform},
-        web, Error, HttpMessage,
+        web, Error, HttpMessage, HttpResponse,
     };
     use futures::future::{ready, LocalBoxFuture, Ready};
-    use log::{debug, error, info};
+    use log::{debug, error};
     use sqlx::PgPool;
     use std::rc::Rc;
-    use std::sync::Arc;
     use std::task::{Context, Poll};
 
     use crate::app::db::user_database;
-    use crate::app::models::user::{User, UserJwt, UserRole};
+    use crate::app::models::user::{SessionUser, UserRole};
 
     pub struct Authentication;
 
@@ -62,24 +60,21 @@ mod server {
             let service = self.service.clone();
 
             Box::pin(async move {
-                // Store user data outside the extensions borrow scope
-                let mut authenticated_user: Option<UserJwt> = None;
+                let mut authenticated_user: Option<SessionUser> = None;
 
-                // Try to extract the database pool
-                let pool = req.app_data::<web::Data<PgPool>>();
-
-                if let Some(pool) = pool {
-                    // Get session cookie from request
-                    if let Some(cookies) = req.cookies().ok() {
+                // Extract database pool
+                if let Some(pool) = req.app_data::<web::Data<PgPool>>() {
+                    // Check for session cookie
+                    if let Ok(cookies) = req.cookies() {
                         if let Some(session_cookie) = cookies.iter().find(|c| c.name() == "session")
                         {
                             let session_token = session_cookie.value();
 
-                            // Validate session using the actual database function
+                            // Validate session - returns SessionUser (not User)
                             match user_database::validate_session(&pool, session_token).await {
                                 Ok(Some(user)) => {
                                     debug!("Valid session found for user: {}", user.username);
-                                    authenticated_user = Some(user);
+                                    authenticated_user = Some(user); // Already SessionUser
                                 }
                                 Ok(None) => {
                                     debug!("Invalid or expired session token");
@@ -94,47 +89,75 @@ mod server {
                     error!("Database pool not found in middleware");
                 }
 
-                // Only insert into extensions if we have a valid user
-                // and do it in a separate, scoped block
+                // Insert SessionUser into request extensions if authenticated
                 if let Some(user) = authenticated_user {
-                    // Carefully scope the mutable borrow to avoid conflicts
-                    {
-                        let mut extensions = req.extensions_mut();
-                        extensions.insert(user);
-                    } // Borrow is dropped here
+                    req.extensions_mut().insert(user);
                     debug!("User successfully added to request extensions");
                 }
 
-                // Continue with the request regardless of authentication status
-                let res = service.call(req).await?;
-                Ok(res)
+                // Continue with request
+                service.call(req).await
             })
         }
     }
 
-    // Helper function to extract current user from request extensions
-    pub fn get_current_user_from_request(req: &ServiceRequest) -> Option<UserJwt> {
-        req.extensions().get::<UserJwt>().cloned()
+    // Helper functions for extracting user data from requests
+    pub fn get_current_user_from_request(req: &ServiceRequest) -> Option<SessionUser> {
+        req.extensions().get::<SessionUser>().cloned()
     }
 
     // Helper function to check if user has required role
-    pub fn user_has_role(user: &UserJwt, required_role: UserRole) -> bool {
+    pub fn user_has_role(user: &SessionUser, required_role: UserRole) -> bool {
         match required_role {
             UserRole::Guest => true, // All users can access guest-level content
-            UserRole::User => matches!(
-                user.role,
-                UserRole::User | UserRole::Admin | UserRole::SuperAdmin
-            ),
-            UserRole::Admin => matches!(user.role, UserRole::Admin | UserRole::SuperAdmin),
-            UserRole::SuperAdmin => matches!(user.role, UserRole::SuperAdmin),
-            UserRole::Teacher => matches!(
-                user.role,
-                UserRole::Teacher | UserRole::Admin | UserRole::SuperAdmin
-            ),
+            UserRole::User => user.is_user(),
+            UserRole::Teacher => user.is_teacher(),
+            UserRole::Admin => user.is_admin(),
+            UserRole::SuperAdmin => user.is_super_admin(),
         }
+    }
+
+    // Helper to check if user has any of the required roles
+    pub fn user_has_any_role(user: &SessionUser, required_roles: &[UserRole]) -> bool {
+        required_roles.iter().any(|role| user_has_role(user, *role))
+    }
+
+    // Helper to get user ID from request
+    pub fn get_user_id_from_request(req: &ServiceRequest) -> Option<i64> {
+        get_current_user_from_request(req).map(|user| user.id)
+    }
+
+    // Helper to check if user is authenticated
+    pub fn is_authenticated(req: &ServiceRequest) -> bool {
+        get_current_user_from_request(req).is_some()
+    }
+
+    // Helper to check if user is admin
+    pub fn is_admin(req: &ServiceRequest) -> bool {
+        get_current_user_from_request(req)
+            .map(|user| user.is_admin())
+            .unwrap_or(false)
+    }
+
+    // Helper to check if user is teacher or admin
+    pub fn is_teacher_or_admin(req: &ServiceRequest) -> bool {
+        get_current_user_from_request(req)
+            .map(|user| user.is_teacher())
+            .unwrap_or(false)
     }
 }
 
-// Reexport server types when "ssr" feature is enabled
+// Re-export the Authentication struct at the module root level
 #[cfg(feature = "ssr")]
-pub use server::*;
+pub use server::Authentication;
+
+// Provide a stub implementation for non-ssr builds
+#[cfg(not(feature = "ssr"))]
+pub struct Authentication;
+
+#[cfg(not(feature = "ssr"))]
+impl Authentication {
+    pub fn new() -> Self {
+        Authentication
+    }
+}

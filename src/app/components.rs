@@ -62,3 +62,6 @@ pub use gradebook::*;
 
 pub mod settings;
 pub use settings::*;
+
+pub mod admin;
+pub use admin::*;

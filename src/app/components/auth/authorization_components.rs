@@ -1,57 +1,66 @@
-use crate::app::models::user::UserJwt;
-use crate::app::server_functions::auth::{get_current_user, login, logout, register};
+use crate::app::models::user::SessionUser;
+use crate::app::server_functions::auth::get_current_user;
 use leptos::*;
 use leptos_router::{use_location, use_navigate};
-use log::{debug, error, log};
-use serde::Serialize;
-#[cfg(feature = "ssr")]
-use {
-    lettre::transport::smtp::authentication::Credentials,
-    lettre::{message::Message, SmtpTransport, Transport},
-};
+use log::debug;
 
 #[component]
 pub fn AuthProvider(children: Children) -> impl IntoView {
-    let (current_user, set_current_user) = create_signal::<Option<UserJwt>>(None);
+    let (current_user, set_current_user) = create_signal::<Option<SessionUser>>(None);
     let (loading, set_loading) = create_signal(true);
     let (initialized, set_initialized) = create_signal(false);
     let (redirect_after_auth, set_redirect_after_auth) = create_signal::<Option<String>>(None);
 
-    // Only initialize auth on the client side
+    // Use create_local_resource to avoid hydration issues
+    let user_resource = create_local_resource(
+        move || initialized.get(),
+        move |_| async move {
+            if initialized.get() {
+                debug!("AuthProvider: Loading user");
+                get_current_user().await
+            } else {
+                Ok(None)
+            }
+        },
+    );
+
+    // Initialize auth on client side only
     create_effect(move |_| {
-        // Only run this effect once, on the client side
-        if !initialized.get() {
+        if !initialized.get_untracked() {
             set_initialized.set(true);
 
-            // Store the current path if we're not already on login/register pages
+            // Store current path for post-login redirect
             let location = use_location();
-            let current_path = location.pathname.get();
-            if !current_path.starts_with("/login") && !current_path.starts_with("/register") {
+            let current_path = location.pathname.get_untracked();
+            if !is_auth_page(&current_path) {
                 set_redirect_after_auth.set(Some(current_path));
             }
-
-            // Reduced delay and better error handling
-            set_timeout(
-                move || {
-                    spawn_local(async move {
-                        match get_current_user().await {
-                            Ok(user) => {
-                                logging::log!("AuthProvider: User loaded: {:?}", user);
-                                set_current_user.set(user);
-                            }
-                            Err(err) => {
-                                logging::log!("AuthProvider: Error loading user: {:?}", err);
-                                set_current_user.set(None);
-                            }
-                        }
-                        set_loading.set(false);
-                    });
-                },
-                std::time::Duration::from_millis(50), // Reduced delay
-            );
         }
     });
 
+    // Track resource state
+    create_effect(move |_| {
+        match user_resource.get() {
+            Some(Ok(user)) => {
+                debug!("AuthProvider: User loaded: {:?}", user.is_some());
+                set_current_user.set(user);
+                set_loading.set(false);
+            }
+            Some(Err(err)) => {
+                debug!("AuthProvider: Error loading user: {:?}", err);
+                set_current_user.set(None);
+                set_loading.set(false);
+            }
+            None => {
+                // Still loading
+                if initialized.get() {
+                    set_loading.set(true);
+                }
+            }
+        }
+    });
+
+    // Provide context
     provide_context(current_user);
     provide_context(set_current_user);
     provide_context(loading);
@@ -63,47 +72,56 @@ pub fn AuthProvider(children: Children) -> impl IntoView {
 
 #[component]
 pub fn RequireAuth(children: Children) -> impl IntoView {
-    let current_user = use_context::<ReadSignal<Option<UserJwt>>>().unwrap();
-    let loading = use_context::<ReadSignal<bool>>().unwrap();
-    let redirect_after_auth = use_context::<ReadSignal<Option<String>>>().unwrap();
-    let set_redirect_after_auth = use_context::<WriteSignal<Option<String>>>().unwrap();
+    let current_user =
+        use_context::<ReadSignal<Option<SessionUser>>>().expect("AuthProvider context not found");
+    let loading = use_context::<ReadSignal<bool>>().expect("AuthProvider context not found");
+    let set_redirect_after_auth =
+        use_context::<WriteSignal<Option<String>>>().expect("AuthProvider context not found");
+
     let navigate = use_navigate();
     let location = use_location();
-
-    // Store children to avoid re-rendering
     let rendered_children = store_value(children());
 
-    // Handle navigation with a separate effect - only redirect when loading is complete
+    // Handle redirect when not authenticated - use create_effect with proper tracking
     create_effect(move |_| {
-        if !loading.get() && current_user.get().is_none() {
-            let current_path = location.pathname.get();
-            // Only store redirect path if we're not already on auth pages
-            if !current_path.starts_with("/login") && !current_path.starts_with("/register") {
+        let is_loading = loading.get();
+        let user = current_user.get();
+
+        debug!(
+            "RequireAuth: loading={}, user={:?}",
+            is_loading,
+            user.is_some()
+        );
+
+        if !is_loading && user.is_none() {
+            let current_path = location.pathname.get_untracked();
+            if !is_auth_page(&current_path) {
                 set_redirect_after_auth.set(Some(current_path));
             }
-            logging::log!("RequireAuth: No user found, redirecting to login");
+            debug!("RequireAuth: No user found, redirecting to login");
             navigate("/login", Default::default());
         }
     });
 
-    move || {
-        if loading.get() {
-            view! {
-                <div class="flex items-center justify-center min-h-screen">
-                    <div class="text-lg">Loading...</div>
-                </div>
-            }
-            .into_view()
-        } else if current_user.get().is_some() {
-            rendered_children.get_value().into_view()
-        } else {
-            view! {
-                <div class="flex items-center justify-center min-h-screen">
-                    <div class="text-lg">Redirecting to login...</div>
-                </div>
-            }
-            .into_view()
-        }
+    // Use Suspense to handle loading states properly
+    view! {
+        <Suspense fallback=move || loading_view()>
+            {move || {
+                let is_loading = loading.get();
+                let user = current_user.get();
+
+                if is_loading {
+                    debug!("RequireAuth: Showing loading view");
+                    loading_view().into_view()
+                } else if user.is_some() {
+                    debug!("RequireAuth: User authenticated, showing content");
+                    rendered_children.get_value().into_view()
+                } else {
+                    debug!("RequireAuth: No user, showing redirect view");
+                    redirect_view().into_view()
+                }
+            }}
+        </Suspense>
     }
 }
 
@@ -112,157 +130,134 @@ pub fn RequireRole(
     #[prop(default = "user".to_string())] role: String,
     children: Children,
 ) -> impl IntoView {
-    let current_user = use_context::<ReadSignal<Option<UserJwt>>>().unwrap();
-    let loading = use_context::<ReadSignal<bool>>().unwrap();
-    let redirect_after_auth = use_context::<ReadSignal<Option<String>>>().unwrap();
-    let set_redirect_after_auth = use_context::<WriteSignal<Option<String>>>().unwrap();
+    let current_user =
+        use_context::<ReadSignal<Option<SessionUser>>>().expect("AuthProvider context not found");
+    let loading = use_context::<ReadSignal<bool>>().expect("AuthProvider context not found");
+    let set_redirect_after_auth =
+        use_context::<WriteSignal<Option<String>>>().expect("AuthProvider context not found");
+
     let navigate = use_navigate();
     let location = use_location();
-
-    // Store children and role to avoid re-rendering
     let rendered_children = store_value(children());
     let role_stored = store_value(role);
 
     create_effect(move |_| {
-        if !loading.get() {
-            let role = role_stored.get_value();
-            match current_user.get() {
-                Some(user) => {
-                    let has_permission = match role.as_str() {
-                        "admin" => user.is_admin(),
-                        "teacher" => user.is_teacher(),
-                        _ => true,
-                    };
+        let is_loading = loading.get();
+        let user = current_user.get();
+        let role = role_stored.get_value();
 
-                    if !has_permission {
-                        logging::log!("RequireRole: User lacks required role: {}", role);
+        debug!(
+            "RequireRole: loading={}, user={:?}, required_role={}",
+            is_loading,
+            user.is_some(),
+            role
+        );
+
+        if !is_loading {
+            match user {
+                Some(user) => {
+                    if !user_has_role(&user, &role) {
+                        debug!("RequireRole: User lacks required role: {}", role);
                         navigate("/", Default::default());
                     }
                 }
                 None => {
-                    let current_path = location.pathname.get();
-                    if !current_path.starts_with("/login") && !current_path.starts_with("/register")
-                    {
+                    let current_path = location.pathname.get_untracked();
+                    if !is_auth_page(&current_path) {
                         set_redirect_after_auth.set(Some(current_path));
                     }
-                    logging::log!("RequireRole: No user found, redirecting to login");
+                    debug!("RequireRole: No user found, redirecting to login");
                     navigate("/login", Default::default());
                 }
             }
         }
     });
 
-    move || {
-        let role = role_stored.get_value();
-        if loading.get() {
-            view! {
-                <div class="flex items-center justify-center min-h-screen">
-                    <div class="text-lg">Loading...</div>
-                </div>
-            }
-            .into_view()
-        } else if let Some(user) = current_user.get() {
-            let has_permission = match role.as_str() {
-                "admin" => user.is_admin(),
-                "teacher" => user.is_teacher(),
-                _ => true,
-            };
+    view! {
+        <Suspense fallback=move || loading_view()>
+            {move || {
+                let is_loading = loading.get();
+                let user = current_user.get();
+                let role = role_stored.get_value();
 
-            if has_permission {
-                rendered_children.get_value().into_view()
-            } else {
-                view! {
-                    <div class="flex items-center justify-center min-h-screen">
-                        <div class="text-lg text-red-600">Unauthorized - Insufficient permissions</div>
-                    </div>
-                }.into_view()
-            }
-        } else {
-            view! {
-                <div class="flex items-center justify-center min-h-screen">
-                    <div class="text-lg">Redirecting to login...</div>
-                </div>
-            }
-            .into_view()
-        }
+                if is_loading {
+                    debug!("RequireRole: Showing loading view");
+                    loading_view().into_view()
+                } else if let Some(user) = user {
+                    if user_has_role(&user, &role) {
+                        debug!("RequireRole: User has required role, showing content");
+                        rendered_children.get_value().into_view()
+                    } else {
+                        debug!("RequireRole: User lacks required role, showing unauthorized view");
+                        unauthorized_view().into_view()
+                    }
+                } else {
+                    debug!("RequireRole: No user, showing redirect view");
+                    redirect_view().into_view()
+                }
+            }}
+        </Suspense>
     }
 }
 
 #[component]
 pub fn RequireAnyRole(roles: Vec<String>, children: Children) -> impl IntoView {
-    let current_user = use_context::<ReadSignal<Option<UserJwt>>>().unwrap();
-    let loading = use_context::<ReadSignal<bool>>().unwrap();
-    let redirect_after_auth = use_context::<ReadSignal<Option<String>>>().unwrap();
-    let set_redirect_after_auth = use_context::<WriteSignal<Option<String>>>().unwrap();
+    let current_user =
+        use_context::<ReadSignal<Option<SessionUser>>>().expect("AuthProvider context not found");
+    let loading = use_context::<ReadSignal<bool>>().expect("AuthProvider context not found");
+    let set_redirect_after_auth =
+        use_context::<WriteSignal<Option<String>>>().expect("AuthProvider context not found");
+
     let navigate = use_navigate();
     let location = use_location();
-
-    // Store values to avoid re-rendering
     let rendered_children = store_value(children());
     let roles_stored = store_value(roles);
 
     create_effect(move |_| {
-        if !loading.get() {
-            let roles = roles_stored.get_value();
-            match current_user.get() {
-                Some(user) => {
-                    let has_permission = roles.iter().any(|role| match role.as_str() {
-                        "admin" => user.is_admin(),
-                        "teacher" => user.is_teacher(),
-                        _ => true,
-                    });
+        let is_loading = loading.get();
+        let user = current_user.get();
+        let roles = roles_stored.get_value();
 
-                    if !has_permission {
-                        logging::log!("RequireAnyRole: User lacks required roles: {:?}", roles);
+        if !is_loading {
+            match user {
+                Some(user) => {
+                    if !user_has_any_role(&user, &roles) {
+                        debug!("RequireAnyRole: User lacks required roles: {:?}", roles);
                         navigate("/", Default::default());
                     }
                 }
                 None => {
-                    let current_path = location.pathname.get();
-                    if !current_path.starts_with("/login") && !current_path.starts_with("/register")
-                    {
+                    let current_path = location.pathname.get_untracked();
+                    if !is_auth_page(&current_path) {
                         set_redirect_after_auth.set(Some(current_path));
                     }
-                    logging::log!("RequireAnyRole: No user found, redirecting to login");
+                    debug!("RequireAnyRole: No user found, redirecting to login");
                     navigate("/login", Default::default());
                 }
             }
         }
     });
 
-    move || {
-        let roles = roles_stored.get_value();
-        if loading.get() {
-            view! {
-                <div class="flex items-center justify-center min-h-screen">
-                    <div class="text-lg">Loading...</div>
-                </div>
-            }
-            .into_view()
-        } else if let Some(user) = current_user.get() {
-            let has_permission = roles.iter().any(|role| match role.as_str() {
-                "admin" => user.is_admin(),
-                "teacher" => user.is_teacher(),
-                _ => true,
-            });
+    view! {
+        <Suspense fallback=move || loading_view()>
+            {move || {
+                let is_loading = loading.get();
+                let user = current_user.get();
+                let roles = roles_stored.get_value();
 
-            if has_permission {
-                rendered_children.get_value().into_view()
-            } else {
-                view! {
-                    <div class="flex items-center justify-center min-h-screen">
-                        <div class="text-lg text-red-600">Unauthorized - Insufficient permissions</div>
-                    </div>
-                }.into_view()
-            }
-        } else {
-            view! {
-                <div class="flex items-center justify-center min-h-screen">
-                    <div class="text-lg">Redirecting to login...</div>
-                </div>
-            }
-            .into_view()
-        }
+                if is_loading {
+                    loading_view().into_view()
+                } else if let Some(user) = user {
+                    if user_has_any_role(&user, &roles) {
+                        rendered_children.get_value().into_view()
+                    } else {
+                        unauthorized_view().into_view()
+                    }
+                } else {
+                    redirect_view().into_view()
+                }
+            }}
+        </Suspense>
     }
 }
 
@@ -275,84 +270,87 @@ pub fn RequireAdminOrTeacher(children: Children) -> impl IntoView {
     }
 }
 
-// Updated hook with better redirect handling
-pub fn use_auth_redirect() -> (ReadSignal<Option<UserJwt>>, Signal<bool>) {
-    let user = use_context::<ReadSignal<Option<UserJwt>>>().expect("AuthProvider not found");
-    let loading = use_context::<Signal<bool>>().unwrap_or_else(|| Signal::derive(|| false));
-    let redirect_after_auth = use_context::<ReadSignal<Option<String>>>().unwrap();
-    let set_redirect_after_auth = use_context::<WriteSignal<Option<String>>>().unwrap();
-    let navigate = use_navigate();
-    let location = use_location();
-
-    // Handle redirect for unauthenticated users - only after loading completes
-    create_effect(move |_| {
-        if !loading.get() && user.get().is_none() {
-            let current_path = location.pathname.get();
-            if !current_path.starts_with("/login") && !current_path.starts_with("/register") {
-                set_redirect_after_auth.set(Some(current_path));
-            }
-            logging::log!("use_auth_redirect: No user found, redirecting to login");
-            navigate("/login", Default::default());
-        }
-    });
-
-    (user, loading)
+// Utility functions
+fn is_auth_page(path: &str) -> bool {
+    path.starts_with("/login")
+        || path.starts_with("/register")
+        || path.starts_with("/forgot-password")
+        || path.starts_with("/reset-password")
 }
 
-pub fn use_role_redirect(
-    required_roles: Vec<String>,
-) -> (ReadSignal<Option<UserJwt>>, Signal<bool>) {
-    let user = use_context::<ReadSignal<Option<UserJwt>>>().expect("AuthProvider not found");
-    let loading = use_context::<Signal<bool>>().unwrap_or_else(|| Signal::derive(|| false));
-    let redirect_after_auth = use_context::<ReadSignal<Option<String>>>().unwrap();
-    let set_redirect_after_auth = use_context::<WriteSignal<Option<String>>>().unwrap();
-    let navigate = use_navigate();
-    let location = use_location();
-
-    // Handle redirect for unauthorized users - only after loading completes
-    create_effect(move |_| {
-        if !loading.get() {
-            match user.get() {
-                Some(user_data) => {
-                    let has_permission = required_roles.iter().any(|role| match role.as_str() {
-                        "admin" => user_data.is_admin(),
-                        "teacher" => user_data.is_teacher(),
-                        _ => true,
-                    });
-
-                    if !has_permission {
-                        logging::log!(
-                            "use_role_redirect: User lacks required roles: {:?}",
-                            required_roles
-                        );
-                        navigate("/", Default::default());
-                    }
-                }
-                None => {
-                    let current_path = location.pathname.get();
-                    if !current_path.starts_with("/login") && !current_path.starts_with("/register")
-                    {
-                        set_redirect_after_auth.set(Some(current_path));
-                    }
-                    logging::log!("use_role_redirect: No user found, redirecting to login");
-                    navigate("/login", Default::default());
-                }
-            }
-        }
-    });
-
-    (user, loading)
+fn user_has_role(user: &SessionUser, required_role: &str) -> bool {
+    match required_role {
+        "admin" => user.is_admin(),
+        "teacher" => user.is_teacher(),
+        "user" => user.is_user(),
+        "guest" => user.is_guest(),
+        _ => true,
+    }
 }
 
+fn user_has_any_role(user: &SessionUser, required_roles: &[String]) -> bool {
+    required_roles.iter().any(|role| user_has_role(user, role))
+}
+
+// Reusable view components
+fn loading_view() -> impl IntoView {
+    view! {
+        <div class="flex items-center justify-center min-h-screen">
+            <div class="flex items-center space-x-2">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <span class="text-lg text-gray-600">Loading...</span>
+            </div>
+        </div>
+    }
+}
+
+fn redirect_view() -> impl IntoView {
+    view! {
+        <div class="flex items-center justify-center min-h-screen">
+            <div class="text-lg text-gray-600">Redirecting to login...</div>
+        </div>
+    }
+}
+
+fn unauthorized_view() -> impl IntoView {
+    view! {
+        <div class="flex items-center justify-center min-h-screen">
+            <div class="text-center">
+                <h1 class="text-2xl font-bold text-red-600 mb-2">Unauthorized</h1>
+                <p class="text-gray-600">"You don't have permission to access this page."</p>
+                <a href="/" class="mt-4 inline-block text-blue-600 hover:underline">
+                    Return to Dashboard
+                </a>
+            </div>
+        </div>
+    }
+}
+
+// Post-login redirect function
 pub fn perform_post_login_redirect() {
-    let redirect_after_auth = use_context::<ReadSignal<Option<String>>>().unwrap();
-    let set_redirect_after_auth = use_context::<WriteSignal<Option<String>>>().unwrap();
+    let redirect_after_auth =
+        use_context::<ReadSignal<Option<String>>>().expect("AuthProvider context not found");
+    let set_redirect_after_auth =
+        use_context::<WriteSignal<Option<String>>>().expect("AuthProvider context not found");
     let navigate = use_navigate();
 
-    if let Some(redirect_path) = redirect_after_auth.get() {
+    if let Some(redirect_path) = redirect_after_auth.get_untracked() {
         set_redirect_after_auth.set(None);
         navigate(&redirect_path, Default::default());
     } else {
         navigate("/dashboard", Default::default());
     }
+}
+
+// Auth hooks for components that need user data
+pub fn use_current_user() -> ReadSignal<Option<SessionUser>> {
+    use_context::<ReadSignal<Option<SessionUser>>>().expect("AuthProvider context not found")
+}
+
+pub fn use_auth_loading() -> ReadSignal<bool> {
+    use_context::<ReadSignal<bool>>().expect("AuthProvider context not found")
+}
+
+pub fn use_set_current_user() -> WriteSignal<Option<SessionUser>> {
+    use_context::<WriteSignal<Option<SessionUser>>>().expect("AuthProvider context not found")
 }

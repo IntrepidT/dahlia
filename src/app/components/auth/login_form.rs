@@ -1,5 +1,5 @@
 use crate::app::components::authorization_components::perform_post_login_redirect;
-use crate::app::models::user::UserJwt;
+use crate::app::models::user::SessionUser;
 use crate::app::server_functions::auth::{get_current_user, login, logout, register};
 use leptos::*;
 use leptos_router::use_navigate;
@@ -16,7 +16,7 @@ pub fn LoginForm() -> impl IntoView {
     let (username, set_username) = create_signal("".to_string());
     let (password, set_password) = create_signal("".to_string());
     let (error, set_error) = create_signal::<Option<String>>(None);
-    let set_current_user = use_context::<WriteSignal<Option<UserJwt>>>().unwrap();
+    let set_current_user = use_context::<WriteSignal<Option<SessionUser>>>().unwrap();
 
     let handle_submit = create_action(move |_: &()| {
         let username = username.get();
@@ -131,7 +131,7 @@ pub fn RegisterForm() -> impl IntoView {
     let (password, set_password) = create_signal("".to_string());
     let (confirm_password, set_confirm_password) = create_signal("".to_string());
     let (error, set_error) = create_signal::<Option<String>>(None);
-    let set_current_user = use_context::<WriteSignal<Option<UserJwt>>>().unwrap();
+    let set_current_user = use_context::<WriteSignal<Option<SessionUser>>>().unwrap();
 
     let handle_submit = create_action(move |_: &()| {
         let username = username.get();
@@ -254,7 +254,7 @@ pub fn RegisterForm() -> impl IntoView {
 
 #[component]
 pub fn LogoutButton() -> impl IntoView {
-    let set_current_user = use_context::<WriteSignal<Option<UserJwt>>>().unwrap();
+    let set_current_user = use_context::<WriteSignal<Option<SessionUser>>>().unwrap();
 
     let handle_logout = create_action(move |_: &()| {
         async move {

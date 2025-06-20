@@ -1,5 +1,5 @@
 use crate::app::db::user_database;
-use crate::app::models::user::{UserJwt, UserRole};
+use crate::app::models::user::{SessionUser, UserRole};
 #[cfg(feature = "ssr")]
 use actix_web::{cookie::Cookie, http::header, HttpRequest, HttpResponse};
 use leptos::*;
@@ -14,7 +14,7 @@ use sqlx::PgPool;
 pub struct AuthResponse {
     pub success: bool,
     pub message: String,
-    pub user: Option<UserJwt>,
+    pub user: Option<SessionUser>,
 }
 
 #[server(Login, "/api")]
@@ -30,39 +30,39 @@ pub async fn login(username: String, password: String) -> Result<AuthResponse, S
             .await
             .map_err(|e| ServerFnError::new(format!("Failed to extract pool: {}", e)))?;
 
-        // Check if the user exists
         log::info!("Looking up user in database: {}", username);
         let user_result = user_database::get_user_by_username(&pool, &username).await;
 
         match user_result {
             Ok(Some(user)) => {
                 log::info!("User found, verifying password");
-                // Verify the password
                 if user_database::verify_password(&password, &user.password_hash) {
                     log::info!("Password verified for user: {}", username);
-                    // Create a session
+
                     match user_database::create_session(&pool, user.id).await {
                         Ok(session_token) => {
                             log::info!("Session created for user: {}", username);
-                            // Set the session cookie
+
+                            // Set secure session cookie
                             let response = expect_context::<ResponseOptions>();
-                            response.insert_header(
-                                header::SET_COOKIE,
-                                header::HeaderValue::from_str(&format!(
-                                    "session={}; Path=/; HttpOnly; SameSite=Strict; Max-Age=604800; Secure",
-                                    session_token
-                                ))
-                                .expect("Failed to create header value"),
+                            let cookie_value =
+                                format!(
+                                "session={}; Path=/; HttpOnly; SameSite=Strict; Max-Age=604800{}",
+                                session_token,
+                                if cfg!(debug_assertions) { "" } else { "; Secure" }
                             );
 
-                            // Return success
-                            let auth_response = AuthResponse {
+                            response.insert_header(
+                                header::SET_COOKIE,
+                                header::HeaderValue::from_str(&cookie_value)
+                                    .expect("Failed to create header value"),
+                            );
+
+                            Ok(AuthResponse {
                                 success: true,
                                 message: "Login successful".to_string(),
-                                user: Some(user),
-                            };
-                            log::info!("Login successful for user: {}", username);
-                            Ok(auth_response)
+                                user: Some(user.to_session_user()), // Convert to SessionUser
+                            })
                         }
                         Err(e) => {
                             log::error!("Failed to create session: {:?}", e);
@@ -103,7 +103,6 @@ pub async fn login(username: String, password: String) -> Result<AuthResponse, S
 
     #[cfg(not(feature = "ssr"))]
     {
-        log::warn!("Login function called without SSR feature enabled");
         Err(ServerFnError::ServerError("Not implemented".to_string()))
     }
 }
@@ -115,7 +114,6 @@ pub async fn logout() -> Result<AuthResponse, ServerFnError> {
         use actix_web::web;
         use leptos_actix::extract;
 
-        // Extract pool and request in separate statements to avoid borrow conflicts
         let pool = extract::<web::Data<PgPool>>()
             .await
             .map_err(|e| ServerFnError::new(format!("Failed to extract pool: {}", e)))?;
@@ -124,7 +122,6 @@ pub async fn logout() -> Result<AuthResponse, ServerFnError> {
             .await
             .map_err(|e| ServerFnError::new(format!("Failed to extract request: {}", e)))?;
 
-        // Now we can safely use both without borrow conflicts
         let cookies = match req.cookies() {
             Ok(cookies) => cookies,
             Err(e) => {
@@ -137,32 +134,28 @@ pub async fn logout() -> Result<AuthResponse, ServerFnError> {
             }
         };
 
-        // Find the session cookie
-        let session_token_opt = cookies
-            .iter()
-            .find(|c| c.name() == "session")
-            .map(|c| c.value().to_string());
-
-        if let Some(session_token) = session_token_opt {
-            // Delete the session from database
-            if let Err(e) = user_database::delete_session(&pool, &session_token).await {
+        // Find and invalidate session
+        if let Some(session_cookie) = cookies.iter().find(|c| c.name() == "session") {
+            let session_token = session_cookie.value();
+            if let Err(e) = user_database::delete_session(&pool, session_token).await {
                 log::error!("Failed to delete session from database: {:?}", e);
-                return Ok(AuthResponse {
-                    success: false,
-                    message: "Failed to delete session".to_string(),
-                    user: None,
-                });
             }
         }
 
         // Clear the session cookie
         let response = expect_context::<ResponseOptions>();
+        let clear_cookie = format!(
+            "session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0{}",
+            if cfg!(debug_assertions) {
+                ""
+            } else {
+                "; Secure"
+            }
+        );
+
         response.insert_header(
             header::SET_COOKIE,
-            header::HeaderValue::from_str(
-                "session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0; Secure",
-            )
-            .expect("Failed to create header value"),
+            header::HeaderValue::from_str(&clear_cookie).expect("Failed to create header value"),
         );
 
         Ok(AuthResponse {
@@ -179,13 +172,12 @@ pub async fn logout() -> Result<AuthResponse, ServerFnError> {
 }
 
 #[server(GetCurrentUser, "/api")]
-pub async fn get_current_user() -> Result<Option<UserJwt>, ServerFnError> {
+pub async fn get_current_user() -> Result<Option<SessionUser>, ServerFnError> {
     #[cfg(feature = "ssr")]
     {
         use actix_web::web;
         use leptos_actix::extract;
 
-        // Extract pool and request separately to avoid borrow conflicts
         let pool = extract::<web::Data<PgPool>>()
             .await
             .map_err(|e| ServerFnError::new(format!("Failed to extract pool: {}", e)))?;
@@ -202,31 +194,21 @@ pub async fn get_current_user() -> Result<Option<UserJwt>, ServerFnError> {
             }
         };
 
-        log::info!("Attempting to find session cookie");
+        if let Some(session_cookie) = cookies.iter().find(|c| c.name() == "session") {
+            let session_token = session_cookie.value();
 
-        // Find the session cookie
-        let session_token_opt = cookies
-            .iter()
-            .find(|c| c.name() == "session")
-            .map(|c| c.value().to_string());
-
-        if let Some(session_token) = session_token_opt {
-            log::info!("Session cookie found, validating with database");
-            // Use validate_session instead of get_user_by_session for consistency
-            match user_database::validate_session(&pool, &session_token).await {
+            match user_database::validate_session(&pool, session_token).await {
                 Ok(Some(user)) => {
-                    log::info!("Valid session found for user: {}", user.username);
-                    return Ok(Some(user));
+                    log::debug!("Valid session found for user: {}", user.username);
+                    return Ok(Some(user)); // Already returns SessionUser
                 }
                 Ok(None) => {
-                    log::info!("Invalid or expired session");
+                    log::debug!("Invalid or expired session");
                 }
                 Err(e) => {
                     log::error!("Error validating session: {:?}", e);
                 }
             }
-        } else {
-            log::info!("No session cookie found");
         }
 
         Ok(None)
@@ -246,7 +228,7 @@ pub async fn register(
 ) -> Result<AuthResponse, ServerFnError> {
     #[cfg(feature = "ssr")]
     {
-        // Basic validation
+        // Input validation
         if username.trim().is_empty() || email.trim().is_empty() || password.len() < 8 {
             return Ok(AuthResponse {
                 success: false,
@@ -264,7 +246,7 @@ pub async fn register(
 
         log::info!("Registration attempt for username: {}", username);
 
-        // Check if the username already exists
+        // Check for existing username
         if let Ok(Some(_)) = user_database::get_user_by_username(&pool, &username).await {
             return Ok(AuthResponse {
                 success: false,
@@ -273,7 +255,7 @@ pub async fn register(
             });
         }
 
-        // Check if the email already exists
+        // Check for existing email
         if let Ok(Some(_)) = user_database::get_user_by_email(&pool, &email).await {
             return Ok(AuthResponse {
                 success: false,
@@ -282,33 +264,38 @@ pub async fn register(
             });
         }
 
-        log::info!("Creating new user: {}", username);
-        // Create the user
+        // Create user
         match user_database::create_user(&pool, username.clone(), email, password, UserRole::Guest)
             .await
         {
             Ok(user) => {
                 log::info!("User created successfully: {}", username);
-                // Create a session
+
+                // Create session
                 match user_database::create_session(&pool, user.id).await {
                     Ok(session_token) => {
-                        log::info!("Session created for new user: {}", username);
-                        // Set the session cookie
+                        // Set session cookie
                         let response = expect_context::<ResponseOptions>();
-                        response.insert_header(
-                            header::SET_COOKIE,
-                            header::HeaderValue::from_str(&format!(
-                                "session={}; Path=/; HttpOnly; SameSite=Strict; Max-Age=604800; Secure",
-                                session_token
-                            ))
-                            .expect("Failed to create header value"),
+                        let cookie_value = format!(
+                            "session={}; Path=/; HttpOnly; SameSite=Strict; Max-Age=604800{}",
+                            session_token,
+                            if cfg!(debug_assertions) {
+                                ""
+                            } else {
+                                "; Secure"
+                            }
                         );
 
-                        // Return success
+                        response.insert_header(
+                            header::SET_COOKIE,
+                            header::HeaderValue::from_str(&cookie_value)
+                                .expect("Failed to create header value"),
+                        );
+
                         Ok(AuthResponse {
                             success: true,
                             message: "Registration successful".to_string(),
-                            user: Some(user),
+                            user: Some(user.to_session_user()), // Convert to SessionUser
                         })
                     }
                     Err(e) => {
@@ -338,6 +325,7 @@ pub async fn register(
     }
 }
 
+// Keep password reset functions as they are - they're well implemented
 #[server(RequestPasswordReset, "/api")]
 pub async fn request_password_reset(email: String) -> Result<AuthResponse, ServerFnError> {
     #[cfg(feature = "ssr")]
@@ -354,26 +342,21 @@ pub async fn request_password_reset(email: String) -> Result<AuthResponse, Serve
             .await
             .map_err(|e| ServerFnError::new(format!("Failed to extract pool: {}", e)))?;
 
-        // Check if the user exists
         let user_result = user_database::get_user_by_email(&pool, &email).await;
 
         match user_result {
             Ok(Some(user)) => {
-                // Generate a random token
                 let token: String = rand::thread_rng()
                     .sample_iter(&Alphanumeric)
                     .take(64)
                     .map(char::from)
                     .collect();
 
-                // Set expiration time (24 hours from now)
                 let expires = Utc::now() + Duration::hours(24);
 
-                // Update the user in the database with the reset token and expiration
                 match user_database::set_password_reset_token(&pool, user.id, &token, expires).await
                 {
                     Ok(_) => {
-                        // Send an email with the password reset link
                         if let Err(e) = email_service::send_reset_email(&email, &token).await {
                             log::error!("Failed to send password reset email: {}", e);
                         }
@@ -395,7 +378,6 @@ pub async fn request_password_reset(email: String) -> Result<AuthResponse, Serve
                 }
             }
             Ok(None) => {
-                // Don't reveal that the email doesn't exist for security reasons
                 log::info!("Password reset requested for non-existent email: {}", email);
                 Ok(AuthResponse {
                     success: true,
@@ -433,7 +415,6 @@ pub async fn validate_reset_token(token: String) -> Result<bool, ServerFnError> 
             .await
             .map_err(|e| ServerFnError::new(format!("Failed to extract pool: {}", e)))?;
 
-        // Check if the token exists and is not expired
         match user_database::validate_password_reset_token(&pool, &token).await {
             Ok(valid) => Ok(valid),
             Err(e) => {
@@ -471,15 +452,11 @@ pub async fn reset_password(
             .await
             .map_err(|e| ServerFnError::new(format!("Failed to extract pool: {}", e)))?;
 
-        // Validate token again before proceeding
         if let Ok(true) = user_database::validate_password_reset_token(&pool, &token).await {
-            // Get the user associated with this token
             match user_database::get_user_by_reset_token(&pool, &token).await {
                 Ok(Some(user)) => {
-                    // Hash the new password
                     let password_hash = user_database::hash_password(&new_password)?;
 
-                    // Update the user's password and clear the reset token
                     match user_database::update_password_and_clear_token(
                         &pool,
                         user.id,

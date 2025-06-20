@@ -6,6 +6,7 @@ pub mod server_functions;
 use leptos_meta::*;
 use leptos_router::*;
 pub mod pages;
+pub mod routes;
 pub mod websockets;
 use crate::app::middleware::global_settings::SettingsProvider;
 use components::enhanced_login_form::provide_student_mapping_service;
@@ -21,6 +22,7 @@ pub mod components;
 use components::auth::authorization_components::{
     AuthProvider, RequireAdminOrTeacher, RequireAuth, RequireRole,
 };
+use components::saml_admin::SamlAdminPanel;
 pub mod middleware;
 pub mod services;
 
@@ -55,123 +57,31 @@ pub fn App() -> impl IntoView {
                                     <HomePage />
                                 }
                             }/>
-                            <Route path="/dashboard" view=Dashboard />
+                            <Route path="/dashboard" view=move || {
+                                view! {
+                                    <Dashboard />
+                                }
+                            }/>
+                            <Route path="/admin/saml" view=SamlAdminPanel />
                             <Route path="/studentview" view=StudentView />
                             <Route path="/studentview/:student_id/results" view=TestResultsPage />
-                            <Route path="/admintest" view=move || {
-                                view!{
-                                    <RequireRole role="teacher".to_string()>
-                                        <AdministerTest />
-                                    </RequireRole>
-                                }
-                            }/>
-                            <Route path="/teachers" view=move || {
-                                view! {
-                                    <RequireRole role="admin".to_string()>
-                                        <Teachers />
-                                    </RequireRole>
-                                }
-                            }/>
-                            <Route path="/admindashboard" view=move || {
-                                view! {
-                                    <RequireRole role="admin".to_string()>
-                                        <AdminDashboard />
-                                    </RequireRole>
-                                }
-                            }/>
-                            <Route path="/assessments" view=move || {
-                                view! {
-                                    <RequireRole role="admin".to_string()>
-                                        <AssessmentPage />
-                                    </RequireRole>
-                                }
-                            }/>
-                            <Route path="/myaccount" view=|| {
-                                view!{
-                                    <RequireAuth>
-                                        <MyAccount />
-                                    </RequireAuth>
-                                }
-                            }/>
-                            <Route path="/settings" view=|| {
-                                view! {
-                                    <RequireAuth>
-                                        <Settings />
-                                    </RequireAuth>
-                                }
-                            }/>
-                            <Route path="/login" view=|| {
-                                view!{
-                                    <LoginPage />
-                                }
-                            }/>
-                            <Route path="/forgot-password" view=|| {
-                                view!{
-                                    <RequestPasswordResetForm />
-                                }
-                            }/>
-                            <Route path="/reset-password/:token" view=|| {
-                                view!{
-                                    <ResetPasswordForm />
-                                }
-                            }/>
-                            // Fixed: Use RequireAdminOrTeacher instead of nested RequireRole
-                            <Route path="/gradebook" view=|| {
-                                view!{
-                                    <RequireAdminOrTeacher>
-                                        <Gradebook />
-                                    </RequireAdminOrTeacher>
-                                }
-                            }/>
-                            <Route path="/mathtesting" view=|| {
-                                view!{
-                                    <RequireAdminOrTeacher>
-                                        <MathTesting />
-                                    </RequireAdminOrTeacher>
-                                }
-                            }/>
-                            <Route path="/readingtesting" view=|| {
-                                view!{
-                                    <RequireAdminOrTeacher>
-                                        <ReadingTesting />
-                                    </RequireAdminOrTeacher>
-                                }
-                            }/>
-                            <Route path="/testbuilder" view=|| {
-                                view!{
-                                    <RequireAdminOrTeacher>
-                                        <TestBuilder />
-                                    </RequireAdminOrTeacher>
-                                }
-                            }/>
-                            <Route path="/testbuilder/:test_id" view= || {
-                                view!{
-                                    <RequireAdminOrTeacher>
-                                        <TestBuilder />
-                                    </RequireAdminOrTeacher>
-                                }
-                            }/>
-                            <Route path="/assessment/:test_id" view=|| {
-                                view!{
-                                    <RequireAdminOrTeacher>
-                                        <Assessment />
-                                    </RequireAdminOrTeacher>
-                                }
-                            }/>
-                            <Route path="/flashcardset/:test_id" view=|| {
-                                view!{
-                                    <RequireAdminOrTeacher>
-                                        <FlashCardSet />
-                                    </RequireAdminOrTeacher>
-                                }
-                            }/>
-                            <Route path="/reviewtest/:test_id/:student_id/:test_variant/:attempt" view=|| {
-                                view! {
-                                    <RequireAdminOrTeacher>
-                                        <ReviewTest />
-                                    </RequireAdminOrTeacher>
-                                }
-                            }/>
+                            <Route path="/admintest" view=AdministerTest />
+                            <Route path="/teachers" view=Teachers />
+                            <Route path="/admindashboard" view=AdminDashboard />
+                            <Route path="/assessments" view=AssessmentPage />
+                            <Route path="/myaccount" view=MyAccount />
+                            <Route path="/settings" view=Settings />
+                            <Route path="/login" view=LoginPage />
+                            <Route path="/forgot-password" view=RequestPasswordResetForm />
+                            <Route path="/reset-password/:token" view=ResetPasswordForm />
+                            <Route path="/gradebook" view=Gradebook />
+                            <Route path="/mathtesting" view=MathTesting />
+                            <Route path="/readingtesting" view=ReadingTesting />
+                            <Route path="/testbuilder" view=TestBuilder />
+                            <Route path="/testbuilder/:test_id" view=TestBuilder />
+                            <Route path="/assessment/:test_id" view=Assessment />
+                            <Route path="/flashcardset/:test_id" view=FlashCardSet />
+                            <Route path="/reviewtest/:test_id/:student_id/:test_variant/:attempt" view=ReviewTest />
                             <Route path="/test-session/:test_id" view=RealtimeTestSession/>
                             <Route path="/tests/:test_id/sessions/:session_id" view=RealtimeTestSession/>
                             <Route path="/testsessions" view=TestSessionsList/>

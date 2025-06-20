@@ -1,3 +1,4 @@
+use crate::app::components::auth::server_auth_components::ServerAuthGuard;
 use crate::app::components::dashboard::dashboard_sidebar::{DashboardSidebar, SidebarSelected};
 use crate::app::components::header::Header;
 use crate::app::models::{
@@ -91,6 +92,15 @@ impl Default for CourseFormData {
 
 #[component]
 pub fn AdminDashboard() -> impl IntoView {
+    view! {
+        <ServerAuthGuard page_path="/admindashboard">
+            <AdminDashboardContent />
+        </ServerAuthGuard>
+    }
+}
+
+#[component]
+pub fn AdminDashboardContent() -> impl IntoView {
     let (selected_view, set_selected_view) = create_signal(SidebarSelected::AdminDashboard);
     let (current_tab, set_current_tab) = create_signal(DashboardView::Courses);
 

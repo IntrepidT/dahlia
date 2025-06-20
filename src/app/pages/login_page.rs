@@ -1,14 +1,15 @@
 use crate::app::components::auth::enhanced_login_form::EnhancedLoginForm;
 use crate::app::components::auth::login_form::{LoginForm, RegisterForm};
+use crate::app::components::auth::saml_login_form::SamlLoginForm;
 use crate::app::middleware::global_settings::use_settings;
-use crate::app::models::user::UserJwt;
+use crate::app::models::user::SessionUser;
 use leptos::*;
 use leptos_router::*;
 
 #[component]
 pub fn LoginPage() -> impl IntoView {
     let (show_register, set_show_register) = create_signal(false);
-    let current_user = use_context::<ReadSignal<Option<UserJwt>>>().unwrap();
+    let current_user = use_context::<ReadSignal<Option<SessionUser>>>().unwrap();
     let navigate = use_navigate();
 
     // Get settings to check if student protections are enabled
@@ -45,7 +46,7 @@ pub fn LoginPage() -> impl IntoView {
                             if student_protections_enabled() {
                                 view! { <EnhancedLoginForm /> }.into_view()
                             } else {
-                                view! { <LoginForm /> }.into_view()
+                                view! { <SamlLoginForm /> }.into_view()
                             }
                         }}
 

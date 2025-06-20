@@ -2,7 +2,7 @@ use crate::app::models::question::QuestionType;
 use crate::app::models::score::CreateScoreRequest;
 use crate::app::models::student::Student;
 use crate::app::models::test::Test;
-use crate::app::models::user::UserJwt;
+use crate::app::models::user::SessionUser;
 use crate::app::server_functions::students::get_students;
 use crate::app::server_functions::{
     questions::get_questions, scores::add_score, tests::get_tests, users::get_user,
@@ -25,7 +25,7 @@ pub fn FlashCardSet() -> impl IntoView {
     // Get test_id from URL parameters
     let params = use_params_map();
     let test_id = move || params.with(|params| params.get("test_id").cloned().unwrap_or_default());
-    let user = use_context::<ReadSignal<Option<UserJwt>>>().expect("AuthProvider not Found");
+    let user = use_context::<ReadSignal<Option<SessionUser>>>().expect("AuthProvider not Found");
     let user_data = create_resource(
         move || user.get().map(|u| u.id),
         move |id| async move {

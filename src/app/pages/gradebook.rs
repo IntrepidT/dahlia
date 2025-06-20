@@ -1,3 +1,4 @@
+use crate::app::components::auth::server_auth_components::ServerAuthGuard;
 use crate::app::components::dashboard_sidebar::{DashboardSidebar, SidebarSelected};
 use crate::app::components::data_processing::{
     AssessmentSummary, Progress, StudentResultsSummary, TestDetail,
@@ -24,6 +25,15 @@ use std::collections::HashMap;
 
 #[component]
 pub fn Gradebook() -> impl IntoView {
+    view! {
+        <ServerAuthGuard page_path="/gradebook">
+            <GradebookContent />
+        </ServerAuthGuard>
+    }
+}
+
+#[component]
+pub fn GradebookContent() -> impl IntoView {
     let (refresh_trigger, set_refresh_trigger) = create_signal(0);
     let (selected_view, set_selected_view) = create_signal(SidebarSelected::Dashboard);
     let (search_term, set_search_term) = create_signal(String::new());
@@ -51,7 +61,7 @@ pub fn Gradebook() -> impl IntoView {
     let (student_mapping_service, _) = use_student_mapping_service();
 
     // Fetch students
-    let students = create_resource(
+    let students = create_local_resource(
         move || refresh_trigger(),
         |_| async move {
             match get_students().await {
@@ -111,7 +121,8 @@ pub fn Gradebook() -> impl IntoView {
     };
 
     // Fetch assessment list
-    let assessment_list = create_resource(move || (), |_| async move { get_assessments().await });
+    let assessment_list =
+        create_local_resource(move || (), |_| async move { get_assessments().await });
 
     // Create a derived resource to get the selected assessment
     let selected_assessment = create_memo(move |_| {
@@ -133,7 +144,7 @@ pub fn Gradebook() -> impl IntoView {
     });
 
     // Create a derived resource that reacts to changes in selected assessment and loads up tests in batches
-    let tests = create_resource(
+    let tests = create_local_resource(
         move || (selected_assessment.get(), refresh_trigger()),
         |(selected_assessment_opt, _)| async move {
             if let Some(assessment) = selected_assessment_opt {
@@ -151,7 +162,7 @@ pub fn Gradebook() -> impl IntoView {
     );
 
     // Create resource for scores by test
-    let scores = create_resource(
+    let scores = create_local_resource(
         move || (selected_assessment.get(), refresh_trigger()),
         |(selected_assessment_opt, _)| async move {
             if let Some(assessment) = selected_assessment_opt {
@@ -191,7 +202,7 @@ pub fn Gradebook() -> impl IntoView {
     });
 
     // Create a resource for all student results to avoid repeated API calls
-    let all_student_results = create_resource(
+    let all_student_results = create_local_resource(
         move || (students.get(), refresh_trigger()),
         move |(students_opt, _)| async move {
             let mut results_map = HashMap::new();

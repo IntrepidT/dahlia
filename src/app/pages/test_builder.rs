@@ -1,3 +1,4 @@
+use crate::app::components::auth::server_auth_components::ServerAuthGuard;
 use crate::app::components::header::Header;
 use crate::app::components::question_builder::BuildingQuestion;
 use crate::app::models::assessment::ScopeEnum;
@@ -17,6 +18,15 @@ use strum::IntoEnumIterator;
 
 #[component]
 pub fn TestBuilder() -> impl IntoView {
+    view! {
+        <ServerAuthGuard page_path="/testbuilder">
+            <TestBuilderContent />
+        </ServerAuthGuard>
+    }
+}
+
+#[component]
+pub fn TestBuilderContent() -> impl IntoView {
     const TAB_BUTTON_STYLE: &str =
         "bg-[#00356b] px-8 py-2 rounded text-white transition-all duration-1000 ease-in-out ml-2";
     const INPUT_STYLE: &str = "w-[20rem] h-12 border-[#00356b] border pr-4 pl-6 py-4 text-[#00356b] rounded transition-all duration-1000 ease-in-out";

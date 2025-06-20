@@ -1,8 +1,8 @@
 use crate::app::components::auth::login_form::LogoutButton;
 use crate::app::components::update_user_modal::UpdateProfileModal; // Import the new modal component
 use crate::app::components::Header;
+use crate::app::models::user::SessionUser;
 use crate::app::models::user::User;
-use crate::app::models::user::UserJwt;
 use crate::app::server_functions::auth::{get_current_user, Logout};
 use crate::app::server_functions::users::get_user;
 use leptos::*;
@@ -13,7 +13,7 @@ pub fn MyAccount() -> impl IntoView {
     let (show_update_modal, set_show_update_modal) = create_signal(false);
 
     // Get the current user from context (provided by AuthProvider)
-    let current_user = use_context::<ReadSignal<Option<UserJwt>>>()
+    let current_user = use_context::<ReadSignal<Option<SessionUser>>>()
         .expect("AuthProvider should provide current_user");
 
     // Create a derived signal for user_id to avoid unnecessary refetching

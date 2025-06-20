@@ -1,3 +1,4 @@
+use crate::app::components::auth::server_auth_components::ServerAuthGuard;
 use crate::app::components::dashboard::dashboard_sidebar::{DashboardSidebar, SidebarSelected};
 use crate::app::components::{Header, MathTestDisplay, Toast, ToastMessage, ToastMessageType};
 use crate::app::models::{DeleteTestRequest, Test, TestType};
@@ -8,6 +9,15 @@ use std::rc::Rc;
 
 #[component]
 pub fn MathTesting() -> impl IntoView {
+    view! {
+        <ServerAuthGuard page_path="/mathtesting">
+            <MathTestingContent />
+        </ServerAuthGuard>
+    }
+}
+
+#[component]
+pub fn MathTestingContent() -> impl IntoView {
     let (selected_view, set_selected_view) = create_signal(SidebarSelected::AdministerTest);
     // Button styles updated to match Stripe's design language
     const ADD_BUTTON_STYLE: &str = "bg-[#2E3A59] px-3 py-2 sm:px-4 rounded-md text-white font-medium text-xs sm:text-sm shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-[#2E3A59] focus:ring-offset-2";
@@ -25,7 +35,7 @@ pub fn MathTesting() -> impl IntoView {
 
     let (search_term, set_search_term) = create_signal(String::new());
 
-    let get_tests_info = create_resource(|| (), |_| async move { get_tests().await });
+    let get_tests_info = create_local_resource(|| (), |_| async move { get_tests().await });
 
     let on_click_add = move |_| {
         let navigate = leptos_router::use_navigate();

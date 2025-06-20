@@ -1,4 +1,4 @@
-use crate::app::components::auth::authorization_components::use_role_redirect;
+use crate::app::components::auth::server_auth_components::ServerAuthGuard;
 use crate::app::components::dashboard::dashboard_sidebar::{DashboardSidebar, SidebarSelected};
 use crate::app::components::header::Header;
 use crate::app::components::student_page::bulk_upload_modal::BulkUploadModal;
@@ -9,7 +9,7 @@ use crate::app::components::student_page::{
     add_student_form::AddStudentForm, student_details::StudentDetails,
 };
 use crate::app::models::student::{DeleteStudentRequest, ESLEnum, Student};
-use crate::app::models::user::UserJwt;
+use crate::app::models::user::SessionUser;
 use crate::app::server_functions::students::{delete_student, get_students};
 use crate::app::server_functions::teachers::get_teachers;
 use leptos::ev::SubmitEvent;
@@ -30,7 +30,16 @@ const TABLE_CONTAINER_STYLE_EXPANDED: &str = "w-full lg:w-[92%] fixed p-3 lg:p-5
 
 #[component]
 pub fn StudentView() -> impl IntoView {
-    let user = use_context::<ReadSignal<Option<UserJwt>>>().expect("AuthProvider not found");
+    view! {
+        <ServerAuthGuard page_path="/studentview">
+            <StudentViewContent />
+        </ServerAuthGuard>
+    }
+}
+
+#[component]
+pub fn StudentViewContent() -> impl IntoView {
+    let user = use_context::<ReadSignal<Option<SessionUser>>>().expect("AuthProvider not found");
 
     // Signals for gathering data from existing students
     let (refresh_trigger, set_refresh_trigger) = create_signal(0);

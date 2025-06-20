@@ -4,7 +4,7 @@ use sqlx::FromRow;
 use std::fmt::{self, Display};
 use std::str::FromStr;
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum UserRole {
     Admin,
     Teacher,
@@ -70,62 +70,8 @@ impl AccountStatus {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct UserJwt {
-    pub id: i64,
-    pub username: String,
-    pub email: String,
-    pub password_hash: String,
-    pub role: UserRole,
-}
-
-impl UserJwt {
-    pub fn new(
-        id: i64,
-        username: String,
-        email: String,
-        password_hash: String,
-        role: UserRole,
-    ) -> Self {
-        UserJwt {
-            id,
-            username,
-            email,
-            password_hash,
-            role,
-        }
-    }
-    pub fn is_user(&self) -> bool {
-        self.role == UserRole::User
-            || self.role == UserRole::Teacher
-            || self.role == UserRole::Admin
-            || self.role == UserRole::SuperAdmin
-    }
-
-    pub fn is_admin(&self) -> bool {
-        self.role == UserRole::Admin || self.role == UserRole::SuperAdmin
-    }
-
-    pub fn is_teacher(&self) -> bool {
-        self.role == UserRole::Teacher
-            || self.role == UserRole::Admin
-            || self.role == UserRole::SuperAdmin
-    }
-
-    pub fn is_super_admin(&self) -> bool {
-        // Implement based on your user role system
-        self.role == UserRole::SuperAdmin
-    }
-
-    pub fn is_super(&self) -> bool {
-        self.role == UserRole::SuperAdmin
-    }
-
-    pub fn is_guest(&self) -> bool {
-        self.role == UserRole::Guest
-    }
-}
-
+// Full User struct - contains ALL user data including sensitive information
+// Used for: database operations, admin functions, complete user management
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct User {
     pub id: i64,
@@ -145,24 +91,101 @@ pub struct User {
 }
 
 impl User {
+    pub fn new(
+        id: i64,
+        username: String,
+        email: String,
+        password_hash: String,
+        role: UserRole,
+    ) -> Self {
+        User {
+            id,
+            username,
+            email,
+            password_hash,
+            role,
+            password_salt: None,
+            account_status: AccountStatus::Active,
+            email_verified: false,
+            phone_number: None,
+            phone_verified: false,
+            display_name: None,
+            first_name: None,
+            last_name: None,
+        }
+    }
+
     pub fn is_user(&self) -> bool {
-        self.role == UserRole::User
-            || self.role == UserRole::Teacher
-            || self.role == UserRole::Admin
-            || self.role == UserRole::SuperAdmin
+        matches!(
+            self.role,
+            UserRole::User | UserRole::Teacher | UserRole::Admin | UserRole::SuperAdmin
+        )
     }
 
     pub fn is_admin(&self) -> bool {
-        self.role == UserRole::Admin || self.role == UserRole::SuperAdmin
+        matches!(self.role, UserRole::Admin | UserRole::SuperAdmin)
     }
 
     pub fn is_teacher(&self) -> bool {
-        self.role == UserRole::Teacher
-            || self.role == UserRole::Admin
-            || self.role == UserRole::SuperAdmin
+        matches!(
+            self.role,
+            UserRole::Teacher | UserRole::Admin | UserRole::SuperAdmin
+        )
     }
 
-    pub fn is_super(&self) -> bool {
+    pub fn is_super_admin(&self) -> bool {
+        self.role == UserRole::SuperAdmin
+    }
+
+    pub fn is_guest(&self) -> bool {
+        self.role == UserRole::Guest
+    }
+
+    // Convert to session-safe version (without sensitive data)
+    pub fn to_session_user(&self) -> SessionUser {
+        SessionUser {
+            id: self.id,
+            username: self.username.clone(),
+            email: self.email.clone(),
+            role: self.role,
+            display_name: self.display_name.clone(),
+            first_name: self.first_name.clone(),
+            last_name: self.last_name.clone(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SessionUser {
+    pub id: i64,
+    pub username: String,
+    pub email: String,
+    pub role: UserRole,
+    pub display_name: Option<String>,
+    pub first_name: Option<String>,
+    pub last_name: Option<String>,
+}
+
+impl SessionUser {
+    pub fn is_user(&self) -> bool {
+        matches!(
+            self.role,
+            UserRole::User | UserRole::Teacher | UserRole::Admin | UserRole::SuperAdmin
+        )
+    }
+
+    pub fn is_admin(&self) -> bool {
+        matches!(self.role, UserRole::Admin | UserRole::SuperAdmin)
+    }
+
+    pub fn is_teacher(&self) -> bool {
+        matches!(
+            self.role,
+            UserRole::Teacher | UserRole::Admin | UserRole::SuperAdmin
+        )
+    }
+
+    pub fn is_super_admin(&self) -> bool {
         self.role == UserRole::SuperAdmin
     }
 

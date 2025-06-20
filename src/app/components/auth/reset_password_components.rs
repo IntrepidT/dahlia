@@ -1,4 +1,3 @@
-use crate::app::models::user::UserJwt;
 use crate::app::server_functions::auth::{get_current_user, login, logout, register};
 use leptos::*;
 use leptos_router::use_navigate;

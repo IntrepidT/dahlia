@@ -4,9 +4,9 @@ async fn main() -> std::io::Result<()> {
     use actix::Actor;
     use actix_files::Files;
     use actix_web::{web, App, HttpServer};
-    use argon2::password_hash;
     use dahlia::app::db::database;
     use dahlia::app::middleware::authentication::Authentication;
+    use dahlia::app::routes::saml_routes::configure_saml_routes; // Add this import
     use dahlia::app::websockets::lobby::Lobby;
     use dahlia::app::websockets::start_connection::start_connection;
     use dahlia::app::*;
@@ -34,7 +34,6 @@ async fn main() -> std::io::Result<()> {
 
     // Generate the list of routes in your Leptos App
     let routes = generate_route_list(App);
-    //println!("Generated routes: {:?}", routes);
     println!("listening on http://{}", &addr);
 
     // Create a secret key for cookie encryption
@@ -42,6 +41,10 @@ async fn main() -> std::io::Result<()> {
         println!("WARNING: Using default secret key. Set the SECRET_KEY environment variable in production.");
         "this_is_a_default_key_and_should_be_changed_in_production".to_string()
     });
+
+    // Check for SAML configuration
+    let base_url = env::var("BASE_URL").unwrap_or_else(|_| format!("http://{}", &addr));
+    println!("Base URL for SAML: {}", base_url);
 
     HttpServer::new(move || {
         let leptos_options = &conf.leptos_options;
@@ -59,6 +62,8 @@ async fn main() -> std::io::Result<()> {
             .app_data(chat_server_clone.clone())
             // Authentication middleware
             .wrap(Authentication::new())
+            // Configure SAML routes BEFORE other routes
+            .configure(configure_saml_routes)
             // serve JS/WASM/CSS from `pkg`
             .service(Files::new("/pkg", format!("{site_root}/pkg")))
             // serve other assets from the `assets` directory

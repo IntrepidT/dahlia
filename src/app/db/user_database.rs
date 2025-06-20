@@ -7,7 +7,7 @@ cfg_if::cfg_if! {
         };
         use sqlx::{Pool, Postgres};
         use leptos::ServerFnError;
-        use crate::app::models::user::{UserJwt, User, UserRole};
+        use crate::app::models::user::{SessionUser, User, UserRole};
         use sqlx::Row;
         use chrono::{DateTime, Utc};
         use crate::app::models::user::AccountStatus;
@@ -35,20 +35,20 @@ cfg_if::cfg_if! {
                 .is_ok()
         }
 
-        // Create a new user
+        // Create a new user - returns FULL User struct (for registration flow)
         pub async fn create_user(
             pool: &Pool<Postgres>,
             username: String,
             email: String,
             password: String,
             role: UserRole,
-        ) -> Result<UserJwt, ServerFnError> {
+        ) -> Result<User, ServerFnError> {
             let password_hash = hash_password(&password)?;
 
             let row = sqlx::query(
                 "INSERT INTO users (username, email, password_hash, role, account_status, email_verified, phone_verified)
                  VALUES ($1, $2, $3, $4, 'pending', false, false)
-                 RETURNING id, username, email, password_hash, role"
+                 RETURNING id, username, email, password_hash, role, password_salt, account_status::text, email_verified, phone_number, phone_verified, display_name, first_name, last_name"
             )
                 .bind(&username)
                 .bind(&email)
@@ -58,18 +58,26 @@ cfg_if::cfg_if! {
                 .await
                 .map_err(|e| ServerFnError::new(format!("Database error: {}", e)))?;
 
-            let user = UserJwt {
+            let user = User {
                 id: row.get("id"),
                 username: row.get("username"),
                 email: row.get("email"),
                 password_hash: row.get("password_hash"),
                 role: row.get("role"),
+                password_salt: row.try_get("password_salt").unwrap_or(None),
+                account_status: AccountStatus::from_str(row.get("account_status")),
+                email_verified: row.get("email_verified"),
+                phone_number: row.try_get("phone_number").unwrap_or(None),
+                phone_verified: row.get("phone_verified"),
+                display_name: row.try_get("display_name").unwrap_or(None),
+                first_name: row.try_get("first_name").unwrap_or(None),
+                last_name: row.try_get("last_name").unwrap_or(None),
             };
 
             Ok(user)
         }
 
-        // Get all users (admin function)
+        // Get all users (admin function) - returns FULL User structs
         pub async fn get_all_users(pool: &sqlx::PgPool) -> Result<Vec<User>, ServerFnError> {
             let rows = sqlx::query("SELECT id, username, email, password_hash, role, password_salt, account_status::text, email_verified, phone_number, phone_verified, display_name, first_name, last_name FROM users ORDER BY id ASC")
                 .fetch_all(pool)
@@ -99,7 +107,7 @@ cfg_if::cfg_if! {
             Ok(users)
         }
 
-        // Get full user by ID (returns User struct with all fields)
+        // Get full user by ID (returns FULL User struct with all fields)
         pub async fn get_user(id: i64, pool: &sqlx::PgPool) -> Result<User, ServerFnError> {
             let row = sqlx::query("SELECT id, username, email, password_hash, role, password_salt, account_status::text, email_verified, phone_number, phone_verified, display_name, first_name, last_name FROM users WHERE id = $1")
                 .bind(id)
@@ -142,13 +150,13 @@ cfg_if::cfg_if! {
             Ok(settings)
         }
 
-        // Get user by username (returns lightweight UserJwt)
+        // Get user by username for AUTHENTICATION - returns FULL User (needs password_hash for verification)
         pub async fn get_user_by_username(
             pool: &Pool<Postgres>,
             username: &str,
-        ) -> Result<Option<UserJwt>, ServerFnError> {
+        ) -> Result<Option<User>, ServerFnError> {
             let row = sqlx::query(
-                "SELECT id, username, email, password_hash, role
+                "SELECT id, username, email, password_hash, role, password_salt, account_status::text, email_verified, phone_number, phone_verified, display_name, first_name, last_name
                  FROM users
                  WHERE username = $1"
             )
@@ -159,12 +167,20 @@ cfg_if::cfg_if! {
 
             match row {
                 Some(row) => {
-                    let user = UserJwt {
+                    let user = User {
                         id: row.get("id"),
                         username: row.get("username"),
                         email: row.get("email"),
                         password_hash: row.get("password_hash"),
                         role: row.get("role"),
+                        password_salt: row.try_get("password_salt").unwrap_or(None),
+                        account_status: AccountStatus::from_str(row.get("account_status")),
+                        email_verified: row.get("email_verified"),
+                        phone_number: row.try_get("phone_number").unwrap_or(None),
+                        phone_verified: row.get("phone_verified"),
+                        display_name: row.try_get("display_name").unwrap_or(None),
+                        first_name: row.try_get("first_name").unwrap_or(None),
+                        last_name: row.try_get("last_name").unwrap_or(None),
                     };
                     Ok(Some(user))
                 },
@@ -172,13 +188,13 @@ cfg_if::cfg_if! {
             }
         }
 
-        // Get user by email (returns lightweight UserJwt)
+        // Get user by email for PASSWORD RESET - returns FULL User
         pub async fn get_user_by_email(
             pool: &Pool<Postgres>,
             email: &str,
-        ) -> Result<Option<UserJwt>, ServerFnError> {
+        ) -> Result<Option<User>, ServerFnError> {
             let row = sqlx::query(
-                "SELECT id, username, email, password_hash, role
+                "SELECT id, username, email, password_hash, role, password_salt, account_status::text, email_verified, phone_number, phone_verified, display_name, first_name, last_name
                  FROM users
                  WHERE email = $1"
             )
@@ -189,12 +205,20 @@ cfg_if::cfg_if! {
 
             match row {
                 Some(row) => {
-                    let user = UserJwt {
+                    let user = User {
                         id: row.get("id"),
                         username: row.get("username"),
                         email: row.get("email"),
                         password_hash: row.get("password_hash"),
                         role: row.get("role"),
+                        password_salt: row.try_get("password_salt").unwrap_or(None),
+                        account_status: AccountStatus::from_str(row.get("account_status")),
+                        email_verified: row.get("email_verified"),
+                        phone_number: row.try_get("phone_number").unwrap_or(None),
+                        phone_verified: row.get("phone_verified"),
+                        display_name: row.try_get("display_name").unwrap_or(None),
+                        first_name: row.try_get("first_name").unwrap_or(None),
+                        last_name: row.try_get("last_name").unwrap_or(None),
                     };
                     Ok(Some(user))
                 },
@@ -202,10 +226,10 @@ cfg_if::cfg_if! {
             }
         }
 
-        // Get user by ID (returns lightweight UserJwt)
-        pub async fn get_user_by_id(pool: &Pool<Postgres>, id: i64) -> Result<Option<UserJwt>, ServerFnError> {
+        // Get user by ID for general purposes - returns lightweight SessionUser
+        pub async fn get_user_by_id(pool: &Pool<Postgres>, id: i64) -> Result<Option<SessionUser>, ServerFnError> {
             let row = sqlx::query(
-                "SELECT id, username, email, password_hash, role
+                "SELECT id, username, email, role, display_name, first_name, last_name
                 FROM users
                 WHERE id = $1"
             )
@@ -216,12 +240,14 @@ cfg_if::cfg_if! {
 
             match row {
                 Some(row) => {
-                    let user = UserJwt {
+                    let user = SessionUser {
                         id: row.get("id"),
                         username: row.get("username"),
                         email: row.get("email"),
-                        password_hash: row.get("password_hash"),
                         role: row.get("role"),
+                        display_name: row.try_get("display_name").unwrap_or(None),
+                        first_name: row.try_get("first_name").unwrap_or(None),
+                        last_name: row.try_get("last_name").unwrap_or(None),
                     };
                     Ok(Some(user))
                 },
@@ -288,13 +314,14 @@ cfg_if::cfg_if! {
             Ok(session_token)
         }
 
-        // Validate session and return user (MAIN SESSION VALIDATION FUNCTION)
+        // Validate session and return SessionUser (MAIN SESSION VALIDATION FUNCTION)
+        // Returns SessionUser - safe for session storage and client use
         pub async fn validate_session(
             pool: &Pool<Postgres>,
             session_token: &str,
-        ) -> Result<Option<UserJwt>, ServerFnError> {
+        ) -> Result<Option<SessionUser>, ServerFnError> {
             let row = sqlx::query(
-                "SELECT u.id, u.username, u.email, u.password_hash, u.role
+                "SELECT u.id, u.username, u.email, u.role, u.display_name, u.first_name, u.last_name
                  FROM users u
                  JOIN sessions s ON u.id = s.user_id
                  WHERE s.token = $1 AND s.expires_at > NOW()"
@@ -306,12 +333,14 @@ cfg_if::cfg_if! {
 
             match row {
                 Some(row) => {
-                    let user = UserJwt {
+                    let user = SessionUser {
                         id: row.get("id"),
                         username: row.get("username"),
                         email: row.get("email"),
-                        password_hash: row.get("password_hash"),
                         role: row.get("role"),
+                        display_name: row.try_get("display_name").unwrap_or(None),
+                        first_name: row.try_get("first_name").unwrap_or(None),
+                        last_name: row.try_get("last_name").unwrap_or(None),
                     };
                     Ok(Some(user))
                 },
@@ -384,9 +413,9 @@ cfg_if::cfg_if! {
         pub async fn get_user_by_reset_token(
             pool: &Pool<Postgres>,
             token: &str
-        ) -> Result<Option<UserJwt>, ServerFnError> {
+        ) -> Result<Option<User>, ServerFnError> {
             let row = sqlx::query(
-                "SELECT id, username, email, password_hash, role
+                "SELECT id, username, email, password_hash, role, password_salt, account_status::text, email_verified, phone_number, phone_verified, display_name, first_name, last_name
                  FROM users
                  WHERE password_reset_token = $1
                  AND password_reset_expires > NOW()"
@@ -398,12 +427,20 @@ cfg_if::cfg_if! {
 
             match row {
                 Some(row) => {
-                    let user = UserJwt {
+                    let user = User {
                         id: row.get("id"),
                         username: row.get("username"),
                         email: row.get("email"),
                         password_hash: row.get("password_hash"),
                         role: row.get("role"),
+                        password_salt: row.try_get("password_salt").unwrap_or(None),
+                        account_status: AccountStatus::from_str(row.get("account_status")),
+                        email_verified: row.get("email_verified"),
+                        phone_number: row.try_get("phone_number").unwrap_or(None),
+                        phone_verified: row.get("phone_verified"),
+                        display_name: row.try_get("display_name").unwrap_or(None),
+                        first_name: row.try_get("first_name").unwrap_or(None),
+                        last_name: row.try_get("last_name").unwrap_or(None),
                     };
                     Ok(Some(user))
                 },

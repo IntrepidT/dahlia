@@ -5,7 +5,7 @@ use icondata::{
 };
 // Add new imports for additional icons, including pin/unpin icons
 use crate::app::components::ShowAdministerTestModal;
-use crate::app::models::{setting_data::UserSettings, user::UserJwt};
+use crate::app::models::{setting_data::UserSettings, user::SessionUser};
 use crate::app::server_functions::user_settings::get_user_settings;
 use icondata::{
     AiCoffeeOutlined,
@@ -51,7 +51,7 @@ pub fn DashboardSidebar(
 ) -> impl IntoView {
     // Get the current user ID from use_context
     let current_user =
-        use_context::<ReadSignal<Option<UserJwt>>>().expect("AuthProvider not Found");
+        use_context::<ReadSignal<Option<SessionUser>>>().expect("AuthProvider not Found");
     let user_settings_resource = create_resource(
         move || current_user.get().map(|user| user.id),
         move |id| async move {
