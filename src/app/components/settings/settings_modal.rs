@@ -1,8 +1,10 @@
+use crate::app::components::admin::saml_admin_content::SamlAdminContent;
 use crate::app::components::settings::bulk_enrollment_modal::BulkUploadModal;
 use crate::app::middleware::global_settings::{try_use_settings, try_use_settings_loading};
 use crate::app::models::global::{GlobalSetting, SettingsCache};
 use crate::app::models::setting_data::UserSettings;
 use crate::app::models::user::SessionUser;
+use crate::app::models::user::UserRole;
 use crate::app::server_functions::globals::{
     get_global_settings, restore_student_ids_from_file, toggle_student_protection,
 };
@@ -96,7 +98,7 @@ pub fn SettingsModal(
                                             on_select=set_selected_tab
                                         />
                                         <SettingsNavButton
-                                            label="Daily notes"
+                                            label="SAML Configuration"
                                             selected=selected_tab
                                             on_select=set_selected_tab
                                         />
@@ -340,6 +342,19 @@ fn SettingsContent(
                                 <StudentProtectionToggleSafe />
                             </Show>
                         </SettingsSection>
+                    </div>
+                }.into_view(),
+
+                "SAML Configuration" => view! {
+                    <div class="space-y-4">
+                        <Show when=move || user.get().map(|u| matches!(u.role, UserRole::Admin | UserRole::SuperAdmin)).unwrap_or(false)>
+                            <SamlAdminContent user_id=user_id />
+                        </Show>
+                        <Show when=move || !user.get().map(|u| matches!(u.role, UserRole::Admin | UserRole::SuperAdmin)).unwrap_or(false)>
+                            <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+                                "You do not have permission to view SAML settings."
+                            </div>
+                        </Show>
                     </div>
                 }.into_view(),
 

@@ -741,5 +741,607 @@ cfg_if::cfg_if! {
 
             Ok(())
         }
+
+        // Get SAML config by ID
+        pub async fn get_saml_config_by_id(
+            pool: &Pool<Postgres>,
+            config_id: uuid::Uuid,
+        ) -> Result<Option<SamlConfig>, ServerFnError> {
+            let row = sqlx::query(
+                "SELECT id, institution_name, entity_id, sso_url, slo_url, x509_cert, metadata_url,
+                        active, created_at, updated_at, attribute_mapping, role_mapping, 
+                        auto_provision, require_encrypted_assertions
+                 FROM saml_configs WHERE id = $1"
+            )
+            .bind(config_id)
+            .fetch_optional(pool)
+            .await
+            .map_err(|e| ServerFnError::new(format!("Database error: {}", e)))?;
+
+            match row {
+                Some(row) => {
+                    // Manual conversion from time::OffsetDateTime to chrono::DateTime<Utc>
+                    let created_at: time::OffsetDateTime = row.get("created_at");
+                    let updated_at: time::OffsetDateTime = row.get("updated_at");
+
+                    let created_at_chrono = DateTime::<Utc>::from_timestamp(
+                        created_at.unix_timestamp(),
+                        created_at.nanosecond()
+                    ).unwrap_or_else(|| Utc::now());
+
+                    let updated_at_chrono = DateTime::<Utc>::from_timestamp(
+                        updated_at.unix_timestamp(),
+                        updated_at.nanosecond()
+                    ).unwrap_or_else(|| Utc::now());
+
+                    let attribute_mapping: serde_json::Value = row.get("attribute_mapping");
+                    let role_mapping: serde_json::Value = row.get("role_mapping");
+
+                    Ok(Some(SamlConfig {
+                        id: row.get("id"),
+                        institution_name: row.get("institution_name"),
+                        entity_id: row.get("entity_id"),
+                        sso_url: row.get("sso_url"),
+                        slo_url: row.get("slo_url"),
+                        x509_cert: row.get("x509_cert"),
+                        metadata_url: row.get("metadata_url"),
+                        active: row.get("active"),
+                        created_at: created_at_chrono,
+                        updated_at: updated_at_chrono,
+                        attribute_mapping: serde_json::from_value(attribute_mapping).unwrap_or_default(),
+                        role_mapping: serde_json::from_value(role_mapping).unwrap_or_default(),
+                        auto_provision: row.get("auto_provision"),
+                        require_encrypted_assertions: row.get("require_encrypted_assertions"),
+                    }))
+                }
+                None => Ok(None),
+            }
+        }
+
+        // Update SAML config
+        pub async fn update_saml_config(
+            pool: &Pool<Postgres>,
+            config_id: uuid::Uuid,
+            institution_name: &str,
+            entity_id: &str,
+            sso_url: &str,
+            slo_url: Option<&str>,
+            x509_cert: &str,
+            metadata_url: Option<&str>,
+            active: bool,
+        ) -> Result<(), ServerFnError> {
+            sqlx::query(
+                "UPDATE saml_configs SET
+                    institution_name = $2,
+                    entity_id = $3,
+                    sso_url = $4,
+                    slo_url = $5,
+                    x509_cert = $6,
+                    metadata_url = $7,
+                    active = $8,
+                    updated_at = NOW()
+                 WHERE id = $1"
+            )
+            .bind(config_id)
+            .bind(institution_name)
+            .bind(entity_id)
+            .bind(sso_url)
+            .bind(slo_url)
+            .bind(x509_cert)
+            .bind(metadata_url)
+            .bind(active)
+            .execute(pool)
+            .await
+            .map_err(|e| ServerFnError::new(format!("Failed to update SAML config: {}", e)))?;
+
+            Ok(())
+        }
+
+        // Delete SAML config
+        pub async fn delete_saml_config(
+            pool: &Pool<Postgres>,
+            config_id: uuid::Uuid,
+        ) -> Result<String, ServerFnError> {
+            // First get the institution name for the response
+            let institution_name: String = sqlx::query_scalar(
+                "SELECT institution_name FROM saml_configs WHERE id = $1"
+            )
+            .bind(config_id)
+            .fetch_optional(pool)
+            .await
+            .map_err(|e| ServerFnError::new(format!("Database error: {}", e)))?
+            .ok_or_else(|| ServerFnError::new("SAML configuration not found"))?;
+
+            // Delete associated user mappings first (foreign key constraint)
+            sqlx::query("DELETE FROM saml_user_mappings WHERE institution_id = $1")
+                .bind(&institution_name)
+                .execute(pool)
+                .await
+                .map_err(|e| ServerFnError::new(format!("Failed to delete user mappings: {}", e)))?;
+
+            // Delete the SAML config
+            let result = sqlx::query("DELETE FROM saml_configs WHERE id = $1")
+                .bind(config_id)
+                .execute(pool)
+                .await
+                .map_err(|e| ServerFnError::new(format!("Failed to delete SAML config: {}", e)))?;
+
+            if result.rows_affected() == 0 {
+                return Err(ServerFnError::new("SAML configuration not found"));
+            }
+
+            Ok(institution_name)
+        }
+
+        // Toggle SAML config active status
+        pub async fn toggle_saml_config_status(
+            pool: &Pool<Postgres>,
+            config_id: uuid::Uuid,
+        ) -> Result<(String, bool), ServerFnError> {
+            // Get current status and institution name
+            let row = sqlx::query("SELECT institution_name, active FROM saml_configs WHERE id = $1")
+                .bind(config_id)
+                .fetch_optional(pool)
+                .await
+                .map_err(|e| ServerFnError::new(format!("Database error: {}", e)))?
+                .ok_or_else(|| ServerFnError::new("SAML configuration not found"))?;
+
+            let institution_name: String = row.get("institution_name");
+            let current_status: bool = row.get("active");
+            let new_status = !current_status;
+
+            // Toggle the status
+            sqlx::query(
+                "UPDATE saml_configs SET active = $2, updated_at = NOW() WHERE id = $1"
+            )
+            .bind(config_id)
+            .bind(new_status)
+            .execute(pool)
+            .await
+            .map_err(|e| ServerFnError::new(format!("Failed to toggle SAML config status: {}", e)))?;
+
+            Ok((institution_name, new_status))
+        }
+
+        // Get SAML statistics
+        pub async fn get_saml_statistics(pool: &Pool<Postgres>) -> Result<crate::app::server_functions::saml_auth::SamlStats, ServerFnError> {
+            // Get total and active institutions
+            let institutions_row = sqlx::query(
+                "SELECT
+                    COUNT(*) as total,
+                    COUNT(*) FILTER (WHERE active = true) as active
+                 FROM saml_configs"
+            )
+            .fetch_one(pool)
+            .await
+            .map_err(|e| ServerFnError::new(format!("Database error: {}", e)))?;
+
+            let total_institutions: i64 = institutions_row.get("total");
+            let active_institutions: i64 = institutions_row.get("active");
+
+            // Get total SAML users
+            let total_saml_users: i64 = sqlx::query_scalar(
+                "SELECT COUNT(DISTINCT user_id) FROM saml_user_mappings"
+            )
+            .fetch_one(pool)
+            .await
+            .map_err(|e| ServerFnError::new(format!("Database error: {}", e)))?;
+
+            // Get recent logins (last 30 days)
+            let recent_logins: i64 = sqlx::query_scalar(
+                "SELECT COUNT(DISTINCT user_id) FROM saml_user_mappings
+                 WHERE last_login >= NOW() - INTERVAL '30 days'"
+            )
+            .fetch_one(pool)
+            .await
+            .map_err(|e| ServerFnError::new(format!("Database error: {}", e)))?;
+
+            Ok(crate::app::server_functions::saml_auth::SamlStats {
+                total_institutions,
+                active_institutions,
+                total_saml_users,
+                recent_logins,
+            })
+        }
+
+        // Fetch and parse SAML metadata from URL
+        pub async fn fetch_and_parse_metadata(metadata_url: &str) -> Result<crate::app::server_functions::saml_auth::SamlMetadataResponse, ServerFnError> {
+            use reqwest;
+
+            // Fetch metadata XML
+            let client = reqwest::Client::builder()
+                .timeout(std::time::Duration::from_secs(30))
+                .build()
+                .map_err(|e| ServerFnError::new(format!("Failed to create HTTP client: {}", e)))?;
+
+            let response = client
+                .get(metadata_url)
+                .send()
+                .await
+                .map_err(|e| ServerFnError::new(format!("Failed to fetch metadata: {}", e)))?;
+
+            if !response.status().is_success() {
+                return Err(ServerFnError::new(format!(
+                    "HTTP error fetching metadata: {}",
+                    response.status()
+                )));
+            }
+
+            let metadata_xml = response
+                .text()
+                .await
+                .map_err(|e| ServerFnError::new(format!("Failed to read metadata response: {}", e)))?;
+
+            // Parse the XML
+            let doc = Document::parse(&metadata_xml)
+                .map_err(|e| ServerFnError::new(format!("Failed to parse metadata XML: {}", e)))?;
+
+            // Extract entity ID
+            let entity_id = doc
+                .root()
+                .attribute("entityID")
+                .ok_or_else(|| ServerFnError::new("EntityID not found in metadata"))?
+                .to_string();
+
+            // Extract SSO URL
+            let sso_url = doc
+                .descendants()
+                .find(|n| {
+                    n.has_tag_name("SingleSignOnService") || n.has_tag_name("md:SingleSignOnService")
+                })
+                .and_then(|n| n.attribute("Location"))
+                .ok_or_else(|| ServerFnError::new("SSO URL not found in metadata"))?
+                .to_string();
+
+            // Extract SLO URL (optional)
+            let slo_url = doc
+                .descendants()
+                .find(|n| {
+                    n.has_tag_name("SingleLogoutService") || n.has_tag_name("md:SingleLogoutService")
+                })
+                .and_then(|n| n.attribute("Location"))
+                .map(|s| s.to_string());
+
+            // Extract X.509 certificate
+            let x509_cert = doc
+                .descendants()
+                .find(|n| n.has_tag_name("X509Certificate") || n.has_tag_name("ds:X509Certificate"))
+                .and_then(|n| n.text())
+                .ok_or_else(|| ServerFnError::new("X.509 certificate not found in metadata"))?
+                .trim()
+                .to_string();
+
+            // Format the certificate properly
+            let formatted_cert = if !x509_cert.starts_with("-----BEGIN CERTIFICATE-----") {
+                format!(
+                    "-----BEGIN CERTIFICATE-----\n{}\n-----END CERTIFICATE-----",
+                    x509_cert
+                )
+            } else {
+                x509_cert
+            };
+
+            Ok(crate::app::server_functions::saml_auth::SamlMetadataResponse {
+                success: true,
+                message: "Metadata parsed successfully".to_string(),
+                entity_id,
+                sso_url,
+                slo_url,
+                x509_cert: formatted_cert,
+            })
+        }
+
+        // Get all SAML configurations with detailed info (for admin management)
+        pub async fn get_all_saml_configs_detailed(pool: &Pool<Postgres>) -> Result<Vec<SamlConfig>, ServerFnError> {
+            let rows = sqlx::query(
+                "SELECT sc.id, sc.institution_name, sc.entity_id, sc.sso_url, sc.slo_url,
+                        sc.x509_cert, sc.metadata_url, sc.active, sc.created_at, sc.updated_at,
+                        sc.attribute_mapping, sc.role_mapping, sc.auto_provision, 
+                        sc.require_encrypted_assertions,
+                        COUNT(sum.user_id) as user_count,
+                        MAX(sum.last_login) as last_used
+                 FROM saml_configs sc
+                 LEFT JOIN saml_user_mappings sum ON sc.institution_name = sum.institution_id
+                 GROUP BY sc.id, sc.institution_name, sc.entity_id, sc.sso_url, sc.slo_url,
+                          sc.x509_cert, sc.metadata_url, sc.active, sc.created_at, sc.updated_at,
+                          sc.attribute_mapping, sc.role_mapping, sc.auto_provision,
+                          sc.require_encrypted_assertions
+                 ORDER BY sc.institution_name"
+            )
+            .fetch_all(pool)
+            .await
+            .map_err(|e| ServerFnError::new(format!("Database error: {}", e)))?;
+
+            let mut configs = Vec::new();
+            for row in rows {
+                // Manual conversion from time::OffsetDateTime to chrono::DateTime<Utc>
+                let created_at: time::OffsetDateTime = row.get("created_at");
+                let updated_at: time::OffsetDateTime = row.get("updated_at");
+
+                let created_at_chrono = DateTime::<Utc>::from_timestamp(
+                    created_at.unix_timestamp(),
+                    created_at.nanosecond()
+                ).unwrap_or_else(|| Utc::now());
+
+                let updated_at_chrono = DateTime::<Utc>::from_timestamp(
+                    updated_at.unix_timestamp(),
+                    updated_at.nanosecond()
+                ).unwrap_or_else(|| Utc::now());
+
+                let attribute_mapping: serde_json::Value = row.get("attribute_mapping");
+                let role_mapping: serde_json::Value = row.get("role_mapping");
+
+                configs.push(SamlConfig {
+                    id: row.get("id"),
+                    institution_name: row.get("institution_name"),
+                    entity_id: row.get("entity_id"),
+                    sso_url: row.get("sso_url"),
+                    slo_url: row.get("slo_url"),
+                    x509_cert: row.get("x509_cert"),
+                    metadata_url: row.get("metadata_url"),
+                    active: row.get("active"),
+                    created_at: created_at_chrono,
+                    updated_at: updated_at_chrono,
+                    attribute_mapping: serde_json::from_value(attribute_mapping).unwrap_or_default(),
+                    role_mapping: serde_json::from_value(role_mapping).unwrap_or_default(),
+                    auto_provision: row.get("auto_provision"),
+                    require_encrypted_assertions: row.get("require_encrypted_assertions"),
+                });
+            }
+
+            Ok(configs)
+        }
+
+        // Validate SAML configuration
+        pub async fn validate_saml_config(
+            pool: &Pool<Postgres>,
+            config: &SamlConfig,
+        ) -> Result<Vec<String>, ServerFnError> {
+            let mut validation_errors = Vec::new();
+
+            // Check for duplicate institution names (excluding current config if updating)
+            let existing_count: i64 = sqlx::query_scalar(
+                "SELECT COUNT(*) FROM saml_configs WHERE institution_name = $1 AND id != $2"
+            )
+            .bind(&config.institution_name)
+            .bind(config.id)
+            .fetch_one(pool)
+            .await
+            .map_err(|e| ServerFnError::new(format!("Database error: {}", e)))?;
+
+            if existing_count > 0 {
+                validation_errors.push(format!(
+                    "Institution name '{}' already exists",
+                    config.institution_name
+                ));
+            }
+
+            // Validate URLs
+            if !config.sso_url.starts_with("https://") && !config.sso_url.starts_with("http://") {
+                validation_errors.push("SSO URL must be a valid HTTP/HTTPS URL".to_string());
+            }
+
+            if let Some(ref slo_url) = config.slo_url {
+                if !slo_url.starts_with("https://") && !slo_url.starts_with("http://") {
+                    validation_errors.push("SLO URL must be a valid HTTP/HTTPS URL".to_string());
+                }
+            }
+
+            if let Some(ref metadata_url) = config.metadata_url {
+                if !metadata_url.starts_with("https://") && !metadata_url.starts_with("http://") {
+                    validation_errors.push("Metadata URL must be a valid HTTP/HTTPS URL".to_string());
+                }
+            }
+
+            // Validate certificate format
+            if !config.x509_cert.contains("-----BEGIN CERTIFICATE-----") ||
+               !config.x509_cert.contains("-----END CERTIFICATE-----") {
+                validation_errors.push("X.509 certificate must be in PEM format".to_string());
+            }
+
+            // Validate entity ID format
+            if config.entity_id.trim().is_empty() {
+                validation_errors.push("Entity ID cannot be empty".to_string());
+            }
+
+            Ok(validation_errors)
+        }
+
+        // Helper function to update SAML config status
+        #[cfg(feature = "ssr")]
+        pub async fn update_saml_config_status(
+            pool: &Pool<Postgres>,
+            config_id: Uuid,
+            active: bool,
+        ) -> Result<String, ServerFnError> {
+            // Get institution name first
+            let institution_name: String = sqlx::query_scalar(
+                "SELECT institution_name FROM saml_configs WHERE id = $1"
+            )
+            .bind(config_id)
+            .fetch_optional(pool)
+            .await
+            .map_err(|e| ServerFnError::new(format!("Database error: {}", e)))?
+            .ok_or_else(|| ServerFnError::new("SAML configuration not found"))?;
+
+            // Update the status
+            sqlx::query(
+                "UPDATE saml_configs SET active = $2, updated_at = NOW() WHERE id = $1"
+            )
+            .bind(config_id)
+            .bind(active)
+            .execute(pool)
+            .await
+            .map_err(|e| ServerFnError::new(format!("Failed to update SAML config status: {}", e)))?;
+
+            Ok(institution_name)
+        }
+
+        // Helper function to get SAML config summary for dashboard
+        #[cfg(feature = "ssr")]
+        pub async fn get_saml_config_summary(
+            pool: &Pool<Postgres>,
+        ) -> Result<SamlConfigSummary, ServerFnError> {
+            let summary_row = sqlx::query(
+                "SELECT
+                    COUNT(*) as total_configs,
+                    COUNT(*) FILTER (WHERE active = true) as active_configs,
+                    COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '30 days') as recent_configs
+                 FROM saml_configs"
+            )
+            .fetch_one(pool)
+            .await
+            .map_err(|e| ServerFnError::new(format!("Database error: {}", e)))?;
+
+            let users_row = sqlx::query(
+                "SELECT
+                    COUNT(DISTINCT user_id) as total_saml_users,
+                    COUNT(DISTINCT user_id) FILTER (WHERE last_login >= NOW() - INTERVAL '30 days') as active_saml_users
+                 FROM saml_user_mappings"
+            )
+            .fetch_one(pool)
+            .await
+            .map_err(|e| ServerFnError::new(format!("Database error: {}", e)))?;
+
+            Ok(SamlConfigSummary {
+                total_configs: summary_row.get("total_configs"),
+                active_configs: summary_row.get("active_configs"),
+                recent_configs: summary_row.get("recent_configs"),
+                total_saml_users: users_row.get("total_saml_users"),
+                active_saml_users: users_row.get("active_saml_users"),
+            })
+        }
+
+        #[cfg(feature = "ssr")]
+        #[derive(Clone, Debug)]
+        pub struct SamlConfigSummary {
+            pub total_configs: i64,
+            pub active_configs: i64,
+            pub recent_configs: i64,
+            pub total_saml_users: i64,
+            pub active_saml_users: i64,
+        }
+
+        // Helper function to search and filter SAML configs
+        #[cfg(feature = "ssr")]
+        pub async fn search_saml_configs(
+            pool: &Pool<Postgres>,
+            search_term: Option<&str>,
+            active_only: bool,
+            limit: Option<i64>,
+            offset: Option<i64>,
+        ) -> Result<Vec<SamlConfig>, ServerFnError> {
+            let mut query = "SELECT id, institution_name, entity_id, sso_url, slo_url, x509_cert, metadata_url,
+                                   active, created_at, updated_at, attribute_mapping, role_mapping, 
+                                   auto_provision, require_encrypted_assertions
+                            FROM saml_configs WHERE 1=1".to_string();
+
+            let mut bind_params: Vec<Box<dyn sqlx::Encode<'_, sqlx::Postgres> + Send + Sync>> = Vec::new();
+            let mut param_count = 0;
+
+            if let Some(term) = search_term {
+                param_count += 1;
+                query.push_str(&format!(" AND (institution_name ILIKE ${} OR entity_id ILIKE ${})", param_count, param_count));
+                bind_params.push(Box::new(format!("%{}%", term)));
+            }
+
+            if active_only {
+                query.push_str(" AND active = true");
+            }
+
+            query.push_str(" ORDER BY institution_name");
+
+            if let Some(limit_val) = limit {
+                param_count += 1;
+                query.push_str(&format!(" LIMIT ${}", param_count));
+                bind_params.push(Box::new(limit_val));
+            }
+
+            if let Some(offset_val) = offset {
+                param_count += 1;
+                query.push_str(&format!(" OFFSET ${}", param_count));
+                bind_params.push(Box::new(offset_val));
+            }
+
+            // This is a simplified version - in practice, you'd want to use sqlx::query_builder
+            // for dynamic queries to avoid SQL injection
+            let rows = sqlx::query(&query)
+                .fetch_all(pool)
+                .await
+                .map_err(|e| ServerFnError::new(format!("Database error: {}", e)))?;
+
+            let mut configs = Vec::new();
+            for row in rows {
+                // Convert time types and JSON as done in other functions
+                let created_at: time::OffsetDateTime = row.get("created_at");
+                let updated_at: time::OffsetDateTime = row.get("updated_at");
+
+                let created_at_chrono = chrono::DateTime::<chrono::Utc>::from_timestamp(
+                    created_at.unix_timestamp(),
+                    created_at.nanosecond()
+                ).unwrap_or_else(|| chrono::Utc::now());
+
+                let updated_at_chrono = chrono::DateTime::<chrono::Utc>::from_timestamp(
+                    updated_at.unix_timestamp(),
+                    updated_at.nanosecond()
+                ).unwrap_or_else(|| chrono::Utc::now());
+
+                let attribute_mapping: serde_json::Value = row.get("attribute_mapping");
+                let role_mapping: serde_json::Value = row.get("role_mapping");
+
+                configs.push(SamlConfig {
+                    id: row.get("id"),
+                    institution_name: row.get("institution_name"),
+                    entity_id: row.get("entity_id"),
+                    sso_url: row.get("sso_url"),
+                    slo_url: row.get("slo_url"),
+                    x509_cert: row.get("x509_cert"),
+                    metadata_url: row.get("metadata_url"),
+                    active: row.get("active"),
+                    created_at: created_at_chrono,
+                    updated_at: updated_at_chrono,
+                    attribute_mapping: serde_json::from_value(attribute_mapping).unwrap_or_default(),
+                    role_mapping: serde_json::from_value(role_mapping).unwrap_or_default(),
+                    auto_provision: row.get("auto_provision"),
+                    require_encrypted_assertions: row.get("require_encrypted_assertions"),
+                });
+            }
+
+            Ok(configs)
+        }
+
+        // Helper function to export SAML configurations for backup
+        #[cfg(feature = "ssr")]
+        pub async fn export_saml_configs_csv(
+            pool: &Pool<Postgres>,
+        ) -> Result<String, ServerFnError> {
+            let configs = list_saml_configs(pool).await?;
+
+            let mut csv_content = String::from("institution_name,entity_id,sso_url,slo_url,active,created_at,metadata_url\n");
+
+            for config in configs {
+                csv_content.push_str(&format!(
+                    "{},{},{},{},{},{},{}\n",
+                    escape_csv_field(&config.institution_name),
+                    escape_csv_field(&config.entity_id),
+                    escape_csv_field(&config.sso_url),
+                    escape_csv_field(&config.slo_url.unwrap_or_default()),
+                    config.active,
+                    config.created_at.format("%Y-%m-%d %H:%M:%S"),
+                    escape_csv_field(&config.metadata_url.unwrap_or_default())
+                ));
+            }
+
+            Ok(csv_content)
+        }
+
+        #[cfg(feature = "ssr")]
+        fn escape_csv_field(field: &str) -> String {
+            if field.contains(',') || field.contains('"') || field.contains('\n') {
+                format!("\"{}\"", field.replace('"', "\"\""))
+            } else {
+                field.to_string()
+            }
+        }
     }
 }
