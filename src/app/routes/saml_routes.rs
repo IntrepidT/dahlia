@@ -39,18 +39,13 @@ cfg_if::cfg_if! {
             pool: web::Data<sqlx::PgPool>,
             query: web::Query<SamlLoginQuery>,
         ) -> Result<HttpResponse> {
-            log::info!(
-                "Initiating SAML login for institution: {}",
-                query.institution
-            );
+            log::info!("Initiating SAML login for institution: {}", query.institution);
 
             // Convert institution name to match database format
-            // URL parameter "mock-saml-test" becomes "Mock SAML Test"
             let institution_name = query
                 .institution
                 .split('-')
                 .map(|word| {
-                    // Special case for "saml" -> "SAML"
                     if word.to_lowercase() == "saml" {
                         "SAML".to_string()
                     } else {
@@ -83,16 +78,12 @@ cfg_if::cfg_if! {
             };
 
             if !config.active {
-                log::warn!(
-                    "SAML config is disabled for institution: {}",
-                    institution_name
-                );
+                log::warn!("SAML config is disabled for institution: {}", institution_name);
                 return Ok(HttpResponse::BadRequest().body("SAML SSO is disabled for this institution"));
             }
 
             // Create SAML manager
-            let base_url =
-                std::env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:8080".to_string());
+            let base_url = std::env::var("BASE_URL").expect("BASE_URL environment variable must be set for SAML functionality");
             let saml_manager = match saml_database::SamlManager::new(&base_url) {
                 Ok(manager) => manager,
                 Err(e) => {
@@ -101,35 +92,21 @@ cfg_if::cfg_if! {
                 }
             };
 
-            // Generate SAML auth request - Fix: use config's SSO URL, not base URL
-            let auth_url =
-                match generate_auth_request_url(&saml_manager, &config, query.relay_state.as_deref()) {
-                    Ok(url) => url,
-                    Err(e) => {
-                        log::error!("Failed to generate SAML auth request: {:?}", e);
-                        return Ok(
-                            HttpResponse::InternalServerError().body("Failed to generate SAML request")
-                        );
-                    }
-                };
+            // Generate SAML auth request - institution info will be embedded in RelayState
+            let auth_url = match generate_auth_request_url(&saml_manager, &config, query.relay_state.as_deref()) {
+                Ok(url) => url,
+                Err(e) => {
+                    log::error!("Failed to generate SAML auth request: {:?}", e);
+                    return Ok(HttpResponse::InternalServerError().body("Failed to generate SAML request"));
+                }
+            };
 
             log::info!("Redirecting to SAML IdP: {}", auth_url);
 
-            // Store institution info in cookie for the return trip
-            let response = HttpResponse::Found()
+            // Simple redirect without cookies
+            Ok(HttpResponse::Found()
                 .append_header(("Location", auth_url))
-                .cookie(
-                    actix_web::cookie::Cookie::build("saml_institution", &query.institution)
-                        .path("/")
-                        .http_only(true)
-                        .same_site(actix_web::cookie::SameSite::None)  // Changed from Strict to None
-                        .max_age(actix_web::cookie::time::Duration::minutes(10))
-                        .secure(true)  // Must be true when SameSite::None
-                        .finish(),
-                )
-                .finish();
-
-            Ok(response)
+                .finish())
         }
 
 // Replace your generate_auth_request_url function with this version:
@@ -150,7 +127,6 @@ cfg_if::cfg_if! {
         let request_id = Uuid::new_v4().to_string();
         let timestamp = Utc::now().format("%Y-%m-%dT%H:%M:%SZ");
 
-        // Clean, properly formatted SAML request
         let saml_request = format!(
             r#"<?xml version="1.0" encoding="UTF-8"?>
     <samlp:AuthnRequest xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol" xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion" ID="{}" Version="2.0" IssueInstant="{}" Destination="{}" ProtocolBinding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST" AssertionConsumerServiceURL="{}">
@@ -165,18 +141,11 @@ cfg_if::cfg_if! {
 
         log::debug!("Generated SAML Request XML: {}", saml_request);
 
-        // CRITICAL: Mock SAML expects deflated content
-        // Step 1: Compress the XML using deflate
+        // Compress and encode the request
         let mut encoder = DeflateEncoder::new(Vec::new(), Compression::default());
         encoder.write_all(saml_request.as_bytes())?;
         let compressed_data = encoder.finish()?;
-
-        log::debug!("Compressed data length: {} bytes", compressed_data.len());
-
-        // Step 2: Base64 encode the compressed data
         let encoded_request = general_purpose::STANDARD.encode(&compressed_data);
-
-        log::debug!("Base64 encoded request: {}", encoded_request);
 
         // Build the redirect URL
         let mut auth_url = url::Url::parse(&config.sso_url)?;
@@ -184,11 +153,20 @@ cfg_if::cfg_if! {
             .query_pairs_mut()
             .append_pair("SAMLRequest", &encoded_request);
 
-        if let Some(relay_state) = relay_state {
-            auth_url
-                .query_pairs_mut()
-                .append_pair("RelayState", relay_state);
-        }
+        // IMPORTANT: Encode institution info in RelayState
+        // Format: "institution_id|original_relay_state"
+        let encoded_relay_state = match relay_state {
+            Some(original_relay_state) => {
+                format!("{}|{}", config.institution_name, original_relay_state)
+            }
+            None => {
+                format!("{}|/dashboard", config.institution_name)
+            }
+        };
+
+        auth_url
+            .query_pairs_mut()
+            .append_pair("RelayState", &encoded_relay_state);
 
         log::info!("Generated auth URL: {}", auth_url);
 
@@ -198,7 +176,7 @@ cfg_if::cfg_if! {
         // Serve SAML metadata for service provider
         pub async fn saml_metadata(_pool: web::Data<sqlx::PgPool>) -> Result<HttpResponse> {
             let base_url =
-                std::env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:8080".to_string());
+                std::env::var("BASE_URL").expect("BASE_URL environment variable must be set for SAML functionality");
 
             let metadata_xml = format!(
                 r#"<?xml version="1.0" encoding="UTF-8"?>
@@ -229,42 +207,45 @@ cfg_if::cfg_if! {
         ) -> Result<HttpResponse> {
             log::info!("Received SAML ACS request");
 
-            // Get institution ID from cookie
-            let institution_id = req
-                .cookie("saml_institution")
-                .map(|cookie| cookie.value().to_string())
-                .ok_or_else(|| {
-                    log::error!("No institution ID found in cookie");
-                    actix_web::error::ErrorBadRequest("No institution ID found")
-                })?;
+            // Debug: Log all cookies (for debugging purposes)
+            if let Ok(cookies) = req.cookies() {
+                log::info!("Available cookies:");
+                for cookie in cookies.iter() {
+                    log::info!("  Cookie: {} = {}", cookie.name(), cookie.value());
+                }
+            }
 
-            log::info!(
-                "Processing SAML response for institution: {}",
-                institution_id
-            );
+            // Extract institution info from RelayState instead of cookies
+            let (institution_name, redirect_url) = match &form.relay_state {
+                Some(relay_state) if !relay_state.is_empty() => {
+                    log::info!("Processing RelayState: {}", relay_state);
 
-            // Convert URL format back to database format
-            let institution_name = institution_id
-                .split('-')
-                .map(|word| {
-                    // Special case for "saml" -> "SAML"
-                    if word.to_lowercase() == "saml" {
-                        "SAML".to_string()
-                    } else {
-                        // Regular title case for other words
-                        let mut chars = word.chars();
-                        match chars.next() {
-                            None => String::new(),
-                            Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
+                    if relay_state.contains('|') {
+                        let parts: Vec<&str> = relay_state.split('|').collect();
+                        if parts.len() >= 2 {
+                            let institution = parts[0].to_string();
+                            let redirect = parts[1].to_string();
+                            log::info!("Extracted institution: '{}', redirect: '{}'", institution, redirect);
+                            (institution, redirect)
+                        } else {
+                            log::error!("Invalid RelayState format: {}", relay_state);
+                            return Ok(HttpResponse::BadRequest().body("Invalid RelayState format"));
                         }
+                    } else {
+                        // Fallback: treat entire RelayState as institution name
+                        log::warn!("RelayState doesn't contain separator, treating as institution name");
+                        (relay_state.clone(), "/dashboard".to_string())
                     }
-                })
-                .collect::<Vec<_>>()
-                .join(" ");
+                }
+                _ => {
+                    log::error!("No RelayState provided in SAML response");
+                    return Ok(HttpResponse::BadRequest().body("No institution information found"));
+                }
+            };
 
-            log::info!("Converted '{}' to '{}'", institution_id, institution_name);
+            log::info!("Processing SAML response for institution: {}", institution_name);
 
-            // Get SAML config
+            // Get SAML config - institution_name is already in the correct format from RelayState
             let config = match saml_database::get_saml_config_by_name(&pool, &institution_name).await {
                 Ok(Some(config)) => config,
                 Ok(None) => {
@@ -277,9 +258,9 @@ cfg_if::cfg_if! {
                 }
             };
 
+            // Rest of your SAML processing logic remains the same...
             // Decode and parse SAML response
-            let base_url =
-                std::env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:8080".to_string());
+            let base_url = std::env::var("BASE_URL").expect("BASE_URL environment variable msut be set for SAML functionality");
             let saml_manager = match saml_database::SamlManager::new(&base_url) {
                 Ok(manager) => manager,
                 Err(e) => {
@@ -320,9 +301,7 @@ cfg_if::cfg_if! {
             log::info!("Parsed SAML response for user: {}", parsed_response.name_id);
 
             // Provision or get existing user
-            let user = match saml_database::provision_saml_user(&pool, &parsed_response, &institution_name)
-                .await
-            {
+            let user = match saml_database::provision_saml_user(&pool, &parsed_response, &institution_name).await {
                 Ok(user) => user,
                 Err(e) => {
                     log::error!("Failed to provision SAML user: {:?}", e);
@@ -339,47 +318,26 @@ cfg_if::cfg_if! {
                 }
             };
 
-            log::info!(
-                "SAML login successful for user: {} ({})",
-                user.username,
-                user.id
-            );
+            log::info!("SAML login successful for user: {} ({})", user.username, user.id);
 
-            // Build redirect URL
-            let redirect_url = match form.relay_state.as_deref() {
-                Some(relay_state) if !relay_state.is_empty() && relay_state != "undefined" && relay_state != "null" => {
-                    // If using the RelayState encoding method:
-                    if relay_state.contains('|') {
-                        let parts: Vec<&str> = relay_state.split('|').collect();
-                        if parts.len() >= 2 {
-                            parts[1].to_string()  // Get the redirect part
-                        } else {
-                            "/dashboard".to_string()
-                        }
-                    } else {
-                        relay_state.to_string()
-                    }
-                }
-                _ => "/dashboard".to_string()  // Default fallback
-            };
-
+            // Use the redirect_url extracted from RelayState
             log::info!("Redirecting to: {}", redirect_url);
 
             // Create HTML response with auto-redirect and session cookie
             let html_response = format!(
                 r#"<!DOCTYPE html>
-            <html>
-            <head>
-                <title>Login Successful</title>
-                <meta http-equiv="refresh" content="0;url={}">
-            </head>
-            <body>
-                <p>Login successful! Redirecting...</p>
-                <script>
-                    window.location.href = '{}';
-                </script>
-            </body>
-            </html>"#,
+        <html>
+        <head>
+            <title>Login Successful</title>
+            <meta http-equiv="refresh" content="0;url={}">
+        </head>
+        <body>
+            <p>Login successful! Redirecting...</p>
+            <script>
+                window.location.href = '{}';
+            </script>
+        </body>
+        </html>"#,
                 redirect_url, redirect_url
             );
 
@@ -391,14 +349,7 @@ cfg_if::cfg_if! {
                         .http_only(true)
                         .same_site(actix_web::cookie::SameSite::Strict)
                         .max_age(actix_web::cookie::time::Duration::days(7))
-                        .secure(!cfg!(debug_assertions))
-                        .finish(),
-                )
-                .cookie(
-                    actix_web::cookie::Cookie::build("saml_institution", "")
-                        .path("/")
-                        .http_only(true)
-                        .max_age(actix_web::cookie::time::Duration::seconds(0))
+                        .secure(true)
                         .finish(),
                 )
                 .body(html_response))
@@ -535,4 +486,34 @@ cfg_if::cfg_if! {
 pub fn configure_saml_routes(_cfg: &mut ()) {
     // This function exists only for client-side compilation compatibility
     // The actual implementation is behind the SSR feature gate
+}
+
+//validates that the production environment is correctly configured for SAML
+#[cfg(feature = "ssr")]
+fn validate_production_config() -> Result<(), Box<dyn std::error::Error>> {
+    let base_url = std::env::var("BASE_URL")?;
+
+    if !base_url.starts_with("https://") {
+        return Err("BASE_URL must use HTTPS in production".into());
+    }
+
+    if base_url.contains("localhost") || base_url.contains("127.0.0.1") {
+        log::warn!("BASE_URL appears to be localhost - ensure this is intentional");
+    }
+
+    // Validate that required environment variables are set
+    if std::env::var("DATABASE_URL").is_err() {
+        return Err("DATABASE_URL must be set".into());
+    }
+
+    log::info!("Production SAML configuration validated successfully");
+    Ok(())
+}
+
+// Call this in your main.rs or app startup:
+#[cfg(feature = "ssr")]
+pub fn initialize_saml() -> Result<(), Box<dyn std::error::Error>> {
+    validate_production_config()?;
+    log::info!("SAML subsystem initialized for production");
+    Ok(())
 }

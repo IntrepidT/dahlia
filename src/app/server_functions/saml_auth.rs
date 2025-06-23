@@ -26,6 +26,16 @@ pub struct SamlInstitution {
     pub name: String,
     pub active: bool,
 }
+impl SamlInstitution {
+    pub fn to_url_safe(&self) -> String {
+        self.name
+            .to_lowercase()
+            .replace(" ", "-")
+            .chars()
+            .filter(|c| c.is_alphanumeric() || *c == '-')
+            .collect::<String>()
+    }
+}
 
 // Get list of available SAML institutions
 #[server(GetSamlInstitutions, "/api")]
@@ -98,8 +108,7 @@ pub async fn initiate_saml_login(
             })?;
 
         // Create SAML manager
-        let base_url =
-            std::env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
+        let base_url = std::env::var("BASE_URL").expect("BASE_URL environment variable not set");
         let saml_manager = saml_database::SamlManager::new(&base_url)
             .map_err(|e| ServerFnError::new(format!("Failed to create SAML manager: {}", e)))?;
 
@@ -183,8 +192,8 @@ pub async fn handle_saml_response(
             .map_err(|e| ServerFnError::new(format!("Invalid UTF-8 in SAML response: {}", e)))?;
 
         // Create SAML manager and parse response
-        let base_url =
-            std::env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
+        let base_url = std::env::var("BASE_URL")
+            .expect("BASE_URL environment variable must be set for SAML functionality");
         let saml_manager = saml_database::SamlManager::new(&base_url)
             .map_err(|e| ServerFnError::new(format!("Failed to create SAML manager: {}", e)))?;
 
@@ -309,7 +318,7 @@ pub async fn initiate_saml_logout() -> Result<SamlAuthResponse, ServerFnError> {
                 if let Some(slo_url) = config.slo_url {
                     // Generate SAML logout request
                     let base_url = std::env::var("BASE_URL")
-                        .unwrap_or_else(|_| "http://localhost:3000".to_string());
+                        .expect("BASE_URL environment variable must be set for SAML functionality");
                     let saml_manager = saml_database::SamlManager::new(&base_url).map_err(|e| {
                         ServerFnError::new(format!("Failed to create SAML manager: {}", e))
                     })?;
@@ -670,8 +679,8 @@ pub async fn test_saml_config(config_id: String) -> Result<SamlAuthResponse, Ser
             .ok_or_else(|| ServerFnError::new("SAML configuration not found"))?;
 
         // Test the configuration by trying to create a SAML manager and generate a test request
-        let base_url =
-            std::env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
+        let base_url = std::env::var("BASE_URL")
+            .expect("BASE_URL environment variable must be set for SAML functionality");
         let saml_manager = saml_database::SamlManager::new(&base_url)
             .map_err(|e| ServerFnError::new(format!("Failed to create SAML manager: {}", e)))?;
 

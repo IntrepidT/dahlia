@@ -1,7 +1,9 @@
 use crate::app::components::auth::authorization_components::perform_post_login_redirect;
 use crate::app::models::user::SessionUser;
 use crate::app::server_functions::auth::{get_current_user, login};
-use crate::app::server_functions::saml_auth::{get_saml_institutions, SamlInstitution};
+use crate::app::server_functions::saml_auth::{
+    get_saml_institutions, initiate_saml_login, SamlInstitution,
+};
 use leptos::*;
 use leptos_router::use_navigate;
 
@@ -184,7 +186,7 @@ pub fn SamlLoginForm() -> impl IntoView {
                         </form>
                     }.into_view()
                 } else {
-                    // SAML Institution Login - Using HTML links instead of closures
+                    // SAML Institution Login - Using button with JavaScript navigation
                     view! {
                         <div class="space-y-4">
                             {move || {
@@ -217,19 +219,23 @@ pub fn SamlLoginForm() -> impl IntoView {
                                             >
                                                 <option value="">"-- Select Institution --"</option>
                                                 {institutions_list.into_iter().map(|institution| {
+                                                    let url_safe_name = institution.to_url_safe();
                                                     view! {
-                                                        <option value={institution.id.clone()}>{institution.name}</option>
+                                                        <option value={url_safe_name}>{institution.name}</option>
                                                     }
                                                 }).collect::<Vec<_>>()}
                                             </select>
 
-                                            // Use HTML link approach to avoid closure issues
+                                            // Use Leptos navigation for SPA routing with hydration guards
                                             {move || {
                                                 if let Some(institution_id) = selected_institution.get() {
-                                                    let saml_url = format!("/saml/login?institution={}&relay_state=/dashboard", institution_id);
+                                                    let login_url = format!("/saml/login?institution={}&relay_state=/dashboard", institution_id);
+
                                                     view! {
                                                         <a
-                                                            href={saml_url}
+                                                            href={login_url}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
                                                             class="block w-full mt-4 p-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 text-center transition-colors duration-200 no-underline"
                                                         >
                                                             <div class="flex items-center justify-center">

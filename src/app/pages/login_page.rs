@@ -1,4 +1,3 @@
-use crate::app::components::auth::enhanced_login_form::EnhancedLoginForm;
 use crate::app::components::auth::login_form::{LoginForm, RegisterForm};
 use crate::app::components::auth::saml_login_form::SamlLoginForm;
 use crate::app::middleware::global_settings::use_settings;
@@ -42,13 +41,7 @@ pub fn LoginPage() -> impl IntoView {
                 } else {
                     view! {
                         // Conditionally render the appropriate login form
-                        {move || {
-                            if student_protections_enabled() {
-                                view! { <EnhancedLoginForm /> }.into_view()
-                            } else {
-                                view! { <SamlLoginForm /> }.into_view()
-                            }
-                        }}
+                        <SamlLoginForm />
 
                         <div class="mt-4 text-center">
                             <div class="flex justify-center">

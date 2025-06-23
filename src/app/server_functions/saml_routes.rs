@@ -1,8 +1,8 @@
+use crate::app::db::saml_database;
+use crate::app::db::user_database;
+use crate::app::models::user::SessionUser;
 use actix_web::{web, HttpRequest, HttpResponse, Result};
 use serde::Deserialize;
-use crate::app::db::saml_database;
-use crate::app::models::user::SessionUser;
-use crate::app::db::user_database;
 
 #[derive(Deserialize)]
 pub struct SamlAcsRequest {
@@ -23,12 +23,12 @@ pub struct SamlSloRequest {
 }
 
 // Serve SAML metadata for service provider
-pub async fn saml_metadata(
-    pool: web::Data<sqlx::PgPool>,
-) -> Result<HttpResponse> {
-    let base_url = std::env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
-    
-    let metadata_xml = format!(r#"<?xml version="1.0" encoding="UTF-8"?>
+pub async fn saml_metadata(pool: web::Data<sqlx::PgPool>) -> Result<HttpResponse> {
+    let base_url =
+        std::env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:8080".to_string());
+
+    let metadata_xml = format!(
+        r#"<?xml version="1.0" encoding="UTF-8"?>
 <md:EntityDescriptor xmlns:md="urn:oasis:names:tc:SAML:2.0:metadata"
                      entityID="{}/saml/metadata">
     <md:SPSSODescriptor protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
@@ -57,7 +57,9 @@ pub async fn saml_metadata(
                                     Location="{}/saml/acs"
                                     index="1"/>
     </md:SPSSODescriptor>
-</md:EntityDescriptor>"#, base_url, base_url, base_url);
+</md:EntityDescriptor>"#,
+        base_url, base_url, base_url
+    );
 
     Ok(HttpResponse::Ok()
         .content_type("application/xml")
@@ -81,7 +83,10 @@ pub async fn saml_acs(
             actix_web::error::ErrorBadRequest("No institution ID found")
         })?;
 
-    log::info!("Processing SAML response for institution: {}", institution_id);
+    log::info!(
+        "Processing SAML response for institution: {}",
+        institution_id
+    );
 
     // Get SAML config
     let config = match saml_database::get_saml_config(&pool, &institution_id).await {
@@ -97,7 +102,8 @@ pub async fn saml_acs(
     };
 
     // Decode and parse SAML response
-    let base_url = std::env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
+    let base_url =
+        std::env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
     let saml_manager = match saml_database::SamlManager::new(&base_url) {
         Ok(manager) => manager,
         Err(e) => {
@@ -138,13 +144,14 @@ pub async fn saml_acs(
     log::info!("Parsed SAML response for user: {}", parsed_response.name_id);
 
     // Provision or get existing user
-    let user = match saml_database::provision_saml_user(&pool, &parsed_response, &institution_id).await {
-        Ok(user) => user,
-        Err(e) => {
-            log::error!("Failed to provision SAML user: {:?}", e);
-            return Ok(HttpResponse::InternalServerError().body("User provisioning failed"));
-        }
-    };
+    let user =
+        match saml_database::provision_saml_user(&pool, &parsed_response, &institution_id).await {
+            Ok(user) => user,
+            Err(e) => {
+                log::error!("Failed to provision SAML user: {:?}", e);
+                return Ok(HttpResponse::InternalServerError().body("User provisioning failed"));
+            }
+        };
 
     // Create session
     let session_token = match user_database::create_session(&pool, user.id).await {
@@ -155,13 +162,18 @@ pub async fn saml_acs(
         }
     };
 
-    log::info!("SAML login successful for user: {} ({})", user.username, user.id);
+    log::info!(
+        "SAML login successful for user: {} ({})",
+        user.username,
+        user.id
+    );
 
     // Build redirect URL
     let redirect_url = form.relay_state.as_deref().unwrap_or("/dashboard");
 
     // Create HTML response with auto-redirect and session cookie
-    let html_response = format!(r#"
+    let html_response = format!(
+        r#"
 <!DOCTYPE html>
 <html>
 <head>
@@ -174,7 +186,9 @@ pub async fn saml_acs(
         window.location.href = '{}';
     </script>
 </body>
-</html>"#, redirect_url, redirect_url);
+</html>"#,
+        redirect_url, redirect_url
+    );
 
     Ok(HttpResponse::Ok()
         .content_type("text/html")
@@ -185,14 +199,14 @@ pub async fn saml_acs(
                 .same_site(actix_web::cookie::SameSite::Strict)
                 .max_age(actix_web::cookie::time::Duration::days(7))
                 .secure(!cfg!(debug_assertions))
-                .finish()
+                .finish(),
         )
         .cookie(
             actix_web::cookie::Cookie::build("saml_institution", "")
                 .path("/")
                 .http_only(true)
                 .max_age(actix_web::cookie::time::Duration::seconds(0))
-                .finish()
+                .finish(),
         )
         .body(html_response))
 }
@@ -226,7 +240,7 @@ pub async fn saml_sls(
                     .path("/")
                     .http_only(true)
                     .max_age(actix_web::cookie::time::Duration::seconds(0))
-                    .finish()
+                    .finish(),
             )
             .finish());
     }
@@ -242,15 +256,13 @@ pub async fn saml_sls(
                 .path("/")
                 .http_only(true)
                 .max_age(actix_web::cookie::time::Duration::seconds(0))
-                .finish()
+                .finish(),
         )
         .finish())
 }
 
 // Health check endpoint for SAML functionality
-pub async fn saml_health(
-    pool: web::Data<sqlx::PgPool>,
-) -> Result<HttpResponse> {
+pub async fn saml_health(pool: web::Data<sqlx::PgPool>) -> Result<HttpResponse> {
     // Check if we can connect to database and have SAML configs
     match saml_database::list_saml_configs(&pool).await {
         Ok(configs) => {
@@ -281,6 +293,6 @@ pub fn configure_saml_routes(cfg: &mut web::ServiceConfig) {
             .route("/acs", web::post().to(saml_acs))
             .route("/sls", web::get().to(saml_sls))
             .route("/sls", web::post().to(saml_sls))
-            .route("/health", web::get().to(saml_health))
+            .route("/health", web::get().to(saml_health)),
     );
 }

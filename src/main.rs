@@ -3,6 +3,7 @@
 async fn main() -> std::io::Result<()> {
     use actix::Actor;
     use actix_files::Files;
+    use actix_web::middleware::DefaultHeaders;
     use actix_web::{web, App, HttpServer};
     use dahlia::app::db::database;
     use dahlia::app::middleware::authentication::Authentication;
@@ -64,6 +65,17 @@ async fn main() -> std::io::Result<()> {
             .wrap(Authentication::new())
             // Configure SAML routes BEFORE other routes
             .configure(configure_saml_routes)
+            .wrap(
+                DefaultHeaders::new()
+                    .header("X-Frame-Options", "DENY")
+                    .header("X-COntENT-TYPE-OPTIONS", "nosniff")
+                    .header("X-XSS-Protection", "1; mode=block")
+                    .header("Referrer-Policy", "strict-origin-when-cross-origin")
+                    .header(
+                        "Strict-Transport-Security",
+                        "max-age=31536000; includeSubDomains; preload",
+                    ),
+            )
             // serve JS/WASM/CSS from `pkg`
             .service(Files::new("/pkg", format!("{site_root}/pkg")))
             // serve other assets from the `assets` directory
