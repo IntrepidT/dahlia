@@ -24,18 +24,22 @@ pub fn HomePage() -> impl IntoView {
                             <Header />
                             <main id="main-content" role="main" class="h-dvh">
                                 <div class="max-w-8xl mx-auto px-10 h-full">
-                                    <div class="h-5/6 items-center justify-center mt-10 bg-cover bg-[url('/assets/home23.png')] rounded-2xl flex-col">
-                                        <div class="h-5/6 pt-20 ml-20 mt-30">
-                                            <h1 class="text-5xl font-extrabold text-left text-white mt-20 mb-10">
+                                    <div class="h-5/6 items-center justify-center mt-10 rounded-2xl flex-col relative overflow-hidden">
+                                        // Multi-layered background for smooth loading
+                                        <div class="absolute inset-0 bg-gradient-to-br from-blue-600 via-purple-600 to-indigo-700"></div>
+                                        <div class="absolute inset-0 bg-[url('/assets/home23.png')] bg-cover bg-center"></div>
+
+                                        <div class="h-5/6 pt-20 ml-20 mt-30 relative z-10">
+                                            <h1 class="text-5xl font-extrabold text-left text-white mt-20 mb-10 drop-shadow-lg">
                                                 Simplifying<br/>Standardized<br/>Testing.
                                             </h1>
-                                            <p class="text-2xl font-semibold text-left text-white mt-10">
+                                            <p class="text-2xl font-semibold text-left text-white mt-10 drop-shadow-md">
                                                 Bringing your testing needs together,<br/>
                                                 so you can pursue what is important.
                                             </p>
                                             <div class="flex relative mt-10 font-base justify-start text-center text-white">
                                                 <A href="/login" class="font-semibold text-center text-white">
-                                                    <div class="bg-[#2E3A59] rounded-2xl border-white border-1 pl-3 pr-3 py-3">
+                                                    <div class="bg-[#2E3A59] rounded-2xl border-white border-1 pl-3 pr-3 py-3 hover:bg-[#3a4660] transition-colors shadow-lg">
                                                         "Log in"
                                                         <img src="/assets/arrow.png" alt="arrow" class="inline h-6 w-6 pb-1" />
                                                     </div>

@@ -77,6 +77,8 @@ ENV SMTP_PORT=587
 ENV SMTP_USERNAME=apikey 
 ENV APP_URL=https://www.teapottesting.com 
 ENV APP_ENV=production
+ENV RUST_ENV=production
+ENV BASE_URL=https://www.teapottesting.com
 
 # Expose the application port
 EXPOSE 8080
