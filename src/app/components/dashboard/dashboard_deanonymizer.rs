@@ -1,5 +1,5 @@
 use crate::app::components::auth::enhanced_login_form::{
-    StudentMappingService, use_student_mapping_service, StudentMappingData, StudentMapping
+    use_student_mapping_service, StudentMapping, StudentMappingData, StudentMappingService,
 };
 use crate::app::middleware::global_settings::use_settings;
 use leptos::*;
@@ -22,7 +22,8 @@ pub fn DashboardDeanonymizer() -> impl IntoView {
     // Check if mapping service is already active
     let has_active_mapping = move || mapping_service_signal.get().is_some();
     let mapping_count = move || {
-        mapping_service_signal.get()
+        mapping_service_signal
+            .get()
             .map(|service| service.get_mapping_count())
             .unwrap_or(0)
     };
@@ -42,7 +43,7 @@ pub fn DashboardDeanonymizer() -> impl IntoView {
         let header = lines[0];
         let expected_headers = [
             "app_id",
-            "original_student_id", 
+            "original_student_id",
             "firstname",
             "lastname",
             "pin",
@@ -76,11 +77,18 @@ pub fn DashboardDeanonymizer() -> impl IntoView {
                 ));
             }
 
-            let app_id = parts[0].trim().parse::<i32>()
+            let app_id = parts[0]
+                .trim()
+                .parse::<i32>()
                 .map_err(|_| format!("Invalid app_id at line {}: '{}'", line_num + 2, parts[0]))?;
 
-            let original_student_id = parts[1].trim().parse::<i32>()
-                .map_err(|_| format!("Invalid original_student_id at line {}: '{}'", line_num + 2, parts[1]))?;
+            let original_student_id = parts[1].trim().parse::<i32>().map_err(|_| {
+                format!(
+                    "Invalid original_student_id at line {}: '{}'",
+                    line_num + 2,
+                    parts[1]
+                )
+            })?;
 
             if app_id <= 0 || original_student_id <= 0 {
                 return Err(format!(
@@ -109,7 +117,11 @@ pub fn DashboardDeanonymizer() -> impl IntoView {
     // File upload handler
     #[cfg(feature = "hydrate")]
     let handle_file_upload = move |ev: web_sys::Event| {
-        let input = ev.target().unwrap().dyn_into::<web_sys::HtmlInputElement>().unwrap();
+        let input = ev
+            .target()
+            .unwrap()
+            .dyn_into::<web_sys::HtmlInputElement>()
+            .unwrap();
 
         if let Some(files) = input.files() {
             if files.length() > 0 {
@@ -136,14 +148,18 @@ pub fn DashboardDeanonymizer() -> impl IntoView {
                     let parse_csv_content = parse_csv_content.clone();
 
                     move |event: web_sys::Event| {
-                        let file_reader = event.target().unwrap()
-                            .dyn_into::<web_sys::FileReader>().unwrap();
+                        let file_reader = event
+                            .target()
+                            .unwrap()
+                            .dyn_into::<web_sys::FileReader>()
+                            .unwrap();
 
                         if let Ok(result) = file_reader.result() {
                             if let Some(content) = result.as_string() {
                                 match parse_csv_content(content) {
                                     Ok(mapping_data) => {
-                                        let mapping_service = StudentMappingService::new(mapping_data.mappings);
+                                        let mapping_service =
+                                            StudentMappingService::new(mapping_data.mappings);
                                         let count = mapping_service.get_mapping_count();
                                         set_student_mapping_service.set(Some(mapping_service));
                                         set_error.set(None);
@@ -151,7 +167,10 @@ pub fn DashboardDeanonymizer() -> impl IntoView {
                                             "✓ De-anonymization active ({} mappings loaded)",
                                             count
                                         )));
-                                        logging::log!("Student mapping service activated with {} mappings", count);
+                                        logging::log!(
+                                            "Student mapping service activated with {} mappings",
+                                            count
+                                        );
                                     }
                                     Err(e) => {
                                         set_error.set(Some(format!("Invalid CSV: {}", e)));
@@ -172,7 +191,9 @@ pub fn DashboardDeanonymizer() -> impl IntoView {
 
     #[cfg(not(feature = "hydrate"))]
     let handle_file_upload = move |_| {
-        set_error.set(Some("File upload not supported in this environment".to_string()));
+        set_error.set(Some(
+            "File upload not supported in this environment".to_string(),
+        ));
     };
 
     let clear_mapping = move |_| {
@@ -186,7 +207,7 @@ pub fn DashboardDeanonymizer() -> impl IntoView {
         {move || {
             if anonymization_enabled() {
                 view! {
-                    <div class="bg-white rounded-lg shadow-md border border-gray-200 mb-6">
+                    <div class="bg-white rounded-lg shadow-md border border-gray-200">
                         <div class="p-4 border-b border-gray-200">
                             <button
                                 class="flex items-center justify-between w-full text-left"
@@ -216,7 +237,7 @@ pub fn DashboardDeanonymizer() -> impl IntoView {
                                             }.into_view()
                                         }
                                     }}
-                                    <svg 
+                                    <svg
                                         class=move || if is_expanded.get() { "w-5 h-5 transform rotate-180 transition-transform" } else { "w-5 h-5 transition-transform" }
                                         fill="none" stroke="currentColor" viewBox="0 0 24 24"
                                     >
@@ -272,14 +293,14 @@ pub fn DashboardDeanonymizer() -> impl IntoView {
                                                             <p class="text-sm text-blue-700 mb-3">
                                                                 "Upload a CSV file to convert anonymized student IDs back to real names and original IDs."
                                                             </p>
-                                                            
+
                                                             <input
                                                                 type="file"
                                                                 accept=".csv"
                                                                 class="w-full p-2 border border-gray-300 rounded-md file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
                                                                 on:change=handle_file_upload
                                                             />
-                                                            
+
                                                             {move || {
                                                                 if let Some(status) = file_upload_status.get() {
                                                                     view! {

@@ -1,3 +1,7 @@
+use crate::app::components::auth::enhanced_login_form::{
+    use_student_mapping_service, DeAnonymizedStudent,
+};
+use crate::app::middleware::global_settings::use_settings;
 use crate::app::models::question::QuestionType;
 use crate::app::models::score::CreateScoreRequest;
 use crate::app::models::student::Student;
@@ -89,13 +93,16 @@ pub fn RealtimeTestSession() -> impl IntoView {
 
     let (should_disable_inputs, set_should_disable_inputs) = create_signal(true);
 
-    if user().expect("Unwrapping a user").is_admin()
-        || user().expect("Unwrapping a user").is_teacher()
-    {
-        set_role(Role::Teacher);
-    } else {
-        set_role(Role::Student);
-    };
+    // Initialize role based on user
+    create_effect(move |_| {
+        if let Some(current_user) = user() {
+            if current_user.is_admin() || current_user.is_teacher() {
+                set_role(Role::Teacher);
+            } else {
+                set_role(Role::Student);
+            }
+        }
+    });
 
     create_effect(move |_| {
         let current_role = role.get();
@@ -150,7 +157,7 @@ pub fn RealtimeTestSession() -> impl IntoView {
         None => "0".to_string(),
     });
 
-    // Handle WebSocket connection
+    // Handle WebSocket connection - FIXED: Removed duplication
     #[cfg(feature = "hydrate")]
     let connect_to_session = create_action(move |session_id: &Uuid| {
         let session_id = *session_id;
@@ -170,8 +177,8 @@ pub fn RealtimeTestSession() -> impl IntoView {
         let set_remaining_time = set_remaining_time.clone();
         let set_is_test_active = set_is_test_active.clone();
         let set_is_submitted = set_is_submitted.clone();
-        let set_connection_status = set_connection_status.clone(); // Add a new signal for connection status
-        let set_error_message = set_error_message.clone(); // Add error message signal
+        let set_connection_status = set_connection_status.clone();
+        let set_error_message = set_error_message.clone();
 
         async move {
             log::info!("Connecting to WebSocket at: {}", ws_url);
@@ -188,7 +195,6 @@ pub fn RealtimeTestSession() -> impl IntoView {
             match WebSocket::new(&ws_url) {
                 Ok(websocket) => {
                     // Setup message handler
-                    let ws_clone = websocket.clone();
                     let onmessage_callback = Closure::wrap(Box::new(move |e: MessageEvent| {
                         if let Ok(text) = e.data().dyn_into::<js_sys::JsString>() {
                             let message = text.as_string().unwrap();
@@ -217,7 +223,7 @@ pub fn RealtimeTestSession() -> impl IntoView {
                                                     .get("questions")
                                                     .and_then(|q| q.as_array())
                                                 {
-                                                    let qs: Vec<
+                                                    let _qs: Vec<
                                                         crate::app::models::question::Question,
                                                     > = questions_array
                                                         .iter()
@@ -405,301 +411,18 @@ pub fn RealtimeTestSession() -> impl IntoView {
                     let set_connection_status_clone = set_connection_status.clone();
                     let set_error_message_clone = set_error_message.clone();
                     let onerror_callback = Closure::wrap(Box::new(move |e: ErrorEvent| {
+                        // Safely get the error message, providing a default if empty
                         let error_msg = e.message();
-                        log::error!("WebSocket error occurred: {}", error_msg);
+                        let final_msg = if error_msg.is_empty() {
+                            "WebSocket connection failed".to_string()
+                        } else {
+                            error_msg
+                        };
+
+                        log::error!("WebSocket error occurred: {}", final_msg);
                         set_connection_status_clone.set(ConnectionStatus::Error);
                         set_error_message_clone
-                            .set(Some(format!("Connection error: {}", error_msg)));
-                    })
-                        as Box<dyn FnMut(ErrorEvent)>);
-
-                    // Set event handlers
-                    websocket.set_onmessage(Some(onmessage_callback.as_ref().unchecked_ref()));
-                    websocket.set_onopen(Some(onopen_callback.as_ref().unchecked_ref()));
-                    websocket.set_onclose(Some(onclose_callback.as_ref().unchecked_ref()));
-                    websocket.set_onerror(Some(onerror_callback.as_ref().unchecked_ref()));
-
-                    // Store callbacks to prevent them from being dropped
-                    onmessage_callback.forget();
-                    onopen_callback.forget();
-                    onclose_callback.forget();
-                    onerror_callback.forget();
-
-                    // Store the websocket
-                    set_ws.set(Some(websocket));
-                    Ok(())
-                }
-                Err(err) => {
-                    let error_msg = format!("WebSocket connection failed: {:?}", err);
-                    log::error!("{}", error_msg);
-                    set_connection_status.set(ConnectionStatus::Error);
-                    set_error_message.set(Some(error_msg));
-                    Err(())
-                }
-            }
-        }
-    });
-
-    // Handle WebSocket connection
-    #[cfg(feature = "hydrate")]
-    let connect_to_session = create_action(move |session_id: &Uuid| {
-        let session_id = *session_id;
-        let protocol = if web_sys::window().unwrap().location().protocol().unwrap() == "https:" {
-            "wss"
-        } else {
-            "ws"
-        };
-        let host = web_sys::window().unwrap().location().host().unwrap();
-        let ws_url = format!("{protocol}://{host}/api/ws/{session_id}");
-
-        // Clone necessary signals for the async block
-        let set_role = set_role.clone();
-        let set_connected_students = set_connected_students.clone();
-        let set_responses = set_responses.clone();
-        let set_current_card_index = set_current_card_index.clone();
-        let set_remaining_time = set_remaining_time.clone();
-        let set_is_test_active = set_is_test_active.clone();
-        let set_is_submitted = set_is_submitted.clone();
-        let set_connection_status = set_connection_status.clone(); // Add a new signal for connection status
-        let set_error_message = set_error_message.clone(); // Add error message signal
-
-        async move {
-            log::info!("Connecting to WebSocket at: {}", ws_url);
-
-            // Close any existing connection
-            if let Some(ws) = ws.get_untracked() {
-                let _ = ws.close();
-            }
-
-            // Reset connection-dependent state
-            set_connection_status.set(ConnectionStatus::Connecting);
-            set_error_message.set(None);
-
-            match WebSocket::new(&ws_url) {
-                Ok(websocket) => {
-                    // Setup message handler
-                    let ws_clone = websocket.clone();
-                    let onmessage_callback = Closure::wrap(Box::new(move |e: MessageEvent| {
-                        if let Ok(text) = e.data().dyn_into::<js_sys::JsString>() {
-                            let message = text.as_string().unwrap();
-                            log::debug!("WebSocket message received: {}", message);
-
-                            match serde_json::from_str::<Value>(&message) {
-                                Ok(json_value) => {
-                                    if let Some(msg_type) =
-                                        json_value.get("type").and_then(|t| t.as_str())
-                                    {
-                                        match msg_type {
-                                            "role_assigned" => {
-                                                log::info!("Assigning role");
-                                                if let Some(role_str) =
-                                                    json_value.get("role").and_then(|r| r.as_str())
-                                                {
-                                                    match role_str {
-                                                        "teacher" => set_role.set(Role::Teacher),
-                                                        "student" => set_role.set(Role::Student),
-                                                        _ => set_role.set(Role::Unknown),
-                                                    }
-                                                }
-                                            }
-                                            "test_data" => {
-                                                if let Some(questions_array) = json_value
-                                                    .get("questions")
-                                                    .and_then(|q| q.as_array())
-                                                {
-                                                    let qs: Vec<
-                                                        crate::app::models::question::Question,
-                                                    > = questions_array
-                                                        .iter()
-                                                        .filter_map(|q| {
-                                                            serde_json::from_value(q.clone()).ok()
-                                                        })
-                                                        .collect();
-                                                }
-                                            }
-                                            "student_joined" | "user_joined" => {
-                                                let is_student = msg_type == "student_joined";
-                                                let log_msg = if is_student {
-                                                    "student joined"
-                                                } else {
-                                                    "user joined"
-                                                };
-                                                log::info!(
-                                                    "Received {} message {:?}",
-                                                    log_msg,
-                                                    json_value
-                                                );
-
-                                                // Extract ID field based on message type
-                                                let id_field =
-                                                    if is_student { "student_id" } else { "id" };
-                                                let data_field = if is_student {
-                                                    "student_data"
-                                                } else {
-                                                    "user_data"
-                                                };
-                                                let name_field =
-                                                    if is_student { "name" } else { "username" };
-
-                                                if let Some(user_id) = json_value
-                                                    .get(id_field)
-                                                    .and_then(|s| s.as_str())
-                                                {
-                                                    if let Some(user_data) =
-                                                        json_value.get(data_field)
-                                                    {
-                                                        let name = user_data
-                                                            .get(name_field)
-                                                            .and_then(|n| n.as_str())
-                                                            .unwrap_or("Unknown");
-
-                                                        set_connected_students.update(|students| {
-                                                            // Check if student already exists
-                                                            if let Some(pos) =
-                                                                students.iter().position(|s| {
-                                                                    s.student_id == user_id
-                                                                })
-                                                            {
-                                                                students[pos].status =
-                                                                    "Connected".to_string();
-                                                            } else {
-                                                                students.push(ConnectedStudent {
-                                                                    student_id: user_id.to_string(),
-                                                                    name: name.to_string(),
-                                                                    status: "Connected".to_string(),
-                                                                });
-                                                            }
-                                                        });
-                                                    }
-                                                }
-                                            }
-                                            "student_left" | "user_left" => {
-                                                let is_student = msg_type == "student_left";
-                                                let log_msg = if is_student {
-                                                    "student left"
-                                                } else {
-                                                    "user left"
-                                                };
-                                                log::info!(
-                                                    "Received {} message {:?}",
-                                                    log_msg,
-                                                    json_value
-                                                );
-
-                                                // Extract ID field based on message type
-                                                let id_field =
-                                                    if is_student { "student_id" } else { "id" };
-
-                                                if let Some(user_id) = json_value
-                                                    .get(id_field)
-                                                    .and_then(|s| s.as_str())
-                                                {
-                                                    set_connected_students.update(|students| {
-                                                        if let Some(pos) = students
-                                                            .iter()
-                                                            .position(|s| s.student_id == user_id)
-                                                        {
-                                                            students[pos].status =
-                                                                "Disconnected".to_string();
-                                                        }
-                                                    });
-                                                }
-                                            }
-                                            "student_answer" => {
-                                                if let Some(answer_data) =
-                                                    json_value.get("answer_data")
-                                                {
-                                                    if let (Some(qnumber), Some(answer)) = (
-                                                        answer_data
-                                                            .get("question_id")
-                                                            .and_then(|q| q.as_i64()),
-                                                        answer_data
-                                                            .get("answer")
-                                                            .and_then(|a| a.as_str()),
-                                                    ) {
-                                                        set_responses.update(|r| {
-                                                            let qnumber = qnumber as i32;
-                                                            let response = r
-                                                                .entry(qnumber)
-                                                                .or_insert(QuestionResponse {
-                                                                    answer: String::new(),
-                                                                    comment: String::new(),
-                                                                });
-                                                            response.answer = answer.to_string();
-                                                        });
-                                                    }
-                                                }
-                                            }
-                                            "focus_question" => {
-                                                if let Some(question_data) =
-                                                    json_value.get("question_data")
-                                                {
-                                                    if let Some(index) = question_data
-                                                        .get("index")
-                                                        .and_then(|i| i.as_i64())
-                                                    {
-                                                        set_current_card_index.set(index as usize);
-                                                    }
-                                                }
-                                            }
-                                            "time_update" => {
-                                                if let Some(time_data) = json_value.get("time_data")
-                                                {
-                                                    if let Some(remaining) = time_data
-                                                        .get("remaining")
-                                                        .and_then(|r| r.as_i64())
-                                                    {
-                                                        set_remaining_time
-                                                            .set(Some(remaining as i32));
-                                                    }
-                                                }
-                                            }
-                                            "test_started" => {
-                                                set_is_test_active.set(true);
-                                            }
-                                            "test_ended" => {
-                                                set_is_test_active.set(false);
-                                                set_is_submitted.set(true);
-                                            }
-                                            _ => {
-                                                log::debug!("Unhandled message type: {}", msg_type);
-                                            }
-                                        }
-                                    }
-                                }
-                                Err(err) => {
-                                    log::error!("Failed to parse WebSocket message: {:?}", err);
-                                }
-                            }
-                        }
-                    })
-                        as Box<dyn FnMut(MessageEvent)>);
-
-                    // Setup onopen handler
-                    let set_connection_status_clone = set_connection_status.clone();
-                    let onopen_callback = Closure::wrap(Box::new(move |_| {
-                        log::info!("WebSocket connection established");
-                        set_connection_status_clone.set(ConnectionStatus::Connected);
-                    })
-                        as Box<dyn FnMut(JsValue)>);
-
-                    // Setup onclose handler
-                    let set_connection_status_clone = set_connection_status.clone();
-                    let onclose_callback = Closure::wrap(Box::new(move |e: CloseEvent| {
-                        log::info!("WebSocket closed: {} - {}", e.code(), e.reason());
-                        set_connection_status_clone.set(ConnectionStatus::Disconnected);
-                    })
-                        as Box<dyn FnMut(CloseEvent)>);
-
-                    // Setup onerror handler
-                    let set_connection_status_clone = set_connection_status.clone();
-                    let set_error_message_clone = set_error_message.clone();
-                    let onerror_callback = Closure::wrap(Box::new(move |e: ErrorEvent| {
-                        let error_msg = e.message();
-                        log::error!("WebSocket error occurred: {}", error_msg);
-                        set_connection_status_clone.set(ConnectionStatus::Error);
-                        set_error_message_clone
-                            .set(Some(format!("Connection error: {}", error_msg)));
+                            .set(Some(format!("Connection error: {}", final_msg)));
                     })
                         as Box<dyn FnMut(ErrorEvent)>);
 
@@ -735,8 +458,9 @@ pub fn RealtimeTestSession() -> impl IntoView {
         let tid = test_id();
         let test_name = match &test_details() {
             Some(Some(test)) => test.name.clone(),
-            _ => "Could not get test".to_string(),
+            _ => "Unknown Test".to_string(), // FIXED: Better default value
         };
+
         if !tid.is_empty() {
             spawn_local(async move {
                 // First check if there's an active session for this test
@@ -752,9 +476,7 @@ pub fn RealtimeTestSession() -> impl IntoView {
                             // Join existing session
                             set_room_id.set(Some(active_session.id));
                             #[cfg(feature = "hydrate")]
-                            if let Some(session_uuid) = Some(active_session.id) {
-                                connect_to_session.dispatch(session_uuid);
-                            }
+                            connect_to_session.dispatch(active_session.id);
                         } else {
                             // Create new session
                             let request = CreateSessionRequest {
@@ -775,9 +497,7 @@ pub fn RealtimeTestSession() -> impl IntoView {
                                 Ok(session) => {
                                     set_room_id.set(Some(session.id));
                                     #[cfg(feature = "hydrate")]
-                                    if let Some(session_uuid) = Some(session.id) {
-                                        connect_to_session.dispatch(session_uuid);
-                                    }
+                                    connect_to_session.dispatch(session.id);
                                 }
                                 Err(e) => {
                                     log::error!("Failed to create session: {}", e);
@@ -821,7 +541,7 @@ pub fn RealtimeTestSession() -> impl IntoView {
             set_remaining_time.set(Some(duration_minutes * 60));
 
             // Start timer countdown
-            let timer_handle = set_interval_with_handle(
+            let _timer_handle = set_interval_with_handle(
                 move || {
                     set_remaining_time.update(|time| {
                         if let Some(t) = time {
@@ -1107,7 +827,7 @@ pub fn RealtimeTestSession() -> impl IntoView {
                 <h2 class="text-2xl font-bold text-gray-800">
                     {move || match &test_details.get() {
                         Some(Some(test)) => format!("Realtime Test Session: {}", test.name.clone()),
-                        _ => test_id()
+                        _ => format!("Test Session: {}", test_id())
                     }}
                 </h2>
                 <div class="mt-2 text-sm text-gray-600">
@@ -1119,18 +839,53 @@ pub fn RealtimeTestSession() -> impl IntoView {
                 </div>
             </div>
 
+            {/* Connection Status Indicator */}
+            <div class="flex justify-center mb-4">
+                <div class="flex items-center space-x-2 px-3 py-1 rounded-full text-sm"
+                     class:bg-green-100={move || matches!(connection_status.get(), ConnectionStatus::Connected)}
+                     class:text-green-800={move || matches!(connection_status.get(), ConnectionStatus::Connected)}
+                     class:bg-yellow-100={move || matches!(connection_status.get(), ConnectionStatus::Connecting)}
+                     class:text-yellow-800={move || matches!(connection_status.get(), ConnectionStatus::Connecting)}
+                     class:bg-red-100={move || matches!(connection_status.get(), ConnectionStatus::Error)}
+                     class:text-red-800={move || matches!(connection_status.get(), ConnectionStatus::Error)}
+                     class:bg-gray-100={move || matches!(connection_status.get(), ConnectionStatus::Disconnected)}
+                     class:text-gray-800={move || matches!(connection_status.get(), ConnectionStatus::Disconnected)}>
+                    <div class="w-2 h-2 rounded-full"
+                         class:bg-green-500={move || matches!(connection_status.get(), ConnectionStatus::Connected)}
+                         class:bg-yellow-500={move || matches!(connection_status.get(), ConnectionStatus::Connecting)}
+                         class:bg-red-500={move || matches!(connection_status.get(), ConnectionStatus::Error)}
+                         class:bg-gray-500={move || matches!(connection_status.get(), ConnectionStatus::Disconnected)}></div>
+                    <span>{move || match connection_status.get() {
+                        ConnectionStatus::Connected => "Connected",
+                        ConnectionStatus::Connecting => "Connecting...",
+                        ConnectionStatus::Error => "Connection Error",
+                        ConnectionStatus::Disconnected => "Disconnected"
+                    }}</span>
+                </div>
+            </div>
+
+            {/* Error Message */}
+            <Show when=move || error_message.get().is_some()>
+                <div class="max-w-4xl mx-auto mb-6">
+                    <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+                        <strong>"Error: "</strong>
+                        {move || error_message.get().unwrap_or_default()}
+                    </div>
+                </div>
+            </Show>
+
             {/* Session Status */}
             <div class="flex justify-between items-center mb-6 max-w-4xl mx-auto">
                 <div class="text-sm text-gray-600">
-                    <span class="font-medium">Session ID: </span>
+                    <span class="font-medium">"Session ID: "</span>
                     {move || room_id.get().map(|id| id.to_string()).unwrap_or_else(|| "Connecting...".to_string())}
                 </div>
                 <div class="text-sm text-gray-600">
-                    <span class="font-medium">Status: </span>
+                    <span class="font-medium">"Status: "</span>
                     {move || if is_test_active.get() { "Active" } else { "Waiting" }}
                 </div>
                 <div class="text-sm text-gray-600">
-                    <span class="font-medium">Time: </span>
+                    <span class="font-medium">"Time: "</span>
                     {move || formatted_time()}
                 </div>
             </div>
@@ -1144,32 +899,27 @@ pub fn RealtimeTestSession() -> impl IntoView {
                         </div>
                         {
                             #[cfg(feature = "hydrate")]
-                            {
-                                view! {
-
-                                    <button
-                                        class="px-5 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                                        on:click=start_test
-                                        disabled=move || selected_student_id.get().is_none()
-                                    >
-                                        "Start Test Session"
-                                    </button>
-                                }
+                            view! {
+                                <button
+                                    class="px-5 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                    on:click=start_test
+                                    disabled=move || selected_student_id.get().is_none() || !matches!(connection_status.get(), ConnectionStatus::Connected)
+                                >
+                                    "Start Test Session"
+                                </button>
                             }
                         }
                     </Show>
                     <Show when=move || is_test_active.get() && !is_submitted.get()>
                         {
                             #[cfg(feature = "hydrate")]
-                            {
-                                view! {
-                                    <button
-                                        class="px-5 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                                        on:click=move |_| end_test(())
-                                    >
-                                        "End Test Session"
-                                    </button>
-                                }
+                            view! {
+                                <button
+                                    class="px-5 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                                    on:click=move |_| end_test(())
+                                >
+                                    "End Test Session"
+                                </button>
                             }
                         }
                     </Show>
@@ -1179,7 +929,7 @@ pub fn RealtimeTestSession() -> impl IntoView {
             {/* Connected Students (Teacher View) */}
             <Show when=move || matches!(role.get(), Role::Teacher)>
                 <div class="mb-8 max-w-4xl mx-auto">
-                    <h3 class="text-lg font-medium mb-2">Connected Students</h3>
+                    <h3 class="text-lg font-medium mb-2">"Connected Students"</h3>
                     <div class="bg-white shadow-sm rounded-lg p-4">
                         <Show when=move || !connected_students.get().is_empty() fallback=|| view! {
                             <p class="text-gray-500 text-center py-2">"No students connected"</p>
@@ -1189,18 +939,17 @@ pub fn RealtimeTestSession() -> impl IntoView {
                                     each=move || connected_students.get()
                                     key=|student| student.student_id.clone()
                                     children=move |student| {
-                                        let status_for_class = student.status.clone();
-                                        let status_for_display = student.status.clone();
+                                        let status_class = if student.status == "Connected" {
+                                            "bg-green-100 text-green-800"
+                                        } else {
+                                            "bg-red-100 text-red-800"
+                                        };
 
                                         view! {
                                             <li class="py-2 flex justify-between items-center">
-                                                <span>{student.name} ({student.student_id})</span>
-                                                <span class=move || {
-                                                    format!("text-sm px-2 py-1 rounded-full {}",
-                                                    if student.status == "Connected" { "bg-green-100 text-green-800" }
-                                                    else { "bg-red-100 text-red-800" })
-                                                }>
-                                                    {status_for_display}
+                                                <span>{format!("{} ({})", student.name, student.student_id)}</span>
+                                                <span class=format!("text-sm px-2 py-1 rounded-full {}", status_class)>
+                                                    {student.status}
                                                 </span>
                                             </li>
                                         }
@@ -1215,11 +964,13 @@ pub fn RealtimeTestSession() -> impl IntoView {
             {/* Test Content - Only show if test is active or teacher */}
             <Show when=move || is_test_active.get() || matches!(role.get(), Role::Teacher)>
                 <Suspense
-                    fallback=move || view! { <div class="flex justify-center items-center h-64">
-                        <div class="animate-pulse bg-white rounded-lg shadow-md w-full max-w-2xl h-64 flex items-center justify-center">
-                            <p class="text-gray-400">"Loading questions..."</p>
+                    fallback=move || view! {
+                        <div class="flex justify-center items-center h-64">
+                            <div class="animate-pulse bg-white rounded-lg shadow-md w-full max-w-2xl h-64 flex items-center justify-center">
+                                <p class="text-gray-400">"Loading questions..."</p>
+                            </div>
                         </div>
-                    </div> }
+                    }
                 >
                     {move || match (questions.get(), test_details.get()) {
                         (None, _) => view! {<div class="text-center py-8">"Loading..."</div>}.into_view(),
@@ -1241,7 +992,7 @@ pub fn RealtimeTestSession() -> impl IntoView {
                                     {/* Progress Bar */}
                                     <div class="w-full max-w-2xl mb-4">
                                         <div class="flex justify-between mb-1 text-xs text-gray-700">
-                                            <span>Progress</span>
+                                            <span>"Progress"</span>
                                             <span>{move || format!("{:.1}%", calculate_answered_percentage())}</span>
                                         </div>
                                         <div class="mb-4 w-full bg-gray-200 rounded-full h-2.5">
@@ -1256,11 +1007,11 @@ pub fn RealtimeTestSession() -> impl IntoView {
                                     <div class="text-center mb-4">
                                         <span class="inline-flex items-center justify-center bg-white text-sm font-medium text-gray-700 px-3 py-1 rounded-full shadow-sm border border-gray-200">
                                             {move || current_card_index.get() + 1}
-                                            {" / "}
+                                            " / "
                                             {total_questions}
                                             <span class="ml-2 text-purple-600 font-semibold">
                                                 {move || current_question().point_value}
-                                                {" pts"}
+                                                " pts"
                                             </span>
                                         </span>
                                     </div>
@@ -1303,7 +1054,6 @@ pub fn RealtimeTestSession() -> impl IntoView {
 
                                                                             view! {
                                                                                 <label class="flex items-center p-3 rounded-lg border border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-colors cursor-pointer">
-                                                                                    #[cfg(feature = "hydrate")]
                                                                                     <input
                                                                                         type="radio"
                                                                                         name=format!("q_{}", qnumber)
@@ -1347,7 +1097,6 @@ pub fn RealtimeTestSession() -> impl IntoView {
 
                                                                 view! {
                                                                     <div class="w-full flex flex-col sm:flex-row gap-4 items-center justify-center">
-                                                                        #[cfg(feature = "hydrate")]
                                                                         <button
                                                                             type="button"
                                                                             class="px-6 py-3 w-full rounded-lg font-medium text-center transition-colors"
@@ -1358,19 +1107,16 @@ pub fn RealtimeTestSession() -> impl IntoView {
                                                                             class:bg-green-500={move || is_true()}
                                                                             class:text-white={move || is_true()}
                                                                             class:border-transparent={move || is_true()}
-                                                                            class:cursor-not-allowd={should_disable_inputs()}
+                                                                            class:cursor-not-allowed={should_disable_inputs()}
                                                                             on:click=move |_| {
                                                                                 #[cfg(feature = "hydrate")]
-                                                                                {
-                                                                                    if !should_disable_inputs.get() {
-                                                                                        handle_answer_change(qnumber, "true".to_string());
-                                                                                    }
+                                                                                if !should_disable_inputs.get() {
+                                                                                    handle_answer_change(qnumber, "true".to_string());
                                                                                 }
                                                                             }
                                                                         >
                                                                             "Yes"
                                                                         </button>
-                                                                        #[cfg(feature = "hydrate")]
                                                                         <button
                                                                             type="button"
                                                                             class="px-6 py-3 w-full rounded-lg font-medium text-center transition-colors"
@@ -1384,10 +1130,8 @@ pub fn RealtimeTestSession() -> impl IntoView {
                                                                             class:cursor-not-allowed={should_disable_inputs()}
                                                                             on:click=move |_| {
                                                                                 #[cfg(feature = "hydrate")]
-                                                                                {
-                                                                                    if !should_disable_inputs.get() {
-                                                                                        handle_answer_change(qnumber, "false".to_string());
-                                                                                    }
+                                                                                if !should_disable_inputs.get() {
+                                                                                    handle_answer_change(qnumber, "false".to_string());
                                                                                 }
                                                                             }
                                                                         >
@@ -1408,18 +1152,15 @@ pub fn RealtimeTestSession() -> impl IntoView {
 
                                                                 view! {
                                                                     <div>
-                                                                        #[cfg(feature = "hydrate")]
                                                                         <textarea
                                                                             class="w-full p-3 border border-gray-200 rounded-lg focus:ring-blue-500 focus:border-blue-500"
                                                                             prop:value=move || answer_value()
                                                                             prop:disabled={should_disable_inputs()}
                                                                             on:input=move |ev| {
                                                                                 #[cfg(feature = "hydrate")]
-                                                                                {
-                                                                                    if !should_disable_inputs.get() {
-                                                                                        let value = event_target_value(&ev);
-                                                                                        handle_answer_change(qnumber, value);
-                                                                                    }
+                                                                                if !should_disable_inputs.get() {
+                                                                                    let value = event_target_value(&ev);
+                                                                                    handle_answer_change(qnumber, value);
                                                                                 }
                                                                             }
                                                                             placeholder="Enter your answer here..."
@@ -1450,7 +1191,6 @@ pub fn RealtimeTestSession() -> impl IntoView {
                                                         });
                                                         view! {
                                                             <div>
-                                                                #[cfg(feature = "hydrate")]
                                                                 <textarea
                                                                     class="w-full p-3 border border-gray-200 rounded-lg focus:ring-blue-500 focus:border-blue-500"
                                                                     prop:value=move || comment_value()
@@ -1468,7 +1208,7 @@ pub fn RealtimeTestSession() -> impl IntoView {
                                                         }
                                                     }}
                                                 </div>
-                                            </Show>
+                                        </Show>
                                         </div>
                                     </div>
 
@@ -1477,17 +1217,15 @@ pub fn RealtimeTestSession() -> impl IntoView {
                                         <div class="flex flex-wrap items-center justify-center gap-4 mt-8">
                                             {
                                                 #[cfg(feature = "hydrate")]
-                                                {
-                                                    view! {
-                                                        <button
-                                                            class="flex items-center justify-center px-5 py-2 bg-white border border-gray-200 rounded-lg shadow-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                                            disabled=move || (current_card_index.get() == 0 || should_disable_inputs())
-                                                            on:click=go_to_previous_card
-                                                        >
-                                                            <span class="mr-1">"←"</span>
-                                                            "Previous"
-                                                        </button>
-                                                    }
+                                                view! {
+                                                    <button
+                                                        class="flex items-center justify-center px-5 py-2 bg-white border border-gray-200 rounded-lg shadow-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                                        disabled=move || (current_card_index.get() == 0 || should_disable_inputs())
+                                                        on:click=move |_| go_to_previous_card(())
+                                                    >
+                                                        <span class="mr-1">"←"</span>
+                                                        "Previous"
+                                                    </button>
                                                 }
                                             }
 
@@ -1495,41 +1233,41 @@ pub fn RealtimeTestSession() -> impl IntoView {
                                                 let is_last = current_card_index.get() == total_questions - 1;
 
                                                 if is_last && matches!(role.get(), Role::Teacher) && is_test_active.get() && !is_submitted.get() {
-                                                    view! {
-                                                        #[cfg(feature = "hydrate")]
-                                                        <button
-                                                            class="flex items-center justify-center px-5 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg shadow-sm hover:from-blue-700 hover:to-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                                            on:click=move |_| {
-                                                                #[cfg(feature = "hydrate")]
-                                                                {
-                                                                    handle_submit.dispatch(());
-                                                                }
-                                                            }
-                                                            disabled=move || (selected_student_id.get().is_none() || should_disable_inputs())
-                                                        >
-                                                            "Submit Assessment"
-                                                            <span class="ml-1">"✓"</span>
-                                                        </button>
-                                                    }.into_view()
+                                                    #[cfg(feature = "hydrate")]
+                                                    {
+                                                        view! {
+                                                            <button
+                                                                class="flex items-center justify-center px-5 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg shadow-sm hover:from-blue-700 hover:to-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                                                on:click=move |_| handle_submit.dispatch(())
+                                                                disabled=move || (selected_student_id.get().is_none() || should_disable_inputs())
+                                                            >
+                                                                "Submit Assessment"
+                                                                <span class="ml-1">"✓"</span>
+                                                            </button>
+                                                        }.into_view()
+                                                    }
+                                                    #[cfg(not(feature = "hydrate"))]
+                                                    {
+                                                        view! { <div></div> }.into_view()
+                                                    }
                                                 } else if !is_last {
-                                                    view! {
-                                                        {
-                                                            #[cfg(feature = "hydrate")]
-                                                            {
-                                                                view! {
-                                                                    <button
-                                                                        class="flex items-center justify-center px-5 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg shadow-sm hover:from-blue-700 hover:to-purple-700 transition-colors"
-                                                                        on:click=go_to_next_card
-                                                                        disabled=move || {should_disable_inputs}
-                                                                    >
-                                                                        "Next"
-                                                                        <span class="ml-1">"→"</span>
-                                                                    </button>
-                                                                }
-                                                            }
-                                                        }
-
-                                                    }.into_view()
+                                                    #[cfg(feature = "hydrate")]
+                                                    {
+                                                        view! {
+                                                            <button
+                                                                class="flex items-center justify-center px-5 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg shadow-sm hover:from-blue-700 hover:to-purple-700 transition-colors"
+                                                                on:click=move |_| go_to_next_card(())
+                                                                disabled=move || should_disable_inputs()
+                                                            >
+                                                                "Next"
+                                                                <span class="ml-1">"→"</span>
+                                                            </button>
+                                                        }.into_view()
+                                                    }
+                                                    #[cfg(not(feature = "hydrate"))]
+                                                    {
+                                                        view! { <div></div> }.into_view()
+                                                    }
                                                 } else {
                                                     view! { <div></div> }.into_view()
                                                 }
@@ -1545,19 +1283,20 @@ pub fn RealtimeTestSession() -> impl IntoView {
                                                 "Assessment submitted successfully!"
                                             </div>
                                             <div>
-                                                #[cfg(feature = "hydrate")]
-                                                <button
-                                                    class="px-5 py-2 mt-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-colors"
-                                                    on:click=move |_| {
-                                                        #[cfg(feature = "hydrate")]
-                                                        {
-                                                            let navigate=leptos_router::use_navigate();
-                                                            navigate("/dashboard", Default::default());
-                                                        }
+                                                {
+                                                    #[cfg(feature = "hydrate")]
+                                                    view! {
+                                                        <button
+                                                            class="px-5 py-2 mt-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                                                            on:click=move |_| {
+                                                                let navigate = leptos_router::use_navigate();
+                                                                navigate("/dashboard", Default::default());
+                                                            }
+                                                        >
+                                                            "Return to Dashboard"
+                                                        </button>
                                                     }
-                                                >
-                                                    "Return to Dashboard"
-                                                </button>
+                                                }
                                             </div>
                                         </div>
                                     </Show>
@@ -1572,8 +1311,8 @@ pub fn RealtimeTestSession() -> impl IntoView {
             <Show when=move || !is_test_active.get() && matches!(role.get(), Role::Student)>
                 <div class="flex flex-col items-center justify-center py-12 max-w-md mx-auto">
                     <div class="bg-white p-8 rounded-lg shadow-md w-full text-center">
-                        <h3 class="text-xl font-medium mb-4">Waiting for Test to Start</h3>
-                        <p class="text-gray-600 mb-6">Your teacher will start the test soon. Please stand by.</p>
+                        <h3 class="text-xl font-medium mb-4">"Waiting for Test to Start"</h3>
+                        <p class="text-gray-600 mb-6">"Your teacher will start the test soon. Please stand by."</p>
                         <div class="animate-pulse flex justify-center">
                             <div class="h-4 w-4 bg-blue-400 rounded-full mr-1"></div>
                             <div class="h-4 w-4 bg-blue-500 rounded-full mr-1 animation-delay-200"></div>
@@ -1589,7 +1328,14 @@ pub fn RealtimeTestSession() -> impl IntoView {
 // Student select component with hydrate gates
 #[component]
 pub fn StudentSelect(set_selected_student_id: WriteSignal<Option<i32>>) -> impl IntoView {
-    let (students, set_students) = create_signal(Vec::new());
+    // Extract information in the event student is anonymized
+    let (settings, _) = use_settings();
+    let anonymization_enabled = move || settings.get().student_protections;
+
+    // Get mapping service for de-anonymization
+    let (student_mapping_service, _) = use_student_mapping_service();
+
+    // Fetch students from server
     let get_students_action = create_action(|_: &()| async move {
         match get_students().await {
             Ok(fetched_students) => fetched_students,
@@ -1600,40 +1346,78 @@ pub fn StudentSelect(set_selected_student_id: WriteSignal<Option<i32>>) -> impl 
         }
     });
 
+    // Create enhanced student data with de-anonymization info
+    let enhanced_students = create_memo(move |_| {
+        let students_data = get_students_action
+            .value()
+            .get()
+            .as_ref()
+            .cloned()
+            .unwrap_or_default();
+
+        if anonymization_enabled() {
+            let mapping_service = student_mapping_service.get();
+            students_data
+                .into_iter()
+                .map(|student| {
+                    let de_anon = DeAnonymizedStudent::from_student_with_mapping(
+                        &student,
+                        mapping_service.as_ref(),
+                    );
+                    (student, Some(de_anon))
+                })
+                .collect::<Vec<_>>()
+        } else {
+            students_data
+                .into_iter()
+                .map(|student| (student, None))
+                .collect::<Vec<_>>()
+        }
+    });
+
     // Dispatch action only once on component mount
     create_effect(move |_| {
         get_students_action.dispatch(());
     });
 
-    // Update students when data is received
-    create_effect(move |_| {
-        if let Some(result) = get_students_action.value().get() {
-            set_students.set(result);
-        }
-    });
-
     view! {
-        <div class="mb-4 max-w-[20rem]">
-            <label class="block text-sm font-medium mb-2">"Select Student:"</label>
-            #[cfg(feature = "hydrate")]
+        <div class="mb-2 max-w-[20rem]">
+            <label class="block text-sm font-medium mb-1">"Select Student:"</label>
             <select
                 class="w-full p-2 border rounded-md"
                 on:change=move |ev| {
-                    #[cfg(feature = "hydrate")]
-                    {
-                        let value = event_target_value(&ev).parse().ok();
-                        set_selected_student_id.set(value);
-                    }
+                    let value = event_target_value(&ev).parse().ok();
+                    set_selected_student_id.set(value);
                 }
             >
                 <option value="">"Select a student..."</option>
-                {move || students.get().into_iter().map(|student| {
-                    view! {
-                        <option value={student.student_id.to_string()}>
-                            {format!("{} {} - {}", student.firstname.unwrap(), student.lastname.unwrap(), student.student_id)}
-                        </option>
-                    }
-                }).collect_view()}
+                <Suspense fallback=move || view! {
+                    <option>"Loading students..."</option>
+                }>
+                    {move || {
+                        enhanced_students().into_iter().map(|(student, de_anon_opt)| {
+                            // Determine display values based on anonymization status
+                            let display_text = if let Some(de_anon) = &de_anon_opt {
+                                // Use de-anonymized display name and ID
+                                format!("{} - {}", de_anon.display_name, de_anon.display_id)
+                            } else {
+                                // Use original student data
+                                format!(
+                                    "{} {} - {}",
+                                    student.firstname.as_ref().unwrap_or(&"Unknown".to_string()),
+                                    student.lastname.as_ref().unwrap_or(&"Unknown".to_string()),
+                                    student.student_id
+                                )
+                            };
+
+                            view! {
+                                <option value={student.student_id.to_string()}>
+                                    {display_text}
+                                </option>
+                            }
+                        }).collect_view()
+                    }}
+                </Suspense>
             </select>
         </div>
     }

@@ -43,6 +43,7 @@ const GRAY_COLOR: &str = "text-[#DADADA]";
 const BLUE_COLOR: &str = "text-[#2E3A59]";
 const BLUE_HUE: &str = "bg-blue-100";
 const BG_BLUE: &str = "bg-[#2E3A59]";
+const WHITE_COLOR: &str = "text-[#F9F9F8]";
 
 #[component]
 pub fn DashboardSidebar(
@@ -162,7 +163,7 @@ pub fn DashboardSidebar(
     view! {
         <div class="relative">
             <div
-                class="fixed left-0 top-16 h-[calc(100vh-4rem)] bg-[#F9F9F8] shadow-lg transition-all duration-300 ease-in-out z-40"
+                class="fixed left-0 top-20 h-[calc(100vh-4rem)] bg-[#F9F9F8] shadow-lg transition-all duration-300 ease-in-out z-40"
                 class:w-16={move || !is_expanded() && is_small_screen()}
                 class:w-20={move || !is_expanded() && !is_small_screen()}
                 class:w-48={move || is_expanded() && is_small_screen()}
@@ -171,7 +172,7 @@ pub fn DashboardSidebar(
                 on:mouseleave=handle_mouseleave
             >
                 <div class="flex flex-col h-full p-4 overflow-y-auto">
-                    <div class="space-y-4">
+                    <div class="space-y-4 flex-1">
                         // Transferred navigation items from header
                         <SidebarNavLink
                             icon=AiDashboardOutlined
@@ -252,6 +253,9 @@ pub fn DashboardSidebar(
                                 </Show>
                             </div>
                         </div>
+                    </div>
+
+                    <div class="space-y-4 mt-auto pb-4">
 
                         // Divider
                         <div class="border-t border-[#DADADA] my-2"></div>

@@ -59,7 +59,7 @@ pub fn SearchFilter(
     view! {
         <div class=SEARCH_CONTAINER_STYLE>
             // Search input - adjusted to be less wide
-            <div class="flex-grow sm:w-72 md:w-72">
+            <div class="flex-grow sm:w-72 md:w-72 mt-5">
                 <label for="search" class=LABEL_STYLE>"Search Students"</label>
                 <div class="relative rounded-md shadow-sm">
                     <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">

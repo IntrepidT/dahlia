@@ -1,3 +1,7 @@
+use crate::app::components::auth::enhanced_login_form::{
+    use_student_mapping_service, DeAnonymizedStudent,
+};
+use crate::app::middleware::global_settings::use_settings;
 use crate::app::models::question::QuestionType;
 use crate::app::models::score::CreateScoreRequest;
 use crate::app::models::student::Student;
@@ -543,7 +547,14 @@ pub fn FlashCardSet() -> impl IntoView {
 // StudentSelect component with improved performance
 #[component]
 pub fn StudentSelect(set_selected_student_id: WriteSignal<Option<i32>>) -> impl IntoView {
-    let (students, set_students) = create_signal(Vec::new());
+    // Extract information in the event student is anonymized
+    let (settings, _) = use_settings();
+    let anonymization_enabled = move || settings.get().student_protections;
+
+    // Get mapping service for de-anonymization
+    let (student_mapping_service, _) = use_student_mapping_service();
+
+    // Fetch students from server
     let get_students_action = create_action(|_: &()| async move {
         match get_students().await {
             Ok(fetched_students) => fetched_students,
@@ -554,21 +565,43 @@ pub fn StudentSelect(set_selected_student_id: WriteSignal<Option<i32>>) -> impl 
         }
     });
 
+    // Create enhanced student data with de-anonymization info
+    let enhanced_students = create_memo(move |_| {
+        let students_data = get_students_action
+            .value()
+            .get()
+            .as_ref()
+            .cloned()
+            .unwrap_or_default();
+
+        if anonymization_enabled() {
+            let mapping_service = student_mapping_service.get();
+            students_data
+                .into_iter()
+                .map(|student| {
+                    let de_anon = DeAnonymizedStudent::from_student_with_mapping(
+                        &student,
+                        mapping_service.as_ref(),
+                    );
+                    (student, Some(de_anon))
+                })
+                .collect::<Vec<_>>()
+        } else {
+            students_data
+                .into_iter()
+                .map(|student| (student, None))
+                .collect::<Vec<_>>()
+        }
+    });
+
     // Dispatch action only once on component mount
     create_effect(move |_| {
         get_students_action.dispatch(());
     });
 
-    // Update students when data is received
-    create_effect(move |_| {
-        if let Some(result) = get_students_action.value().get() {
-            set_students.set(result);
-        }
-    });
-
     view! {
-        <div class="mb-4 max-w-[20rem]">
-            <label class="block text-sm font-medium mb-2">"Select Student:"</label>
+        <div class="mb-2 max-w-[20rem]">
+            <label class="block text-sm font-medium mb-1">"Select Student:"</label>
             <select
                 class="w-full p-2 border rounded-md"
                 on:change=move |ev| {
@@ -577,13 +610,33 @@ pub fn StudentSelect(set_selected_student_id: WriteSignal<Option<i32>>) -> impl 
                 }
             >
                 <option value="">"Select a student..."</option>
-                {move || students.get().into_iter().map(|student| {
-                    view! {
-                        <option value={student.student_id.to_string()}>
-                            {format!("{} {} - {}", student.firstname.unwrap(), student.lastname.unwrap(), student.student_id)}
-                        </option>
-                    }
-                }).collect_view()}
+                <Suspense fallback=move || view! {
+                    <option>"Loading students..."</option>
+                }>
+                    {move || {
+                        enhanced_students().into_iter().map(|(student, de_anon_opt)| {
+                            // Determine display values based on anonymization status
+                            let display_text = if let Some(de_anon) = &de_anon_opt {
+                                // Use de-anonymized display name and ID
+                                format!("{} - {}", de_anon.display_name, de_anon.display_id)
+                            } else {
+                                // Use original student data
+                                format!(
+                                    "{} {} - {}",
+                                    student.firstname.as_ref().unwrap_or(&"Unknown".to_string()),
+                                    student.lastname.as_ref().unwrap_or(&"Unknown".to_string()),
+                                    student.student_id
+                                )
+                            };
+
+                            view! {
+                                <option value={student.student_id.to_string()}>
+                                    {display_text}
+                                </option>
+                            }
+                        }).collect_view()
+                    }}
+                </Suspense>
             </select>
         </div>
     }

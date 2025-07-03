@@ -135,9 +135,9 @@ pub fn TestSessionsList() -> impl IntoView {
                 set_selected_item=set_selected_view
             />
 
-            <div class="p-4 w-full h-screen overflow-y-auto bg-gray-50 mx-auto">
+            <div class="p-4 w-full h-screen overflow-y-auto mx-auto">
                 {/* Header */}
-                <div class="text-center mb-8">
+                <div class="text-center py-8">
                     <h2 class="text-2xl font-bold text-gray-800">
                         "Available Test Sessions"
                     </h2>

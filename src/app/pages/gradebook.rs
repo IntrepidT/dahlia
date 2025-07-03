@@ -478,7 +478,7 @@ pub fn GradebookContent() -> impl IntoView {
 
                                                 view! {
                                                     <tr>
-                                                        <td class="px-2 py-2 border whitespace-nowrap text-indigo-500">
+                                                        <td class="px-2 py-2 border whitespace-nowrap text-indigo-500 bg-white">
                                                             <a href=format!("/studentview/{}/results", &student.student_id)>
                                                                 <Icon
                                                                     icon=HiUserCircleOutlineLg
@@ -487,7 +487,7 @@ pub fn GradebookContent() -> impl IntoView {
                                                                 {display_name}
                                                             </a>
                                                         </td>
-                                                        <td class="px-2 py-2 border whitespace-nowrap text-center">{display_id}</td>
+                                                        <td class="px-2 py-2 border whitespace-nowrap text-center bg-white">{display_id}</td>
                                                         {
                                                             move || {
                                                                 let student_results_map = all_student_results.get().unwrap_or_default();

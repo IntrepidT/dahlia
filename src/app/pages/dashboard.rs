@@ -44,7 +44,7 @@ fn DashboardContent() -> impl IntoView {
                     selected_item=selected_view
                     set_selected_item=set_selected_view
                 />
-                <main class="flex-1 mt-10 ml-20 px-10">
+                <main class="flex-1 ml-20 px-10 mt-5">
                     {move || match selected_view() {
                         SidebarSelected::Overview => view! {
                             <div>
