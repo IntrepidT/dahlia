@@ -207,7 +207,7 @@ pub fn DashboardDeanonymizer() -> impl IntoView {
         {move || {
             if anonymization_enabled() {
                 view! {
-                    <div class="bg-white rounded-lg shadow-md border border-gray-200">
+                    <div class="bg-white rounded-lg shadow-sm border border-gray-200">
                         <div class="p-4 border-b border-gray-200">
                             <button
                                 class="flex items-center justify-between w-full text-left"

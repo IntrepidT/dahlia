@@ -1,3 +1,4 @@
+use crate::app::models::user::UserRole;
 #[cfg(feature = "ssr")]
 use actix::prelude::{Message, Recipient};
 use serde::{Deserialize, Serialize};
@@ -15,6 +16,17 @@ pub struct Connect {
     pub addr: Recipient<WsMessage>,
     pub lobby_id: Uuid,
     pub self_id: Uuid,
+    pub user_role: Option<UserRole>,
+    pub is_session_creator: bool,
+}
+
+#[cfg(feature = "ssr")]
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct UserInfoMessage {
+    pub user_data: serde_json::Value,
+    pub user_id: Uuid,
+    pub room_id: Uuid,
 }
 
 #[cfg(feature = "ssr")]
@@ -57,4 +69,5 @@ pub enum TestMessageType {
     UserLeft,
     QuestionFocus,
     TimeUpdate,
+    RequestParticipants,
 }

@@ -49,7 +49,7 @@ fn DashboardContent() -> impl IntoView {
                         SidebarSelected::Overview => view! {
                             <div>
                                 <DashboardDeanonymizer />
-                                <div class="flex justify-between items-center mb-4">
+                                <div class="flex justify-between items-center my-4">
                                     <div class="text-2xl font-bold text-[#2E3A59]">
                                         "Overview"
                                     </div>

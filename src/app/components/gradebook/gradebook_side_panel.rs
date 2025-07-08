@@ -48,6 +48,17 @@ pub fn StudentScorePanel(
         }
     };
 
+    // Helper function to get student display name safely
+    let get_student_display_name = move |student: &Student| -> String {
+        let firstname = student.firstname.as_deref().unwrap_or("Student");
+        let lastname = student
+            .lastname
+            .as_deref()
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| format!("#{}", student.student_id));
+        format!("{} {}", firstname, lastname)
+    };
+
     // Close panel function
     let close_panel = move |_| {
         set_show.call(false);
@@ -81,7 +92,7 @@ pub fn StudentScorePanel(
                     if !show.get() {
                         view! { <div></div> }.into_view()
                     } else {
-                        // Student info section
+                        // Student info section - Fixed the unwrap issue
                         let student_info = view! {
                             <div class="mb-6 bg-[#F9F9F8] p-4 rounded-lg shadow-sm">
                                 <div class="flex items-center mb-3">
@@ -91,10 +102,18 @@ pub fn StudentScorePanel(
                                     />
                                     <div>
                                         <h3 class="text-lg font-semibold text-[#2E3A59]">
-                                            {move || student.get().map(|s| format!("{} {}", s.firstname.unwrap(), s.lastname.unwrap())).unwrap_or_default()}
+                                            {move || {
+                                                student.get()
+                                                    .map(|s| get_student_display_name(&s))
+                                                    .unwrap_or_else(|| "Unknown Student".to_string())
+                                            }}
                                         </h3>
                                         <div class="text-sm text-gray-600">
-                                            <p>{"ID: "} {move || student.get().map(|s| s.student_id.to_string()).unwrap_or_default()}</p>
+                                            <p>{"ID: "} {move || {
+                                                student.get()
+                                                    .map(|s| s.student_id.to_string())
+                                                    .unwrap_or_else(|| "N/A".to_string())
+                                            }}</p>
                                         </div>
                                     </div>
                                 </div>

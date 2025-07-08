@@ -2,13 +2,14 @@
 use {
     crate::app::websockets::lobby::Lobby,
     crate::app::websockets::messages::{
-        ClientActorMessage, Connect, Disconnect, TestMessageType, TestSessionMessage, WsMessage,
+        ClientActorMessage, Connect, Disconnect, TestMessageType, TestSessionMessage,
+        UserInfoMessage, WsMessage,
     },
     actix::{fut, ActorContext, ActorFuture, ContextFutureSpawner, WrapFuture},
     actix::{Actor, Addr, Running, StreamHandler},
     actix::{ActorFutureExt, AsyncContext, Handler},
     actix_web_actors::ws,
-    serde_json::{from_str, Value},
+    serde_json::{from_str, json, Value}, // Added json! macro here
 };
 
 use std::time::{Duration, Instant};
@@ -50,6 +51,8 @@ impl Actor for WsConn {
                 addr: addr.recipient(),
                 lobby_id: self.room,
                 self_id: self.id,
+                user_role: None,           //Role assigned later
+                is_session_creator: false, //this is determined based on logic
             })
             .into_actor(self)
             .then(|res, _, ctx| {
@@ -107,13 +110,52 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsConn {
             }
             Ok(ws::Message::Nop) => (),
             Ok(ws::Message::Text(s)) => {
+                log::info!("Received WebSocket message: {}", s);
+
                 if let Ok(json_value) = from_str::<Value>(&s) {
                     if let Some(msg_type) = json_value.get("type").and_then(|t| t.as_str()) {
+                        log::info!("Processing message type: {}", msg_type);
+
                         match msg_type {
+                            "user_info" => {
+                                log::info!("Handling user_info from user {}", self.id);
+                                // Send user info to lobby for role assignment
+                                self.lobby_addr.do_send(UserInfoMessage {
+                                    user_data: json_value,
+                                    user_id: self.id,
+                                    room_id: self.room,
+                                });
+                                return;
+                            }
+                            "user_info" => {
+                                log::info!("Handling user info from user {}", self.id);
+                                //Send user info to lobby for role assignment
+                                self.lobby_addr.do_send(UserInfoMessage {
+                                    user_data: json_value,
+                                    user_id: self.id,
+                                    room_id: self.room,
+                                });
+                                return;
+                            }
+                            "request_participants" => {
+                                log::info!("Handling request_participants from user {}", self.id);
+                                self.lobby_addr.do_send(TestSessionMessage {
+                                    message_type: TestMessageType::RequestParticipants,
+                                    payload: json!({}),
+                                    id: self.id,
+                                    room_id: self.room,
+                                });
+                                return;
+                            }
                             "test_message" => {
                                 if let Some(test_msg_type_str) =
                                     json_value.get("test_message_type").and_then(|t| t.as_str())
                                 {
+                                    log::info!(
+                                        "Processing test message type: {}",
+                                        test_msg_type_str
+                                    );
+
                                     let message_type = match test_msg_type_str {
                                         "start_test" => TestMessageType::StartTest,
                                         "submit_answer" => TestMessageType::SubmitAnswer,
@@ -124,7 +166,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsConn {
                                         "question_focus" => TestMessageType::QuestionFocus,
                                         "time_update" => TestMessageType::TimeUpdate,
                                         unknown => {
-                                            println!("Unknown test message type: {}", unknown);
+                                            log::warn!("Unknown test message type: {}", unknown);
                                             return;
                                         }
                                     };
@@ -141,18 +183,28 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsConn {
                                     return;
                                 }
                             }
-                            _ => (),
+                            _ => {
+                                log::info!("Unhandled message type: {}", msg_type);
+                            }
                         }
+                    } else {
+                        log::warn!("Message missing 'type' field: {}", s);
                     }
+                } else {
+                    log::warn!("Failed to parse JSON message: {}", s);
                 }
 
+                // Fallback to regular chat message
                 self.lobby_addr.do_send(ClientActorMessage {
                     id: self.id,
                     msg: s.to_string(),
                     room_id: self.room,
                 });
             }
-            Err(e) => std::panic::panic_any(e),
+            Err(e) => {
+                log::error!("WebSocket protocol error: {:?}", e);
+                std::panic::panic_any(e)
+            }
         }
     }
 }

@@ -20,11 +20,11 @@ pub fn HomePage() -> impl IntoView {
                 } else {
                     // Otherwise, show the normal homepage content
                     view! {
-                        <div class="bg-[#F9F9F8]">
+                        <div class="bg-[#F9F9F8] h-screen overflow-hidden flex flex-col">
                             <Header />
-                            <main id="main-content" role="main" class="h-dvh">
+                            <main id="main-content" role="main" class="flex-1 min-h-0">
                                 <div class="max-w-8xl mx-auto px-10 h-full">
-                                    <div class="h-5/6 items-center justify-center mt-10 rounded-2xl flex-col relative overflow-hidden">
+                                    <div class="h-5/6 items-center justify-center mt-20 rounded-2xl flex-col relative overflow-hidden">
                                         // Multi-layered background for smooth loading
                                         <div class="absolute inset-0 bg-gradient-to-br from-blue-600 via-purple-600 to-indigo-700"></div>
                                         <div class="absolute inset-0 bg-[url('/assets/home23.png')] bg-cover bg-center"></div>

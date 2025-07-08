@@ -155,7 +155,7 @@ impl User {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct SessionUser {
     pub id: i64,
     pub username: String,

@@ -65,17 +65,32 @@ pub fn RealtimeTestSession() -> impl IntoView {
     let test_id = move || params.with(|params| params.get("test_id").cloned().unwrap_or_default());
     let user = use_context::<ReadSignal<Option<SessionUser>>>().expect("AuthProvider not Found");
     let user_data = create_resource(
-        move || user.get().map(|u| u.id),
-        move |id| async move {
-            match id {
-                Some(user_id) => match get_user(user_id).await {
-                    Ok(user) => Some(user),
-                    Err(e) => {
-                        log::error!("Failed to fetch user from database: {}", e);
-                        None
+        move || user.get().map(|u| (u.id, u.clone())),
+        move |user_info| async move {
+            match user_info {
+                Some((user_id, session_user)) => {
+                    log::info!("Fetching user data for ID: {}, Session user: {:?}", user_id, session_user);
+                    
+                    // Log session user details
+                    log::info!("Session user role: {:?}", session_user.role);
+                    log::info!("Session user is_admin(): {}", session_user.is_admin());
+                    log::info!("Session user is_teacher(): {}", session_user.is_teacher());
+                    
+                    match get_user(user_id).await {
+                        Ok(full_user) => {
+                            log::info!("Full user data fetched: {:?}", full_user);
+                            Some(full_user)
+                        },
+                        Err(e) => {
+                            log::error!("Failed to fetch user from database: {}", e);
+                            None
+                        }
                     }
                 },
-                None => None,
+                None => {
+                    log::warn!("No user session data available");
+                    None
+                }
             }
         },
     );
@@ -93,23 +108,128 @@ pub fn RealtimeTestSession() -> impl IntoView {
 
     let (should_disable_inputs, set_should_disable_inputs) = create_signal(true);
 
+    create_effect(move |_| {
+        let students = connected_students.get();
+        log::info!(
+            "Connected students updated: {} participants",
+            students.len()
+        );
+        for student in &students {
+            log::info!(
+                "  - {} ({}): {}",
+                student.name,
+                student.student_id,
+                student.status
+            );
+        }
+    });
     // Initialize role based on user
     create_effect(move |_| {
+        log::info!("=== Role Assignment Effect Triggered ===");
+        
         if let Some(current_user) = user() {
-            if current_user.is_admin() || current_user.is_teacher() {
+            log::info!("User session data available:");
+            log::info!("  - User ID: {}", current_user.id);
+            log::info!("  - Username: {}", current_user.username);
+            log::info!("  - Role: {:?}", current_user.role);
+            log::info!("  - is_admin(): {}", current_user.is_admin());
+            log::info!("  - is_teacher(): {}", current_user.is_teacher());
+            
+            if current_user.is_admin() {
+                log::info!("🔑 Setting role to Teacher (Admin privileges)");
+                set_role(Role::Teacher);
+            } else if current_user.is_teacher() {
+                log::info!("🍎 Setting role to Teacher (Teacher privileges)");
                 set_role(Role::Teacher);
             } else {
+                log::info!("📚 Setting role to Student (role: {:?})", current_user.role);
                 set_role(Role::Student);
+            }
+        } else {
+            log::warn!("❌ No user session data available - setting role to Unknown");
+            set_role(Role::Unknown);
+        }
+        
+        log::info!("=== Role Assignment Effect Complete ===");
+    });
+
+// Enhanced role effect with detailed logging
+create_effect(move |_| {
+    let current_role = role.get();
+    let should_disable = matches!(current_role, Role::Student | Role::Unknown);
+    
+    log::info!("=== Input Disable Effect ===");
+    log::info!("Current role: {:?}", current_role);
+    log::info!("Should disable inputs: {}", should_disable);
+    log::info!("========================");
+    
+    set_should_disable_inputs.set(should_disable);
+});
+
+    create_effect(move |_| {
+        let current_role = role.get();
+        let should_disable = matches!(current_role, Role::Student | Role::Unknown);
+        log::info!("Current role: {:?}, should_disable_inputs: {}", current_role, should_disable);
+        set_should_disable_inputs.set(should_disable);
+    });
+
+    // Periodic participants request
+    #[cfg(feature = "hydrate")]
+    {
+            let ws_for_interval = ws.clone();
+            let set_connection_status_for_interval = set_connection_status.clone();
+            create_effect(move |_| {
+                if matches!(connection_status.get(), ConnectionStatus::Connected) {
+                    let ws_clone = ws_for_interval.clone();
+                    let interval_handle = set_interval_with_handle(
+                        move || {
+                            if let Some(socket) = ws_clone.get() {
+                                let request = json!({
+                                    "type": "request_participants"
+                                }).to_string();
+                                
+                                match socket.send_with_str(&request) {
+                                    Ok(_) => log::debug!("Sent periodic participants request"),
+                                    Err(e) => log::error!("Failed to send periodic participants request: {:?}", e),
+                                }
+                            }
+                        },
+                        StdDuration::from_secs(10), // Request every 10 seconds
+                    );
+                    
+                    // Store the interval handle to clean it up later
+                    on_cleanup(move || {
+                        if let Ok(handle) = interval_handle {
+                            handle.clear();
+                        }
+                    });
+                }
+            });
+        }
+
+    // Debugging for connected student update
+    create_effect(move |_| {
+        let students = connected_students.get();
+        log::info!("Connected students state updated - Total: {}", students.len());
+        
+        if students.is_empty() {
+            log::warn!("No students in connected_students list!");
+        } else {
+            for (index, student) in students.iter().enumerate() {
+                log::info!("  [{}] ID: {}, Name: {}, Status: {}", 
+                         index, student.student_id, student.name, student.status);
             }
         }
     });
 
+    // Connection state Debugging
     create_effect(move |_| {
-        let current_role = role.get();
-        match current_role {
-            Role::Teacher => set_should_disable_inputs.set(false),
-            Role::Student => set_should_disable_inputs.set(true),
-            Role::Unknown => set_should_disable_inputs.set(true),
+        let status = connection_status.get();
+        let room = room_id.get();
+        log::info!("Connection status: {:?}, Room ID: {:?}", status, room);
+        
+        if matches!(status, ConnectionStatus::Connected) && room.is_some() {
+            log::info!("Fully connected to room, should be able to receive participant updates");
         }
     });
 
@@ -190,7 +310,8 @@ pub fn RealtimeTestSession() -> impl IntoView {
 
             // Reset connection-dependent state
             set_connection_status.set(ConnectionStatus::Connecting);
-            set_error_message.set(None);
+            set_error_message.set(None); // Clear any previous errors here too
+            set_connected_students.set(Vec::new());
 
             match WebSocket::new(&ws_url) {
                 Ok(websocket) => {
@@ -198,140 +319,140 @@ pub fn RealtimeTestSession() -> impl IntoView {
                     let onmessage_callback = Closure::wrap(Box::new(move |e: MessageEvent| {
                         if let Ok(text) = e.data().dyn_into::<js_sys::JsString>() {
                             let message = text.as_string().unwrap();
-                            log::debug!("WebSocket message received: {}", message);
-
+                            log::info!("WebSocket message received: {}", message); // Changed from debug to info
+                            
                             match serde_json::from_str::<Value>(&message) {
                                 Ok(json_value) => {
-                                    if let Some(msg_type) =
-                                        json_value.get("type").and_then(|t| t.as_str())
-                                    {
+                                    if let Some(msg_type) = json_value.get("type").and_then(|t| t.as_str()) {
+                                        log::info!("Processing message type: {}", msg_type);
+                                        
                                         match msg_type {
                                             "role_assigned" => {
-                                                log::info!("Assigning role");
-                                                if let Some(role_str) =
-                                                    json_value.get("role").and_then(|r| r.as_str())
-                                                {
+                                                log::info!("Received role assignment from server: {:?}", json_value);
+                                                if let Some(role_str) = json_value.get("role").and_then(|r| r.as_str()) {
+                                                    log::info!("Server assigned role: {}", role_str);
                                                     match role_str {
-                                                        "teacher" => set_role.set(Role::Teacher),
-                                                        "student" => set_role.set(Role::Student),
-                                                        _ => set_role.set(Role::Unknown),
+                                                        "teacher" => {
+                                                            log::info!("Server confirmed teacher role");
+                                                            set_role.set(Role::Teacher);
+                                                        },
+                                                        "student" => {
+                                                            log::info!("Server confirmed student role");
+                                                            set_role.set(Role::Student);
+                                                        },
+                                                        _ => {
+                                                            log::warn!("Unknown role from server: {}", role_str);
+                                                            set_role.set(Role::Unknown);
+                                                        }
                                                     }
+                                                } else {
+                                                    log::warn!("Role assignment message missing role field");
                                                 }
                                             }
                                             "test_data" => {
-                                                if let Some(questions_array) = json_value
-                                                    .get("questions")
-                                                    .and_then(|q| q.as_array())
-                                                {
-                                                    let _qs: Vec<
-                                                        crate::app::models::question::Question,
-                                                    > = questions_array
+                                                if let Some(questions_array) = json_value.get("questions").and_then(|q| q.as_array()) {
+                                                    let _qs: Vec<crate::app::models::question::Question> = questions_array
                                                         .iter()
-                                                        .filter_map(|q| {
-                                                            serde_json::from_value(q.clone()).ok()
+                                                        .filter_map(|q| serde_json::from_value(q.clone()).ok())
+                                                        .collect();
+                                                }
+                                            }
+                                            "participants_list" => {
+                                                log::info!("Received participants_list: {:?}", json_value);
+                                                if let Some(participants) = json_value.get("participants").and_then(|p| p.as_array()) {
+                                                    log::info!("Found {} participants in the list", participants.len());
+                                                    
+                                                    let connected_list: Vec<ConnectedStudent> = participants
+                                                        .iter()
+                                                        .filter_map(|p| {
+                                                            log::info!("Processing participant: {:?}", p);
+                                                            
+                                                            let id = p.get("id")?.as_str()?;
+                                                            let name = p.get("name")?.as_str().unwrap_or("Unknown");
+                                                            let user_type = p.get("type")?.as_str().unwrap_or("User");
+                                                            let status = p.get("status")?.as_str().unwrap_or("Connected");
+                                                            
+                                                            log::info!("Parsed participant: id={}, name={}, type={}, status={}", 
+                                                                     id, name, user_type, status);
+                                                            
+                                                            Some(ConnectedStudent {
+                                                                student_id: id.to_string(),
+                                                                name: format!("{} ({})", name, user_type),
+                                                                status: status.to_string(),
+                                                            })
                                                         })
                                                         .collect();
+                                                    
+                                                    log::info!("Setting {} connected students", connected_list.len());
+                                                    set_connected_students.set(connected_list);
+                                                } else {
+                                                    log::warn!("No participants array found in participants_list message");
                                                 }
                                             }
                                             "student_joined" | "user_joined" => {
                                                 let is_student = msg_type == "student_joined";
-                                                let log_msg = if is_student {
-                                                    "student joined"
-                                                } else {
-                                                    "user joined"
-                                                };
-                                                log::info!(
-                                                    "Received {} message {:?}",
-                                                    log_msg,
-                                                    json_value
-                                                );
-
-                                                // Extract ID field based on message type
-                                                let id_field =
-                                                    if is_student { "student_id" } else { "id" };
-                                                let data_field = if is_student {
-                                                    "student_data"
-                                                } else {
-                                                    "user_data"
-                                                };
-                                                let name_field =
-                                                    if is_student { "name" } else { "username" };
-
-                                                if let Some(user_id) = json_value
-                                                    .get(id_field)
-                                                    .and_then(|s| s.as_str())
-                                                {
-                                                    if let Some(user_data) =
-                                                        json_value.get(data_field)
-                                                    {
-                                                        let name = user_data
-                                                            .get(name_field)
+                                                log::info!("Processing {} message: {:?}", msg_type, json_value);
+                                                
+                                                let id_field = if is_student { "student_id" } else { "id" };
+                                                let data_field = if is_student { "student_data" } else { "user_data" };
+                                                let name_field = if is_student { "name" } else { "username" };
+                                                
+                                                if let Some(user_id) = json_value.get(id_field).and_then(|s| s.as_str()) {
+                                                    if let Some(user_data) = json_value.get(data_field) {
+                                                        let name = user_data.get(name_field)
                                                             .and_then(|n| n.as_str())
                                                             .unwrap_or("Unknown");
-
+                                                        
+                                                        let user_type = if is_student { "Student" } else { "Teacher" };
+                                                        let display_name = format!("{} ({})", name, user_type);
+                                                        
+                                                        log::info!("Adding/updating participant: {} - {}", user_id, display_name);
+                                                        
                                                         set_connected_students.update(|students| {
-                                                            // Check if student already exists
-                                                            if let Some(pos) =
-                                                                students.iter().position(|s| {
-                                                                    s.student_id == user_id
-                                                                })
-                                                            {
-                                                                students[pos].status =
-                                                                    "Connected".to_string();
+                                                            if let Some(pos) = students.iter().position(|s| s.student_id == user_id) {
+                                                                log::info!("Updating existing participant at position {}", pos);
+                                                                students[pos].status = "Connected".to_string();
+                                                                students[pos].name = display_name;
                                                             } else {
+                                                                log::info!("Adding new participant");
                                                                 students.push(ConnectedStudent {
                                                                     student_id: user_id.to_string(),
-                                                                    name: name.to_string(),
+                                                                    name: display_name,
                                                                     status: "Connected".to_string(),
                                                                 });
                                                             }
+                                                            log::info!("Total participants after update: {}", students.len());
                                                         });
+                                                    } else {
+                                                        log::warn!("Missing {} field in {} message", data_field, msg_type);
                                                     }
+                                                } else {
+                                                    log::warn!("Missing {} field in {} message", id_field, msg_type);
                                                 }
                                             }
                                             "student_left" | "user_left" => {
                                                 let is_student = msg_type == "student_left";
-                                                let log_msg = if is_student {
-                                                    "student left"
-                                                } else {
-                                                    "user left"
-                                                };
-                                                log::info!(
-                                                    "Received {} message {:?}",
-                                                    log_msg,
-                                                    json_value
-                                                );
-
-                                                // Extract ID field based on message type
-                                                let id_field =
-                                                    if is_student { "student_id" } else { "id" };
-
-                                                if let Some(user_id) = json_value
-                                                    .get(id_field)
-                                                    .and_then(|s| s.as_str())
-                                                {
+                                                log::info!("Processing {} message: {:?}", msg_type, json_value);
+                                                
+                                                let id_field = if is_student { "student_id" } else { "id" };
+                                                
+                                                if let Some(user_id) = json_value.get(id_field).and_then(|s| s.as_str()) {
+                                                    log::info!("Marking participant as disconnected: {}", user_id);
                                                     set_connected_students.update(|students| {
-                                                        if let Some(pos) = students
-                                                            .iter()
-                                                            .position(|s| s.student_id == user_id)
-                                                        {
-                                                            students[pos].status =
-                                                                "Disconnected".to_string();
+                                                        if let Some(pos) = students.iter().position(|s| s.student_id == user_id) {
+                                                            students[pos].status = "Disconnected".to_string();
+                                                            log::info!("Updated participant status to disconnected");
+                                                        } else {
+                                                            log::warn!("Participant {} not found when trying to mark as disconnected", user_id);
                                                         }
                                                     });
                                                 }
                                             }
                                             "student_answer" => {
-                                                if let Some(answer_data) =
-                                                    json_value.get("answer_data")
-                                                {
+                                                if let Some(answer_data) = json_value.get("answer_data") {
                                                     if let (Some(qnumber), Some(answer)) = (
-                                                        answer_data
-                                                            .get("question_id")
-                                                            .and_then(|q| q.as_i64()),
-                                                        answer_data
-                                                            .get("answer")
-                                                            .and_then(|a| a.as_str()),
+                                                        answer_data.get("question_id").and_then(|q| q.as_i64()),
+                                                        answer_data.get("answer").and_then(|a| a.as_str()),
                                                     ) {
                                                         set_responses.update(|r| {
                                                             let qnumber = qnumber as i32;
@@ -347,26 +468,16 @@ pub fn RealtimeTestSession() -> impl IntoView {
                                                 }
                                             }
                                             "focus_question" => {
-                                                if let Some(question_data) =
-                                                    json_value.get("question_data")
-                                                {
-                                                    if let Some(index) = question_data
-                                                        .get("index")
-                                                        .and_then(|i| i.as_i64())
-                                                    {
+                                                if let Some(question_data) = json_value.get("question_data") {
+                                                    if let Some(index) = question_data.get("index").and_then(|i| i.as_i64()) {
                                                         set_current_card_index.set(index as usize);
                                                     }
                                                 }
                                             }
                                             "time_update" => {
-                                                if let Some(time_data) = json_value.get("time_data")
-                                                {
-                                                    if let Some(remaining) = time_data
-                                                        .get("remaining")
-                                                        .and_then(|r| r.as_i64())
-                                                    {
-                                                        set_remaining_time
-                                                            .set(Some(remaining as i32));
+                                                if let Some(time_data) = json_value.get("time_data") {
+                                                    if let Some(remaining) = time_data.get("remaining").and_then(|r| r.as_i64()) {
+                                                        set_remaining_time.set(Some(remaining as i32));
                                                     }
                                                 }
                                             }
@@ -381,48 +492,78 @@ pub fn RealtimeTestSession() -> impl IntoView {
                                                 log::debug!("Unhandled message type: {}", msg_type);
                                             }
                                         }
+                                    } else {
+                                        log::warn!("Message missing 'type' field: {}", message);
                                     }
                                 }
                                 Err(err) => {
-                                    log::error!("Failed to parse WebSocket message: {:?}", err);
+                                    log::error!("Failed to parse WebSocket message: {:?}. Raw message: {}", err, message);
                                 }
                             }
+                        } else {
+                            log::error!("Received non-string WebSocket message");
                         }
-                    })
-                        as Box<dyn FnMut(MessageEvent)>);
+                    }) as Box<dyn FnMut(MessageEvent)>);
 
                     // Setup onopen handler
                     let set_connection_status_clone = set_connection_status.clone();
+                    let set_error_message_clone = set_error_message.clone(); // Add this line
                     let onopen_callback = Closure::wrap(Box::new(move |_| {
                         log::info!("WebSocket connection established");
                         set_connection_status_clone.set(ConnectionStatus::Connected);
-                    })
-                        as Box<dyn FnMut(JsValue)>);
+                        set_error_message_clone.set(None);
 
-                    // Setup onclose handler
-                    let set_connection_status_clone = set_connection_status.clone();
-                    let onclose_callback = Closure::wrap(Box::new(move |e: CloseEvent| {
-                        log::info!("WebSocket closed: {} - {}", e.code(), e.reason());
-                        set_connection_status_clone.set(ConnectionStatus::Disconnected);
-                    })
-                        as Box<dyn FnMut(CloseEvent)>);
+                        // Send user role information to server
+                        if let Some(current_user) = user.get_untracked() {
+                            let user_info = json!({
+                                "type": "user_info",
+                                "user_id": current_user.id,
+                                "role": current_user.role,
+                                "is_teacher": current_user.is_teacher(),
+                                "is_admin": current_user.is_admin()
+                            }).to_string();
+
+                            if let Some(socket) = ws.get() {
+                                let _ = socket.send_with_str(&user_info);
+                            }
+                        }
+
+                        // Add a small delay before requesting participants to ensure server is ready
+                        let ws_clone = ws.clone();
+                        let _timeout_handle = set_timeout_with_handle(
+                            move || {
+                                if let Some(socket) = ws_clone.get() {
+                                    let request_participants = json!({
+                                        "type": "request_participants"
+                                    }).to_string();
+                                    
+                                    log::info!("Requesting participants list");
+                                    match socket.send_with_str(&request_participants) {
+                                        Ok(_) => log::info!("Participants request sent successfully"),
+                                        Err(e) => log::error!("Failed to send participants request: {:?}", e),
+                                    }
+                                }
+                            },
+                            StdDuration::from_millis(100),
+                        ).expect("Could not create timeout");
+                    }) as Box<dyn FnMut(JsValue)>);
+
+                        // Setup onclose handler
+                        let set_connection_status_clone = set_connection_status.clone();
+                        let onclose_callback = Closure::wrap(Box::new(move |e: CloseEvent| {
+                            log::info!("WebSocket closed: {} - {}", e.code(), e.reason());
+                            set_connection_status_clone.set(ConnectionStatus::Disconnected);
+                        })
+                            as Box<dyn FnMut(CloseEvent)>);
 
                     // Setup onerror handler
                     let set_connection_status_clone = set_connection_status.clone();
                     let set_error_message_clone = set_error_message.clone();
-                    let onerror_callback = Closure::wrap(Box::new(move |e: ErrorEvent| {
-                        // Safely get the error message, providing a default if empty
-                        let error_msg = e.message();
-                        let final_msg = if error_msg.is_empty() {
-                            "WebSocket connection failed".to_string()
-                        } else {
-                            error_msg
-                        };
-
-                        log::error!("WebSocket error occurred: {}", final_msg);
+                    let onerror_callback = Closure::wrap(Box::new(move |_e: ErrorEvent| {
+                        let error_msg = "WebSocket connection failed".to_string();
+                        log::error!("WebSocket error occurred: {}", error_msg);
                         set_connection_status_clone.set(ConnectionStatus::Error);
-                        set_error_message_clone
-                            .set(Some(format!("Connection error: {}", final_msg)));
+                        set_error_message_clone.set(Some(error_msg));
                     })
                         as Box<dyn FnMut(ErrorEvent)>);
 
@@ -927,39 +1068,45 @@ pub fn RealtimeTestSession() -> impl IntoView {
             </Show>
 
             {/* Connected Students (Teacher View) */}
-            <Show when=move || matches!(role.get(), Role::Teacher)>
-                <div class="mb-8 max-w-4xl mx-auto">
-                    <h3 class="text-lg font-medium mb-2">"Connected Students"</h3>
-                    <div class="bg-white shadow-sm rounded-lg p-4">
-                        <Show when=move || !connected_students.get().is_empty() fallback=|| view! {
-                            <p class="text-gray-500 text-center py-2">"No students connected"</p>
-                        }>
-                            <ul class="divide-y divide-gray-200">
-                                <For
-                                    each=move || connected_students.get()
-                                    key=|student| student.student_id.clone()
-                                    children=move |student| {
-                                        let status_class = if student.status == "Connected" {
-                                            "bg-green-100 text-green-800"
-                                        } else {
-                                            "bg-red-100 text-red-800"
-                                        };
+            //<Show when=move || matches!(role.get(), Role::Teacher)>
+            <div class="mb-8 max-w-4xl mx-auto">
+                <h3 class="text-lg font-medium mb-2">
+                    {move || match role.get() {
+                        Role::Teacher => "Connected Students",
+                        Role::Student => "Connected Participants",
+                        Role::Unknown => "Session Participants"
+                    }}
+                </h3>
+                <div class="bg-white shadow-sm rounded-lg p-4">
+                    <Show when=move || !connected_students.get().is_empty() fallback=|| view! {
+                        <p class="text-gray-500 text-center py-2">"No participants connected"</p>
+                    }>
+                        <ul class="divide-y divide-gray-200">
+                            <For
+                                each=move || connected_students.get()
+                                key=|student| student.student_id.clone()
+                                children=move |student| {
+                                    let status_class = if student.status == "Connected" {
+                                        "bg-green-100 text-green-800"
+                                    } else {
+                                        "bg-red-100 text-red-800"
+                                    };
 
-                                        view! {
-                                            <li class="py-2 flex justify-between items-center">
-                                                <span>{format!("{} ({})", student.name, student.student_id)}</span>
-                                                <span class=format!("text-sm px-2 py-1 rounded-full {}", status_class)>
-                                                    {student.status}
-                                                </span>
-                                            </li>
-                                        }
+                                    view! {
+                                        <li class="py-2 flex justify-between items-center">
+                                            <span>{student.name.clone()}</span>
+                                            <span class=format!("text-sm px-2 py-1 rounded-full {}", status_class)>
+                                                {student.status.clone()}
+                                            </span>
+                                        </li>
                                     }
-                                />
-                            </ul>
-                        </Show>
-                    </div>
+                                }
+                            />
+                        </ul>
+                    </Show>
                 </div>
-            </Show>
+            </div>
+            //</Show>
 
             {/* Test Content - Only show if test is active or teacher */}
             <Show when=move || is_test_active.get() || matches!(role.get(), Role::Teacher)>

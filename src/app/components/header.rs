@@ -4,7 +4,7 @@ use leptos_router::*;
 #[component]
 pub fn Header() -> impl IntoView {
     view! {
-        <header class="sticky top-0 z-50 w-full bg-[#F9F9F8] backdrop-blur bg-opacity-90 shadow-sm">
+        <header class="sticky top-0 z-50 w-full bg-[#F9F9F8] backdrop-blur bg-opacity-90">
             <div class="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
                 <div class="flex justify-between items-center h-20">
                     {/* Logo and brand name */}

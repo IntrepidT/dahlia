@@ -371,14 +371,7 @@ cfg_if::cfg_if! {
 
         //Cleanup expired or empty session (for test and chat session)
         pub async fn cleanup_inactive_sessions(pool: &PgPool) -> Result<(), ServerFnError> {
-            sqlx::query(
-                "UPDATE websocket_sessions SET status = 'expired'::session_status_enum
-                WHERE status = 'active'::session_status_enum
-                AND last_active < NOW() - INTERVAL '24 hours'"
-            )
-            .execute(pool)
-            .await?;
-
+            // First: Mark empty sessions as inactive after 1 hour
             sqlx::query(
                 "UPDATE websocket_sessions SET status = 'inactive'::session_status_enum
                 WHERE status = 'active'::session_status_enum
@@ -388,8 +381,18 @@ cfg_if::cfg_if! {
             .execute(pool)
             .await?;
 
+            // Then: Mark old sessions as expired after 24 hours
             sqlx::query(
-                "Update websocket_sessions
+                "UPDATE websocket_sessions SET status = 'expired'::session_status_enum
+                WHERE status = 'active'::session_status_enum
+                AND last_active < NOW() - INTERVAL '24 hours'"
+            )
+            .execute(pool)
+            .await?;
+
+            // Handle completed test sessions
+            sqlx::query(
+                "UPDATE websocket_sessions
                 SET status = 'expired'::session_status_enum
                 WHERE status = 'active'::session_status_enum
                 AND session_type = 'test'::session_type_enum

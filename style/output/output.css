@@ -1105,10 +1105,6 @@ body {
   height: calc(100vh - 4rem);
 }
 
-.h-dvh {
-  height: 100dvh;
-}
-
 .h-full {
   height: 100%;
 }
@@ -1139,6 +1135,10 @@ body {
 
 .max-h-full {
   max-height: 100%;
+}
+
+.min-h-0 {
+  min-height: 0px;
 }
 
 .min-h-10 {
