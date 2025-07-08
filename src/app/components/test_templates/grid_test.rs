@@ -254,47 +254,80 @@ pub fn GridTest() -> impl IntoView {
     });
 
     view! {
-        <div class="flex flex-col h-screen bg-gray-50 overflow-hidden">
-            {/* Header with Student Selection and Evaluator - Fixed at top */}
-            <div class="p-4 bg-white shadow-sm">
-                <div class="flex flex-wrap items-center justify-between mb-2 max-w-4xl mx-auto w-full">
-                    <div class="w-full md:w-1/2 mb-2 md:mb-0">
-                        <StudentSelect set_selected_student_id=set_selected_student_id />
-                    </div>
-                    <div class="text-sm text-gray-600 font-medium">
-                        {"Evaluator: "}
-                        {move || match user_resource.get() {
-                            Some(Some(user)) => format!("{} {}", user.first_name.unwrap_or("None".to_string()), user.last_name.unwrap_or("None".to_string())),
-                            Some(None) => evaluator_id(),
-                            None => "Loading...".to_string(),
-                        }}
-                    </div>
-                </div>
+        <div class="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+            {/* Header with Student Selection and Evaluator - Enhanced styling */}
+            <div class="bg-white/80 backdrop-blur-sm border-b border-gray-200/50 shadow-lg sticky top-0 z-10">
+                <div class="max-w-7xl mx-auto px-6 py-5">
+                    <div class="flex flex-col lg:flex-row items-center justify-between gap-4">
+                        <div class="flex-1 w-full lg:w-auto">
+                            <StudentSelect set_selected_student_id=set_selected_student_id />
+                        </div>
 
-                {/* Test Title */}
-                <div class="text-center">
-                    <h2 class="text-xl font-medium text-gray-700 break-words">
-                        {move || match &test_details.get() {
-                            Some(Some(test)) => test.name.clone(),
-                            _ => test_id()
-                        }}
-                    </h2>
+                        <div class="flex items-center gap-3 bg-gradient-to-r from-indigo-50 to-purple-50 px-4 py-2 rounded-full border border-indigo-200/50">
+                            <span class="text-sm font-medium text-gray-700">
+                                {"Evaluator: "}
+                                <span class="text-indigo-600 font-semibold">
+                                    {move || match user_resource.get() {
+                                        Some(Some(user)) => format!("{} {}", user.first_name.unwrap_or("None".to_string()), user.last_name.unwrap_or("None".to_string())),
+                                        Some(None) => evaluator_id(),
+                                        None => "Loading...".to_string(),
+                                    }}
+                                </span>
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* Test Title - Enhanced */}
+                    <div class="mt-4 text-center">
+                        <h1 class="text-3xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+                            {move || match &test_details.get() {
+                                Some(Some(test)) => test.name.clone(),
+                                _ => test_id()
+                            }}
+                        </h1>
+                        <div class="mt-2 h-1 w-20 bg-gradient-to-r from-indigo-400 to-purple-400 rounded-full mx-auto"></div>
+                    </div>
                 </div>
             </div>
 
-            {/* Main container with grid and comments - scrollable with proper height constraints */}
-            <div class="flex-1 flex flex-col overflow-auto p-4">
+            {/* Main container - Enhanced layout */}
+            <div class="max-w-7xl mx-auto px-6 py-8">
                 <Suspense
-                    fallback=move || view! { <div class="flex justify-center items-center h-full">
-                        <div class="animate-pulse bg-white rounded w-full h-full flex items-center justify-center">
-                            <p class="text-gray-400">"Loading..."</p>
+                    fallback=move || view! {
+                        <div class="flex justify-center items-center min-h-[60vh]">
+                            <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl p-12 border border-gray-200/50">
+                                <div class="flex flex-col items-center gap-4">
+                                    <div class="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
+                                    <p class="text-gray-600 font-medium">"Loading assessment..."</p>
+                                </div>
+                            </div>
                         </div>
-                    </div> }
+                    }
                 >
                     {move || match (questions.get(), test_details.get()) {
-                        (None, _) => view! { <div class="text-center py-4">"Loading..."</div> }.into_view(),
+                        (None, _) => view! {
+                            <div class="flex justify-center items-center min-h-[60vh]">
+                                <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl p-12 border border-gray-200/50">
+                                    <div class="flex flex-col items-center gap-4">
+                                        <div class="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
+                                        <p class="text-gray-600 font-medium">"Loading assessment..."</p>
+                                    </div>
+                                </div>
+                            </div>
+                        }.into_view(),
                         (Some(questions), _) if questions.is_empty() => {
-                            view! { <div class="text-center py-4 text-red-500">"No questions found for this test ID."</div> }.into_view()
+                            view! {
+                                <div class="flex justify-center items-center min-h-[60vh]">
+                                    <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl p-12 border border-red-200/50">
+                                        <div class="flex flex-col items-center gap-4">
+                                            <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
+                                                <span class="text-red-600 text-2xl">"!"</span>
+                                            </div>
+                                            <p class="text-red-600 font-medium text-center">"No questions found for this test ID."</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            }.into_view()
                         },
                         (Some(questions), _) => {
                             // Check if all questions are TrueFalse type
@@ -302,14 +335,25 @@ pub fn GridTest() -> impl IntoView {
 
                             if has_invalid_questions {
                                 view! {
-                                    <div class="text-center py-4 text-red-500">
-                                        "Error: This test contains questions that are not True/False type. GridTest requires all questions to be True/False."
+                                    <div class="flex justify-center items-center min-h-[60vh]">
+                                        <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl p-12 border border-red-200/50">
+                                            <div class="flex flex-col items-center gap-4">
+                                                <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
+                                                    <span class="text-red-600 text-2xl">"⚠"</span>
+                                                </div>
+                                                <p class="text-red-600 font-medium text-center max-w-md">
+                                                    "Error: This test contains questions that are not True/False type. GridTest requires all questions to be True/False."
+                                                </p>
+                                            </div>
+                                        </div>
                                     </div>
                                 }.into_view()
                             } else {
                                 let (rows, cols) = grid_dimensions();
+                                let questions_clone = questions.clone();
+                                let questions_count = questions.len();
                                 let sorted_questions = create_memo(move |_| {
-                                    let mut sorted = questions.clone();
+                                    let mut sorted = questions_clone.clone();
                                     sorted.sort_by_key(|q| q.qnumber);
                                     sorted
                                 });
@@ -317,131 +361,223 @@ pub fn GridTest() -> impl IntoView {
                                 let current_cell_size = cell_size_class();
 
                                 view! {
-                                    <div class="flex flex-col h-full gap-4">
-                                        {/* Grid container with fixed max height instead of aspect-square */}
-                                        <div class="bg-white rounded shadow-md p-2 max-h-[55vh] overflow-auto">
-                                            <div
-                                                class="grid w-full"
-                                                style=move || format!(
-                                                    "grid-template-columns: repeat({}, minmax(0, 1fr)); grid-template-rows: repeat({}, minmax(0, 1fr)); gap: 1px; background-color: #e5e7eb;",
-                                                    cols, rows
-                                                )
-                                            >
-                                                {move || {
-                                                    sorted_questions().into_iter().map(|question| {
-                                                        let qnumber = question.qnumber;
-                                                        let display_text = question.word_problem.clone();
+                                    <div class="grid grid-cols-1 xl:grid-cols-3 gap-8 items-start">
+                                        {/* Grid container - Enhanced design */}
+                                        <div class="xl:col-span-2">
+                                            <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-gray-200/50 p-6">
+                                                <div class="flex items-center gap-3 mb-6">
+                                                    <h2 class="text-xl font-semibold text-gray-800">"Assessment Grid"</h2>
+                                                    <div class="flex-1 h-px bg-gradient-to-r from-gray-200 to-transparent"></div>
+                                                    <span class="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
+                                                        {format!("{} questions", questions_count)}
+                                                    </span>
+                                                </div>
 
-                                                        let is_correct = create_memo(move |_| {
-                                                            responses.with(|r| {
-                                                                r.get(&qnumber)
-                                                                 .map(|resp| resp.answer == "true")
-                                                                 .unwrap_or(true) // Default to true if not explicitly marked
-                                                            })
-                                                        });
+                                                <div class="relative">
+                                                    <div
+                                                        class="grid w-full"
+                                                        style=move || format!(
+                                                            "grid-template-columns: repeat({}, minmax(0, 1fr)); grid-template-rows: repeat({}, minmax(0, 1fr)); gap: 3px; background-color: #f8fafc;",
+                                                            cols, rows
+                                                        )
+                                                    >
+                                                        {move || {
+                                                            sorted_questions().into_iter().map(|question| {
+                                                                let qnumber = question.qnumber;
+                                                                let display_text = question.word_problem.clone();
 
-                                                        let is_selected = create_memo(move |_| {
-                                                            selected_question.get() == Some(qnumber)
-                                                        });
+                                                                let is_correct = create_memo(move |_| {
+                                                                    responses.with(|r| {
+                                                                        r.get(&qnumber)
+                                                                         .map(|resp| resp.answer == "true")
+                                                                         .unwrap_or(true) // Default to true if not explicitly marked
+                                                                    })
+                                                                });
 
-                                                        view! {
-                                                            <div
-                                                                class="flex items-center justify-center cursor-pointer transition-all relative p-2"
-                                                                class:bg-green-100=move || is_correct()
-                                                                class:bg-red-100=move || !is_correct()
-                                                                class:ring-2=move || is_selected()
-                                                                class:ring-blue-500=move || is_selected()
-                                                                on:click=move |_| toggle_answer(qnumber)
-                                                            >
-                                                                <span class=format!("select-none font-medium {} px-1 py-1 text-center text-7xl", current_cell_size)>{display_text}</span>
-                                                                {move || if !is_correct() {
-                                                                    view! {
-                                                                        <span class="absolute top-0 right-0 text-xs bg-red-500 text-white rounded-full w-3 h-3 flex items-center justify-center">
-                                                                            "×"
+                                                                let is_selected = create_memo(move |_| {
+                                                                    selected_question.get() == Some(qnumber)
+                                                                });
+
+                                                                let has_comment = create_memo(move |_| {
+                                                                    responses.with(|r| {
+                                                                        r.get(&qnumber)
+                                                                         .map(|resp| !resp.comment.is_empty())
+                                                                         .unwrap_or(false)
+                                                                    })
+                                                                });
+
+                                                                view! {
+                                                                    <div
+                                                                        class="relative flex items-center justify-center cursor-pointer transition-all duration-200 rounded-lg min-h-[50px] group hover:shadow-md"
+                                                                        class:bg-gradient-to-br=true
+                                                                        class:from-emerald-50=move || is_correct()
+                                                                        class:to-green-100=move || is_correct()
+                                                                        class:from-red-50=move || !is_correct()
+                                                                        class:to-red-100=move || !is_correct()
+                                                                        class:ring-3=move || is_selected()
+                                                                        class:ring-indigo-400=move || is_selected()
+                                                                        class:shadow-lg=move || is_selected()
+                                                                        class:scale-105=move || is_selected()
+                                                                        class:border-2=move || is_correct()
+                                                                        class:border-green-300=move || is_correct()
+                                                                        class:border-red-300=move || !is_correct()
+                                                                        on:click=move |_| toggle_answer(qnumber)
+                                                                    >
+                                                                        <span class=format!("select-none font-bold text-gray-700 px-2 py-2 text-center {} group-hover:scale-110 transition-transform", current_cell_size)>
+                                                                            {display_text}
                                                                         </span>
-                                                                    }.into_view()
-                                                                } else {
-                                                                    view! { <span></span> }.into_view()
-                                                                }}
-                                                            </div>
-                                                        }
-                                                    }).collect_view()
-                                                }}
+
+                                                                        {/* Incorrect marker */}
+                                                                        {move || if !is_correct() {
+                                                                            view! {
+                                                                                <div class="absolute -top-1 -right-1 w-6 h-6 bg-gradient-to-br from-red-500 to-red-600 text-white rounded-full flex items-center justify-center shadow-lg">
+                                                                                    <span class="text-xs font-bold">"×"</span>
+                                                                                </div>
+                                                                            }.into_view()
+                                                                        } else {
+                                                                            view! { <div></div> }.into_view()
+                                                                        }}
+
+                                                                        {/* Comment indicator */}
+                                                                        {move || if has_comment() {
+                                                                            view! {
+                                                                                <div class="absolute -bottom-1 -right-1 w-4 h-4 bg-gradient-to-br from-blue-500 to-indigo-600 text-white rounded-full flex items-center justify-center shadow-sm">
+                                                                                    <span class="text-xs">"💬"</span>
+                                                                                </div>
+                                                                            }.into_view()
+                                                                        } else {
+                                                                            view! { <div></div> }.into_view()
+                                                                        }}
+                                                                    </div>
+                                                                }
+                                                            }).collect_view()
+                                                        }}
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
 
-                                        {/* Comments section - will now always be visible */}
-                                        <div class="bg-white rounded-lg shadow-sm p-4">
-                                            {move || match selected_question.get() {
-                                                Some(qnumber) => {
-                                                    let question_text = sorted_questions().iter()
-                                                        .find(|q| q.qnumber == qnumber)
-                                                        .map(|q| q.word_problem.clone())
-                                                        .unwrap_or_default();
+                                        {/* Comments and Submit section - Enhanced sidebar */}
+                                        <div class="space-y-6">
+                                            {/* Comments section */}
+                                            <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-gray-200/50 p-6">
+                                                <div class="flex items-center gap-3 mb-4">
+                                                    <div class="w-3 h-3 bg-gradient-to-r from-purple-400 to-pink-400 rounded-full"></div>
+                                                    <h3 class="text-lg font-semibold text-gray-800">"Comments"</h3>
+                                                </div>
 
-                                                    view! {
-                                                        <div>
-                                                            <label class="block text-sm font-medium text-gray-700 mb-2">
-                                                                {format!("Comment for '{}':", question_text)}
-                                                            </label>
-                                                            <textarea
-                                                                class="w-full p-3 border border-gray-200 rounded-lg focus:ring-blue-500 focus:border-blue-500"
-                                                                prop:value=move || selected_comment()
-                                                                on:input=move |ev| {
-                                                                    let value = event_target_value(&ev);
-                                                                    handle_comment_change(value);
-                                                                }
-                                                                placeholder="Add any comments or notes here..."
-                                                                rows="2"
-                                                            ></textarea>
+                                                {move || match selected_question.get() {
+                                                    Some(qnumber) => {
+                                                        let question_text = sorted_questions().iter()
+                                                            .find(|q| q.qnumber == qnumber)
+                                                            .map(|q| q.word_problem.clone())
+                                                            .unwrap_or_default();
+
+                                                        view! {
+                                                            <div class="space-y-4">
+                                                                <div class="bg-gradient-to-r from-indigo-50 to-purple-50 p-4 rounded-xl border border-indigo-200/50">
+                                                                    <div class="flex items-center gap-2 mb-2">
+                                                                        <span class="text-lg font-bold text-indigo-600">
+                                                                            {question_text.clone()}
+                                                                        </span>
+                                                                    </div>
+                                                                    <p class="text-sm text-gray-600">"Selected for commenting"</p>
+                                                                </div>
+
+                                                                <div>
+                                                                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                                                                        "Add your comments:"
+                                                                    </label>
+                                                                    <textarea
+                                                                        class="w-full p-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 resize-none bg-white/80 backdrop-blur-sm"
+                                                                        prop:value=move || selected_comment()
+                                                                        on:input=move |ev| {
+                                                                            let value = event_target_value(&ev);
+                                                                            handle_comment_change(value);
+                                                                        }
+                                                                        placeholder="Add any comments, notes, or feedback here..."
+                                                                        rows="4"
+                                                                    ></textarea>
+                                                                </div>
+                                                            </div>
+                                                        }.into_view()
+                                                    },
+                                                    None => view! {
+                                                        <div class="text-center py-8">
+                                                            <div class="w-16 h-16 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
+                                                                <span class="text-gray-400 text-2xl">"💭"</span>
+                                                            </div>
+                                                            <p class="text-gray-500 text-sm">
+                                                                "Click any grid cell to select it and add comments"
+                                                            </p>
                                                         </div>
                                                     }.into_view()
-                                                },
-                                                None => view! {
-                                                    <div class="text-sm text-gray-500 italic py-3 text-center">
-                                                        "Click any grid cell to select it and add comments"
-                                                    </div>
-                                                }.into_view()
-                                            }}
-                                        </div>
+                                                }}
+                                            </div>
 
-                                        {/* Submit Button section - always visible */}
-                                        <div class="flex flex-wrap items-center justify-center gap-4 mb-2">
-                                            {move || if !is_submitted.get() {
-                                                view! {
-                                                    <button
-                                                        class="flex items-center justify-center px-5 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg shadow-sm hover:from-blue-700 hover:to-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                                        on:click=move |_| {
-                                                            handle_submit.dispatch(());
-                                                            set_is_submitted.set(true);
-                                                        }
-                                                        disabled=move || selected_student_id.get().is_none()
-                                                    >
-                                                        "Submit Assessment"
-                                                        <span class="ml-1">"✓"</span>
-                                                    </button>
-                                                }.into_view()
-                                            } else {
-                                                view! {
-                                                    <div class="text-center">
-                                                        <div class="inline-flex items-center px-4 py-2 rounded-full bg-green-100 text-green-800 mb-4">
-                                                            <span class="mr-2">"✓"</span>
-                                                            "Assessment submitted successfully!"
-                                                        </div>
-                                                        <div>
+                                            {/* Submit section */}
+                                            <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-gray-200/50 p-6">
+                                                <div class="flex items-center gap-3 mb-4">
+                                                    <h3 class="text-lg font-semibold text-gray-800">"Submit Assessment"</h3>
+                                                </div>
+
+                                                {move || if !is_submitted.get() {
+                                                    view! {
+                                                        <div class="space-y-4">
+
                                                             <button
-                                                                class="px-5 py-2 mt-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                                                                class="w-full flex items-center justify-center gap-3 px-6 py-4 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-700 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none transform hover:scale-105 active:scale-95"
+                                                                on:click=move |_| {
+                                                                    handle_submit.dispatch(());
+                                                                    set_is_submitted.set(true);
+                                                                }
+                                                                disabled=move || selected_student_id.get().is_none()
+                                                            >
+                                                                <span class="font-semibold">"Submit Assessment"</span>
+                                                                <span class="text-lg">"✓"</span>
+                                                            </button>
+
+                                                            {move || if selected_student_id.get().is_none() {
+                                                                view! {
+                                                                    <p class="text-xs text-amber-600 text-center bg-amber-50 px-3 py-2 rounded-lg border border-amber-200">
+                                                                        "Please select a student before submitting"
+                                                                    </p>
+                                                                }.into_view()
+                                                            } else {
+                                                                view! { <div></div> }.into_view()
+                                                            }}
+                                                        </div>
+                                                    }.into_view()
+                                                } else {
+                                                    view! {
+                                                        <div class="text-center space-y-4">
+                                                            <div class="w-20 h-20 bg-gradient-to-br from-green-400 to-emerald-500 rounded-full flex items-center justify-center mx-auto shadow-lg">
+                                                                <span class="text-white text-3xl">"✓"</span>
+                                                            </div>
+
+                                                            <div class="space-y-2">
+                                                                <h4 class="text-lg font-semibold text-gray-800">
+                                                                    "Assessment Submitted!"
+                                                                </h4>
+                                                                <p class="text-sm text-gray-600">
+                                                                    "Your assessment has been successfully submitted and saved."
+                                                                </p>
+                                                            </div>
+
+                                                            <button
+                                                                class="w-full flex items-center justify-center gap-3 px-6 py-4 bg-gradient-to-r from-gray-700 to-gray-800 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 active:scale-95"
                                                                 on:click=move |_| {
                                                                     let navigate=leptos_router::use_navigate();
                                                                     navigate("/dashboard", Default::default());
                                                                 }
                                                             >
-                                                                "Return to Dashboard"
+                                                                <span class="text-lg">"🏠"</span>
+                                                                <span class="font-semibold">"Return to Dashboard"</span>
                                                             </button>
                                                         </div>
-                                                    </div>
-                                                }.into_view()
-                                            }}
+                                                    }.into_view()
+                                                }}
+                                            </div>
                                         </div>
                                     </div>
                                 }.into_view()
