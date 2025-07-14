@@ -1,13 +1,27 @@
+use crate::app::components::enhanced_login_form::{
+    use_student_mapping_service, DeAnonymizedStudent, StudentMappingService,
+};
+use crate::app::middleware::global_settings::use_settings;
 use crate::app::models::score::{DeleteScoreRequest, Score};
+use crate::app::models::student::Student;
 use crate::app::server_functions::scores::{delete_score, get_scores};
 use crate::app::server_functions::students::get_students;
 use crate::app::server_functions::tests::get_tests;
 use chrono::DateTime;
 use leptos::*;
+use std::rc::Rc;
 
 #[component]
 pub fn ScoresLedger() -> impl IntoView {
     let navigate = leptos_router::use_navigate();
+
+    //Get global settings for anonymization
+    let (settings, _) = use_settings();
+    let anonymization_enabled = move || settings.get().student_protections;
+
+    //Get the student mapping service
+    let (student_mapping_service, _) = use_student_mapping_service();
+
     // Create resource for fetching scores from the database
     let scores_resource = create_local_resource(
         || (),
@@ -16,6 +30,7 @@ pub fn ScoresLedger() -> impl IntoView {
                 Ok(mut scores) => {
                     if scores.len() > 4 {
                         scores.truncate(4);
+                        scores.reverse();
                     }
                     Ok(scores)
                 }
@@ -27,18 +42,42 @@ pub fn ScoresLedger() -> impl IntoView {
         },
     );
 
+    // Create students resource
     let students_resource = create_local_resource(
         || (),
         |_| async {
             match get_students().await {
-                Ok(students) => Ok(students),
+                Ok(students) => Some(students),
                 Err(e) => {
                     log::error!("Failed to load students: {}", e);
-                    Err(ServerFnError::new("Failed to load students"))
+                    None
                 }
             }
         },
     );
+
+    // Create enhanced student data with de-anonymization info
+    let enhanced_students = create_memo(move |_| {
+        let students_data = students_resource.get().unwrap_or(None).unwrap_or_default();
+
+        if anonymization_enabled() {
+            students_data
+                .into_iter()
+                .map(|student| {
+                    let de_anon = DeAnonymizedStudent::from_student_with_mapping(
+                        &student,
+                        student_mapping_service.get().as_ref(),
+                    );
+                    (student, Some(de_anon))
+                })
+                .collect::<Vec<_>>()
+        } else {
+            students_data
+                .into_iter()
+                .map(|student| (student, None))
+                .collect::<Vec<_>>()
+        }
+    });
 
     let tests_resource = create_local_resource(
         || (),
@@ -52,6 +91,7 @@ pub fn ScoresLedger() -> impl IntoView {
             }
         },
     );
+
     //helper function to get test name
     let get_test_name = move |test_id: String| -> String {
         if let Some(Ok(tests)) = tests_resource.get() {
@@ -61,6 +101,7 @@ pub fn ScoresLedger() -> impl IntoView {
         }
         "Unknown Test".to_string()
     };
+
     //helper function to get a max score for test
     let get_max_score = move |test_id: String| -> i32 {
         if let Some(Ok(tests)) = tests_resource.get() {
@@ -71,18 +112,48 @@ pub fn ScoresLedger() -> impl IntoView {
         0
     };
 
-    //helper function to get student name
+    //helper function to get student name with de-anonymization support
     let get_student_name = move |student_id: i32| -> String {
-        if let Some(Ok(students)) = students_resource.get() {
-            if let Some(student) = students.iter().find(|s| s.student_id == student_id) {
-                return format!(
+        let students_data = enhanced_students();
+
+        if let Some((student, de_anon_opt)) = students_data
+            .iter()
+            .find(|(s, _)| s.student_id == student_id)
+        {
+            if let Some(de_anon) = de_anon_opt {
+                // Use de-anonymized display name
+                de_anon.display_name.clone()
+            } else {
+                // Use original student data
+                format!(
                     "{} {}",
                     student.firstname.as_ref().unwrap_or(&"Unknown".to_string()),
                     student.lastname.as_ref().unwrap_or(&"Student".to_string())
-                );
+                )
             }
+        } else {
+            "Unknown Student".to_string()
         }
-        "Unknown Student".to_string()
+    };
+
+    //helper function to get student ID display with de-anonymization support
+    let get_student_id_display = move |student_id: i32| -> String {
+        let students_data = enhanced_students();
+
+        if let Some((student, de_anon_opt)) = students_data
+            .iter()
+            .find(|(s, _)| s.student_id == student_id)
+        {
+            if let Some(de_anon) = de_anon_opt {
+                // Use de-anonymized display ID
+                de_anon.display_id.clone()
+            } else {
+                // Use original student ID
+                student.student_id.to_string()
+            }
+        } else {
+            student_id.to_string()
+        }
     };
 
     let (expanded_view, set_expanded_view) = create_signal(false);
@@ -283,7 +354,6 @@ pub fn ScoresLedger() -> impl IntoView {
                                                     let test_variant = score.test_variant;
                                                     let attempt = score.attempt;
 
-
                                                     // Create delete request for this score
                                                     let delete_req = DeleteScoreRequest {
                                                         student_id,
@@ -292,11 +362,10 @@ pub fn ScoresLedger() -> impl IntoView {
                                                         attempt,
                                                     };
 
-
                                                     view! {
                                                         <tr class="hover:bg-gray-50">
                                                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-[#2E3A59]">
-                                                                {score.student_id}
+                                                                {get_student_id_display(score.student_id)}
                                                             </td>
                                                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-[#2E3A59]">
                                                                 {get_student_name(score.student_id)}

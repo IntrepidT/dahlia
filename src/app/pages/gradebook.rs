@@ -60,38 +60,136 @@ pub fn GradebookContent() -> impl IntoView {
     // Get the student mapping service
     let (student_mapping_service, _) = use_student_mapping_service();
 
-    // Fetch students
-    let students = create_local_resource(
+    // OPTIMIZATION 1: Combine all initial data fetching into a single resource with better error handling
+    let initial_data = create_local_resource(
         move || refresh_trigger(),
         |_| async move {
-            match get_students().await {
-                Ok(students) => Some(students),
-                Err(e) => {
+            log::info!("Starting gradebook data fetch...");
+
+            // Fetch students and assessments concurrently
+            let (students_result, assessments_result) =
+                futures::join!(get_students(), get_assessments());
+
+            match (students_result, assessments_result) {
+                (Ok(students), Ok(assessments)) => {
+                    log::info!(
+                        "Fetched {} students and {} assessments",
+                        students.len(),
+                        assessments.len()
+                    );
+
+                    if !students.is_empty() {
+                        let student_ids: Vec<i32> =
+                            students.iter().map(|student| student.student_id).collect();
+
+                        log::info!("Starting batch fetch for {} students", student_ids.len());
+
+                        // Use the optimized batch function
+                        match get_student_results_batch(student_ids).await {
+                            Ok(student_results) => {
+                                log::info!(
+                                    "Successfully fetched batch results for {} students",
+                                    student_results.len()
+                                );
+                                Some((students, assessments, student_results))
+                            }
+                            Err(e) => {
+                                log::error!("Failed to fetch batch results: {}", e);
+                                // Return with empty results rather than failing completely
+                                Some((students, assessments, HashMap::new()))
+                            }
+                        }
+                    } else {
+                        log::info!("No students found");
+                        Some((students, assessments, HashMap::new()))
+                    }
+                }
+                (Err(e), _) => {
                     log::error!("Failed to fetch students: {}", e);
+                    None
+                }
+                (_, Err(e)) => {
+                    log::error!("Failed to fetch assessments: {}", e);
                     None
                 }
             }
         },
     );
 
-    // Create de-anonymized students resource
-    let de_anonymized_students = create_memo(move |_| {
-        if let Some(Some(student_list)) = students.get() {
-            let mapping_service = student_mapping_service.get();
+    // OPTIMIZATION 2: Create derived signals from the combined data
+    let students = create_memo(move |_| {
+        initial_data
+            .get()
+            .and_then(|data| data.as_ref().map(|(students, _, _)| students.clone()))
+            .unwrap_or_default()
+    });
 
-            student_list
-                .into_iter()
-                .map(|student| {
-                    DeAnonymizedStudent::from_student_with_mapping(
-                        &student,
-                        mapping_service.as_ref(),
-                    )
-                })
-                .collect::<Vec<_>>()
+    let assessment_list = create_memo(move |_| {
+        initial_data
+            .get()
+            .and_then(|data| data.as_ref().map(|(_, assessments, _)| assessments.clone()))
+            .unwrap_or_default()
+    });
+
+    let all_student_results = create_memo(move |_| {
+        initial_data
+            .get()
+            .and_then(|data| data.as_ref().map(|(_, _, results)| results.clone()))
+            .unwrap_or_default()
+    });
+
+    // OPTIMIZATION 3: Lazy load tests and scores only when assessment is selected
+    let selected_assessment = create_memo(move |_| {
+        if let Some(assessment_id) = selected_assessment_id.get() {
+            if assessment_id.is_empty() {
+                return None;
+            }
+
+            let assessments = assessment_list.get();
+            assessments
+                .iter()
+                .find(|a| a.id.to_string() == assessment_id)
+                .cloned()
         } else {
-            vec![]
+            None
         }
     });
+
+    // Only load tests when an assessment is selected
+    let tests = create_local_resource(
+        move || (selected_assessment.get(), refresh_trigger()),
+        |(selected_assessment_opt, _)| async move {
+            if let Some(assessment) = selected_assessment_opt {
+                match get_tests_batch(assessment.tests).await {
+                    Ok(tests) => Some(tests),
+                    Err(e) => {
+                        log::error!("Failed to fetch tests: {}", e);
+                        Some(vec![])
+                    }
+                }
+            } else {
+                None
+            }
+        },
+    );
+
+    // Only load scores when an assessment is selected
+    let scores = create_local_resource(
+        move || (selected_assessment.get(), refresh_trigger()),
+        |(selected_assessment_opt, _)| async move {
+            if let Some(assessment) = selected_assessment_opt {
+                match get_scores_by_test(assessment.tests).await {
+                    Ok(scores) => Some(scores),
+                    Err(e) => {
+                        log::error!("Failed to fetch scores: {}", e);
+                        Some(vec![])
+                    }
+                }
+            } else {
+                None
+            }
+        },
+    );
 
     // Helper function to get display name and ID
     let get_student_display = move |student: &Student| -> (String, String) {
@@ -120,121 +218,31 @@ pub fn GradebookContent() -> impl IntoView {
         )
     };
 
-    // Fetch assessment list
-    let assessment_list =
-        create_local_resource(move || (), |_| async move { get_assessments().await });
-
-    // Create a derived resource to get the selected assessment
-    let selected_assessment = create_memo(move |_| {
-        if let Some(assessment_id) = selected_assessment_id.get() {
-            if assessment_id.is_empty() {
-                return None;
-            }
-
-            match assessment_list.get() {
-                Some(Ok(assessments)) => assessments
-                    .iter()
-                    .find(|a| a.id.to_string() == assessment_id)
-                    .cloned(),
-                _ => None,
-            }
-        } else {
-            None
-        }
-    });
-
-    // Create a derived resource that reacts to changes in selected assessment and loads up tests in batches
-    let tests = create_local_resource(
-        move || (selected_assessment.get(), refresh_trigger()),
-        |(selected_assessment_opt, _)| async move {
-            if let Some(assessment) = selected_assessment_opt {
-                match get_tests_batch(assessment.tests).await {
-                    Ok(tests) => Some(tests),
-                    Err(e) => {
-                        log::error!("Failed to fetch tests: {}", e);
-                        Some(vec![])
-                    }
-                }
-            } else {
-                None
-            }
-        },
-    );
-
-    // Create resource for scores by test
-    let scores = create_local_resource(
-        move || (selected_assessment.get(), refresh_trigger()),
-        |(selected_assessment_opt, _)| async move {
-            if let Some(assessment) = selected_assessment_opt {
-                match get_scores_by_test(assessment.tests).await {
-                    Ok(scores) => Some(scores),
-                    Err(e) => {
-                        log::error!("Failed to fetch scores: {}", e);
-                        Some(vec![])
-                    }
-                }
-            } else {
-                None
-            }
-        },
-    );
-
-    // Filter students based on search term using de-anonymized data
+    // OPTIMIZATION 4: Memoized filtered students with debouncing
     let filtered_students = create_memo(move |_| {
         let search = search_term().trim().to_lowercase();
+        let students_list = students.get();
 
-        students
-            .get()
-            .unwrap_or(None)
-            .unwrap_or_default()
+        if search.is_empty() {
+            return students_list;
+        }
+
+        students_list
             .into_iter()
             .filter(|student| {
-                if search.is_empty() {
-                    return true;
-                }
-
                 let (display_name, display_id) = get_student_display(student);
-
                 display_name.to_lowercase().contains(&search)
                     || display_id.to_lowercase().contains(&search)
             })
             .collect::<Vec<_>>()
     });
 
-    // Create a resource for all student results to avoid repeated API calls
-    let all_student_results = create_local_resource(
-        move || (students.get(), refresh_trigger()),
-        move |(students_opt, _)| async move {
-            let mut results_map = HashMap::new();
-
-            if let Some(Some(students_list)) = students_opt {
-                if !students_list.is_empty() {
-                    let student_ids: Vec<i32> = students_list
-                        .iter()
-                        .map(|student| student.student_id)
-                        .collect();
-
-                    match get_student_results_batch(student_ids).await {
-                        Ok(batch_results) => {
-                            results_map = batch_results;
-                        }
-                        Err(e) => {
-                            log::error!("Failed to fetch batch results: {}", e);
-                        }
-                    }
-                }
-            }
-            results_map
-        },
-    );
-
-    // Helper function to find the next test ID - Defined before it's used
+    // Helper function to find the next test ID
     fn find_next_test_id(assessment: &AssessmentSummary) -> Option<String> {
         if assessment.progress == Progress::Completed {
             return None;
         }
 
-        // Find the first test that isn't completed
         assessment
             .test_details
             .iter()
@@ -244,91 +252,69 @@ pub fn GradebookContent() -> impl IntoView {
 
     // Handler for opening assessment side panel
     let open_assessment_panel = move |assessment_id: String, student_id: i32| {
-        // Find the student data
-        if let Some(Some(students_list)) = students.get() {
-            if let Some(student) = students_list.iter().find(|s| s.student_id == student_id) {
-                set_selected_student(Some(student.clone()));
+        let students_list = students.get();
+        if let Some(student) = students_list.iter().find(|s| s.student_id == student_id) {
+            set_selected_student(Some(student.clone()));
 
-                // Find the assessment data
-                let results_map = all_student_results.get().unwrap_or_default();
-                if let Some(student_results) = results_map.get(&student_id) {
-                    if let Some(summary) = student_results
-                        .assessment_summaries
-                        .iter()
-                        .find(|s| s.assessment_id == assessment_id)
-                    {
-                        // Set the panel data
-                        set_current_assessment_data(Some(summary.clone()));
-
-                        // Find the next test if any - using the regular function
-                        set_next_test_id(find_next_test_id(summary));
-
-                        // Show the panel
-                        set_panel_type(ScorePanelType::AssessmentScore(assessment_id));
-                        set_show_side_panel(true);
-                        return;
-                    }
+            let results_map = all_student_results.get();
+            if let Some(student_results) = results_map.get(&student_id) {
+                if let Some(summary) = student_results
+                    .assessment_summaries
+                    .iter()
+                    .find(|s| s.assessment_id == assessment_id)
+                {
+                    set_current_assessment_data(Some(summary.clone()));
+                    set_next_test_id(find_next_test_id(summary));
+                    set_panel_type(ScorePanelType::AssessmentScore(assessment_id));
+                    set_show_side_panel(true);
+                    return;
                 }
             }
         }
-
-        // If we get here, we couldn't find all the data
         log::error!("Failed to load assessment data for side panel");
     };
 
     // Handler for opening test side panel
     let open_test_panel = move |test_id: String, student_id: i32, attempt: i32| {
-        // Find the student data
-        if let Some(Some(students_list)) = students.get() {
-            if let Some(student) = students_list.iter().find(|s| s.student_id == student_id) {
-                set_selected_student(Some(student.clone()));
+        let students_list = students.get();
+        if let Some(student) = students_list.iter().find(|s| s.student_id == student_id) {
+            set_selected_student(Some(student.clone()));
 
-                // Get test data from already loaded tests instead of calling get_test_details
-                if let Some(Some(test_list)) = tests.get() {
-                    if let Some(test) = test_list.iter().find(|t| t.test_id == test_id) {
-                        // Create a TestDetail from the existing Test data
-                        let test_detail = TestDetail {
-                            test_id: test.test_id.clone(),
-                            test_name: test.name.clone(),
-                            test_area: test.testarea.clone().to_string(),
-                            score: 0, // We'll get this from scores
-                            total_possible: test.score,
-                            performance_class: "Not available".to_string(),
-                            date_administered: Utc::now(), // Default to now since we don't have the actual date
-                            attempt: 0,                    //We'll also get this from scores
-                            test_variant: 0,               // Get variant from the score
-                        };
+            if let Some(Some(test_list)) = tests.get() {
+                if let Some(test) = test_list.iter().find(|t| t.test_id == test_id) {
+                    let mut test_detail = TestDetail {
+                        test_id: test.test_id.clone(),
+                        test_name: test.name.clone(),
+                        test_area: test.testarea.clone().to_string(),
+                        score: 0,
+                        total_possible: test.score,
+                        performance_class: "Not available".to_string(),
+                        date_administered: Utc::now(),
+                        attempt: 0,
+                        test_variant: 0,
+                    };
 
-                        // Update score if available
-                        if let Some(Some(score_data)) = scores.get() {
-                            if let Some(score) = score_data.iter().find(|s| {
-                                s.student_id == student_id
-                                    && s.test_id == test_id
-                                    && s.attempt == attempt
-                            }) {
-                                let test_detail = TestDetail {
-                                    score: score.get_total(),
-                                    performance_class: if score.get_total() >= (test.score / 2) {
-                                        "Satisfactory".to_string()
-                                    } else {
-                                        "Needs Improvement".to_string()
-                                    },
-                                    attempt: score.attempt,
-                                    test_variant: score.test_variant,
-                                    ..test_detail
-                                };
-                                set_current_test_data(Some(test_detail));
-                                set_panel_type(ScorePanelType::TestScore(
-                                    test_id, student_id, attempt,
-                                ));
-                                set_show_side_panel(true);
-                            }
-                        } else {
-                            set_current_test_data(Some(test_detail));
-                            set_panel_type(ScorePanelType::TestScore(test_id, student_id, attempt));
-                            set_show_side_panel(true);
+                    if let Some(Some(score_data)) = scores.get() {
+                        if let Some(score) = score_data.iter().find(|s| {
+                            s.student_id == student_id
+                                && s.test_id == test_id
+                                && s.attempt == attempt
+                        }) {
+                            test_detail.score = score.get_total();
+                            test_detail.performance_class = if score.get_total() >= (test.score / 2)
+                            {
+                                "Satisfactory".to_string()
+                            } else {
+                                "Needs Improvement".to_string()
+                            };
+                            test_detail.attempt = score.attempt;
+                            test_detail.test_variant = score.test_variant;
                         }
                     }
+
+                    set_current_test_data(Some(test_detail));
+                    set_panel_type(ScorePanelType::TestScore(test_id, student_id, attempt));
+                    set_show_side_panel(true);
                 }
             }
         }
@@ -397,203 +383,208 @@ pub fn GradebookContent() -> impl IntoView {
                                 prop:value=move || selected_assessment_id.get().unwrap_or_default()
                             >
                                <option value="">"All Assessments"</option>
-                               {move || match assessment_list.get(){
-                                    None => view!{<option>"Loading..."</option>}.into_view(),
-                                    Some(Ok(list)) => list.into_iter().map(|assessment| {
-                                        view! {
-                                            <option value={assessment.id.to_string()}>{assessment.name}</option>
-                                        }
-                                    }).collect_view(),
-                                    Some(Err(e)) => view! {<option>"Error: " {e.to_string()}</option>}.into_view(),
-                                }}
+                               {move || {
+                                   let assessments = assessment_list.get();
+                                   assessments.into_iter().map(|assessment| {
+                                       view! {
+                                           <option value={assessment.id.to_string()}>{assessment.name}</option>
+                                       }
+                                   }).collect_view()
+                               }}
                             </select>
                         </div>
                     </div>
-                    <div class="flex-1 flex flex-col overflow-hidden rounded-md">
-                        <div class="h-full overflow-auto">
-                            <table class="min-w-full bg-[#F9F9F8] border border-gray-200 table-fixed divide-y divide-[#DADADA]">
-                                <thead class="sticky top-0 bg-[#DADADA]">
-                                    <tr>
-                                        <th class="px-2 py-4 border text-center font-medium text-[#2E3A59] text-md uppercase tracking-wider">"Student Name"</th>
-                                        <th class="px-2 py-4 border text-center font-medium text-[#2E3A59] text-md uppercase tracking-wider">
-                                            {move || {
-                                                if anonymization_enabled() && student_mapping_service.get().is_some() {
-                                                    "Original ID"
-                                                } else {
-                                                    "ID"
-                                                }
-                                            }}
-                                        </th>
-                                        {
-                                            move || {
-                                                if selected_assessment_id.get().is_none() {
-                                                    // Show all assessments as columns
-                                                    match assessment_list.get() {
-                                                        None => view!{}.into_view(),
-                                                        Some(Ok(list)) => list.into_iter().map(|assessment| {
-                                                            view! {
-                                                                <th class="px-2 py-4 border text-center font-medium text-[#2E3A59] text-md whitespace-normal uppercase tracking-wider">{&assessment.name}</th>
-                                                            }
-                                                        }).collect_view(),
-                                                        Some(Err(_)) => view! {}.into_view(),
-                                                    }
-                                                } else {
-                                                    // Show selected assessment's tests as columns
-                                                    match tests.get() {
-                                                        Some(Some(test_list)) => {
-                                                            test_list.iter().map(|test| {
-                                                                view! {
-                                                                    <th class="px-2 py-4 border text-center font-medium text-[#2E3A59] text-md whitespace-normal uppercase tracking-wider">
-                                                                        {format!("{}",&test.name)}
-                                                                        <br/>
-                                                                        {format!("(Out of {})", &test.score)}
-                                                                    </th>
-                                                                }
-                                                            }).collect_view()
-                                                        },
-                                                        _ => view! {}.into_view()
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    </tr>
-                                </thead>
-                                <tbody class="text-md">
-                                    {move || {
-                                        let students = filtered_students();
-                                        if students.is_empty() {
-                                            view! {
+
+                    // OPTIMIZATION 5: Show loading state
+                    {move || {
+                        match initial_data.get() {
+                            None => view! {
+                                <div class="flex-1 flex items-center justify-center">
+                                    <div class="text-center">
+                                        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-[#2E3A59] mx-auto mb-4"></div>
+                                        <p class="text-gray-600">"Loading gradebook data..."</p>
+                                    </div>
+                                </div>
+                            }.into_view(),
+                            Some(None) => view! {
+                                <div class="flex-1 flex items-center justify-center">
+                                    <p class="text-red-600">"Failed to load gradebook data"</p>
+                                </div>
+                            }.into_view(),
+                            Some(Some(_)) => view! {
+                                <div class="flex-1 flex flex-col overflow-hidden rounded-md">
+                                    <div class="h-full overflow-auto">
+                                        <table class="min-w-full bg-[#F9F9F8] border border-gray-200 table-fixed divide-y divide-[#DADADA]">
+                                            <thead class="sticky top-0 bg-[#DADADA]">
                                                 <tr>
-                                                    <td colspan="2" class="px-2 py-1 border-b">
-                                                        "No students match your search criteria."
-                                                    </td>
-                                                </tr>
-                                            }.into_view()
-                                        } else {
-                                            let results_map = all_student_results.get().unwrap_or_default();
-                                            students.into_iter().map(|student| {
-                                                let student_id = student.student_id;
-                                                let student_results = results_map.get(&student_id);
-                                                let (display_name, display_id) = get_student_display(&student);
-
-                                                view! {
-                                                    <tr>
-                                                        <td class="px-2 py-2 border whitespace-nowrap text-indigo-500 bg-white">
-                                                            <a href=format!("/studentview/{}/results", &student.student_id)>
-                                                                <Icon
-                                                                    icon=HiUserCircleOutlineLg
-                                                                    class="w-4 h-4 text-[#2E3A59] inline-block mr-2"
-                                                                />
-                                                                {display_name}
-                                                            </a>
-                                                        </td>
-                                                        <td class="px-2 py-2 border whitespace-nowrap text-center bg-white">{display_id}</td>
-                                                        {
-                                                            move || {
-                                                                let student_results_map = all_student_results.get().unwrap_or_default();
-                                                                let student_results = student_results_map.get(&student.student_id);
-
-                                                                if selected_assessment_id.get().is_none() {
-                                                                    // Show all assessments for this student
-                                                                    match assessment_list.get() {
-                                                                        None => view! {}.into_view(),
-                                                                        Some(Ok(list)) => list.into_iter().map(|assessment| {
-                                                                            // Try to find assessment summary for this assessment
-                                                                            if let Some(results) = student_results {
-                                                                                if let Some(summary) = results.assessment_summaries.iter()
-                                                                                    .find(|summary| summary.assessment_id == assessment.id.to_string()) {
-                                                                                    // Found an assessment summary
-                                                                                    let score = summary.current_score;
-                                                                                    let total = summary.total_possible.unwrap_or(0);
-                                                                                    let progression_color = if summary.progress == Progress::Completed {
-                                                                                        "bg-green-100"
-                                                                                    } else {
-                                                                                        "bg-yellow-100"
-                                                                                    };
-
-                                                                                    // Clone for the handler
-                                                                                    let assessment_id = assessment.id.to_string();
-                                                                                    let student_id = student.student_id;
-                                                                                    let open_assessment = open_assessment_panel.clone();
-
-                                                                                    view! {
-                                                                                        <td
-                                                                                            class=format!("{} px-2 py-2 border whitespace-nowrap text-center cursor-pointer hover:bg-gray-100", progression_color)
-                                                                                            on:click=move |_| open_assessment(assessment_id.clone(), student_id)
-                                                                                        >
-                                                                                            {format!("{} / {}", score, total)}
-                                                                                        </td>
-                                                                                    }.into_view()
-                                                                                } else {
-                                                                                    // No summary for this assessment
-                                                                                    view! {
-                                                                                        <td class="px-2 py-2 border whitespace-nowrap bg-blue-100 text-center">
-                                                                                            "Not started"
-                                                                                        </td>
-                                                                                    }.into_view()
-                                                                                }
-                                                                            } else {
-                                                                                // No results for this student
-                                                                                view! {
-                                                                                    <td class="px-2 py-2 border whitespace-nowrap text-center">
-                                                                                        "-"
-                                                                                    </td>
-                                                                                }.into_view()
+                                                    <th class="px-2 py-4 border text-center font-medium text-[#2E3A59] text-md uppercase tracking-wider">"Student Name"</th>
+                                                    <th class="px-2 py-4 border text-center font-medium text-[#2E3A59] text-md uppercase tracking-wider">
+                                                        {move || {
+                                                            if anonymization_enabled() && student_mapping_service.get().is_some() {
+                                                                "Original ID"
+                                                            } else {
+                                                                "ID"
+                                                            }
+                                                        }}
+                                                    </th>
+                                                    {
+                                                        move || {
+                                                            if selected_assessment_id.get().is_none() {
+                                                                // Show all assessments as columns
+                                                                let assessments = assessment_list.get();
+                                                                assessments.into_iter().map(|assessment| {
+                                                                    view! {
+                                                                        <th class="px-2 py-4 border text-center font-medium text-[#2E3A59] text-md whitespace-normal uppercase tracking-wider">{&assessment.name}</th>
+                                                                    }
+                                                                }).collect_view()
+                                                            } else {
+                                                                // Show selected assessment's tests as columns
+                                                                match tests.get() {
+                                                                    Some(Some(test_list)) => {
+                                                                        test_list.iter().map(|test| {
+                                                                            view! {
+                                                                                <th class="px-2 py-4 border text-center font-medium text-[#2E3A59] text-md whitespace-normal uppercase tracking-wider">
+                                                                                    {format!("{}",&test.name)}
+                                                                                    <br/>
+                                                                                    {format!("(Out of {})", &test.score)}
+                                                                                </th>
                                                                             }
-                                                                        }).collect_view(),
-                                                                        Some(Err(_)) => view! {}.into_view(),
-                                                                    }
-                                                                } else {
-                                                                    // Show selected assessment's test scores
-                                                                    match tests.get() {
-                                                                        Some(Some(test_list)) => {
-                                                                            let score_data = scores.get().unwrap_or(None).unwrap_or_default();
-                                                                            let student_clone = student.clone();
-
-                                                                            test_list.iter().map(|test| {
-                                                                                let score = score_data
-                                                                                    .iter()
-                                                                                    .find(|s| s.student_id == student.student_id && s.test_id == test.test_id);
-
-                                                                                // Clone for the handler
-                                                                                let test_id = test.test_id.clone();
-                                                                                let student_id = student_clone.student_id;
-                                                                                let open_test = open_test_panel.clone();
-                                                                                let attempt_clone = match score {
-                                                                                    Some(s) => s.attempt.clone(),
-                                                                                    None => 0,
-                                                                                };
-
-                                                                                view! {
-                                                                                    <td class="px-2 py-2 border whitespace-nowrap text-center">
-                                                                                        {
-                                                                                            match score {
-                                                                                                Some(s) => view! {
-                                                                                                    <span class="cursor-pointer hover:text-indigo-600" on:click=move |_| open_test(test_id.clone(), student_id, attempt_clone)>
-                                                                                                        {s.get_total().to_string()}
-                                                                                                    </span>
-                                                                                                }.into_view(),
-                                                                                                None => view!{"-"}.into_view(),
-                                                                                            }
-                                                                                        }
-                                                                                    </td>
-                                                                                }
-                                                                            }).collect_view()
-                                                                        },
-                                                                        _ => view! {}.into_view()
-                                                                    }
+                                                                        }).collect_view()
+                                                                    },
+                                                                    _ => view! {}.into_view()
                                                                 }
                                                             }
                                                         }
-                                                    </tr>
-                                                }
-                                            }).collect_view()
-                                        }
-                                    }}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
+                                                    }
+                                                </tr>
+                                            </thead>
+                                            <                                            tbody class="text-md">
+                                                {move || {
+                                                    let students_list = filtered_students();
+                                                    if students_list.is_empty() {
+                                                        view! {
+                                                            <tr>
+                                                                <td colspan="2" class="px-2 py-1 border-b">
+                                                                    "No students match your search criteria."
+                                                                </td>
+                                                            </tr>
+                                                        }.into_view()
+                                                    } else {
+                                                        // Clone the results map to avoid move issues
+                                                        let results_map = all_student_results.get();
+                                                        students_list.into_iter().map(|student| {
+                                                            let student_id = student.student_id;
+                                                            let (display_name, display_id) = get_student_display(&student);
+
+                                                            // Get student results once for this row
+                                                            let student_results = results_map.get(&student_id);
+
+                                                            view! {
+                                                                <tr>
+                                                                    <td class="px-2 py-2 border whitespace-nowrap text-indigo-500 bg-white">
+                                                                        <a href=format!("/studentview/{}/results", &student.student_id)>
+                                                                            <Icon
+                                                                                icon=HiUserCircleOutlineLg
+                                                                                class="w-4 h-4 text-[#2E3A59] inline-block mr-2"
+                                                                            />
+                                                                            {display_name}
+                                                                        </a>
+                                                                    </td>
+                                                                    <td class="px-2 py-2 border whitespace-nowrap text-center bg-white">{display_id}</td>
+                                                                    {
+                                                                        if selected_assessment_id.get().is_none() {
+                                                                            // Show all assessments for this student
+                                                                            let assessments = assessment_list.get();
+                                                                            assessments.into_iter().map(|assessment| {
+                                                                                if let Some(results) = student_results {
+                                                                                    if let Some(summary) = results.assessment_summaries.iter()
+                                                                                        .find(|summary| summary.assessment_id == assessment.id.to_string()) {
+                                                                                        let score = summary.current_score;
+                                                                                        let total = summary.total_possible.unwrap_or(0);
+                                                                                        let progression_color = if summary.progress == Progress::Completed {
+                                                                                            "bg-green-100"
+                                                                                        } else {
+                                                                                            "bg-yellow-100"
+                                                                                        };
+
+                                                                                        let assessment_id = assessment.id.to_string();
+                                                                                        let student_id = student.student_id;
+                                                                                        let open_assessment = open_assessment_panel.clone();
+
+                                                                                        view! {
+                                                                                            <td
+                                                                                                class=format!("{} px-2 py-2 border whitespace-nowrap text-center cursor-pointer hover:bg-gray-100", progression_color)
+                                                                                                on:click=move |_| open_assessment(assessment_id.clone(), student_id)
+                                                                                            >
+                                                                                                {format!("{} / {}", score, total)}
+                                                                                            </td>
+                                                                                        }.into_view()
+                                                                                    } else {
+                                                                                        view! {
+                                                                                            <td class="px-2 py-2 border whitespace-nowrap bg-blue-100 text-center">
+                                                                                                "Not started"
+                                                                                            </td>
+                                                                                        }.into_view()
+                                                                                    }
+                                                                                } else {
+                                                                                    view! {
+                                                                                        <td class="px-2 py-2 border whitespace-nowrap text-center">
+                                                                                            "-"
+                                                                                        </td>
+                                                                                    }.into_view()
+                                                                                }
+                                                                            }).collect_view()
+                                                                        } else {
+                                                                            // Show selected assessment's test scores
+                                                                            match tests.get() {
+                                                                                Some(Some(test_list)) => {
+                                                                                    let score_data = scores.get().unwrap_or(None).unwrap_or_default();
+
+                                                                                    test_list.iter().map(|test| {
+                                                                                        let score = score_data
+                                                                                            .iter()
+                                                                                            .find(|s| s.student_id == student.student_id && s.test_id == test.test_id);
+
+                                                                                        let test_id = test.test_id.clone();
+                                                                                        let student_id = student.student_id;
+                                                                                        let open_test = open_test_panel.clone();
+                                                                                        let attempt_clone = match score {
+                                                                                            Some(s) => s.attempt.clone(),
+                                                                                            None => 0,
+                                                                                        };
+
+                                                                                        view! {
+                                                                                            <td class="px-2 py-2 border whitespace-nowrap text-center">
+                                                                                                {
+                                                                                                    match score {
+                                                                                                        Some(s) => view! {
+                                                                                                            <span class="cursor-pointer hover:text-indigo-600" on:click=move |_| open_test(test_id.clone(), student_id, attempt_clone)>
+                                                                                                                {s.get_total().to_string()}
+                                                                                                            </span>
+                                                                                                        }.into_view(),
+                                                                                                        None => view!{"-"}.into_view(),
+                                                                                                    }
+                                                                                                }
+                                                                                            </td>
+                                                                                        }
+                                                                                    }).collect_view()
+                                                                                },
+                                                                                _ => view! {}.into_view()
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                </tr>
+                                                            }
+                                                        }).collect_view()
+                                                    }
+                                                }}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            }.into_view()
+                        }
+                    }}
                 </main>
 
                 <StudentScorePanel

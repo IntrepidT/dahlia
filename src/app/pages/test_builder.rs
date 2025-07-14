@@ -4,11 +4,12 @@ use crate::app::components::question_builder::BuildingQuestion;
 use crate::app::models::assessment::ScopeEnum;
 use crate::app::models::student::GradeEnum;
 use crate::app::models::test::BenchmarkCategory;
-use crate::app::models::test::{CreateNewTestRequest, TestType, UpdateTestRequest};
+use crate::app::models::test::{CreateNewTestRequest, Test, TestType, UpdateTestRequest};
 use crate::app::models::{CreateNewQuestionRequest, Question, QuestionType};
 use crate::app::server_functions::assessments::update_assessment_score;
 use crate::app::server_functions::courses::get_courses;
 use crate::app::server_functions::questions::{add_question, delete_questions, get_questions};
+use crate::app::server_functions::tests::get_tests;
 use crate::app::server_functions::tests::{add_test, get_test, score_overrider, update_test};
 use leptos::prelude::*;
 use leptos::*;
@@ -75,6 +76,13 @@ pub fn TestBuilderContent() -> impl IntoView {
     let (test_id, set_test_id) = create_signal(String::new());
     let (scope, set_scope) = create_signal::<Option<ScopeEnum>>(None);
     let (course_id, set_course_id) = create_signal::<Option<i32>>(None);
+
+    //Signals for TestVariation Management
+    let (is_variation, set_is_variation) = create_signal(false);
+    let (base_test_name, set_base_test_name) = create_signal(String::new());
+    let (variation_type_display, set_variation_type_display) = create_signal(String::new());
+    let (related_variations, set_related_variations) = create_signal(Vec::<Test>::new());
+
     let (error_message, set_error_message) = create_signal(String::new());
     let (show_error, set_show_error) = create_signal(false);
     let (is_submitting, set_is_submitting) = create_signal(false);
@@ -132,6 +140,56 @@ pub fn TestBuilderContent() -> impl IntoView {
         });
     };
 
+    //Load related variations in edit mode
+    let related_variations_resource = create_resource(
+        move || (test_id.get(), is_edit_mode()),
+        |(current_test_id, is_editing)| async move {
+            if !is_editing || current_test_id.is_empty() {
+                return Vec::new();
+            }
+
+            match get_tests().await {
+                Ok(all_tests) => {
+                    // Find the current test to determine the base name
+                    let current_test = all_tests.iter().find(|t| t.test_id == current_test_id);
+
+                    if let Some(current) = current_test {
+                        let base_name = if current.name.contains(" - ") {
+                            current
+                                .name
+                                .split(" - ")
+                                .next()
+                                .unwrap_or(&current.name)
+                                .to_string()
+                        } else {
+                            current.name.clone()
+                        };
+
+                        // Find all related tests (base + variations)
+                        all_tests
+                            .into_iter()
+                            .filter(|test| {
+                                let test_base_name = if test.name.contains(" - ") {
+                                    test.name
+                                        .split(" - ")
+                                        .next()
+                                        .unwrap_or(&test.name)
+                                        .to_string()
+                                } else {
+                                    test.name.clone()
+                                };
+                                test_base_name == base_name && test.test_id != current_test_id
+                            })
+                            .collect()
+                    } else {
+                        Vec::new()
+                    }
+                }
+                Err(_) => Vec::new(),
+            }
+        },
+    );
+
     // Effect to load test data when a test_id is available
     create_effect(move |_| {
         if let Some(Some(test)) = test_resource.get() {
@@ -171,6 +229,36 @@ pub fn TestBuilderContent() -> impl IntoView {
                 }
 
                 set_questions(sorted_questions);
+            }
+        }
+    });
+
+    //Loading related variations when in edit mode
+    create_effect(move |_| {
+        if let Some(variations) = related_variations_resource.get() {
+            set_related_variations(variations);
+        }
+    });
+
+    // For editing a variation
+    create_effect(move |_| {
+        if let Some(Some(test)) = test_resource.get() {
+            let is_var = test.name.contains(" - ")
+                && (test.name.to_lowercase().contains("remediation")
+                    || test.name.to_lowercase().contains("advanced")
+                    || test.name.to_lowercase().contains("easy")
+                    || test.name.to_lowercase().contains("hard")
+                    || test.comments.to_lowercase().contains("variation:"));
+
+            set_is_variation(is_var);
+
+            if is_var {
+                if let Some(base_name) = test.name.split(" - ").next() {
+                    set_base_test_name(base_name.to_string());
+                }
+                if let Some(variation_part) = test.name.split(" - ").nth(1) {
+                    set_variation_type_display(variation_part.to_string());
+                }
             }
         }
     });
@@ -446,6 +534,58 @@ pub fn TestBuilderContent() -> impl IntoView {
                 </h1>
                 <div class="h-0.5 w-full bg-gray-300 mt-3"></div>
             </div>
+
+            {move || {
+                if is_variation() && is_edit_mode() {
+                    view! {
+                        <div class="bg-blue-50 border-l-4 border-blue-400 p-4 mb-6">
+                            <div class="flex">
+                                <div class="flex-shrink-0">
+                                    <svg class="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+                                    </svg>
+                                </div>
+                                <div class="ml-3 flex-1">
+                                    <h3 class="text-sm font-medium text-blue-800">
+                                        "Editing Test Variation"
+                                    </h3>
+                                    <div class="mt-2 text-sm text-blue-700">
+                                        <p>
+                                            "This is a " <strong>{variation_type_display}</strong> " variation of "
+                                            <strong>{base_test_name}</strong>
+                                        </p>
+                                        <div class="mt-3">
+                                            <div class="flex items-center space-x-4">
+                                                <button
+                                                    class="text-sm bg-blue-100 hover:bg-blue-200 text-blue-800 px-3 py-1 rounded-md transition-colors"
+                                                    on:click=move |_| {
+                                                        let navigate = leptos_router::use_navigate();
+                                                        navigate("/test-variations", Default::default());
+                                                    }
+                                                >
+                                                    "Manage All Variations"
+                                                </button>
+                                                <span class="text-blue-600">
+                                                    {move || {
+                                                        let count = related_variations().len();
+                                                        if count > 0 {
+                                                            format!("{} related test(s)", count)
+                                                        } else {
+                                                            "No other variations".to_string()
+                                                        }
+                                                    }}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                } else {
+                    view! { <div></div> }
+                }
+            }}
 
             // Error message display
             <Show when=move || show_error()>
@@ -800,6 +940,33 @@ pub fn TestBuilderContent() -> impl IntoView {
                                     }
                                 ></textarea>
                             </div>
+
+                            {move || {
+                                if !is_edit_mode() {
+                                    view! {
+                                        <div class="form-group">
+                                            <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                                                <h3 class="text-sm font-medium text-gray-700 mb-3">Test Variations</h3>
+                                                <p class="text-sm text-gray-600 mb-4">
+                                                    "After creating this test, you can create variations (easier, harder, practice versions) from the Variation Manager."
+                                                </p>
+                                                <button
+                                                    type="button"
+                                                    class="text-sm bg-blue-100 hover:bg-blue-200 text-blue-800 px-3 py-2 rounded-md transition-colors"
+                                                    on:click=move |_| {
+                                                        let navigate = leptos_router::use_navigate();
+                                                        navigate("/test-variations", Default::default());
+                                                    }
+                                                >
+                                                    "Go to Variation Manager"
+                                                </button>
+                                            </div>
+                                        </div>
+                                    }
+                                } else {
+                                    view! { <div></div> }
+                                }
+                            }}
 
                             <div class="pt-6">
                                 <button

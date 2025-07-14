@@ -155,11 +155,6 @@ pub fn DashboardSidebar(
         }
     };
 
-    // Handle administer test click with consideration for pinned state
-    let handle_administer_click = move |_| {
-        set_show_administer_modal.update(|v| *v = !*v);
-    };
-
     view! {
         <div class="relative">
             <div
@@ -232,27 +227,14 @@ pub fn DashboardSidebar(
                             is_active=Signal::derive(move || current_path().starts_with("/gradebook"))
                             is_small_screen=is_small_screen.into()
                         />
-
-                        // Administer Test item with dropdown - Updated click handler
-                        <div
-                            class="flex items-center cursor-pointer hover:bg-[#DADADA] p-2 rounded-md transition-colors"
-                            on:click=handle_administer_click
-                        >
-                            <Icon
-                                icon=IoPricetagOutline
-                                class="w-6 h-6 flex-shrink-0 text-[#2E3A59]"
-                            />
-                            <div class="overflow-hidden whitespace-nowrap">
-                                <Show
-                                    when=move || is_expanded()
-                                    fallback=|| view! { <></> }
-                                >
-                                    <div class="flex items-center justify-between ml-2 w-full">
-                                        <span class="font-semibold text-sm sm:text-base">"Administer Test"</span>
-                                    </div>
-                                </Show>
-                            </div>
-                        </div>
+                        <SidebarNavLink
+                            icon=IoPricetagOutline
+                            label="Tests"
+                            path="/test-manager"
+                            is_expanded=is_expanded.into()
+                            is_active=Signal::derive(move || current_path().starts_with("/test-manager"))
+                            is_small_screen=is_small_screen.into()
+                        />
                     </div>
 
                     <div class="space-y-4 mt-auto pb-4">

@@ -30,7 +30,7 @@ pub fn GridTest() -> impl IntoView {
     let params = use_params_map();
     let test_id = move || params.with(|params| params.get("test_id").cloned().unwrap_or_default());
     let user = use_context::<ReadSignal<Option<SessionUser>>>().expect("AuthProvider not Found");
-    let user_resource = create_resource(
+    let user_resource = create_local_resource(
         move || user.get().map(|u| u.id),
         move |id| async move {
             match id {

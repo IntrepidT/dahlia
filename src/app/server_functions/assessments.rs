@@ -95,20 +95,38 @@ pub async fn add_assessment(
         log::info!("Attempting to add new assessment to the database");
 
         let id = Uuid::new_v4();
-        let buffer_assessment = Assessment::new(
-            add_assessment_request.name,
-            add_assessment_request.frequency,
-            add_assessment_request.grade,
-            add_assessment_request.version,
-            id,
-            add_assessment_request.tests,
-            add_assessment_request.composite_score,
-            add_assessment_request.risk_benchmarks,
-            add_assessment_request.national_benchmarks,
-            add_assessment_request.subject,
-            add_assessment_request.scope,
-            add_assessment_request.course_id,
-        );
+
+        let buffer_assessment = if add_assessment_request.test_sequence.is_some() {
+            Assessment::new_with_sequence(
+                add_assessment_request.name,
+                add_assessment_request.frequency,
+                add_assessment_request.grade,
+                add_assessment_request.version,
+                id,
+                add_assessment_request.composite_score,
+                add_assessment_request.risk_benchmarks,
+                add_assessment_request.national_benchmarks,
+                add_assessment_request.subject,
+                add_assessment_request.scope,
+                add_assessment_request.course_id,
+                add_assessment_request.test_sequence.unwrap(),
+            )
+        } else {
+            Assessment::new(
+                add_assessment_request.name,
+                add_assessment_request.frequency,
+                add_assessment_request.grade,
+                add_assessment_request.version,
+                id,
+                add_assessment_request.tests,
+                add_assessment_request.composite_score,
+                add_assessment_request.risk_benchmarks,
+                add_assessment_request.national_benchmarks,
+                add_assessment_request.subject,
+                add_assessment_request.scope,
+                add_assessment_request.course_id,
+            )
+        };
 
         assessment_database::add_assessment(&buffer_assessment, &pool)
             .await
@@ -205,20 +223,37 @@ pub async fn update_assessment(
 
         log::info!("Attempting to update assessment");
 
-        let buffer_assessment = Assessment::new(
-            update_assessment_request.name,
-            update_assessment_request.frequency,
-            update_assessment_request.grade,
-            update_assessment_request.version,
-            update_assessment_request.id,
-            update_assessment_request.tests,
-            update_assessment_request.composite_score,
-            update_assessment_request.risk_benchmarks,
-            update_assessment_request.national_benchmarks,
-            update_assessment_request.subject,
-            update_assessment_request.scope,
-            update_assessment_request.course_id,
-        );
+        let buffer_assessment = if update_assessment_request.test_sequence.is_some() {
+            Assessment::new_with_sequence(
+                update_assessment_request.name,
+                update_assessment_request.frequency,
+                update_assessment_request.grade,
+                update_assessment_request.version,
+                update_assessment_request.id,
+                update_assessment_request.composite_score,
+                update_assessment_request.risk_benchmarks,
+                update_assessment_request.national_benchmarks,
+                update_assessment_request.subject,
+                update_assessment_request.scope,
+                update_assessment_request.course_id,
+                update_assessment_request.test_sequence.unwrap(),
+            )
+        } else {
+            Assessment::new(
+                update_assessment_request.name,
+                update_assessment_request.frequency,
+                update_assessment_request.grade,
+                update_assessment_request.version,
+                update_assessment_request.id,
+                update_assessment_request.tests,
+                update_assessment_request.composite_score,
+                update_assessment_request.risk_benchmarks,
+                update_assessment_request.national_benchmarks,
+                update_assessment_request.subject,
+                update_assessment_request.scope,
+                update_assessment_request.course_id,
+            )
+        };
 
         match assessment_database::update_assessment(&buffer_assessment, &pool).await {
             Ok(updated_assessment) => Ok(updated_assessment),

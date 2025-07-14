@@ -146,9 +146,17 @@ pub fn ReviewTest() -> impl IntoView {
                                                 <h1 class="text-3xl font-bold text-gray-900">{&test.name}</h1>
                                                 {move || {
                                                     student.get().map(|student_data| {
+                                                        let firstname = match &student_data.firstname {
+                                                            Some(name) => name.clone(),
+                                                            None => "Unknown".to_string(),
+                                                        };
+                                                        let lastname = match &student_data.lastname {
+                                                            Some(name) => name.clone(),
+                                                            None => "Student".to_string(),
+                                                        };
                                                         view! {
                                                             <p class="text-gray-600">
-                                                                Student: {&student_data.firstname.unwrap()}{" "}{&student_data.lastname.unwrap()}
+                                                                Student: {firstname}{" "}{lastname}
                                                             </p>
                                                         }
                                                     })

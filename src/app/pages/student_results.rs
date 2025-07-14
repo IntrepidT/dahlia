@@ -7,6 +7,10 @@ use crate::app::components::data_processing::{
     AssessmentSummary, Progress, StudentResultsSummary, TestDetail,
 };
 use crate::app::components::header::Header;
+use crate::app::components::student_report::sequence_progress_bar::{
+    CompactStripeProgress, StripeProgressBar,
+};
+use crate::app::components::student_report::sequence_web::SequenceWeb;
 use crate::app::server_functions::data_wrappers::get_student_results_server;
 use leptos::*;
 use leptos_router::use_params_map;
@@ -42,6 +46,7 @@ pub fn TestResultsPage() -> impl IntoView {
     let (expanded_assessment, set_expanded_assessment) = create_signal::<Option<String>>(None);
     let (filter_test_name, set_filter_test_name) = create_signal::<Option<String>>(None);
     let (show_filters, set_show_filters) = create_signal::<bool>(false);
+    let (view_mode, set_view_mode) = create_signal::<String>("overview".to_string());
 
     view! {
         <Header />
@@ -77,307 +82,422 @@ pub fn TestResultsPage() -> impl IntoView {
                 })}
             </Suspense>
 
-            // Performance Summary Section
-            <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-                <h2 class="text-xl font-bold mb-4">"Performance Summary"</h2>
-                <Suspense fallback=move || view! { <div>"Loading summary data..."</div> }>
-                    {move || {
-                        let results = student_results_resource.get().unwrap_or(None);
-                        match results {
-                            Some(data) => {
-                                let assessments = data.assessment_summaries.clone();
-                                let assessments_clone = assessments.clone();
-                                if assessments.is_empty() {
-                                    view! { <div class="text-gray-600">"No assessment data available"</div> }
+            //View mode toggle
+            <div class="flex justify-center mb-6">
+                <div class="bg-white rounded-xl shadow-lg p-2 border border-slate-200">
+                    <div class="flex space-x-2">
+                        <button
+                            class=move || {
+                                if view_mode.get() == "overview" {
+                                    "px-6 py-2 bg-blue-500 text-white rounded-lg font-medium transition-all duration-200"
                                 } else {
-                                    view! {
-                                        <div class="overflow-x-auto">
-                                            <table class="min-w-full bg-white">
-                                                <thead class="bg-gray-100">
-                                                    <tr>
-                                                        <th class="py-2 px-4 text-left">"Assessment Name"</th>
-                                                        <th class="py-2 px-4 text-left">"Subject"</th>
-                                                        <th class="py-2 px-4 text-left">"Total Possible"</th>
-                                                        <th class="py-2 px-4 text-left">"Current Score"</th>
-                                                        <th class="py-2 px-4 text-left">"Grade Level"</th>
-                                                        <th class="py-2 px-4 text-left">"Performance"</th>
-                                                        <th class="py-2 px-4 text-left">"Status"</th>
-                                                        <th class="py-2 px-4 text-left">"Action"</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {assessments.into_iter().map(|assessment| {
-                                                        let assessment_id = assessment.assessment_id.clone();
-                                                        let assessment_id_for_button = assessment_id.clone();
-                                                        let assessment_id_for_details = assessment_id.clone();
-                                                        let assessment_id_for_closure = assessment_id.clone();
-                                                        let progress_clone = assessment.progress.clone();
+                                    "px-6 py-2 text-slate-600 hover:text-slate-800 rounded-lg font-medium transition-all duration-200"
+                                }
+                            }
+                            on:click=move |_| set_view_mode("overview".to_string())
+                        >
+                            "Progress Overview"
+                        </button>
+                        <button
+                            class=move || {
+                                if view_mode.get() == "detailed" {
+                                    "px-6 py-2 bg-blue-500 text-white rounded-lg font-medium transition-all duration-200"
+                                } else {
+                                    "px-6 py-2 text-slate-600 hover:text-slate-800 rounded-lg font-medium transition-all duration-200"
+                                }
+                            }
+                            on:click=move |_| set_view_mode("detailed".to_string())
+                        >
+                            "Detailed View"
+                        </button>
+                    </div>
+                </div>
+            </div>
 
-                                                        // Pre-clone all the values that will be used inside closures
-                                                        let test_details = assessment.test_details.clone();
-                                                        let distribution_data = assessment.distribution_data.clone();
-                                                        let assessment_rating = assessment.assessment_rating.clone();
-                                                        let assessment_current_score = assessment.current_score;
-                                                        let assessment_total_possible = assessment.total_possible;
-                                                        let test_details_len = assessment.test_details.len();
+            // Progress Overview Section - Using SequenceWeb components
+            <Suspense fallback=move || view! { <div>"Loading progress data..."</div> }>
+                {move || {
+                    let results = student_results_resource.get().unwrap_or(None);
+                    match results {
+                        Some(data) => {
+                            let assessments = data.assessment_summaries.clone();
 
-                                                        view! {
-                                                            <>
-                                                                <tr class="border-t hover:bg-gray-50">
-                                                                    <td class="py-3 px-4">{assessment.assessment_name}</td>
-                                                                    <td class="py-3 px-4">{assessment.subject}</td>
-                                                                    <td class="py-3 px-4">
-                                                                        {assessment.total_possible.map(|score| score.to_string()).unwrap_or_else(|| "N/A".to_string())}
-                                                                    </td>
-                                                                    <td class="py-3 px-4">{assessment.current_score}</td>
-                                                                    <td class="py-3 px-4">{assessment.grade_level.unwrap_or_else(|| "Any".to_string())}</td>
+                            if view_mode.get() == "overview" && !assessments.is_empty() {
+                                view! {
+                                    <div class="mb-6 space-y-4">
+                                        <h2 class="text-2xl font-bold text-slate-800 mb-4">"Assessment Progress Overview"</h2>
+                                        {assessments.iter().map(|assessment| {
+                                            view! {
+                                                <SequenceWeb
+                                                    assessment={assessment.clone()}
+                                                    test_details={assessment.test_details.clone()}
+                                                />
+                                            }
+                                        }).collect::<Vec<_>>()}
+                                    </div>
+                                }
+                            } else if view_mode.get() == "overview" {
+                                view! {
+                                    <div class="mb-6 bg-slate-50 rounded-lg p-8 text-center">
+                                        <h2 class="text-xl font-semibold text-slate-600 mb-2">"No Assessment Data Available"</h2>
+                                        <p class="text-slate-500">"Assessment progress will appear here once tests are completed."</p>
+                                    </div>
+                                }
+                            } else {
+                                view! { <div></div> }
+                            }
+                        },
+                        None => view! { <div></div> }
+                    }
+                }}
+            </Suspense>
 
-                                                                    <td class="py-3 px-4">{assessment.assessment_rating}</td>
-                                                                    <td class="py-3 px-4">
-                                                                        <span class=move || {
-                                                                            match progress_clone {
-                                                                                Progress::Completed => "px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs",
-                                                                                Progress::Ongoing => "px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs",
-                                                                                Progress::NotStarted => "px-2 py-1 bg-gray-100 text-gray-800 rounded-full text-xs",
-                                                                            }
-                                                                        }>
-                                                                            {format!("{}", assessment.progress)}
-                                                                        </span>
-                                                                    </td>
-                                                                    <td class="py-3 px-4">
-                                                                        <button
-                                                                            class="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
-                                                                            on:click=move |_| {
-                                                                                if expanded_assessment.get() == Some(assessment_id_for_button.clone()) {
-                                                                                    set_expanded_assessment(None);
-                                                                                } else {
-                                                                                    set_expanded_assessment(Some(assessment_id_for_button.clone()));
-                                                                                }
-                                                                            }
-                                                                        >
-                                                                            {move || {
-                                                                                if expanded_assessment.get() == Some(assessment_id_for_closure.clone()) {
-                                                                                    "Hide Details"
-                                                                                } else {
-                                                                                    "Show Details"
-                                                                                }
-                                                                            }}
-                                                                        </button>
-                                                                    </td>
-                                                                </tr>
-                                                            </>
-                                                        }
-                                                    }).collect::<Vec<_>>()}
-                                                </tbody>
-                                            </table>
+            // Compact Progress Cards Section - Show in detailed view only
+            <Suspense fallback=move || view! { <div>"Loading compact progress..."</div> }>
+                {move || {
+                    let results = student_results_resource.get().unwrap_or(None);
+                    match results {
+                        Some(data) => {
+                            let assessments = data.assessment_summaries.clone();
 
-                                            {/* Assessment details display outside of the main table */}
-                                            {assessments_clone.into_iter().map(|assessment| {
-                                                let assessment_id = assessment.assessment_id.clone();
-                                                let assessment_name = assessment.assessment_name.clone();
-
-                                                // Pre-clone all the values that will be used inside closures
-                                                let test_details = assessment.test_details.clone();
-                                                let distribution_data = assessment.distribution_data.clone();
-                                                let assessment_rating = assessment.assessment_rating.clone();
-                                                let assessment_current_score = assessment.current_score;
-                                                let assessment_total_possible = assessment.total_possible;
-                                                let test_details_len = assessment.test_details.len();
-
+                            if view_mode.get() == "detailed" && !assessments.is_empty() {
+                                view! {
+                                    <div class="mb-6">
+                                        <h2 class="text-xl font-bold text-slate-800 mb-4">"Quick Progress Summary"</h2>
+                                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                            {assessments.iter().map(|assessment| {
                                                 view! {
-                                                    {move || {
-                                                        if expanded_assessment.get() == Some(assessment_id.clone()) {
-                                                            let test_details_clone = test_details.clone();
-                                                            // Create a local clone of assessment_rating to avoid moving it
-                                                            let assessment_rating_clone = assessment_rating.clone();
-                                                            let rating = assessment_rating_clone.clone();
-
-                                                            view! {
-                                                                <div class="mt-4 mb-8 bg-gray-50 border rounded-lg p-4 shadow">
-                                                                    <h3 class="font-semibold text-lg mb-2 text-blue-600">
-                                                                        {format!("{} Details", assessment_name)}
-                                                                    </h3>
-
-                                                                    <div class="mb-4">
-                                                                        <h4 class="font-semibold mb-2">{"Subtests Performance"}</h4>
-                                                                        {if test_details_clone.is_empty() {
-                                                                            view! { <div><p class="text-gray-500">"No test data available for this assessment"</p></div> }
-                                                                        } else {
-                                                                            view! {
-                                                                                <div class="overflow-x-auto">
-                                                                                    <table class="min-w-full bg-white border">
-                                                                                        <thead class="bg-gray-100">
-                                                                                            <tr>
-                                                                                                <th class="py-2 px-3 text-left text-sm">"Test Name"</th>
-                                                                                                <th class="py-2 px-3 text-left text-sm">"Score"</th>
-                                                                                                <th class="py-2 px-3 text-left text-sm">"Total"</th>
-                                                                                                <th class="py-2 px-3 text-left text-sm">"Test Area"</th>
-                                                                                                <th class="py-2 px-3 text-left text-sm">"Taken"</th>
-                                                                                                <th class="py-2 px-3 text-left text-sm">"Performance"</th>
-                                                                                            </tr>
-                                                                                        </thead>
-                                                                                        <tbody>
-                                                                                            {test_details_clone.iter().map(|test| {
-                                                                                                let test_for_class = test.clone();
-                                                                                                let performance_class = test.performance_class.clone();
-                                                                                                let performance_class_for_style = performance_class.clone();
-
-                                                                                                view! {
-                                                                                                    <tr class="border-t">
-                                                                                                        <td class="py-2 px-3 text-sm">{test.test_name.clone()}</td>
-                                                                                                        <td class="py-2 px-3 text-sm">
-                                                                                                            <span class=move || {
-                                                                                                                let score_percentage = (test_for_class.score as f32 / test_for_class.total_possible as f32) * 100.0;
-                                                                                                                if score_percentage >= 80.0 {
-                                                                                                                    "text-green-600 font-semibold"
-                                                                                                                } else if score_percentage >= 60.0 {
-                                                                                                                    "text-yellow-600 font-semibold"
-                                                                                                                } else {
-                                                                                                                    "text-red-600 font-semibold"
-                                                                                                                }
-                                                                                                            }>
-                                                                                                                {test.score}
-                                                                                                            </span>
-                                                                                                        </td>
-                                                                                                        <td class="py-2 px-3 text-sm">{test.total_possible}</td>
-                                                                                                        <td class="py-2 px-3 text-sm">{test.test_area.clone()}</td>
-                                                                                                        <td class="py-2 px-3 text-sm">{format!("{}", test.date_administered.format("%Y-%m-%d"))}</td>
-                                                                                                        <td class="py-2 px-3 text-sm">
-                                                                                                            <span class=move || {
-                                                                                                                if performance_class_for_style.contains("Above") || performance_class_for_style.contains("High") {
-                                                                                                                    "px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs"
-                                                                                                                } else if performance_class_for_style.contains("Average") || performance_class_for_style.contains("On Track") {
-                                                                                                                    "px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs"
-                                                                                                                } else if performance_class_for_style.contains("Below") || performance_class_for_style.contains("Risk") {
-                                                                                                                    "px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs"
-                                                                                                                } else {
-                                                                                                                    "px-2 py-1 bg-gray-100 text-gray-800 rounded-full text-xs"
-                                                                                                                }
-                                                                                                            }>
-                                                                                                                {&performance_class.clone()}
-                                                                                                            </span>
-                                                                                                        </td>
-                                                                                                    </tr>
-                                                                                                }
-                                                                                            }).collect::<Vec<_>>()}
-                                                                                        </tbody>
-                                                                                    </table>
-                                                                                </div>
-                                                                            }
-                                                                        }}
-                                                                    </div>
-
-                                                                    // Performance charts for this assessment
-                                                                    <div class="mt-6">
-                                                                        <h4 class="font-semibold mb-2">"Performance Distribution"</h4>
-                                                                        <div class="border rounded-lg p-4 bg-white">
-                                                                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                                                // Distribution chart
-                                                                                <div class="h-64">
-                                                                                    <h5 class="text-sm font-medium text-gray-500 mb-2">"Performance Categories"</h5>
-                                                                                    <div class="flex space-x-2">
-                                                                                        {distribution_data.iter().map(|(category, count)| {
-                                                                                            let category_clone = category.clone();
-                                                                                            let color = match category.as_str() {
-                                                                                                cat if cat.contains("Above") || cat.contains("High") => "bg-green-500",
-                                                                                                cat if cat.contains("Average") || cat.contains("On Track") => "bg-blue-500",
-                                                                                                cat if cat.contains("Below") || cat.contains("Risk") => "bg-red-500",
-                                                                                                _ => "bg-gray-500"
-                                                                                            };
-                                                                                            let width_percent = *count as f32 / test_details_len as f32 * 100.0;
-
-                                                                                            view! {
-                                                                                                <div class="flex flex-col items-center">
-                                                                                                    <div class="w-16 relative h-48 bg-gray-200 rounded overflow-hidden">
-                                                                                                        <div
-                                                                                                            class={format!("{} absolute bottom-0 w-full", color)}
-                                                                                                            style={format!("height: {}%", width_percent)}
-                                                                                                        ></div>
-                                                                                                    </div>
-                                                                                                    <div class="text-xs mt-1">{category_clone}</div>
-                                                                                                    <div class="text-xs font-bold">{count.to_string()}</div>
-                                                                                                </div>
-                                                                                            }
-                                                                                        }).collect::<Vec<_>>()}
-                                                                                    </div>
-                                                                                </div>
-
-                                                                                // Overall assessment rating
-                                                                                <div class="flex flex-col items-center justify-center border rounded-lg p-4">
-                                                                                    <h5 class="text-sm font-medium text-gray-500 mb-2">"Overall Assessment Rating"</h5>
-                                                                                    <div class=move || {
-                                                                                        // Use the cloned value to avoid moving
-                                                                                        let color_class = if rating.contains("Above") || rating.contains("High") {
-                                                                                            "text-4xl font-bold text-green-600"
-                                                                                        } else if rating.contains("Average") || rating.contains("On Track") {
-                                                                                            "text-4xl font-bold text-blue-600"
-                                                                                        } else if rating.contains("Below") || rating.contains("Risk") {
-                                                                                            "text-4xl font-bold text-red-600"
-                                                                                        } else {
-                                                                                            "text-4xl font-bold text-gray-600"
-                                                                                        };
-                                                                                        color_class
-                                                                                    }>
-                                                                                        {&assessment_rating_clone}
-                                                                                    </div>
-                                                                                    <div class="mt-2 text-sm text-gray-600">
-                                                                                        "Based on " {test_details_len} " completed tests"
-                                                                                    </div>
-                                                                                    <div class="mt-4 flex items-center">
-                                                                                        <div class="w-full bg-gray-200 rounded-full h-2.5">
-                                                                                            <div
-                                                                                                class=move || {
-                                                                                                    let score_percent = if let Some(total) = assessment_total_possible {
-                                                                                                        (assessment_current_score as f32 / total as f32 * 100.0) as i32
-                                                                                                    } else {
-                                                                                                        0
-                                                                                                    };
-
-                                                                                                    if score_percent >= 80 {
-                                                                                                        "bg-green-600 h-2.5 rounded-full"
-                                                                                                    } else if score_percent >= 60 {
-                                                                                                        "bg-yellow-400 h-2.5 rounded-full"
-                                                                                                    } else {
-                                                                                                        "bg-red-600 h-2.5 rounded-full"
-                                                                                                    }
-                                                                                                }
-                                                                                                style=move || {
-                                                                                                    let percent = if let Some(total) = assessment_total_possible {
-                                                                                                        let p = (assessment_current_score as f32 / total as f32 * 100.0) as i32;
-                                                                                                        p.min(100)
-                                                                                                    } else {
-                                                                                                        0
-                                                                                                    };
-                                                                                                    format!("width: {}%", percent)
-                                                                                                }
-                                                                                            ></div>
-                                                                                        </div>
-                                                                                    </div>
-                                                                                    <div class="mt-1 text-xs">
-                                                                                        {assessment_current_score}
-                                                                                        {assessment_total_possible.map(|t| format!(" / {}", t)).unwrap_or_else(|| String::new())}
-                                                                                    </div>
-                                                                                </div>
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            }
-                                                        } else {
-                                                            view! { <div></div> }
-                                                        }
-                                                    }}
+                                                    <CompactStripeProgress
+                                                        assessment_name={assessment.assessment_name.clone()}
+                                                        current_score={assessment.current_score}
+                                                        total_possible={assessment.total_possible}
+                                                        test_details={assessment.test_details.clone()}
+                                                    />
                                                 }
                                             }).collect::<Vec<_>>()}
                                         </div>
-                                    }
+                                    </div>
                                 }
-                            },
-                            None => view! { <div class="text-gray-600">"No assessment data available"</div> }
-                        }
-                    }}
-                </Suspense>
-            </div>
+                            } else {
+                                view! { <div></div> }
+                            }
+                        },
+                        None => view! { <div></div> }
+                    }
+                }}
+            </Suspense>
+
+            // Performance Summary Section - Show only in detailed view
+            {move || {
+                if view_mode.get() == "detailed" {
+                    view! {
+                        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                            <h2 class="text-xl font-bold mb-4">"Performance Summary"</h2>
+                            <Suspense fallback=move || view! { <div>"Loading summary data..."</div> }>
+                                {move || {
+                                    let results = student_results_resource.get().unwrap_or(None);
+                                    match results {
+                                        Some(data) => {
+                                            let assessments = data.assessment_summaries.clone();
+                                            let assessments_clone = assessments.clone();
+                                            if assessments.is_empty() {
+                                                view! { <div class="text-gray-600">"No assessment data available"</div> }
+                                            } else {
+                                                view! {
+                                                    <div class="overflow-x-auto">
+                                                        <table class="min-w-full bg-white">
+                                                            <thead class="bg-gray-100">
+                                                                <tr>
+                                                                    <th class="py-2 px-4 text-left">"Assessment Name"</th>
+                                                                    <th class="py-2 px-4 text-left">"Subject"</th>
+                                                                    <th class="py-2 px-4 text-left">"Total Possible"</th>
+                                                                    <th class="py-2 px-4 text-left">"Current Score"</th>
+                                                                    <th class="py-2 px-4 text-left">"Grade Level"</th>
+                                                                    <th class="py-2 px-4 text-left">"Performance"</th>
+                                                                    <th class="py-2 px-4 text-left">"Status"</th>
+                                                                    <th class="py-2 px-4 text-left">"Action"</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                {assessments.into_iter().map(|assessment| {
+                                                                    let assessment_id = assessment.assessment_id.clone();
+                                                                    let assessment_id_for_button = assessment_id.clone();
+                                                                    let assessment_id_for_details = assessment_id.clone();
+                                                                    let assessment_id_for_closure = assessment_id.clone();
+                                                                    let progress_clone = assessment.progress.clone();
+
+                                                                    // Pre-clone all the values that will be used inside closures
+                                                                    let test_details = assessment.test_details.clone();
+                                                                    let distribution_data = assessment.distribution_data.clone();
+                                                                    let assessment_rating = assessment.assessment_rating.clone();
+                                                                    let assessment_current_score = assessment.current_score;
+                                                                    let assessment_total_possible = assessment.total_possible;
+                                                                    let test_details_len = assessment.test_details.len();
+
+                                                                    view! {
+                                                                        <>
+                                                                            <tr class="border-t hover:bg-gray-50">
+                                                                                <td class="py-3 px-4">{assessment.assessment_name}</td>
+                                                                                <td class="py-3 px-4">{assessment.subject}</td>
+                                                                                <td class="py-3 px-4">
+                                                                                    {assessment.total_possible.map(|score| score.to_string()).unwrap_or_else(|| "N/A".to_string())}
+                                                                                </td>
+                                                                                <td class="py-3 px-4">{assessment.current_score}</td>
+                                                                                <td class="py-3 px-4">{assessment.grade_level.unwrap_or_else(|| "Any".to_string())}</td>
+
+                                                                                <td class="py-3 px-4">{assessment.assessment_rating}</td>
+                                                                                <td class="py-3 px-4">
+                                                                                    <span class=move || {
+                                                                                        match progress_clone {
+                                                                                            Progress::Completed => "px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs",
+                                                                                            Progress::Ongoing => "px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs",
+                                                                                            Progress::NotStarted => "px-2 py-1 bg-gray-100 text-gray-800 rounded-full text-xs",
+                                                                                        }
+                                                                                    }>
+                                                                                        {format!("{}", assessment.progress)}
+                                                                                    </span>
+                                                                                </td>
+                                                                                <td class="py-3 px-4">
+                                                                                    <button
+                                                                                        class="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+                                                                                        on:click=move |_| {
+                                                                                            if expanded_assessment.get() == Some(assessment_id_for_button.clone()) {
+                                                                                                set_expanded_assessment(None);
+                                                                                            } else {
+                                                                                                set_expanded_assessment(Some(assessment_id_for_button.clone()));
+                                                                                            }
+                                                                                        }
+                                                                                    >
+                                                                                        {move || {
+                                                                                            if expanded_assessment.get() == Some(assessment_id_for_closure.clone()) {
+                                                                                                "Hide Details"
+                                                                                            } else {
+                                                                                                "Show Details"
+                                                                                            }
+                                                                                        }}
+                                                                                    </button>
+                                                                                </td>
+                                                                            </tr>
+                                                                        </>
+                                                                    }
+                                                                }).collect::<Vec<_>>()}
+                                                            </tbody>
+                                                        </table>
+
+                                                        {/* Assessment details display outside of the main table */}
+                                                        {assessments_clone.into_iter().map(|assessment| {
+                                                            let assessment_id = assessment.assessment_id.clone();
+                                                            let assessment_name = assessment.assessment_name.clone();
+
+                                                            // Pre-clone all the values that will be used inside closures
+                                                            let test_details = assessment.test_details.clone();
+                                                            let distribution_data = assessment.distribution_data.clone();
+                                                            let assessment_rating = assessment.assessment_rating.clone();
+                                                            let assessment_current_score = assessment.current_score;
+                                                            let assessment_total_possible = assessment.total_possible;
+                                                            let test_details_len = assessment.test_details.len();
+
+                                                            view! {
+                                                                {move || {
+                                                                    if expanded_assessment.get() == Some(assessment_id.clone()) {
+                                                                        let test_details_clone = test_details.clone();
+                                                                        // Create a local clone of assessment_rating to avoid moving it
+                                                                        let assessment_rating_clone = assessment_rating.clone();
+                                                                        let rating = assessment_rating_clone.clone();
+
+                                                                        view! {
+                                                                            <div class="mt-4 mb-8 bg-gray-50 border rounded-lg p-4 shadow">
+                                                                                <h3 class="font-semibold text-lg mb-2 text-blue-600">
+                                                                                    {format!("{} Details", assessment_name)}
+                                                                                </h3>
+
+                                                                                <div class="mb-4">
+                                                                                    <h4 class="font-semibold mb-2">{"Subtests Performance"}</h4>
+                                                                                    {if test_details_clone.is_empty() {
+                                                                                        view! { <div><p class="text-gray-500">"No test data available for this assessment"</p></div> }
+                                                                                    } else {
+                                                                                        view! {
+                                                                                            <div class="overflow-x-auto">
+                                                                                                <table class="min-w-full bg-white border">
+                                                                                                    <thead class="bg-gray-100">
+                                                                                                        <tr>
+                                                                                                            <th class="py-2 px-3 text-left text-sm">"Test Name"</th>
+                                                                                                            <th class="py-2 px-3 text-left text-sm">"Score"</th>
+                                                                                                            <th class="py-2 px-3 text-left text-sm">"Total"</th>
+                                                                                                            <th class="py-2 px-3 text-left text-sm">"Test Area"</th>
+                                                                                                            <th class="py-2 px-3 text-left text-sm">"Taken"</th>
+                                                                                                            <th class="py-2 px-3 text-left text-sm">"Performance"</th>
+                                                                                                        </tr>
+                                                                                                    </thead>
+                                                                                                    <tbody>
+                                                                                                        {test_details_clone.iter().map(|test| {
+                                                                                                            let test_for_class = test.clone();
+                                                                                                            let performance_class = test.performance_class.clone();
+                                                                                                            let performance_class_for_style = performance_class.clone();
+
+                                                                                                            view! {
+                                                                                                                <tr class="border-t">
+                                                                                                                    <td class="py-2 px-3 text-sm">{test.test_name.clone()}</td>
+                                                                                                                    <td class="py-2 px-3 text-sm">
+                                                                                                                        <span class=move || {
+                                                                                                                            let score_percentage = (test_for_class.score as f32 / test_for_class.total_possible as f32) * 100.0;
+                                                                                                                            if score_percentage >= 80.0 {
+                                                                                                                                "text-green-600 font-semibold"
+                                                                                                                            } else if score_percentage >= 60.0 {
+                                                                                                                                "text-yellow-600 font-semibold"
+                                                                                                                            } else {
+                                                                                                                                "text-red-600 font-semibold"
+                                                                                                                            }
+                                                                                                                        }>
+                                                                                                                            {test.score}
+                                                                                                                        </span>
+                                                                                                                    </td>
+                                                                                                                    <td class="py-2 px-3 text-sm">{test.total_possible}</td>
+                                                                                                                    <td class="py-2 px-3 text-sm">{test.test_area.clone()}</td>
+                                                                                                                    <td class="py-2 px-3 text-sm">{format!("{}", test.date_administered.format("%Y-%m-%d"))}</td>
+                                                                                                                    <td class="py-2 px-3 text-sm">
+                                                                                                                        <span class=move || {
+                                                                                                                            if performance_class_for_style.contains("Above") || performance_class_for_style.contains("High") {
+                                                                                                                                "px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs"
+                                                                                                                            } else if performance_class_for_style.contains("Average") || performance_class_for_style.contains("On Track") {
+                                                                                                                                "px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs"
+                                                                                                                            } else if performance_class_for_style.contains("Below") || performance_class_for_style.contains("Risk") {
+                                                                                                                                "px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs"
+                                                                                                                            } else {
+                                                                                                                                "px-2 py-1 bg-gray-100 text-gray-800 rounded-full text-xs"
+                                                                                                                            }
+                                                                                                                        }>
+                                                                                                                            {&performance_class.clone()}
+                                                                                                                        </span>
+                                                                                                                    </td>
+                                                                                                                </tr>
+                                                                                                            }
+                                                                                                        }).collect::<Vec<_>>()}
+                                                                                                    </tbody>
+                                                                                                </table>
+                                                                                            </div>
+                                                                                        }
+                                                                                    }}
+                                                                                </div>
+
+                                                                                // Performance charts for this assessment
+                                                                                <div class="mt-6">
+                                                                                    <h4 class="font-semibold mb-2">"Performance Distribution"</h4>
+                                                                                    <div class="border rounded-lg p-4 bg-white">
+                                                                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                                                            // Distribution chart
+                                                                                            <div class="h-64">
+                                                                                                <h5 class="text-sm font-medium text-gray-500 mb-2">"Performance Categories"</h5>
+                                                                                                <div class="flex space-x-2">
+                                                                                                    {distribution_data.iter().map(|(category, count)| {
+                                                                                                        let category_clone = category.clone();
+                                                                                                        let color = match category.as_str() {
+                                                                                                            cat if cat.contains("Above") || cat.contains("High") => "bg-green-500",
+                                                                                                            cat if cat.contains("Average") || cat.contains("On Track") => "bg-blue-500",
+                                                                                                            cat if cat.contains("Below") || cat.contains("Risk") => "bg-red-500",
+                                                                                                            _ => "bg-gray-500"
+                                                                                                        };
+                                                                                                        let width_percent = *count as f32 / test_details_len as f32 * 100.0;
+
+                                                                                                        view! {
+                                                                                                            <div class="flex flex-col items-center">
+                                                                                                                <div class="w-16 relative h-48 bg-gray-200 rounded overflow-hidden">
+                                                                                                                    <div
+                                                                                                                        class={format!("{} absolute bottom-0 w-full", color)}
+                                                                                                                        style={format!("height: {}%", width_percent)}
+                                                                                                                    ></div>
+                                                                                                                </div>
+                                                                                                                <div class="text-xs mt-1">{category_clone}</div>
+                                                                                                                <div class="text-xs font-bold">{count.to_string()}</div>
+                                                                                                            </div>
+                                                                                                        }
+                                                                                                    }).collect::<Vec<_>>()}
+                                                                                                </div>
+                                                                                            </div>
+
+                                                                                            // Overall assessment rating
+                                                                                            <div class="flex flex-col items-center justify-center border rounded-lg p-4">
+                                                                                                <h5 class="text-sm font-medium text-gray-500 mb-2">"Overall Assessment Rating"</h5>
+                                                                                                <div class=move || {
+                                                                                                    // Use the cloned value to avoid moving
+                                                                                                    let color_class = if rating.contains("Above") || rating.contains("High") {
+                                                                                                        "text-4xl font-bold text-green-600"
+                                                                                                    } else if rating.contains("Average") || rating.contains("On Track") {
+                                                                                                        "text-4xl font-bold text-blue-600"
+                                                                                                    } else if rating.contains("Below") || rating.contains("Risk") {
+                                                                                                        "text-4xl font-bold text-red-600"
+                                                                                                    } else {
+                                                                                                        "text-4xl font-bold text-gray-600"
+                                                                                                    };
+                                                                                                    color_class
+                                                                                                }>
+                                                                                                    {&assessment_rating_clone}
+                                                                                                </div>
+                                                                                                <div class="mt-2 text-sm text-gray-600">
+                                                                                                    "Based on " {test_details_len} " completed tests"
+                                                                                                </div>
+                                                                                                <div class="mt-4 flex items-center">
+                                                                                                    <div class="w-full bg-gray-200 rounded-full h-2.5">
+                                                                                                        <div
+                                                                                                            class=move || {
+                                                                                                                let score_percent = if let Some(total) = assessment_total_possible {
+                                                                                                                    (assessment_current_score as f32 / total as f32 * 100.0) as i32
+                                                                                                                } else {
+                                                                                                                    0
+                                                                                                                };
+
+                                                                                                                if score_percent >= 80 {
+                                                                                                                    "bg-green-600 h-2.5 rounded-full"
+                                                                                                                } else if score_percent >= 60 {
+                                                                                                                    "bg-yellow-400 h-2.5 rounded-full"
+                                                                                                                } else {
+                                                                                                                    "bg-red-600 h-2.5 rounded-full"
+                                                                                                                }
+                                                                                                            }
+                                                                                                            style=move || {
+                                                                                                                let percent = if let Some(total) = assessment_total_possible {
+                                                                                                                    let p = (assessment_current_score as f32 / total as f32 * 100.0) as i32;
+                                                                                                                    p.min(100)
+                                                                                                                } else {
+                                                                                                                    0
+                                                                                                                };
+                                                                                                                format!("width: {}%", percent)
+                                                                                                            }
+                                                                                                        ></div>
+                                                                                                    </div>
+                                                                                                </div>
+                                                                                                <div class="mt-1 text-xs">
+                                                                                                    {assessment_current_score}
+                                                                                                    {assessment_total_possible.map(|t| format!(" / {}", t)).unwrap_or_else(|| String::new())}
+                                                                                                </div>
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </div>
+                                                                            </div>
+                                                                        }
+                                                                    } else {
+                                                                        view! { <div></div> }
+                                                                    }
+                                                                }}
+                                                            }
+                                                        }).collect::<Vec<_>>()}
+                                                    </div>
+                                                }
+                                            }
+                                        },
+                                        None => view! { <div class="text-gray-600">"No assessment data available"</div> }
+                                    }
+                                }}
+                            </Suspense>
+                        </div>
+                    }
+                } else {
+                    view! { <div></div> }
+                }
+            }}
+
+            // Test Score Ledger
             <div class="bg-white rounded-lg shadow-md p-6 mb-6">
                 <div class="flex justify-between items-center mb-4">
                     <h2 class="text-xl font-bold">"Test Score Ledger"</h2>

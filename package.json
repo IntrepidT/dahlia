@@ -7,7 +7,6 @@
     "tailwindcss": "^3.4.17"
   },
   "dependencies": {
-    "caniuse-lite": "^1.0.30001695",
     "tinymce": "^7.6.0"
   }
 }

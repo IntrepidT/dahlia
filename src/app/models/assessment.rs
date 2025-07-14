@@ -1,3 +1,4 @@
+use crate::app::models::assessment_sequences::{SequenceBehavior, TestSequenceItem};
 use crate::app::models::student::GradeEnum;
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Debug};
@@ -122,6 +123,7 @@ pub struct Assessment {
     pub subject: SubjectEnum,
     pub scope: Option<ScopeEnum>,
     pub course_id: Option<i32>,
+    pub test_sequence: Option<Vec<TestSequenceItem>>,
 }
 impl Assessment {
     pub fn new(
@@ -151,7 +153,164 @@ impl Assessment {
             subject,
             scope,
             course_id,
+            test_sequence: None,
         }
+    }
+    pub fn new_with_sequence(
+        name: String,
+        frequency: Option<i32>,
+        grade: Option<GradeEnum>,
+        version: i32,
+        id: Uuid,
+        composite_score: Option<i32>,
+        risk_benchmarks: Option<Vec<RangeCategory>>,
+        national_benchmarks: Option<Vec<RangeCategory>>,
+        subject: SubjectEnum,
+        scope: Option<ScopeEnum>,
+        course_id: Option<i32>,
+        test_sequence: Vec<TestSequenceItem>,
+    ) -> Assessment {
+        // Extract test IDs for backward compatibility
+        let tests: Vec<Uuid> = test_sequence.iter().map(|item| item.test_id).collect();
+
+        Assessment {
+            name,
+            frequency,
+            grade,
+            version,
+            id,
+            tests,
+            composite_score,
+            risk_benchmarks,
+            national_benchmarks,
+            subject,
+            scope,
+            course_id,
+            test_sequence: Some(test_sequence),
+        }
+    }
+    //helper function to get the first test in the sequence
+    pub fn get_first_test(&self) -> Option<Uuid> {
+        self.test_sequence
+            .as_ref()?
+            .iter()
+            .min_by_key(|item| item.sequence_order)
+            .map(|item| item.test_id)
+    }
+    //helper function get the next test based on the current test and score
+    pub fn get_next_test(&self, current_test_id: Uuid, score: Option<i32>) -> Option<Uuid> {
+        let sequence = self.test_sequence.as_ref()?;
+        let current_item = sequence
+            .iter()
+            .find(|item| item.test_id == current_test_id)?;
+
+        match current_item.sequence_behavior {
+            SequenceBehavior::Node | SequenceBehavior::Diagnostic => {
+                // For nodes and diagnostics, just get the next test in sequence order
+                self.get_next_in_sequence(current_item.sequence_order)
+            }
+            SequenceBehavior::Optional => {
+                // Optional tests can be skipped, continue to next
+                self.get_next_in_sequence(current_item.sequence_order)
+            }
+            SequenceBehavior::Attainment => {
+                let score = score?;
+                let required_score = current_item.required_score?;
+
+                if score >= required_score {
+                    // Passed: use next_on_pass or next in sequence
+                    current_item
+                        .next_on_pass
+                        .or_else(|| self.get_next_in_sequence(current_item.sequence_order))
+                } else {
+                    // Failed: use next_on_fail or end sequence
+                    current_item.next_on_fail
+                }
+            }
+            SequenceBehavior::Remediation => {
+                // After remediation, typically return to main sequence
+                self.get_next_in_sequence(current_item.sequence_order)
+            }
+            SequenceBehavior::Branching => {
+                let score = score?;
+                if let Some(ranges) = &current_item.score_ranges {
+                    // Find the appropriate score range
+                    for range in ranges {
+                        if score >= range.min && score <= range.max {
+                            return range.next_test;
+                        }
+                    }
+                }
+                // If no range matches, continue to next in sequence
+                self.get_next_in_sequence(current_item.sequence_order)
+            }
+        }
+    }
+    //helper function to get the next test in sequence order
+    pub fn get_next_in_sequence(&self, current_order: i32) -> Option<Uuid> {
+        self.test_sequence
+            .as_ref()?
+            .iter()
+            .filter(|item| item.sequence_order > current_order)
+            .min_by_key(|item| item.sequence_order)
+            .map(|item| item.test_id)
+    }
+    //helper function to check if the test should be shown based on the prerequisites
+    pub fn should_show_test(&self, test_id: Uuid, completed_tests: &[Uuid]) -> bool {
+        let sequence = match self.test_sequence.as_ref() {
+            Some(seq) => seq,
+            None => return true,
+        };
+
+        let test_item = match sequence.iter().find(|item| item.test_id == test_id) {
+            Some(item) => item,
+            None => return true,
+        };
+
+        // Check prerequisites
+        if let Some(prerequisites) = &test_item.prerequisite_tests {
+            if !prerequisites
+                .iter()
+                .all(|req| completed_tests.contains(req))
+            {
+                return false;
+            }
+        }
+
+        // Check skip conditions
+        if let Some(skip_conditions) = &test_item.skip_conditions {
+            if skip_conditions
+                .iter()
+                .any(|skip| completed_tests.contains(skip))
+            {
+                return false;
+            }
+        }
+
+        // Special logic for remediation tests
+        if test_item.sequence_behavior == SequenceBehavior::Remediation {
+            // Only show if prerequisite tests were failed
+            if let Some(prerequisites) = &test_item.prerequisite_tests {
+                // This would need additional logic to check if prerequisites were failed
+                // rather than just completed
+                return true; // Placeholder - implement based on your scoring system
+            }
+        }
+
+        true
+    }
+    //helper function to get available attempts remaining
+    pub fn get_attempts_remaining(&self, test_id: Uuid, attempts_used: &[Uuid]) -> Option<i32> {
+        let sequence = self.test_sequence.as_ref()?;
+        let test_item = sequence.iter().find(|item| item.test_id == test_id)?;
+
+        test_item
+            .max_attempts
+            .map(|max| (max - attempts_used.len() as i32).max(0))
+    }
+    //helper function to check if assessment uses sequences
+    pub fn uses_sequences(&self) -> bool {
+        self.test_sequence.is_some() && !self.test_sequence.as_ref().unwrap().is_empty()
     }
 }
 
@@ -169,6 +328,7 @@ pub struct CreateNewAssessmentRequest {
     pub subject: SubjectEnum,
     pub scope: Option<ScopeEnum>,
     pub course_id: Option<i32>,
+    pub test_sequence: Option<Vec<TestSequenceItem>>,
 }
 impl CreateNewAssessmentRequest {
     pub fn new(
@@ -196,6 +356,37 @@ impl CreateNewAssessmentRequest {
             subject,
             scope,
             course_id,
+            test_sequence: None,
+        }
+    }
+    pub fn new_with_sequence(
+        name: String,
+        frequency: Option<i32>,
+        grade: Option<GradeEnum>,
+        version: i32,
+        composite_score: Option<i32>,
+        risk_benchmarks: Option<Vec<RangeCategory>>,
+        national_benchmarks: Option<Vec<RangeCategory>>,
+        subject: SubjectEnum,
+        scope: Option<ScopeEnum>,
+        course_id: Option<i32>,
+        test_sequence: Vec<TestSequenceItem>,
+    ) -> CreateNewAssessmentRequest {
+        let tests: Vec<Uuid> = test_sequence.iter().map(|item| item.test_id).collect();
+
+        CreateNewAssessmentRequest {
+            name,
+            frequency,
+            grade,
+            version,
+            tests,
+            composite_score,
+            risk_benchmarks,
+            national_benchmarks,
+            subject,
+            scope,
+            course_id,
+            test_sequence: Some(test_sequence),
         }
     }
 }
@@ -215,6 +406,7 @@ pub struct UpdateAssessmentRequest {
     pub subject: SubjectEnum,
     pub scope: Option<ScopeEnum>,
     pub course_id: Option<i32>,
+    pub test_sequence: Option<Vec<TestSequenceItem>>,
 }
 impl UpdateAssessmentRequest {
     pub fn new(
@@ -244,6 +436,39 @@ impl UpdateAssessmentRequest {
             subject,
             scope,
             course_id,
+            test_sequence: None,
+        }
+    }
+    pub fn new_with_sequence(
+        name: String,
+        frequency: Option<i32>,
+        grade: Option<GradeEnum>,
+        version: i32,
+        id: Uuid,
+        composite_score: Option<i32>,
+        risk_benchmarks: Option<Vec<RangeCategory>>,
+        national_benchmarks: Option<Vec<RangeCategory>>,
+        subject: SubjectEnum,
+        scope: Option<ScopeEnum>,
+        course_id: Option<i32>,
+        test_sequence: Vec<TestSequenceItem>,
+    ) -> UpdateAssessmentRequest {
+        let tests: Vec<Uuid> = test_sequence.iter().map(|item| item.test_id).collect();
+
+        UpdateAssessmentRequest {
+            name,
+            frequency,
+            grade,
+            version,
+            id,
+            tests,
+            composite_score,
+            risk_benchmarks,
+            national_benchmarks,
+            subject,
+            scope,
+            course_id,
+            test_sequence: Some(test_sequence),
         }
     }
 }

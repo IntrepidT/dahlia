@@ -8,6 +8,7 @@ use leptos_router::*;
 pub mod pages;
 pub mod routes;
 pub mod websockets;
+use crate::app::components::test_components::test_variation_manager::TestVariationManager;
 use crate::app::middleware::global_settings::SettingsProvider;
 use components::enhanced_login_form::provide_student_mapping_service;
 use components::live_test::RealtimeTestSession;
@@ -15,8 +16,8 @@ use components::login_components::{RequestPasswordResetForm, ResetPasswordForm};
 use components::test_templates::{FlashCardSet, GridTest};
 use pages::{
     AdminDashboard, AdministerTest, Assessment, AssessmentPage, Dashboard, Gradebook, HomePage,
-    LoginPage, MathTesting, MyAccount, ReadingTesting, ReviewTest, Settings, StudentView, Teachers,
-    TestBuilder, TestResultsPage, TestSessionsList,
+    LoginPage, MyAccount, ReviewTest, Settings, StudentView, Teachers, TestBuilder,
+    TestResultsPage, TestSessionsList, UnifiedTestManager,
 };
 pub mod components;
 use components::auth::authorization_components::{
@@ -75,9 +76,9 @@ pub fn App() -> impl IntoView {
                             <Route path="/forgot-password" view=RequestPasswordResetForm />
                             <Route path="/reset-password/:token" view=ResetPasswordForm />
                             <Route path="/gradebook" view=Gradebook />
-                            <Route path="/mathtesting" view=MathTesting />
-                            <Route path="/readingtesting" view=ReadingTesting />
+                            <Route path="/test-manager" view=UnifiedTestManager />
                             <Route path="/testbuilder" view=TestBuilder />
+                            <Route path="/test-variations" view=TestVariationManager />
                             <Route path="/testbuilder/:test_id" view=TestBuilder />
                             <Route path="/assessment/:test_id" view=Assessment />
                             <Route path="/flashcardset/:test_id" view=FlashCardSet />

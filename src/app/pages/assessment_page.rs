@@ -6,6 +6,7 @@ use crate::app::models::assessment::{
     Assessment, CreateNewAssessmentRequest, DeleteAssessmentRequest, RangeCategory, ScopeEnum,
     SubjectEnum, UpdateAssessmentRequest,
 };
+use crate::app::models::assessment_sequences::{SequenceBehavior, TestSequenceItem};
 use crate::app::models::student::GradeEnum;
 use crate::app::models::test::Test;
 use crate::app::server_functions::assessments::{
@@ -29,155 +30,273 @@ pub fn AssessmentPage() -> impl IntoView {
 #[component]
 pub fn AssessmentPageContent() -> impl IntoView {
     let (selected_view, set_selected_view) = create_signal(SidebarSelected::Assessments);
-    // Resource to load all assessments
+
+    // Resources
     let assessments_resource =
         create_local_resource(|| (), |_| async move { get_assessments().await });
-
-    // Resource to load all tests
     let tests_resource = create_local_resource(|| (), |_| async move { get_tests().await });
     let courses_resource = create_local_resource(|| (), |_| async move { get_courses().await });
 
-    // State for assessment form
+    // Form state
     let (show_form, set_show_form) = create_signal(false);
     let (editing, set_editing) = create_signal(false);
     let (selected_assessment_id, set_selected_assessment_id) = create_signal::<Option<Uuid>>(None);
+    let (use_sequences, set_use_sequences) = create_signal(false);
 
-    // Form input signals
+    // Basic form inputs
     let (name, set_name) = create_signal(String::new());
     let (frequency, set_frequency) = create_signal::<Option<i32>>(None);
     let (grade, set_grade) = create_signal::<Option<GradeEnum>>(None);
     let (version, set_version) = create_signal(1);
-    let (selected_tests, set_selected_tests) = create_signal::<Vec<Uuid>>(vec![]);
     let (subject, set_subject) = create_signal(SubjectEnum::Other);
-    let (risk_benchmarks, set_risk_benchmarks) = create_signal::<Option<Vec<RangeCategory>>>(None);
-    let (national_benchmarks, set_national_benchmarks) =
-        create_signal::<Option<Vec<RangeCategory>>>(None);
-
-    // Benchmark editing
-    let (risk_benchmark_min, set_risk_benchmark_min) = create_signal(0);
-    let (risk_benchmark_max, set_risk_benchmark_max) = create_signal(0);
-    let (risk_benchmark_label, set_risk_benchmark_label) = create_signal(String::new());
-
-    let (natl_benchmark_min, set_natl_benchmark_min) = create_signal(0);
-    let (natl_benchmark_max, set_natl_benchmark_max) = create_signal(0);
-    let (natl_benchmark_label, set_natl_benchmark_label) = create_signal(String::new());
     let (scope, set_scope) = create_signal::<Option<ScopeEnum>>(None);
     let (course_id, set_course_id) = create_signal::<Option<i32>>(None);
 
-    // Action to handle form submission
+    // Legacy test selection (for non-sequence mode)
+    let (selected_tests, set_selected_tests) = create_signal::<Vec<Uuid>>(vec![]);
+
+    // New sequence-based test management
+    let (test_sequence, set_test_sequence) = create_signal::<Vec<TestSequenceItem>>(vec![]);
+    let (sequence_counter, set_sequence_counter) = create_signal(1);
+
+    // Benchmark state
+    let (risk_benchmarks, set_risk_benchmarks) = create_signal::<Option<Vec<RangeCategory>>>(None);
+    let (national_benchmarks, set_national_benchmarks) =
+        create_signal::<Option<Vec<RangeCategory>>>(None);
+    let (risk_benchmark_min, set_risk_benchmark_min) = create_signal(0);
+    let (risk_benchmark_max, set_risk_benchmark_max) = create_signal(0);
+    let (risk_benchmark_label, set_risk_benchmark_label) = create_signal(String::new());
+    let (natl_benchmark_min, set_natl_benchmark_min) = create_signal(0);
+    let (natl_benchmark_max, set_natl_benchmark_max) = create_signal(0);
+    let (natl_benchmark_label, set_natl_benchmark_label) = create_signal(String::new());
+
+    // Sequence form inputs
+    let (selected_test_for_sequence, set_selected_test_for_sequence) =
+        create_signal::<Option<Uuid>>(None);
+    let (sequence_behavior, set_sequence_behavior) = create_signal(SequenceBehavior::Node);
+    let (required_score, set_required_score) = create_signal::<Option<i32>>(None);
+    let (max_attempts, set_max_attempts) = create_signal(1);
+    let (time_limit, set_time_limit) = create_signal::<Option<i32>>(None);
+
+    // Function to add test to sequence
+    let add_test_to_sequence = move |_| {
+        if let Some(test_id) = selected_test_for_sequence.get() {
+            let order = sequence_counter.get();
+
+            let new_item = match sequence_behavior.get() {
+                SequenceBehavior::Attainment => TestSequenceItem::new_attainment(
+                    test_id,
+                    order,
+                    required_score.get().unwrap_or(70),
+                    None,
+                    None,
+                ),
+                SequenceBehavior::Node => TestSequenceItem::new_node(test_id, order),
+                SequenceBehavior::Optional => TestSequenceItem::new_optional(test_id, order),
+                SequenceBehavior::Diagnostic => TestSequenceItem::new_diagnostic(test_id, order),
+                SequenceBehavior::Remediation => {
+                    TestSequenceItem::new_remediation(test_id, order, vec![])
+                }
+                SequenceBehavior::Branching => {
+                    TestSequenceItem::new_branching(test_id, order, vec![])
+                }
+            };
+
+            let mut current_sequence = test_sequence.get();
+            current_sequence.push(new_item);
+            current_sequence.sort_by_key(|item| item.sequence_order);
+            set_test_sequence(current_sequence);
+            set_sequence_counter(order + 1);
+
+            // Reset form
+            set_selected_test_for_sequence(None);
+            set_sequence_behavior(SequenceBehavior::Node);
+            set_required_score(None);
+        }
+    };
+
+    // Function to remove test from sequence
+    let remove_from_sequence = move |test_id: Uuid| {
+        let mut current = test_sequence.get();
+        current.retain(|item| item.test_id != test_id);
+        set_test_sequence(current);
+    };
+
+    // Updated submit form action
     let submit_form = create_action(move |_: &()| {
         let name_val = name.get();
         let frequency_val = frequency.get();
         let grade_val = grade.get();
         let version_val = version.get();
-        let tests_val = selected_tests.get();
         let subject_val = subject.get();
         let risk_val = risk_benchmarks.get();
         let natl_val = national_benchmarks.get();
-        let scope = scope.get();
-        if scope != Some(ScopeEnum::Course) {
-            set_course_id(None); // Reset course_id if scope is not Course
-        }
-        let course_id = course_id.get();
-
-        // Calculate composite score from selected tests
-        let composite = if tests_val.is_empty() {
+        let scope_val = scope.get();
+        let course_id_val = if scope_val != Some(ScopeEnum::Course) {
             None
         } else {
-            let tests_resource_value = tests_resource.get();
-            tests_resource_value
-                .and_then(|result| {
-                    result.ok().map(|tests| {
-                        // Filter tests by selected IDs and sum their scores
-                        let sum: i32 = tests
-                            .iter()
-                            .filter(|test| {
-                                tests_val.contains(
-                                    &Uuid::parse_str(&test.test_id).expect("String -> UUID failed"),
-                                )
-                            })
-                            .map(|test| test.score)
-                            .sum();
-
-                        Some(sum)
-                    })
-                })
-                .flatten()
+            course_id.get()
         };
-
         let editing_val = editing.get();
         let selected_id = selected_assessment_id.get();
+        let use_sequences_val = use_sequences.get();
 
         async move {
-            if editing_val && selected_id.is_some() {
-                // Update existing assessment
-                let request = UpdateAssessmentRequest::new(
-                    name_val,
-                    frequency_val,
-                    grade_val,
-                    version_val,
-                    selected_id.unwrap(),
-                    tests_val,
-                    composite,
-                    risk_val,
-                    natl_val,
-                    subject_val,
-                    scope,
-                    course_id,
-                );
-                update_assessment(request).await
+            if use_sequences_val {
+                // Use sequence-based creation/update
+                let sequence = test_sequence.get();
+                let composite = if sequence.is_empty() {
+                    None
+                } else {
+                    let tests_resource_value = tests_resource.get();
+                    tests_resource_value
+                        .and_then(|result| {
+                            result.ok().map(|tests| {
+                                let sum: i32 = tests
+                                    .iter()
+                                    .filter(|test| {
+                                        sequence.iter().any(|seq_item| {
+                                            let test_uuid =
+                                                Uuid::parse_str(&test.test_id).unwrap_or_default();
+                                            seq_item.test_id == test_uuid
+                                        })
+                                    })
+                                    .map(|test| test.score)
+                                    .sum();
+                                Some(sum)
+                            })
+                        })
+                        .flatten()
+                };
+
+                if editing_val && selected_id.is_some() {
+                    let request = UpdateAssessmentRequest::new_with_sequence(
+                        name_val,
+                        frequency_val,
+                        grade_val,
+                        version_val,
+                        selected_id.unwrap(),
+                        composite,
+                        risk_val,
+                        natl_val,
+                        subject_val,
+                        scope_val,
+                        course_id_val,
+                        sequence,
+                    );
+                    update_assessment(request).await
+                } else {
+                    let request = CreateNewAssessmentRequest::new_with_sequence(
+                        name_val,
+                        frequency_val,
+                        grade_val,
+                        version_val,
+                        composite,
+                        risk_val,
+                        natl_val,
+                        subject_val,
+                        scope_val,
+                        course_id_val,
+                        sequence,
+                    );
+                    add_assessment(request).await
+                }
             } else {
-                // Create new assessment
-                let request = CreateNewAssessmentRequest::new(
-                    name_val,
-                    frequency_val,
-                    grade_val,
-                    version_val,
-                    tests_val,
-                    composite,
-                    risk_val,
-                    natl_val,
-                    subject_val,
-                    scope,
-                    course_id,
-                );
-                add_assessment(request).await
+                // Use legacy vector-based creation/update
+                let tests_val = selected_tests.get();
+                let composite = if tests_val.is_empty() {
+                    None
+                } else {
+                    let tests_resource_value = tests_resource.get();
+                    tests_resource_value
+                        .and_then(|result| {
+                            result.ok().map(|tests| {
+                                let sum: i32 = tests
+                                    .iter()
+                                    .filter(|test| {
+                                        tests_val.contains(
+                                            &Uuid::parse_str(&test.test_id)
+                                                .expect("String -> UUID failed"),
+                                        )
+                                    })
+                                    .map(|test| test.score)
+                                    .sum();
+                                Some(sum)
+                            })
+                        })
+                        .flatten()
+                };
+
+                if editing_val && selected_id.is_some() {
+                    let request = UpdateAssessmentRequest::new(
+                        name_val,
+                        frequency_val,
+                        grade_val,
+                        version_val,
+                        selected_id.unwrap(),
+                        tests_val,
+                        composite,
+                        risk_val,
+                        natl_val,
+                        subject_val,
+                        scope_val,
+                        course_id_val,
+                    );
+                    update_assessment(request).await
+                } else {
+                    let request = CreateNewAssessmentRequest::new(
+                        name_val,
+                        frequency_val,
+                        grade_val,
+                        version_val,
+                        tests_val,
+                        composite,
+                        risk_val,
+                        natl_val,
+                        subject_val,
+                        scope_val,
+                        course_id_val,
+                    );
+                    add_assessment(request).await
+                }
             }
         }
     });
 
-    // Action to delete assessment
+    // Delete action (unchanged)
     let delete_action = create_action(|id: &Uuid| {
         let id = *id;
         async move {
-            let request = DeleteAssessmentRequest::new(1, id); // Using 1 as default version
+            let request = DeleteAssessmentRequest::new(1, id);
             delete_assessment(request).await
         }
     });
 
-    // Reset form function
+    // Enhanced reset form function
     let reset_form = move || {
         set_name(String::new());
         set_frequency(None);
         set_grade(None);
         set_version(1);
         set_selected_tests(vec![]);
+        set_test_sequence(vec![]);
+        set_sequence_counter(1);
         set_subject(SubjectEnum::Other);
         set_risk_benchmarks(None);
         set_national_benchmarks(None);
         set_scope(None);
         set_course_id(None);
+        set_use_sequences(false);
         set_editing(false);
         set_selected_assessment_id(None);
     };
 
-    // Function to load assessment for editing
+    // Enhanced edit function
     let edit_assessment = move |assessment: Assessment| {
         set_name(assessment.name);
         set_frequency(assessment.frequency);
         set_grade(assessment.grade);
         set_version(assessment.version);
-        set_selected_tests(assessment.tests);
         set_subject(assessment.subject);
         set_risk_benchmarks(assessment.risk_benchmarks);
         set_national_benchmarks(assessment.national_benchmarks);
@@ -185,10 +304,32 @@ pub fn AssessmentPageContent() -> impl IntoView {
         set_course_id(assessment.course_id);
         set_editing(true);
         set_selected_assessment_id(Some(assessment.id));
+
+        // Check if assessment uses sequences
+        if let Some(sequence) = assessment.test_sequence {
+            if !sequence.is_empty() {
+                set_use_sequences(true);
+                set_test_sequence(sequence);
+                let max_order = test_sequence
+                    .get()
+                    .iter()
+                    .map(|item| item.sequence_order)
+                    .max()
+                    .unwrap_or(0);
+                set_sequence_counter(max_order + 1);
+            } else {
+                set_use_sequences(false);
+                set_selected_tests(assessment.tests);
+            }
+        } else {
+            set_use_sequences(false);
+            set_selected_tests(assessment.tests);
+        }
+
         set_show_form(true);
     };
 
-    // Add benchmark functions
+    // Benchmark functions (unchanged)
     let add_risk_benchmark = move |_| {
         let min = risk_benchmark_min.get();
         let max = risk_benchmark_max.get();
@@ -200,7 +341,6 @@ pub fn AssessmentPageContent() -> impl IntoView {
             current.push(new_benchmark);
             set_risk_benchmarks(Some(current));
 
-            // Reset inputs
             set_risk_benchmark_min(0);
             set_risk_benchmark_max(0);
             set_risk_benchmark_label(String::new());
@@ -218,14 +358,13 @@ pub fn AssessmentPageContent() -> impl IntoView {
             current.push(new_benchmark);
             set_national_benchmarks(Some(current));
 
-            // Reset inputs
             set_natl_benchmark_min(0);
             set_natl_benchmark_max(0);
             set_natl_benchmark_label(String::new());
         }
     };
 
-    // Effect to refresh assessments after submit
+    // Effects (unchanged)
     create_effect(move |_| {
         if let Some(Ok(_)) = submit_form.value().get() {
             reset_form();
@@ -234,7 +373,6 @@ pub fn AssessmentPageContent() -> impl IntoView {
         }
     });
 
-    // Effect to refresh assessments after delete
     create_effect(move |_| {
         if let Some(Ok(_)) = delete_action.value().get() {
             assessments_resource.refetch();
@@ -251,7 +389,6 @@ pub fn AssessmentPageContent() -> impl IntoView {
             <div class="max-w-6xl mx-auto px-4 py-8">
                 <div class="flex justify-between">
                     <h1 class="text-3xl font-medium mb-8 text-[#2E3A59]">"Assessments"</h1>
-
                     <div class="mb-8">
                         <button
                             class="bg-[#2E3A59] text-white px-4 py-2 rounded shadow-md hover:opacity-90 transition-opacity text-sm font-medium"
@@ -265,7 +402,7 @@ pub fn AssessmentPageContent() -> impl IntoView {
                     </div>
                 </div>
 
-                // Assessment List
+                // Assessment List - Enhanced to show sequence info
                 <div class="bg-white rounded-lg shadow-sm mb-8 overflow-hidden">
                     <div class="border-b border-[#DADADA] px-6 py-4">
                         <h2 class="text-xl font-medium text-[#2E3A59]">"All Assessments"</h2>
@@ -280,6 +417,8 @@ pub fn AssessmentPageContent() -> impl IntoView {
                                                 let assessment_clone = assessment.clone();
                                                 let assessment_id = assessment.id;
                                                 let (expanded, set_expanded) = create_signal(false);
+                                                let uses_sequences = assessment.test_sequence.is_some() &&
+                                                    !assessment.test_sequence.as_ref().unwrap().is_empty();
 
                                                 view! {
                                                     <div class="bg-white rounded-lg shadow-sm border border-gray-100 hover:shadow-md transition-shadow overflow-hidden">
@@ -290,7 +429,14 @@ pub fn AssessmentPageContent() -> impl IntoView {
                                                             <div class="flex justify-between items-center">
                                                                 <div>
                                                                     <h3 class="font-medium">{assessment.name}</h3>
-                                                                    <p class="text-sm text-gray-500">"("{assessment.subject.to_string()}")"</p>
+                                                                    <div class="flex items-center space-x-2 text-sm text-gray-500">
+                                                                        <span>"("{assessment.subject.to_string()}")"</span>
+                                                                        {if uses_sequences {
+                                                                            view! { <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">"Sequenced"</span> }
+                                                                        } else {
+                                                                            view! { <span class="bg-gray-100 text-gray-600 px-2 py-1 rounded text-xs">"Legacy"</span> }
+                                                                        }}
+                                                                    </div>
                                                                 </div>
                                                                 <div class="text-sm text-gray-500">
                                                                     {assessment.grade.map(|g| format!("{:?}", g)).unwrap_or_else(|| "Any".to_string())}
@@ -307,52 +453,95 @@ pub fn AssessmentPageContent() -> impl IntoView {
                                                             <div class="p-4">
                                                                 <div class="flex flex-col md:flex-row gap-4">
                                                                     <div class="flex-grow">
-                                                                        <h4 class="text-sm font-medium mb-2">Tests</h4>
-                                                                        <div class="max-h-64 overflow-y-auto pr-2 mb-3">
-                                                                            <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                                                                {move || {
-                                                                                    // Get all tests
-                                                                                    let all_tests = tests_resource.get().map(|r| r.ok()).flatten().unwrap_or_default();
+                                                                        {if uses_sequences {
+                                                                            view! {
+                                                                                <div>
+                                                                                    <h4 class="text-sm font-medium mb-2">"Test Sequence"</h4>
+                                                                                    <div class="max-h-64 overflow-y-auto pr-2 mb-3">
+                                                                                        {if let Some(sequence) = &assessment.test_sequence {
+                                                                                            let all_tests = tests_resource.get().map(|r| r.ok()).flatten().unwrap_or_default();
+                                                                                            sequence.iter().enumerate().map(|(index, seq_item)| {
+                                                                                                let test = all_tests.iter().find(|t| {
+                                                                                                    Uuid::parse_str(&t.test_id).unwrap_or_default() == seq_item.test_id
+                                                                                                });
 
-                                                                                    // Get the IDs of tests assigned to this specific assessment
-                                                                                    let assessment_test_ids = &assessment.tests;
+                                                                                                view! {
+                                                                                                    <div class="flex items-center space-x-2 p-2 bg-gray-50 rounded mb-2">
+                                                                                                        <span class="bg-[#2E3A59] text-white rounded-full w-6 h-6 flex items-center justify-center text-xs">
+                                                                                                            {seq_item.sequence_order}
+                                                                                                        </span>
+                                                                                                        <div class="flex-grow">
+                                                                                                            <div class="text-sm font-medium">
+                                                                                                                {test.map(|t| t.name.clone()).unwrap_or_else(|| "Unknown Test".to_string())}
+                                                                                                            </div>
+                                                                                                            <div class="flex items-center space-x-2 text-xs text-gray-500">
+                                                                                                                <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                                                                                                                    {format!("{:?}", seq_item.sequence_behavior)}
+                                                                                                                </span>
+                                                                                                                {if let Some(score) = seq_item.required_score {
+                                                                                                                    view! { <span>"Req: "{score}</span> }
+                                                                                                                } else {
+                                                                                                                    view! { <span></span> }
+                                                                                                                }}
+                                                                                                            </div>
+                                                                                                        </div>
+                                                                                                    </div>
+                                                                                                }
+                                                                                            }).collect_view()
+                                                                                        } else {
+                                                                                            view! { <div>"No sequence defined"</div> }.into_view()
+                                                                                        }}
+                                                                                    </div>
+                                                                                </div>
+                                                                            }
+                                                                        } else {
+                                                                            view! {
+                                                                                <div>
+                                                                                    <h4 class="text-sm font-medium mb-2">"Tests"</h4>
+                                                                                    <div class="max-h-64 overflow-y-auto pr-2 mb-3">
+                                                                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                                                                            {move || {
+                                                                                                let all_tests = tests_resource.get().map(|r| r.ok()).flatten().unwrap_or_default();
+                                                                                                let assessment_test_ids = &assessment.tests;
 
-                                                                                    // First show assessment tests in their original order
-                                                                                    let mut ordered_tests: Vec<_> = all_tests.iter()
-                                                                                        .filter(|test| {
-                                                                                            let test_id = Uuid::parse_str(&test.test_id).expect("Did not convert uuid to string");
-                                                                                            assessment_test_ids.contains(&test_id)
-                                                                                        })
-                                                                                        .collect();
+                                                                                                let mut ordered_tests: Vec<_> = all_tests.iter()
+                                                                                                    .filter(|test| {
+                                                                                                        let test_id = Uuid::parse_str(&test.test_id).expect("Did not convert uuid to string");
+                                                                                                        assessment_test_ids.contains(&test_id)
+                                                                                                    })
+                                                                                                    .collect();
 
-                                                                                    // Sort ordered_tests according to the order in assessment_test_ids
-                                                                                    ordered_tests.sort_by(|a, b| {
-                                                                                        let a_id = Uuid::parse_str(&a.test_id).expect("Did not convert uuid to string");
-                                                                                        let b_id = Uuid::parse_str(&b.test_id).expect("Did not convert uuid to string");
-                                                                                        let a_pos = assessment_test_ids.iter().position(|id| *id == a_id).unwrap_or(usize::MAX);
-                                                                                        let b_pos = assessment_test_ids.iter().position(|id| *id == b_id).unwrap_or(usize::MAX);
-                                                                                        a_pos.cmp(&b_pos)
-                                                                                    });
+                                                                                                ordered_tests.sort_by(|a, b| {
+                                                                                                    let a_id = Uuid::parse_str(&a.test_id).expect("Did not convert uuid to string");
+                                                                                                    let b_id = Uuid::parse_str(&b.test_id).expect("Did not convert uuid to string");
+                                                                                                    let a_pos = assessment_test_ids.iter().position(|id| *id == a_id).unwrap_or(usize::MAX);
+                                                                                                    let b_pos = assessment_test_ids.iter().position(|id| *id == b_id).unwrap_or(usize::MAX);
+                                                                                                    a_pos.cmp(&b_pos)
+                                                                                                });
 
-                                                                                    ordered_tests.into_iter().enumerate().map(|(index, test)| {
-                                                                                        let test_id = test.test_id.clone();
-                                                                                        let test_clone = test.clone();
-                                                                                        let test_name = test.name.clone();
-                                                                                        view! {
-                                                                                            <div class="mb-1">
-                                                                                                <TestItem
-                                                                                                    test=test_clone.clone()
-                                                                                                    test_id=test_id
-                                                                                                    test_name=test_name
-                                                                                                />
-                                                                                            </div>
-                                                                                        }
-                                                                                    }).collect_view()
-                                                                                }}
-                                                                            </div>
-                                                                        </div>
+                                                                                                ordered_tests.into_iter().enumerate().map(|(index, test)| {
+                                                                                                    let test_id = test.test_id.clone();
+                                                                                                    let test_clone = test.clone();
+                                                                                                    let test_name = test.name.clone();
+                                                                                                    view! {
+                                                                                                        <div class="mb-1">
+                                                                                                            <TestItem
+                                                                                                                test=test_clone.clone()
+                                                                                                                test_id=test_id
+                                                                                                                test_name=test_name
+                                                                                                            />
+                                                                                                        </div>
+                                                                                                    }
+                                                                                                }).collect_view()
+                                                                                            }}
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </div>
+                                                                            }
+                                                                        }}
                                                                     </div>
 
+                                                                    // Benchmarks section (unchanged)
                                                                     <div class="md:w-72 space-y-4">
                                                                         {move || {
                                                                             if let Some(benchmarks) = &assessment.risk_benchmarks {
@@ -438,7 +627,7 @@ pub fn AssessmentPageContent() -> impl IntoView {
                     </div>
                 </div>
 
-                // Assessment Form
+                // Enhanced Assessment Form
                 <div
                     class="bg-white rounded-lg shadow-sm mb-8 overflow-hidden"
                     style:display={move || if show_form.get() { "block" } else { "none" }}
@@ -454,6 +643,7 @@ pub fn AssessmentPageContent() -> impl IntoView {
                             submit_form.dispatch(());
                         }>
                             <div class="space-y-6">
+                                // Basic info section
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div>
                                         <label for="name" class="block text-sm font-medium mb-1">"Name"</label>
@@ -625,53 +815,287 @@ pub fn AssessmentPageContent() -> impl IntoView {
                                     </div>
                                 </div>
 
-                                // Tests selection
-                                <div>
-                                    <label class="block text-sm font-medium mb-3">"Tests"</label>
-                                    {move || tests_resource.get().map(|tests_result| {
-                                        match tests_result {
-                                            Ok(tests) => {
-                                                view! {
-                                                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-                                                        {tests.into_iter().map(|test| {
-                                                            let test_id = Uuid::parse_str(&test.test_id).expect("Did not convert uuid to string");
-                                                            let test_name = test.name.clone();
-                                                            view! {
-                                                                <div class="flex items-center space-x-2 p-2 rounded hover:bg-gray-50">
-                                                                    <input
-                                                                        type="checkbox"
-                                                                        id={format!("test-{}", test_id)}
-                                                                        class="h-4 w-4 text-[#2E3A59] rounded border-[#DADADA] focus:ring-[#2E3A59]"
-                                                                        prop:checked={move || selected_tests.get().contains(&test_id)}
-                                                                        on:change=move |ev| {
-                                                                            let checked = event_target_checked(&ev);
-                                                                            let mut current = selected_tests.get();
-                                                                            if checked && !current.contains(&test_id) {
-                                                                                current.push(test_id);
-                                                                                set_selected_tests(current);
-                                                                            } else if !checked {
-                                                                                current.retain(|&id| id != test_id);
-                                                                                set_selected_tests(current);
+                                // Test Management Mode Selection
+                                <div class="border-t border-[#DADADA] pt-6">
+                                    <div class="mb-4">
+                                        <h3 class="text-lg font-medium mb-3">"Test Management"</h3>
+                                        <div class="flex items-center space-x-4">
+                                            <label class="inline-flex items-center">
+                                                <input
+                                                    type="radio"
+                                                    name="test_mode"
+                                                    class="form-radio h-4 w-4 text-[#2E3A59]"
+                                                    prop:checked={move || !use_sequences.get()}
+                                                    on:change=move |_| set_use_sequences(false)
+                                                />
+                                                <span class="ml-2 text-sm">"Simple Test List"</span>
+                                            </label>
+                                            <label class="inline-flex items-center">
+                                                <input
+                                                    type="radio"
+                                                    name="test_mode"
+                                                    class="form-radio h-4 w-4 text-[#2E3A59]"
+                                                    prop:checked={move || use_sequences.get()}
+                                                    on:change=move |_| set_use_sequences(true)
+                                                />
+                                                <span class="ml-2 text-sm">"Advanced Sequencing"</span>
+                                            </label>
+                                        </div>
+                                        <p class="text-xs text-gray-500 mt-1">
+                                            "Advanced sequencing allows you to control test flow with requirements and branching logic."
+                                        </p>
+                                    </div>
+
+                                    // Conditional Test Selection UI
+                                    <Show
+                                        when=move || !use_sequences.get()
+                                        fallback=move || view! {
+                                            // Advanced Sequence Builder
+                                            <div>
+                                                <h4 class="text-md font-medium mb-3">"Test Sequence Builder"</h4>
+
+                                                // Current Sequence Display
+                                                <div class="mb-4">
+                                                    <div class="bg-gray-50 rounded-lg p-4 min-h-32">
+                                                        <h5 class="text-sm font-medium mb-2">"Current Sequence:"</h5>
+                                                        {move || {
+                                                            let sequence = test_sequence.get();
+                                                            if sequence.is_empty() {
+                                                                view! {
+                                                                    <div class="text-gray-500 text-sm italic">"No tests in sequence. Add tests below."</div>
+                                                                }
+                                                            } else {
+                                                                let all_tests = tests_resource.get().map(|r| r.ok()).flatten().unwrap_or_default();
+                                                                view! {
+                                                                    <div class="space-y-2">
+                                                                        {sequence.into_iter().enumerate().map(|(index, seq_item)| {
+                                                                            let test = all_tests.iter().find(|t| {
+                                                                                Uuid::parse_str(&t.test_id).unwrap_or_default() == seq_item.test_id
+                                                                            });
+                                                                            let item_test_id = seq_item.test_id;
+
+                                                                            view! {
+                                                                                <div class="flex items-center justify-between bg-white p-3 rounded border">
+                                                                                    <div class="flex items-center space-x-3">
+                                                                                        <span class="bg-[#2E3A59] text-white rounded-full w-8 h-8 flex items-center justify-center text-sm font-medium">
+                                                                                            {seq_item.sequence_order}
+                                                                                        </span>
+                                                                                        <div>
+                                                                                            <div class="font-medium text-sm">
+                                                                                                {test.map(|t| t.name.clone()).unwrap_or_else(|| "Unknown Test".to_string())}
+                                                                                            </div>
+                                                                                            <div class="flex items-center space-x-2 text-xs text-gray-500">
+                                                                                                <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                                                                                                    {format!("{:?}", seq_item.sequence_behavior)}
+                                                                                                </span>
+                                                                                                {if let Some(score) = seq_item.required_score {
+                                                                                                    view! { <span class="bg-green-100 text-green-800 px-2 py-1 rounded">"Required: "{score}</span> }
+                                                                                                } else {
+                                                                                                    view! { <span></span> }
+                                                                                                }}
+                                                                                                {if let Some(attempts) = seq_item.max_attempts {
+                                                                                                    view! { <span class="bg-orange-100 text-orange-800 px-2 py-1 rounded">"Max: "{attempts}" attempts"</span> }
+                                                                                                } else {
+                                                                                                    view! { <span></span> }
+                                                                                                }}
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        class="text-red-600 hover:text-red-800 text-sm"
+                                                                                        on:click=move |_| remove_from_sequence(item_test_id)
+                                                                                    >
+                                                                                        "Remove"
+                                                                                    </button>
+                                                                                </div>
                                                                             }
-                                                                        }
-                                                                    />
-                                                                    <label for={format!("test-{}", test_id)} class="text-sm">{test_name}</label>
-                                                                </div>
+                                                                        }).collect_view()}
+                                                                    </div>
+                                                                }
                                                             }
-                                                        }).collect_view()}
+                                                        }}
                                                     </div>
-                                                }
-                                            },
-                                            Err(e) => view! {
-                                                <div class="p-4 bg-red-50 text-red-700 rounded border border-red-200">
-                                                    "Error loading tests: " {e.to_string()}
                                                 </div>
-                                            }
+
+                                                // Add Test to Sequence Form
+                                                <div class="border border-gray-200 rounded-lg p-4">
+                                                    <h5 class="text-sm font-medium mb-3">"Add Test to Sequence"</h5>
+                                                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                                        <div>
+                                                            <label class="block text-xs font-medium mb-1">"Test"</label>
+                                                            <select
+                                                                class="w-full px-2 py-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-[#2E3A59] focus:border-[#2E3A59]"
+                                                                prop:value={move || selected_test_for_sequence.get().map(|id| id.to_string()).unwrap_or_default()}
+                                                                on:change=move |ev| {
+                                                                    let value = event_target_value(&ev);
+                                                                    if value.is_empty() {
+                                                                        set_selected_test_for_sequence(None);
+                                                                    } else if let Ok(uuid) = Uuid::parse_str(&value) {
+                                                                        set_selected_test_for_sequence(Some(uuid));
+                                                                    }
+                                                                }
+                                                            >
+                                                                <option value="">"Select a test"</option>
+                                                                {move || {
+                                                                    tests_resource.get().map(|tests_result| {
+                                                                        match tests_result {
+                                                                            Ok(tests) => {
+                                                                                let current_sequence = test_sequence.get();
+                                                                                let used_test_ids: Vec<Uuid> = current_sequence.iter().map(|item| item.test_id).collect();
+
+                                                                                tests.into_iter()
+                                                                                    .filter(|test| {
+                                                                                        let test_uuid = Uuid::parse_str(&test.test_id).unwrap_or_default();
+                                                                                        !used_test_ids.contains(&test_uuid)
+                                                                                    })
+                                                                                    .map(|test| {
+                                                                                        view! {
+                                                                                            <option value=test.test_id.clone()>
+                                                                                                {test.name.clone()}
+                                                                                            </option>
+                                                                                        }
+                                                                                    }).collect_view()
+                                                                            },
+                                                                            Err(_) => view! {}.into_view()
+                                                                        }
+                                                                    }).unwrap_or_default()
+                                                                }}
+                                                            </select>
+                                                        </div>
+
+                                                        <div>
+                                                            <label class="block text-xs font-medium mb-1">"Behavior"</label>
+                                                            <select
+                                                                class="w-full px-2 py-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-[#2E3A59] focus:border-[#2E3A59]"
+                                                                prop:value={move || format!("{:?}", sequence_behavior.get())}
+                                                                on:change=move |ev| {
+                                                                    let value = event_target_value(&ev);
+                                                                    match value.as_str() {
+                                                                        "Node" => set_sequence_behavior(SequenceBehavior::Node),
+                                                                        "Attainment" => set_sequence_behavior(SequenceBehavior::Attainment),
+                                                                        "Optional" => set_sequence_behavior(SequenceBehavior::Optional),
+                                                                        "Diagnostic" => set_sequence_behavior(SequenceBehavior::Diagnostic),
+                                                                        "Remediation" => set_sequence_behavior(SequenceBehavior::Remediation),
+                                                                        "Branching" => set_sequence_behavior(SequenceBehavior::Branching),
+                                                                        _ => {}
+                                                                    }
+                                                                }
+                                                            >
+                                                                {SequenceBehavior::iter().map(|behavior| {
+                                                                    view! {
+                                                                        <option value=format!("{:?}", behavior)>
+                                                                            {format!("{:?}", behavior)}
+                                                                        </option>
+                                                                    }
+                                                                }).collect::<Vec<_>>()}
+                                                            </select>
+                                                        </div>
+
+                                                        <Show when=move || matches!(sequence_behavior.get(), SequenceBehavior::Attainment)>
+                                                            <div>
+                                                                <label class="block text-xs font-medium mb-1">"Required Score"</label>
+                                                                <input
+                                                                    type="number"
+                                                                    class="w-full px-2 py-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-[#2E3A59] focus:border-[#2E3A59]"
+                                                                    placeholder="70"
+                                                                    prop:value={move || required_score.get().unwrap_or(70)}
+                                                                    on:input=move |ev| {
+                                                                        if let Ok(score) = event_target_value(&ev).parse::<i32>() {
+                                                                            set_required_score(Some(score));
+                                                                        }
+                                                                    }
+                                                                />
+                                                            </div>
+                                                        </Show>
+
+                                                        <div>
+                                                            <label class="block text-xs font-medium mb-1">"Max Attempts"</label>
+                                                            <input
+                                                                type="number"
+                                                                class="w-full px-2 py-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-[#2E3A59] focus:border-[#2E3A59]"
+                                                                placeholder="1"
+                                                                min="1"
+                                                                prop:value={move || max_attempts.get()}
+                                                                on:input=move |ev| {
+                                                                    if let Ok(attempts) = event_target_value(&ev).parse::<i32>() {
+                                                                        set_max_attempts(attempts);
+                                                                    }
+                                                                }
+                                                            />
+                                                        </div>
+                                                    </div>
+
+                                                    <div class="mt-3 flex justify-end">
+                                                        <button
+                                                            type="button"
+                                                            class="bg-[#2E3A59] text-white px-4 py-2 rounded text-sm hover:opacity-90 transition-opacity"
+                                                            on:click=add_test_to_sequence
+                                                            disabled=move || selected_test_for_sequence.get().is_none()
+                                                        >
+                                                            "Add to Sequence"
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                <div class="mt-3 text-xs text-gray-600">
+                                                    <p><strong>"Node"</strong>": Standard test - students progress automatically"</p>
+                                                    <p><strong>"Attainment"</strong>": Students must achieve the required score to progress"</p>
+                                                    <p><strong>"Optional"</strong>": Students can skip this test"</p>
+                                                    <p><strong>"Diagnostic"</strong>": Assessment only - doesn't block progression"</p>
+                                                </div>
+                                            </div>
                                         }
-                                    })}
+                                    >
+                                        // Simple Test Selection (Legacy Mode)
+                                        <div>
+                                            <label class="block text-sm font-medium mb-3">"Tests"</label>
+                                            {move || tests_resource.get().map(|tests_result| {
+                                                match tests_result {
+                                                    Ok(tests) => {
+                                                        view! {
+                                                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                                                                {tests.into_iter().map(|test| {
+                                                                    let test_id = Uuid::parse_str(&test.test_id).expect("Did not convert uuid to string");
+                                                                    let test_name = test.name.clone();
+                                                                    view! {
+                                                                        <div class="flex items-center space-x-2 p-2 rounded hover:bg-gray-50">
+                                                                            <input
+                                                                                type="checkbox"
+                                                                                id={format!("test-{}", test_id)}
+                                                                                class="h-4 w-4 text-[#2E3A59] rounded border-[#DADADA] focus:ring-[#2E3A59]"
+                                                                                prop:checked={move || selected_tests.get().contains(&test_id)}
+                                                                                on:change=move |ev| {
+                                                                                    let checked = event_target_checked(&ev);
+                                                                                    let mut current = selected_tests.get();
+                                                                                    if checked && !current.contains(&test_id) {
+                                                                                        current.push(test_id);
+                                                                                        set_selected_tests(current);
+                                                                                    } else if !checked {
+                                                                                        current.retain(|&id| id != test_id);
+                                                                                        set_selected_tests(current);
+                                                                                    }
+                                                                                }
+                                                                            />
+                                                                            <label for={format!("test-{}", test_id)} class="text-sm">{test_name}</label>
+                                                                        </div>
+                                                                    }
+                                                                }).collect_view()}
+                                                            </div>
+                                                        }
+                                                    },
+                                                    Err(e) => view! {
+                                                        <div class="p-4 bg-red-50 text-red-700 rounded border border-red-200">
+                                                            "Error loading tests: " {e.to_string()}
+                                                        </div>
+                                                    }
+                                                }
+                                            })}
+                                        </div>
+                                    </Show>
                                 </div>
 
-                                // Risk Benchmarks
+                                // Risk Benchmarks (unchanged)
                                 <div class="border-t border-[#DADADA] pt-6">
                                     <h3 class="text-lg font-medium mb-4">"Risk Benchmarks"</h3>
 
@@ -757,7 +1181,7 @@ pub fn AssessmentPageContent() -> impl IntoView {
                                     </div>
                                 </div>
 
-                                // National Benchmarks
+                                // National Benchmarks (unchanged)
                                 <div class="border-t border-[#DADADA] pt-6">
                                     <h3 class="text-lg font-medium mb-4">"National Benchmarks"</h3>
 

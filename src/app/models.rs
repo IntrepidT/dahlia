@@ -71,3 +71,6 @@ pub mod global;
 
 pub mod auth;
 pub use auth::*;
+
+pub mod assessment_sequences;
+pub use assessment_sequences::{SequenceBehavior, TestSequenceItem};

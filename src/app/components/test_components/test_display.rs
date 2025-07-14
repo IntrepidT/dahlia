@@ -23,9 +23,65 @@ pub fn MathTestDisplay(
     editing_mode: ReadSignal<bool>,
     on_delete: Option<Callback<String>>,
     show_delete_mode: ReadSignal<bool>,
+    show_variations: Option<bool>,
+    all_tests: Option<ReadSignal<Vec<Test>>>,
 ) -> impl IntoView {
     let edit_test = test.clone();
     let (show_options_modal, set_show_options_modal) = create_signal(false);
+    let (show_variations_panel, set_show_variations_panel) = create_signal(false);
+
+    // Determine if this is a variation
+    let is_variation = test.name.contains(" - ")
+        && (test.name.to_lowercase().contains("remediation")
+            || test.name.to_lowercase().contains("advanced")
+            || test.name.to_lowercase().contains("easy")
+            || test.name.to_lowercase().contains("hard")
+            || test.comments.to_lowercase().contains("variation:"));
+
+    // Extract base name and variation type
+    let (base_name, variation_type) = if is_variation {
+        let parts: Vec<&str> = test.name.split(" - ").collect();
+        (
+            parts
+                .get(0)
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| test.name.clone()),
+            parts.get(1).map_or("Variation", |v| v).to_string(),
+        )
+    } else {
+        (test.name.clone(), String::new())
+    };
+
+    // Find related variations if all_tests is provided
+    let related_variations = create_memo({
+        let test_clone = test.clone();
+        let base_name_clone = base_name.clone();
+        let test_id_clone = test.test_id.clone();
+
+        move |_| {
+            if let Some(all_tests_signal) = all_tests {
+                let all = all_tests_signal.get();
+                let current_base = if is_variation {
+                    base_name_clone.clone()
+                } else {
+                    test_clone.name.clone()
+                };
+
+                all.into_iter()
+                    .filter(|t| {
+                        let t_base = if t.name.contains(" - ") {
+                            t.name.split(" - ").next().unwrap_or(&t.name).to_string()
+                        } else {
+                            t.name.clone()
+                        };
+                        t_base == current_base && t.test_id != test_id_clone
+                    })
+                    .collect::<Vec<_>>()
+            } else {
+                Vec::new()
+            }
+        }
+    });
 
     // Handle showing selection modal instead of direct navigation
     let on_show_info = move |_| {
@@ -121,6 +177,10 @@ pub fn MathTestDisplay(
         set_show_options_modal.set(false);
     };
 
+    let on_show_variations = move |_| {
+        set_show_variations_panel.set(!show_variations_panel());
+    };
+
     view! {
         <div class="z-auto relative h-full">
             <button
@@ -133,7 +193,20 @@ pub fn MathTestDisplay(
                             <img src=IMG_SRC class="w-full h-full object-cover" />
                         </div>
                         <div class="ml-4 flex-grow">
-                            <p class=CAPTION_STYLE>{test_name}</p>
+                            <div class="flex items-center space-x-2">
+                                <p class=CAPTION_STYLE>
+                                    {if is_variation { base_name.clone() } else { test_name.clone() }}
+                                </p>
+                                {if is_variation {
+                                    view! {
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                            {variation_type.clone()}
+                                        </span>
+                                    }
+                                } else {
+                                    view! { <span></span> }
+                                }}
+                            </div>
                             <div class="mt-2 space-y-1">
                                 <p class=SCORE_STYLE>
                                     "Total Score: " {score_value}
@@ -160,6 +233,28 @@ pub fn MathTestDisplay(
                                 <p class="text-xs text-gray-500 italic mt-1">
                                     {benchmark_info}
                                 </p>
+
+                                // Show variations count if applicable
+                                {move || {
+                                    let variations = related_variations.get();
+                                    if !variations.is_empty() && show_variations.unwrap_or(false) {
+                                        view! {
+                                            <div class="flex items-center space-x-2 mt-2">
+                                                <button
+                                                    class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-2 py-1 rounded transition-colors"
+                                                    on:click=move |e| {
+                                                        e.stop_propagation();
+                                                        on_show_variations(e);
+                                                    }
+                                                >
+                                                    {format!("{} variation(s)", variations.len())}
+                                                </button>
+                                            </div>
+                                        }
+                                    } else {
+                                        view! { <div></div> }
+                                    }
+                                }}
                             </div>
                         </div>
                         <div class="flex-shrink-0 ml-2">
@@ -171,13 +266,106 @@ pub fn MathTestDisplay(
                 </div>
             </button>
 
-            // Test Options Modal
+            // Variations panel (expandable)
+            {move || {
+                if show_variations_panel() && show_variations.unwrap_or(false) {
+                    let variations = related_variations.get();
+                    view! {
+                        <div class="bg-gray-50 border-t border-gray-200 px-4 py-3">
+                            <h4 class="text-sm font-medium text-gray-700 mb-2">Related Tests:</h4>
+                            <div class="space-y-2">
+                                <For
+                                    each=move || variations.clone()
+                                    key=|variation| variation.test_id.clone()
+                                    children=move |variation: Test| {
+                                        let var_clone = variation.clone();
+                                        let is_var = variation.name.contains(" - ");
+                                        let display_name = if is_var {
+                                            variation.name.split(" - ").nth(1).unwrap_or("Variation").to_string()
+                                        } else {
+                                            "Base Test".to_string()
+                                        };
+
+                                        view! {
+                                            <div class="flex items-center justify-between bg-white rounded px-3 py-2 border border-gray-200">
+                                                <div class="flex items-center space-x-2">
+                                                    <span class="text-sm font-medium text-gray-900">
+                                                        {display_name}
+                                                    </span>
+                                                    <span class="text-xs text-gray-500">
+                                                        "({variation.score} pts)"
+                                                    </span>
+                                                </div>
+                                                <div class="flex space-x-2">
+                                                    <button
+                                                        class="text-xs bg-blue-100 hover:bg-blue-200 text-blue-800 px-2 py-1 rounded transition-colors"
+                                                        on:click=move |e| {
+                                                            e.stop_propagation();
+                                                            let test_id = var_clone.test_id.clone();
+                                                            let navigate = leptos_router::use_navigate();
+                                                            navigate(&format!("/testbuilder/{}", test_id), Default::default());
+                                                        }
+                                                    >
+                                                        "Edit"
+                                                    </button>
+                                                    <button
+                                                        class="text-xs bg-green-100 hover:bg-green-200 text-green-800 px-2 py-1 rounded transition-colors"
+                                                        on:click=move |e| {
+                                                            e.stop_propagation();
+                                                            // Navigate to test taking interface
+                                                            let test_id = variation.test_id.clone();
+                                                            let navigate = leptos_router::use_navigate();
+                                                            navigate(&format!("/test-session/{}", test_id), Default::default());
+                                                        }
+                                                    >
+                                                        "Use"
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        }
+                                    }
+                                />
+                            </div>
+                            <div class="mt-3 pt-2 border-t border-gray-200">
+                                <button
+                                    class="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded transition-colors"
+                                    on:click=move |e| {
+                                        e.stop_propagation();
+                                        let navigate = leptos_router::use_navigate();
+                                        navigate("/test-variations", Default::default());
+                                    }
+                                >
+                                    "Manage All Variations"
+                                </button>
+                            </div>
+                        </div>
+                    }
+                } else {
+                    view! { <div></div> }
+                }
+            }}
+
+            // Test Options Modal (existing code)
             {move || {
                 if show_options_modal() {
                     view! {
                         <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                             <div class="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
                                 <h3 class="text-xl font-semibold text-gray-800 mb-4">Choose Test Mode</h3>
+
+                                // Show variation info in modal if applicable
+                                {if is_variation {
+                                    view! {
+                                        <div class="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                                            <p class="text-sm text-blue-800">
+                                                "Using " <strong>{variation_type.clone()}</strong> " version of " <strong>{base_name.clone()}</strong>
+                                            </p>
+                                        </div>
+                                    }
+                                } else {
+                                    view! { <div></div> }
+                                }}
+
                                 <div class="space-y-4">
                                     <button
                                         class="w-full p-3 bg-blue-600 text-white rounded-lg flex items-center justify-between hover:bg-blue-700 transition-colors"
@@ -199,7 +387,6 @@ pub fn MathTestDisplay(
                                             <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd" />
                                         </svg>
                                     </button>
-
 
                                     <button
                                         class="w-full p-3 bg-purple-600 text-white rounded-lg flex items-center justify-between hover:bg-purple-700 transition-colors"
@@ -229,6 +416,7 @@ pub fn MathTestDisplay(
                 }
             }}
 
+            // Delete button (existing code)
             {move || {
                 if show_delete_mode() && on_delete.is_some() {
                     let test_id = delete_test.test_id.clone();

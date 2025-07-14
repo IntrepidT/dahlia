@@ -16,12 +16,6 @@ pub use my_account::MyAccount;
 pub mod login_page;
 pub use login_page::LoginPage;
 
-pub mod reading_testing;
-pub use reading_testing::ReadingTesting;
-
-pub mod math_testing;
-pub use math_testing::MathTesting;
-
 pub mod test_builder;
 pub use test_builder::TestBuilder;
 
@@ -51,3 +45,7 @@ pub use gradebook::Gradebook;
 
 pub mod admin_dashboard;
 pub use admin_dashboard::AdminDashboard;
+
+pub mod test_page;
+pub use test_page::UnifiedTestManager;
+pub use test_page::*;
