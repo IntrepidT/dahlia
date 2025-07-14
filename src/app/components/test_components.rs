@@ -15,5 +15,5 @@ pub use test_item::*;
 
 pub mod test_variation_manager;
 pub use test_variation_manager::{
-    TestVariation, TestVariationManager, TestVariationManagerContent,
+    TestVariationInfo, TestVariationManager, TestVariationManagerContent,
 };

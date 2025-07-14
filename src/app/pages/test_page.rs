@@ -3,6 +3,7 @@ use crate::app::components::dashboard::dashboard_sidebar::{DashboardSidebar, Sid
 use crate::app::components::{Header, MathTestDisplay, Toast, ToastMessage, ToastMessageType};
 use crate::app::models::test::CreateNewTestRequest;
 use crate::app::models::{DeleteTestRequest, Test, TestType};
+use crate::app::server_functions::questions::duplicate_and_randomize_questions;
 use crate::app::server_functions::{
     get_tests,
     tests::{add_test, delete_test},
@@ -103,32 +104,54 @@ fn get_test_type_styling(test_type: &TestType) -> (&'static str, &'static str) {
 fn get_variation_styling(variation_name: &str) -> (&'static str, &'static str) {
     let name_lower = variation_name.to_lowercase();
     match name_lower.as_str() {
-        name if name.contains("remediation") || name.contains("easy") => (
-            "bg-yellow-100 text-yellow-800 border-yellow-300",
-            "Remediation",
+        name if name.contains("randomized") => {
+            ("bg-blue-100 text-blue-800 border-blue-300", "Randomized")
+        }
+        name if name.contains("distinct") => {
+            ("bg-green-100 text-green-800 border-green-300", "Distinct")
+        }
+        name if name.contains("practice") => (
+            "bg-purple-100 text-purple-800 border-purple-300",
+            "Practice",
         ),
-        name if name.contains("advanced") || name.contains("hard") => {
-            ("bg-red-100 text-red-800 border-red-300", "Advanced")
-        }
-        name if name.contains("practice") => {
-            ("bg-green-100 text-green-800 border-green-300", "Practice")
-        }
-        name if name.contains("timed") => {
-            ("bg-purple-100 text-purple-800 border-purple-300", "Timed")
-        }
-        _ => ("bg-blue-100 text-blue-800 border-blue-300", "Standard"),
+        _ => ("bg-gray-100 text-gray-800 border-gray-300", "Standard"),
     }
 }
 
 fn is_variation_test(test: &Test) -> bool {
     test.name.contains(" - ")
-        && (test.name.to_lowercase().contains("remediation")
-            || test.name.to_lowercase().contains("advanced")
-            || test.name.to_lowercase().contains("easy")
-            || test.name.to_lowercase().contains("hard")
+        && (test.name.to_lowercase().contains("randomized")
+            || test.name.to_lowercase().contains("distinct")
             || test.name.to_lowercase().contains("practice")
-            || test.name.to_lowercase().contains("timed")
             || test.comments.to_lowercase().contains("variation:"))
+}
+
+async fn get_next_variant_number_for_base(
+    base_test_name: &str,
+) -> Result<i32, leptos::ServerFnError> {
+    let all_tests = get_tests().await?;
+
+    // Find all tests related to this base test
+    let related_tests: Vec<&Test> = all_tests
+        .iter()
+        .filter(|test| {
+            let test_base_name = if test.name.contains(" - ") {
+                test.name.split(" - ").next().unwrap_or(&test.name)
+            } else {
+                &test.name
+            };
+            test_base_name == base_test_name
+        })
+        .collect();
+
+    // Find the highest variant number
+    let max_variant = related_tests
+        .iter()
+        .map(|test| test.test_variant)
+        .max()
+        .unwrap_or(0);
+
+    Ok(max_variant + 1)
 }
 
 // =============================================================================
@@ -339,11 +362,31 @@ fn ActionButtons(
                 "Edit Mode"
             </button>
 
+            // Enhanced Delete Mode Button
             <button
                 on:click=on_click_delete_mode
-                class=move || if if_show_delete() { styles::SECONDARY_BUTTON_ACTIVE } else { styles::DANGER_BUTTON }
+                class=move || {
+                    if if_show_delete() {
+                        "px-4 py-2 bg-red-600 text-white rounded-md font-medium text-sm shadow-sm hover:bg-red-700 transition-all focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                    } else {
+                        styles::DANGER_BUTTON
+                    }
+                }
+                title=move || {
+                    if if_show_delete() {
+                        "Exit Delete Mode - Click to stop deleting"
+                    } else {
+                        "Enter Delete Mode - Show delete buttons"
+                    }
+                }
             >
-                "Delete Mode"
+                {move || {
+                    if if_show_delete() {
+                        "🗑️ Exit Delete Mode"
+                    } else {
+                        "Delete Mode"
+                    }
+                }}
             </button>
         </div>
     }
@@ -394,8 +437,23 @@ fn TestGroupCard(
     let (test_type_badge_class, test_type_label) = get_test_type_styling(&base_test.testarea);
 
     view! {
-        <div class=styles::CARD>
-            <div class="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-5 border-b border-gray-200">
+        <div class=move || {
+            let base_class = "bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-all duration-200";
+            if if_show_delete() {
+                format!("{} ring-2 ring-red-200", base_class)
+            } else {
+                base_class.to_string()
+            }
+        }>
+            // Base test header
+            <div class=move || {
+                let base_class = "bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-5 border-b border-gray-200";
+                if if_show_delete() {
+                    format!("{} bg-red-50 border-red-200", base_class)
+                } else {
+                    base_class.to_string()
+                }
+            }>
                 <div class="flex items-start justify-between">
                     <div class="flex-1">
                         <div class="flex items-center space-x-3 mb-2">
@@ -403,6 +461,18 @@ fn TestGroupCard(
                             <span class=format!("inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border {}", test_type_badge_class)>
                                 {test_type_label}
                             </span>
+                            // Delete mode indicator
+                            {move || {
+                                if if_show_delete() {
+                                    view! {
+                                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 border border-red-300">
+                                            "🗑️ Delete Mode"
+                                        </span>
+                                    }.into_view()
+                                } else {
+                                    view! { <span></span> }.into_view()
+                                }
+                            }}
                         </div>
 
                         <div class="flex flex-wrap items-center gap-4 text-sm text-gray-600">
@@ -415,7 +485,7 @@ fn TestGroupCard(
                             {if has_variations {
                                 view! {
                                     <div class="flex items-center space-x-1 text-blue-600">
-                                        <span>Test Variations ({variations.len()})</span>
+                                        <span>Test Variations: {variations.len()}</span>
                                     </div>
                                 }
                             } else {
@@ -431,10 +501,19 @@ fn TestGroupCard(
                             let base_name_clone = base_name.clone();
                             view! {
                                 <button
-                                    class="p-2 text-gray-400 hover:text-gray-600 transition-colors"
-                                    on:click=move |_| toggle_fn(base_name_clone.clone())
+                                    class="px-3 py-1 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-md transition-all duration-200 border border-gray-300"
+                                    on:click=move |_| {
+                                        log::info!("Toggling expansion for: {}", base_name_clone.clone());
+                                        toggle_fn(base_name_clone.clone());
+                                    }
                                 >
-                                    {move || if is_expanded() { "Collapse" } else { "Expand" }}
+                                    {move || {
+                                        if is_expanded() {
+                                            "▼ Hide Variations"
+                                        } else {
+                                            "▶ Show Variations"
+                                        }
+                                    }}
                                 </button>
                             }.into_view()
                         } else {
@@ -445,12 +524,36 @@ fn TestGroupCard(
             </div>
 
             // Variations section
-            {if has_variations && is_expanded() {
+            {if has_variations {
                 view! {
-                    <div class="p-6">
-                        <h4 class="text-lg font-medium text-gray-900 mb-4">
-                            "Test Variations ({variations.len()})"
-                        </h4>
+                    <div class=move || {
+                        if is_expanded() {
+                            let base_class = "p-6 bg-gray-50 border-t border-gray-200";
+                            if if_show_delete() {
+                                format!("{} bg-red-25", base_class)
+                            } else {
+                                base_class.to_string()
+                            }
+                        } else {
+                            "hidden".to_string()
+                        }
+                    }>
+                        <div class="flex items-center justify-between mb-4">
+                            <h4 class="text-lg font-medium text-gray-900">
+                                "Test Variations (" {variations.len()} ")"
+                            </h4>
+                            {move || {
+                                if if_show_delete() {
+                                    view! {
+                                        <div class="text-sm text-red-600 font-medium">
+                                            "⚠️ Click variation delete buttons below"
+                                        </div>
+                                    }.into_view()
+                                } else {
+                                    view! { <span></span> }.into_view()
+                                }
+                            }}
+                        </div>
                         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
                             <For
                                 each=move || variations.clone()
@@ -469,7 +572,7 @@ fn TestGroupCard(
                     </div>
                 }.into_view()
             } else {
-                view! { <span></span> }.into_view()
+                view! { <div class="hidden"></div> }.into_view()
             }}
         </div>
     }
@@ -492,6 +595,15 @@ fn VariationCard(
 
     let (variation_badge_class, variation_label) = get_variation_styling(&variation_name);
 
+    // Clone all the values we need to avoid borrow checker issues
+    let variation_test_id_for_delete = variation.test_id.clone();
+    let variation_test_id_for_display = variation.test_id.clone();
+    let variation_name_display = variation.name.clone();
+    let variation_score = variation.score;
+    let variation_test_variant = variation.test_variant;
+    let variation_comments = variation.comments.clone();
+    let variation_for_actions = variation.clone();
+
     view! {
         <div class="bg-white rounded-lg border border-gray-200 hover:border-gray-300 hover:shadow-sm transition-all duration-200">
             <div class="p-4">
@@ -499,37 +611,43 @@ fn VariationCard(
                     <span class=format!("inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border {}", variation_badge_class)>
                         {variation_label}
                     </span>
-                    {if if_show_delete() {
-                        let variation_id = variation.test_id.clone();
-                        view! {
-                            <button
-                                class="text-red-500 hover:text-red-700 hover:bg-red-50 p-1 rounded transition-colors"
-                                on:click=move |_| leptos::Callable::call(&on_delete_test, variation_id.clone())
-                                title="Delete variation"
-                            >
-                                "Delete"
-                            </button>
-                        }.into_view()
-                    } else {
-                        view! { <span></span> }.into_view()
+                    // Enhanced delete button with better visibility
+                    {move || {
+                        if if_show_delete() {
+                            let variation_id = variation_test_id_for_delete.clone();
+                            view! {
+                                <button
+                                    class="px-2 py-1 bg-red-100 hover:bg-red-200 text-red-700 text-xs font-medium rounded-md transition-colors border border-red-300"
+                                    on:click=move |_| {
+                                        log::info!("Deleting variation: {}", variation_id.clone());
+                                        leptos::Callable::call(&on_delete_test, variation_id.clone());
+                                    }
+                                    title="Delete this variation"
+                                >
+                                    "🗑️ Delete"
+                                </button>
+                            }.into_view()
+                        } else {
+                            view! { <span></span> }.into_view()
+                        }
                     }}
                 </div>
 
                 <div class="mb-3">
-                    <h5 class="font-medium text-gray-900 text-sm mb-1">{variation.name.clone()}</h5>
+                    <h5 class="font-medium text-gray-900 text-sm mb-1">{variation_name_display}</h5>
                     <p class="text-xs text-gray-600">
-                        {format!("{} points • Variant {} • ID: {}", variation.score, variation.test_variant, variation.test_id)}
+                        {format!("{} points • Variant {} • ID: {}", variation_score, variation_test_variant, variation_test_id_for_display)}
                     </p>
-                    {if !variation.comments.is_empty() {
+                    {if !variation_comments.is_empty() {
                         view! {
-                            <p class="text-xs text-gray-500 mt-1 line-clamp-2">{variation.comments.clone()}</p>
+                            <p class="text-xs text-gray-500 mt-1 line-clamp-2">{variation_comments}</p>
                         }.into_view()
                     } else {
                         view! { <span></span> }.into_view()
                     }}
                 </div>
 
-                <TestActionButtons test=variation on_create_variation=None />
+                <TestActionButtons test=variation_for_actions on_create_variation=None />
             </div>
         </div>
     }
@@ -620,7 +738,7 @@ pub fn UnifiedTestManagerContent() -> impl IntoView {
     let (test_filter, set_test_filter) = create_signal(TestFilter::All);
     let (expanded_groups, set_expanded_groups) =
         create_signal(std::collections::HashSet::<String>::new());
-    let (show_stats, set_show_stats) = create_signal(true);
+    let (show_stats, set_show_stats) = create_signal(false);
 
     //Variation signals
     let (show_create_variation_modal, set_show_create_variation_modal) = create_signal(false);
@@ -764,13 +882,17 @@ pub fn UnifiedTestManagerContent() -> impl IntoView {
                 );
 
                 // Determine variant number based on type
-                let variant_number = match variation_type_value.to_lowercase().as_str() {
-                    "remediation" | "easy" => base_test_clone.test_variant + 100,
-                    "advanced" | "hard" => base_test_clone.test_variant + 200,
-                    "practice" => base_test_clone.test_variant + 300,
-                    "timed" => base_test_clone.test_variant + 400,
-                    _ => base_test_clone.test_variant + 10,
-                };
+                let variant_number =
+                    match get_next_variant_number_for_base(&base_test_clone.name).await {
+                        Ok(num) => num,
+                        Err(e) => {
+                            log::error!("Failed to get next variant number: {:?}", e);
+                            set_toast_message("Failed to determine variant number".to_string());
+                            set_if_show_toast(true);
+                            set_is_creating_variation(false);
+                            return;
+                        }
+                    };
 
                 let create_request = CreateNewTestRequest::new(
                     variation_name,
@@ -787,19 +909,63 @@ pub fn UnifiedTestManagerContent() -> impl IntoView {
 
                 match add_test(create_request).await {
                     Ok(new_test) => {
-                        get_tests_info.refetch();
-                        set_show_create_variation_modal(false);
-                        set_variation_type(String::new());
-                        set_selected_base_test_for_variation(None);
-                        set_toast_message(ToastMessage::create(ToastMessageType::NewTestAdded));
-                        set_if_show_toast(true);
+                        match variation_type_value.to_lowercase().as_str() {
+                            "randomized" => {
+                                // For randomized tests, generate questions automatically
+                                match duplicate_and_randomize_questions(
+                                    base_test_clone.test_id.clone(),
+                                    new_test.test_id.clone(),
+                                )
+                                .await
+                                {
+                                    Ok(_) => {
+                                        get_tests_info.refetch();
+                                        set_show_create_variation_modal(false);
+                                        set_variation_type(String::new());
+                                        set_selected_base_test_for_variation(None);
+                                        set_toast_message(ToastMessage::create(
+                                            ToastMessageType::NewTestAdded,
+                                        ));
+                                        set_if_show_toast(true);
 
-                        // Navigate to edit the new variation
-                        let navigate = leptos_router::use_navigate();
-                        navigate(
-                            &format!("/testbuilder/{}", new_test.test_id),
-                            Default::default(),
-                        );
+                                        // Navigate to test manager to view the completed randomized test
+                                        let navigate = leptos_router::use_navigate();
+                                        navigate("/test-manager", Default::default());
+                                    }
+                                    Err(e) => {
+                                        log::error!(
+                                            "Failed to create randomized questions: {:?}",
+                                            e
+                                        );
+                                        set_toast_message(
+                                            "Failed to create randomized questions".to_string(),
+                                        );
+                                        set_if_show_toast(true);
+                                    }
+                                }
+                            }
+                            "distinct" | "practice" => {
+                                // For distinct and practice tests, navigate to test builder to add questions
+                                get_tests_info.refetch();
+                                set_show_create_variation_modal(false);
+                                set_variation_type(String::new());
+                                set_selected_base_test_for_variation(None);
+                                set_toast_message(ToastMessage::create(
+                                    ToastMessageType::NewTestAdded,
+                                ));
+                                set_if_show_toast(true);
+
+                                // Navigate to edit the new variation
+                                let navigate = leptos_router::use_navigate();
+                                navigate(
+                                    &format!("/testbuilder/{}", new_test.test_id),
+                                    Default::default(),
+                                );
+                            }
+                            _ => {
+                                log::error!("Unknown variation type: {}", variation_type_value);
+                            }
+                        }
                     }
                     Err(e) => {
                         log::error!("Failed to create variation: {:?}", e);
@@ -1035,18 +1201,79 @@ pub fn UnifiedTestManagerContent() -> impl IntoView {
                                     <label class="block text-sm font-medium text-gray-700 mb-2">
                                         "Variation Type"
                                     </label>
-                                    <select
-                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                        prop:value=variation_type
-                                        on:change=move |ev| set_variation_type(event_target_value(&ev))
-                                    >
-                                        <option value="">"Select variation type"</option>
-                                        <option value="Remediation">"Remediation (Easier)"</option>
-                                        <option value="Advanced">"Advanced (Harder)"</option>
-                                        <option value="Practice">"Practice Version"</option>
-                                        <option value="Timed">"Timed Version"</option>
-                                        <option value="Randomized">"Randomized Version"</option>
-                                    </select>
+                                    <div class="space-y-3">
+                                        // Randomized Variation
+                                        <div class="border rounded-lg p-3 hover:bg-gray-50 cursor-pointer"
+                                             on:click=move |_| set_variation_type("Randomized".to_string())>
+                                            <div class="flex items-start space-x-3">
+                                                <input
+                                                    type="radio"
+                                                    name="variation_type"
+                                                    value="Randomized"
+                                                    class="mt-1"
+                                                    prop:checked=move || variation_type() == "Randomized"
+                                                    on:change=move |_| set_variation_type("Randomized".to_string())
+                                                />
+                                                <div class="flex-1">
+                                                    <h4 class="font-medium text-gray-900">Randomized Version</h4>
+                                                    <p class="text-sm text-gray-600 mt-1">
+                                                        "Same questions with shuffled order and randomized answer choices. Questions are automatically generated."
+                                                    </p>
+                                                    <span class="inline-block mt-2 px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">
+                                                        "Auto-generated"
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        // Distinct Variation
+                                        <div class="border rounded-lg p-3 hover:bg-gray-50 cursor-pointer"
+                                             on:click=move |_| set_variation_type("Distinct".to_string())>
+                                            <div class="flex items-start space-x-3">
+                                                <input
+                                                    type="radio"
+                                                    name="variation_type"
+                                                    value="Distinct"
+                                                    class="mt-1"
+                                                    prop:checked=move || variation_type() == "Distinct"
+                                                    on:change=move |_| set_variation_type("Distinct".to_string())
+                                                />
+                                                <div class="flex-1">
+                                                    <h4 class="font-medium text-gray-900">Distinct Version</h4>
+                                                    <p class="text-sm text-gray-600 mt-1">
+                                                        "Entirely different questions covering the same topics. You'll add new questions manually."
+                                                    </p>
+                                                    <span class="inline-block mt-2 px-2 py-1 bg-green-100 text-green-800 text-xs rounded">
+                                                        "Manual entry required"
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        // Practice Variation
+                                        <div class="border rounded-lg p-3 hover:bg-gray-50 cursor-pointer"
+                                             on:click=move |_| set_variation_type("Practice".to_string())>
+                                            <div class="flex items-start space-x-3">
+                                                <input
+                                                    type="radio"
+                                                    name="variation_type"
+                                                    value="Practice"
+                                                    class="mt-1"
+                                                    prop:checked=move || variation_type() == "Practice"
+                                                    on:change=move |_| set_variation_type("Practice".to_string())
+                                                />
+                                                <div class="flex-1">
+                                                    <h4 class="font-medium text-gray-900">Practice Version</h4>
+                                                    <p class="text-sm text-gray-600 mt-1">
+                                                        "Practice test for student preparation with new questions. You'll add practice questions manually."
+                                                    </p>
+                                                    <span class="inline-block mt-2 px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded">
+                                                        "Manual entry required"
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <div class="flex justify-end space-x-3">

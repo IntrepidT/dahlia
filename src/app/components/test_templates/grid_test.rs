@@ -363,7 +363,7 @@ pub fn GridTest() -> impl IntoView {
                                 view! {
                                     <div class="grid grid-cols-1 xl:grid-cols-3 gap-8 items-start">
                                         {/* Grid container - Enhanced design */}
-                                        <div class="xl:col-span-2">
+                                        <div class="xl:col-span-2 h-full">
                                             <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-gray-200/50 p-6">
                                                 <div class="flex items-center gap-3 mb-6">
                                                     <h2 class="text-xl font-semibold text-gray-800">"Assessment Grid"</h2>
@@ -408,35 +408,25 @@ pub fn GridTest() -> impl IntoView {
 
                                                                 view! {
                                                                     <div
-                                                                        class="relative flex items-center justify-center cursor-pointer transition-all duration-200 rounded-lg min-h-[50px] group hover:shadow-md"
-                                                                        class:bg-gradient-to-br=true
+                                                                        class="relative flex items-center justify-center cursor-pointer transition-all duration-200 rounded-lg min-h-[50px] group hover:shadow-md border-2"
+                                                                        class:bg-gradient-to-br=move || is_correct()
                                                                         class:from-emerald-50=move || is_correct()
                                                                         class:to-green-100=move || is_correct()
-                                                                        class:from-red-50=move || !is_correct()
-                                                                        class:to-red-100=move || !is_correct()
                                                                         class:ring-3=move || is_selected()
                                                                         class:ring-indigo-400=move || is_selected()
                                                                         class:shadow-lg=move || is_selected()
                                                                         class:scale-105=move || is_selected()
-                                                                        class:border-2=move || is_correct()
                                                                         class:border-green-300=move || is_correct()
-                                                                        class:border-red-300=move || !is_correct()
+                                                                        class:border-red-400=move || !is_correct()
+                                                                        class:bg-red-300=move || !is_correct()
                                                                         on:click=move |_| toggle_answer(qnumber)
                                                                     >
-                                                                        <span class=format!("select-none font-bold text-gray-700 px-2 py-2 text-center {} group-hover:scale-110 transition-transform", current_cell_size)>
+                                                                        <span class=format!("select-none font-bold text-gray-700 px-2 py-2 text-center {} group-hover:scale-110 transition-transform", current_cell_size)
+                                                                    //class:text-white=move || !is_correct()
+                                                                    class:text-gray-700=move || is_correct()
+                                                                    >
                                                                             {display_text}
                                                                         </span>
-
-                                                                        {/* Incorrect marker */}
-                                                                        {move || if !is_correct() {
-                                                                            view! {
-                                                                                <div class="absolute -top-1 -right-1 w-6 h-6 bg-gradient-to-br from-red-500 to-red-600 text-white rounded-full flex items-center justify-center shadow-lg">
-                                                                                    <span class="text-xs font-bold">"×"</span>
-                                                                                </div>
-                                                                            }.into_view()
-                                                                        } else {
-                                                                            view! { <div></div> }.into_view()
-                                                                        }}
 
                                                                         {/* Comment indicator */}
                                                                         {move || if has_comment() {

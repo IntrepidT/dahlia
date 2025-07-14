@@ -160,5 +160,75 @@ cfg_if::cfg_if! {
             Ok(deleted_question)
         }
 
+        pub async fn get_single_question(qnumber: i32, test_id: String, pool: &PgPool) -> Result<Question, ServerFnError> {
+            let testlinker_uuid = Uuid::parse_str(&test_id).map_err(|e| ServerFnError::new(format!("Invalid UUID: {}", e)))?;
+
+            let row = sqlx::query("SELECT word_problem, point_value, question_type, options, correct_answer, qnumber, testlinker FROM question_table WHERE qnumber = $1 AND testlinker = $2")
+                .bind(qnumber)
+                .bind(testlinker_uuid)
+                .fetch_one(pool)
+                .await
+                .map_err(|e| ServerFnError::new(format!("Database error: {}", e)))?;
+
+            let question = Question {
+                word_problem: row.get("word_problem"),
+                point_value: row.get("point_value"),
+                question_type: row.get("question_type"),
+                options: row.get("options"),
+                correct_answer: row.get("correct_answer"),
+                qnumber: row.get("qnumber"),
+                testlinker: row.get("testlinker"),
+            };
+
+            Ok(question)
+        }
+
+        pub async fn update_question_options(qnumber: i32, test_id: String, new_options: Vec<String>, pool: &PgPool) -> Result<Question, ServerFnError> {
+            let testlinker_uuid = Uuid::parse_str(&test_id).map_err(|e| ServerFnError::new(format!("Invalid UUID: {}", e)))?;
+
+            let row = sqlx::query("UPDATE question_table SET options = $1 WHERE qnumber = $2 AND testlinker = $3 RETURNING word_problem, point_value, question_type, options, correct_answer, qnumber, testlinker")
+                .bind(&new_options)
+                .bind(qnumber)
+                .bind(testlinker_uuid)
+                .fetch_one(pool)
+                .await
+                .map_err(|e| ServerFnError::new(format!("Database error: {}", e)))?;
+
+            let question = Question {
+                word_problem: row.get("word_problem"),
+                point_value: row.get("point_value"),
+                question_type: row.get("question_type"),
+                options: row.get("options"),
+                correct_answer: row.get("correct_answer"),
+                qnumber: row.get("qnumber"),
+                testlinker: row.get("testlinker"),
+            };
+
+            Ok(question)
+        }
+
+        pub async fn count_questions_by_test(test_id: String, pool: &PgPool) -> Result<i64, ServerFnError> {
+            let testlinker_uuid = Uuid::parse_str(&test_id).map_err(|e| ServerFnError::new(format!("Invalid UUID: {}", e)))?;
+
+            let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM question_table WHERE testlinker = $1")
+                .bind(testlinker_uuid)
+                .fetch_one(pool)
+                .await
+                .map_err(|e| ServerFnError::new(format!("Database error: {}", e)))?;
+
+            Ok(count)
+        }
+
+        pub async fn count_multiple_choice_questions(test_id: String, pool: &PgPool) -> Result<i64, ServerFnError> {
+            let testlinker_uuid = Uuid::parse_str(&test_id).map_err(|e| ServerFnError::new(format!("Invalid UUID: {}", e)))?;
+
+            let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM question_table WHERE testlinker = $1 AND question_type = 'MultipleChoice'")
+                .bind(testlinker_uuid)
+                .fetch_one(pool)
+                .await
+                .map_err(|e| ServerFnError::new(format!("Database error: {}", e)))?;
+
+            Ok(count)
+        }
     }
 }

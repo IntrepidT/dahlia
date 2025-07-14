@@ -26,6 +26,34 @@ pub fn TestBuilder() -> impl IntoView {
     }
 }
 
+async fn get_next_variant_number_for_new_test(
+    test_name: &str,
+) -> Result<i32, leptos::ServerFnError> {
+    let all_tests = get_tests().await?;
+
+    // Find all tests with the same name (exact match or base name match)
+    let related_tests: Vec<&Test> = all_tests
+        .iter()
+        .filter(|test| {
+            let test_base_name = if test.name.contains(" - ") {
+                test.name.split(" - ").next().unwrap_or(&test.name)
+            } else {
+                &test.name
+            };
+            test_base_name == test_name || test.name == test_name
+        })
+        .collect();
+
+    // Find the highest variant number
+    let max_variant = related_tests
+        .iter()
+        .map(|test| test.test_variant)
+        .max()
+        .unwrap_or(-1); // Start from -1 so first test gets variant 0
+
+    Ok(max_variant + 1)
+}
+
 #[component]
 pub fn TestBuilderContent() -> impl IntoView {
     const TAB_BUTTON_STYLE: &str =
@@ -244,10 +272,9 @@ pub fn TestBuilderContent() -> impl IntoView {
     create_effect(move |_| {
         if let Some(Some(test)) = test_resource.get() {
             let is_var = test.name.contains(" - ")
-                && (test.name.to_lowercase().contains("remediation")
-                    || test.name.to_lowercase().contains("advanced")
-                    || test.name.to_lowercase().contains("easy")
-                    || test.name.to_lowercase().contains("hard")
+                && (test.name.to_lowercase().contains("randomized")
+                    || test.name.to_lowercase().contains("distinct")
+                    || test.name.to_lowercase().contains("practice")
                     || test.comments.to_lowercase().contains("variation:"));
 
             set_is_variation(is_var);
@@ -372,53 +399,66 @@ pub fn TestBuilderContent() -> impl IntoView {
             )
         };
 
-        //Convert scope back to Enum and course_id to i32
+        // Convert scope back to Enum and course_id to i32
         let scope_value = scope();
         if scope_value != Some(ScopeEnum::Course) && course_id().is_some() {
             set_course_id(None);
         };
         let course_id_value = course_id();
 
-        // Create the test request, whether for new or update
-        let add_test_request = CreateNewTestRequest::new(
-            test_title(),
-            total_points,
-            test_comments(),
-            test_type.clone(),
-            Some(school_year()),
-            converted_cats.clone(),
-            test_variant(),
-            grade_level(),
-            scope_value.clone(),
-            course_id_value.clone(),
-        );
-
         let converted_clone = converted_cats.clone();
+        let test_title_clone = test_title();
+        let test_comments_clone = test_comments();
+        let school_year_clone = school_year();
+        let grade_level_clone = grade_level();
+        let scope_value_clone = scope_value.clone();
+        let course_id_value_clone = course_id_value.clone();
+
         spawn_local(async move {
             let current_test_id = test_id();
             let is_editing = is_edit_mode();
 
+            // Auto-assign variant number for new tests, keep existing for edits
+            let final_test_variant = if !is_editing {
+                // For new tests, get the next available variant number
+                match get_next_variant_number_for_new_test(&test_title_clone).await {
+                    Ok(num) => {
+                        log::info!("Auto-assigned variant number: {}", num);
+                        set_test_variant(num);
+                        num
+                    }
+                    Err(e) => {
+                        log::error!("Failed to get next variant number: {:?}", e);
+                        set_show_error(true);
+                        set_error_message(format!("Failed to determine variant number: {}", e));
+                        set_is_submitting(false);
+                        return;
+                    }
+                }
+            } else {
+                test_variant() // Keep existing variant for edits
+            };
+
             // If we're editing, update the test rather than creating a new one
             let new_test_id = if is_editing && !current_test_id.is_empty() {
                 let update_test_request = UpdateTestRequest::new(
-                    test_title(),
+                    test_title_clone.clone(),
                     total_points,
-                    test_comments(),
-                    test_type,
-                    Some(school_year()),
-                    converted_clone,
-                    test_variant(),
-                    grade_level(),
-                    test_id(),
-                    scope_value,
-                    course_id_value,
+                    test_comments_clone.clone(),
+                    test_type.clone(),
+                    Some(school_year_clone.clone()),
+                    converted_clone.clone(),
+                    final_test_variant,
+                    grade_level_clone.clone(),
+                    current_test_id.clone(),
+                    scope_value_clone.clone(),
+                    course_id_value_clone.clone(),
                 );
-                // For now, we'll assume we're just keeping the same test_id
+
                 log::info!("Updating test with ID: {}", current_test_id);
-                // Implement update_test function as needed
                 match update_test(update_test_request).await {
-                    Ok(_updated) => {
-                        // We don't need to save the updated test since we're just using the ID
+                    Ok(_) => {
+                        log::info!("Successfully updated test");
                     }
                     Err(e) => {
                         log::error!("Error updating test: {:?}", e);
@@ -430,12 +470,29 @@ pub fn TestBuilderContent() -> impl IntoView {
                 }
                 current_test_id
             } else {
-                // Create a new test
+                // Create a new test with auto-assigned variant
+                let add_test_request = CreateNewTestRequest::new(
+                    test_title_clone.clone(),
+                    total_points,
+                    test_comments_clone.clone(),
+                    test_type.clone(),
+                    Some(school_year_clone.clone()),
+                    converted_clone.clone(),
+                    final_test_variant,
+                    grade_level_clone.clone(),
+                    scope_value_clone.clone(),
+                    course_id_value_clone.clone(),
+                );
+
                 match add_test(add_test_request).await {
                     Ok(added_test) => {
                         let new_id = added_test.test_id.clone();
                         set_test_id(new_id.clone());
-                        log::info!("Created test with ID: {}", new_id);
+                        log::info!(
+                            "Created test with ID: {} and variant: {}",
+                            new_id,
+                            final_test_variant
+                        );
                         new_id
                     }
                     Err(e) => {
@@ -519,9 +576,11 @@ pub fn TestBuilderContent() -> impl IntoView {
                 }
             }
 
+            set_is_submitting(false);
+
             // Navigate to the test list page only after all questions are processed
             let navigate = leptos_router::use_navigate();
-            navigate("/dashboard", Default::default());
+            navigate("/test-manager", Default::default());
         });
     };
 
@@ -537,11 +596,42 @@ pub fn TestBuilderContent() -> impl IntoView {
 
             {move || {
                 if is_variation() && is_edit_mode() {
+                    let variation_info = variation_type_display();
+                    let (info_class, icon_color, info_text, warning_text) = if variation_info.to_lowercase().contains("randomized") {
+                        (
+                            "bg-blue-50 border-blue-400",
+                            "text-blue-400",
+                            "This is a randomized variation with shuffled questions and answer choices.",
+                            Some("Questions are automatically generated from the base test. You can edit them but they may be overwritten if regenerated.")
+                        )
+                    } else if variation_info.to_lowercase().contains("distinct") {
+                        (
+                            "bg-green-50 border-green-400",
+                            "text-green-400",
+                            "This is a distinct variation with entirely different questions.",
+                            None
+                        )
+                    } else if variation_info.to_lowercase().contains("practice") {
+                        (
+                            "bg-purple-50 border-purple-400",
+                            "text-purple-400",
+                            "This is a practice variation for student preparation.",
+                            None
+                        )
+                    } else {
+                        (
+                            "bg-blue-50 border-blue-400",
+                            "text-blue-400",
+                            "This is a test variation.",
+                            None
+                        )
+                    };
+
                     view! {
-                        <div class="bg-blue-50 border-l-4 border-blue-400 p-4 mb-6">
+                        <div class=format!("border-l-4 p-4 mb-6 {}", info_class)>
                             <div class="flex">
                                 <div class="flex-shrink-0">
-                                    <svg class="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+                                    <svg class=format!("h-5 w-5 {}", icon_color) viewBox="0 0 20 20" fill="currentColor">
                                         <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
                                     </svg>
                                 </div>
@@ -554,6 +644,16 @@ pub fn TestBuilderContent() -> impl IntoView {
                                             "This is a " <strong>{variation_type_display}</strong> " variation of "
                                             <strong>{base_test_name}</strong>
                                         </p>
+                                        <p class="mt-1 text-xs">{info_text}</p>
+                                        {if let Some(warning) = warning_text {
+                                            view! {
+                                                <p class="mt-2 text-xs bg-yellow-100 text-yellow-800 p-2 rounded border border-yellow-200">
+                                                    {warning}
+                                                </p>
+                                            }.into_view()
+                                        } else {
+                                            view! { <div></div> }.into_view()
+                                        }}
                                         <div class="mt-3">
                                             <div class="flex items-center space-x-4">
                                                 <button
@@ -724,19 +824,27 @@ pub fn TestBuilderContent() -> impl IntoView {
 
                                 <div class="form-group">
                                     <label class="block text-sm font-medium text-gray-700 mb-1">
-                                        "Variant of Test"
+                                        "Variant Number"
                                     </label>
-                                    <input
-                                        type="number"
-                                        min="0"
-                                        class="w-full px-4 py-3 rounded-md border border-gray-300 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                                        value=move || test_variant().to_string()
-                                        on:input=move |event| {
-                                            if let Ok(value) = event_target_value(&event).parse::<i32>() {
-                                                set_test_variant(value);
-                                            }
+                                    {move || {
+                                        if is_edit_mode() {
+                                            // In edit mode, show the current variant number as read-only
+                                            view! {
+                                                <div class="w-full px-4 py-3 rounded-md border border-gray-300 bg-gray-100 text-gray-600">
+                                                    {test_variant().to_string()}
+                                                    <span class="text-sm text-gray-500 ml-2">"(Auto-assigned)"</span>
+                                                </div>
+                                            }.into_view()
+                                        } else {
+                                            // In create mode, show that it will be auto-assigned
+                                            view! {
+                                                <div class="w-full px-4 py-3 rounded-md border border-gray-300 bg-gray-100 text-gray-600">
+                                                    "Will be auto-assigned"
+                                                    <span class="text-sm text-gray-500 ml-2">"(Next available number)"</span>
+                                                </div>
+                                            }.into_view()
                                         }
-                                    />
+                                    }}
                                 </div>
 
                                 <div class="form-group">
