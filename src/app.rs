@@ -11,7 +11,7 @@ pub mod websockets;
 use crate::app::components::test_components::test_variation_manager::TestVariationManager;
 use crate::app::middleware::global_settings::SettingsProvider;
 use components::enhanced_login_form::provide_student_mapping_service;
-use components::live_test::RealtimeTestSession;
+use components::live_testing::{test_session::RealtimeTestSession, AnonymousStudentTest};
 use components::login_components::{RequestPasswordResetForm, ResetPasswordForm};
 use components::test_templates::{FlashCardSet, GridTest};
 use pages::{
@@ -84,6 +84,7 @@ pub fn App() -> impl IntoView {
                             <Route path="/flashcardset/:test_id" view=FlashCardSet />
                             <Route path="/reviewtest/:test_id/:student_id/:test_variant/:attempt" view=ReviewTest />
                             <Route path="/test-session/:test_id" view=RealtimeTestSession/>
+                            <Route path="/student-test/:test_id/:session_id" view=AnonymousStudentTest/>
                             <Route path="/tests/:test_id/sessions/:session_id" view=RealtimeTestSession/>
                             <Route path="/testsessions" view=TestSessionsList/>
                             <Route path="/gridtest/:test_id" view=GridTest/>

@@ -19,7 +19,7 @@ cfg_if::cfg_if! {
             let rows = sqlx::query(
                 "SELECT id, name, description, created_at, last_active, owner_id,
                 status, max_users, current_users, is_private, password_required, metadata,
-                session_type, test_id, start_time, end_time
+                session_type, test_id, start_time, end_time, teacher_id
                 FROM websocket_sessions WHERE status = 'active' ORDER BY last_active DESC"
             )
             .fetch_all(pool)
@@ -44,6 +44,7 @@ cfg_if::cfg_if! {
                     let test_id: Option<String> = row.get("test_id");
                     let start_time: Option<DateTime<Utc>> = row.get("start_time");
                     let end_time: Option<DateTime<Utc>> = row.get("end_time");
+                    let teacher_id: Option<i32> = row.get("teacher_id");
 
                     Session {
                         id,
@@ -62,6 +63,7 @@ cfg_if::cfg_if! {
                         test_id,
                         start_time,
                         end_time,
+                        teacher_id,
                     }
                 })
                 .collect();
@@ -74,7 +76,7 @@ cfg_if::cfg_if! {
             let rows = sqlx::query(
                 "SELECT id, name, description, created_at, last_active, owner_id,
                 status, max_users, current_users, is_private, password_required, metadata, 
-                session_type, test_id, start_time, end_time
+                session_type, test_id, start_time, end_time, teacher_id
                 FROM websocket_sessions
                 WHERE status = 'active' AND session_type = 'test'
                 ORDER BY last_active DESC"
@@ -101,6 +103,7 @@ cfg_if::cfg_if! {
                     let test_id: Option<String> = row.get("test_id");
                     let start_time: Option<DateTime<Utc>> = row.get("start_time");
                     let end_time: Option<DateTime<Utc>> = row.get("end_time");
+                    let teacher_id: Option<i32> = row.get("teacher_id");
 
                     Session {
                         id,
@@ -119,6 +122,7 @@ cfg_if::cfg_if! {
                         test_id,
                         start_time,
                         end_time,
+                        teacher_id,
                     }
                 })
                 .collect();
@@ -131,7 +135,7 @@ cfg_if::cfg_if! {
             let row = sqlx::query(
                 "SELECT id, name, description, created_at, last_active, owner_id,
                 status, max_users, current_users, is_private, password_required, metadata,
-                session_type, test_id, start_time, end_time
+                session_type, test_id, start_time, end_time, teacher_id
                 FROM websocket_sessions WHERE id = $1"
             )
             .bind(session_id)
@@ -158,6 +162,7 @@ cfg_if::cfg_if! {
                         test_id: row.get("test_id"),
                         start_time: row.get("start_time"),
                         end_time: row.get("end_time"),
+                        teacher_id: row.get("teacher_id"),
                     };
                     Ok(Some(session))
                 },
@@ -170,7 +175,7 @@ cfg_if::cfg_if! {
             let rows = sqlx::query(
                 "SELECT id, name, description, created_at, last_active, owner_id,
                 status, max_users, current_users, is_private, password_required, metadata,
-                session_type, test_id, start_time, end_time
+                session_type, test_id, start_time, end_time, teacher_id
                 FROM websocket_sessions
                 WHERE test_id = $1 
                 ORDER BY created_at DESC"
@@ -198,6 +203,7 @@ cfg_if::cfg_if! {
                     let test_id: Option<String> = row.get("test_id");
                     let start_time: Option<DateTime<Utc>> = row.get("start_time");
                     let end_time: Option<DateTime<Utc>> = row.get("end_time");
+                    let teacher_id: Option<i32> = row.get("teacher_id");
 
                     Session {
                         id,
@@ -216,6 +222,7 @@ cfg_if::cfg_if! {
                         test_id,
                         start_time,
                         end_time,
+                        teacher_id,
                     }
                 })
                 .collect();
@@ -225,12 +232,12 @@ cfg_if::cfg_if! {
 
         /// Creates a new session
         pub async fn create_session(session: &Session, pool: &PgPool) -> Result<Session, ServerFnError> {
-            let row = sqlx::query(
+        let row = sqlx::query(
                 "INSERT INTO websocket_sessions
-                (id, name, description, owner_id, status, max_users, is_private, password_required, password_hash, metadata, session_type, test_id, start_time, end_time) 
-                VALUES ($1, $2, $3, $4, $5::session_status_enum, $6, $7, $8, $9, $10, $11::session_type_enum, $12, $13, $14) 
+                (id, name, description, owner_id, status, max_users, is_private, password_required, password_hash, metadata, session_type, test_id, start_time, end_time, teacher_id) 
+                VALUES ($1, $2, $3, $4, $5::session_status_enum, $6, $7, $8, $9, $10, $11::session_type_enum, $12, $13, $14, $15) 
                 RETURNING id, name, description, created_at, last_active, owner_id, 
-                status, max_users, current_users, is_private, password_required, metadata, session_type, test_id, start_time, end_time"
+                status, max_users, current_users, is_private, password_required, metadata, session_type, test_id, start_time, end_time, teacher_id"
             )
             .bind(session.id)
             .bind(&session.name)
@@ -246,6 +253,7 @@ cfg_if::cfg_if! {
             .bind(&session.test_id)
             .bind(session.start_time)
             .bind(session.end_time)
+            .bind(session.teacher_id)
             .fetch_one(pool)
             .await
             .map_err(|e| ServerFnError::new(format!("Database error: {}", e)))?;
@@ -267,6 +275,7 @@ cfg_if::cfg_if! {
                 test_id: row.get("test_id"),
                 start_time: row.get("start_time"),
                 end_time: row.get("end_time"),
+                teacher_id: row.get("teacher_id"),
             };
 
             Ok(session)
@@ -312,7 +321,7 @@ cfg_if::cfg_if! {
                 WHERE id =  $3 
                 RETURNING id, name, description, created_at, last_active, owner_id, 
                 status, max_users, current_users, is_private, password_required, metadata,
-                session_type, test_id, start_time, end_time"
+                session_type, test_id, start_time, end_time, teacher_id"
             )
             .bind(start_time)
             .bind(end_time)
@@ -338,6 +347,7 @@ cfg_if::cfg_if! {
                 test_id: update_result.get("test_id"),
                 start_time: update_result.get("start_time"),
                 end_time: update_result.get("end_time"),
+                teacher_id: update_result.get("teacher_id"),
             };
 
             Ok(session)
@@ -371,36 +381,225 @@ cfg_if::cfg_if! {
 
         //Cleanup expired or empty session (for test and chat session)
         pub async fn cleanup_inactive_sessions(pool: &PgPool) -> Result<(), ServerFnError> {
-            // First: Mark empty sessions as inactive after 1 hour
-            sqlx::query(
-                "UPDATE websocket_sessions SET status = 'inactive'::session_status_enum
-                WHERE status = 'active'::session_status_enum
-                AND current_users = 0
-                AND last_active < NOW() - INTERVAL '1 hour'"
-            )
-            .execute(pool)
-            .await?;
-
-            // Then: Mark old sessions as expired after 24 hours
-            sqlx::query(
-                "UPDATE websocket_sessions SET status = 'expired'::session_status_enum
-                WHERE status = 'active'::session_status_enum
-                AND last_active < NOW() - INTERVAL '24 hours'"
-            )
-            .execute(pool)
-            .await?;
-
-            // Handle completed test sessions
+            // 1. Clean up sessions where teacher has been inactive for 10 seconds
             sqlx::query(
                 "UPDATE websocket_sessions
-                SET status = 'expired'::session_status_enum
-                WHERE status = 'active'::session_status_enum
-                AND session_type = 'test'::session_type_enum
-                AND end_time IS NOT NULL
-                AND end_time < NOW()"
+                 SET status = 'inactive'::session_status_enum,
+                     teacher_id = NULL
+                 WHERE status = 'active'::session_status_enum
+                 AND teacher_id IS NOT NULL
+                 AND last_active < NOW() - INTERVAL '10 seconds'"
             )
             .execute(pool)
             .await?;
+
+            // 2. Clean up duplicate sessions for same teacher (keep most recent)
+            sqlx::query(
+                "UPDATE websocket_sessions s1
+                 SET status = 'inactive'::session_status_enum,
+                     teacher_id = NULL
+                 WHERE s1.status = 'active'::session_status_enum
+                 AND s1.teacher_id IS NOT NULL
+                 AND EXISTS (
+                     SELECT 1 FROM websocket_sessions s2
+                     WHERE s2.teacher_id = s1.teacher_id
+                     AND s2.id != s1.id
+                     AND s2.status = 'active'::session_status_enum
+                     AND s2.last_active > s1.last_active
+                 )"
+            )
+            .execute(pool)
+            .await?;
+            // 3. Clean up sessions where teacher has been marked as disconnected (more aggressive timing)
+            sqlx::query(
+                "UPDATE websocket_sessions
+                 SET status = 'inactive'::session_status_enum,
+                     teacher_id = NULL
+                 WHERE status = 'active'::session_status_enum
+                 AND teacher_id IS NOT NULL
+                 AND last_active < NOW() - INTERVAL '30 seconds'"  // REDUCED from 2 minutes
+            )
+            .execute(pool)
+            .await?;
+
+            // 4. Mark empty sessions as inactive after 5 minutes (unchanged)
+            sqlx::query(
+                "UPDATE websocket_sessions
+                 SET status = 'inactive'::session_status_enum
+                 WHERE status = 'active'::session_status_enum
+                 AND current_users = 0
+                 AND last_active < NOW() - INTERVAL '5 minutes'"
+            )
+            .execute(pool)
+            .await?;
+
+            // 5. Mark old sessions as expired after 2 hours (unchanged)
+            sqlx::query(
+                "UPDATE websocket_sessions
+                 SET status = 'expired'::session_status_enum
+                 WHERE status = 'active'::session_status_enum
+                 AND last_active < NOW() - INTERVAL '2 hours'"
+            )
+            .execute(pool)
+            .await?;
+
+            // 6. Handle completed test sessions
+            expire_completed_test_sessions(pool).await?;
+
+            Ok(())
+        }
+
+        pub async fn assign_teacher_to_session(session_id: Uuid, teacher_id: i32, pool: &PgPool) -> Result<Session, ServerFnError> {
+            let row = sqlx::query(
+                "UPDATE websocket_sessions
+                 SET teacher_id = $1, last_active = NOW() 
+                 WHERE id = $2 
+                 RETURNING id, name, description, created_at, last_active, owner_id,
+                 status, max_users, current_users, is_private, password_required, metadata,
+                 session_type, test_id, start_time, end_time, teacher_id"
+            )
+            .bind(teacher_id)
+            .bind(session_id)
+            .fetch_one(pool)
+            .await
+            .map_err(|e| ServerFnError::new(format!("Database error: {}", e)))?;
+
+            let session = Session {
+                id: row.get("id"),
+                name: row.get("name"),
+                description: row.get("description"),
+                created_at: row.get("created_at"),
+                last_active: row.get("last_active"),
+                owner_id: row.get("owner_id"),
+                status: row.get("status"),
+                max_users: row.get("max_users"),
+                current_users: row.get("current_users"),
+                is_private: row.get("is_private"),
+                password_required: row.get("password_required"),
+                metadata: row.get("metadata"),
+                session_type: row.get("session_type"),
+                test_id: row.get("test_id"),
+                start_time: row.get("start_time"),
+                end_time: row.get("end_time"),
+                teacher_id: row.get("teacher_id"),
+            };
+
+            Ok(session)
+        }
+
+        /// Gets the active session for a specific teacher
+        pub async fn get_teacher_active_session(teacher_id: i32, pool: &PgPool) -> Result<Option<Session>, ServerFnError> {
+            let row = sqlx::query(
+                "SELECT id, name, description, created_at, last_active, owner_id,
+                 status, max_users, current_users, is_private, password_required, metadata,
+                 session_type, test_id, start_time, end_time, teacher_id
+                 FROM websocket_sessions 
+                 WHERE teacher_id = $1 AND end_time IS NULL AND status = 'active'::session_status_enum"
+            )
+            .bind(teacher_id)
+            .fetch_optional(pool)
+            .await
+            .map_err(|e| ServerFnError::new(format!("Database error: {}", e)))?;
+
+            match row {
+                Some(row) => {
+                    let session = Session {
+                        id: row.get("id"),
+                        name: row.get("name"),
+                        description: row.get("description"),
+                        created_at: row.get("created_at"),
+                        last_active: row.get("last_active"),
+                        owner_id: row.get("owner_id"),
+                        status: row.get("status"),
+                        max_users: row.get("max_users"),
+                        current_users: row.get("current_users"),
+                        is_private: row.get("is_private"),
+                        password_required: row.get("password_required"),
+                        metadata: row.get("metadata"),
+                        session_type: row.get("session_type"),
+                        test_id: row.get("test_id"),
+                        start_time: row.get("start_time"),
+                        end_time: row.get("end_time"),
+                        teacher_id: row.get("teacher_id"),
+                    };
+                    Ok(Some(session))
+                },
+                None => Ok(None),
+            }
+        }
+
+        /// Releases a teacher from a session (sets teacher_id to NULL)
+        pub async fn release_teacher_from_session(session_id: Uuid, pool: &PgPool) -> Result<(), ServerFnError> {
+            sqlx::query(
+                "UPDATE websocket_sessions
+                 SET teacher_id = NULL, last_active = NOW() 
+                 WHERE id = $1"
+            )
+            .bind(session_id)
+            .execute(pool)
+            .await
+            .map_err(|e| ServerFnError::new(format!("Database error: {}", e)))?;
+
+            Ok(())
+        }
+
+        /// Checks if a teacher can access a specific test (no other teacher is currently active)
+        pub async fn check_teacher_test_access(test_id: &str, teacher_id: i32, pool: &PgPool) -> Result<bool, ServerFnError> {
+            // FIRST: Clean up any stale sessions
+            cleanup_inactive_sessions(pool).await?;
+
+            // SECOND: Check for conflicting active sessions
+            let conflicting_sessions = sqlx::query(
+                "SELECT COUNT(*) as count
+                 FROM websocket_sessions 
+                 WHERE test_id = $1 
+                 AND teacher_id IS NOT NULL 
+                 AND teacher_id != $2 
+                 AND end_time IS NULL 
+                 AND status = 'active'::session_status_enum
+                 AND last_active > NOW() - INTERVAL '1 minute'"  // Only consider recently active sessions
+            )
+            .bind(test_id)
+            .bind(teacher_id)
+            .fetch_one(pool)
+            .await
+            .map_err(|e| ServerFnError::new(format!("Database error: {}", e)))?;
+
+            let count: i64 = conflicting_sessions.get("count");
+            Ok(count == 0)
+        }
+
+        /// Immediately cleanup a teacher's session when they disconnect
+        pub async fn cleanup_teacher_session(teacher_id: i32, pool: &PgPool) -> Result<(), ServerFnError> {
+            info!("Starting enhanced cleanup for teacher {}", teacher_id);
+
+            // Get the teacher's active session first for logging
+            if let Some(session) = get_teacher_active_session(teacher_id, pool).await? {
+                info!("Found active session {} for teacher {}, cleaning up...", session.id, teacher_id);
+
+                // Update session timestamp to current time to prevent race conditions
+                sqlx::query(
+                    "UPDATE websocket_sessions
+                     SET last_active = NOW() 
+                     WHERE id = $1"
+                )
+                .bind(session.id)
+                .execute(pool)
+                .await?;
+
+                // Set session to inactive
+                update_session_status(session.id, SessionStatus::Inactive, pool).await?;
+
+                // Release teacher from session
+                release_teacher_from_session(session.id, pool).await?;
+
+                info!("Successfully cleaned up session {} for teacher {}", session.id, teacher_id);
+            } else {
+                info!("No active session found for teacher {} during cleanup", teacher_id);
+            }
+
+            // Also run general cleanup to catch any other stale sessions
+            cleanup_inactive_sessions(pool).await?;
 
             Ok(())
         }

@@ -1,7 +1,8 @@
 use crate::app::components::settings_modal::SettingsModal;
 use icondata::IoChatbubbleEllipsesOutline;
 use icondata::{
-    AiApiOutlined, AiBarChartOutlined, AiHomeOutlined, AiSettingOutlined, ChStack, FiBook,
+    AiApiOutlined, BsClipboardCheck, BsGraphUpArrow, ChNotesTick, FaChildrenSolid,
+    LuLayoutDashboard, RiAdminUserFacesLine,
 };
 // Add new imports for additional icons, including pin/unpin icons
 use crate::app::components::ShowAdministerTestModal;
@@ -178,7 +179,7 @@ pub fn DashboardSidebar(
                             is_small_screen=is_small_screen.into()
                         />
                         <SidebarNavLink
-                            icon=IoPeopleOutline
+                            icon=FaChildrenSolid
                             label="Student View"
                             path="/studentview"
                             is_expanded=is_expanded.into()
@@ -195,7 +196,7 @@ pub fn DashboardSidebar(
                         />
                         <Show when=move || current_user.get().map(|user| user.is_admin()).unwrap_or(false)>
                             <SidebarNavLink
-                                icon=BiClipboardRegular
+                                icon=RiAdminUserFacesLine
                                 label="Admin Dashboard (beta)"
                                 path="/admindashboard"
                                 is_expanded=is_expanded.into()
@@ -212,7 +213,7 @@ pub fn DashboardSidebar(
                             is_small_screen=is_small_screen.into()
                         />
                         <SidebarNavLink
-                            icon=ChStack
+                            icon=ChNotesTick
                             label="Assessments"
                             path="/assessments"
                             is_expanded=is_expanded.into()
@@ -220,7 +221,7 @@ pub fn DashboardSidebar(
                             is_small_screen=is_small_screen.into()
                         />
                         <SidebarNavLink
-                            icon=FiBook
+                            icon=BsGraphUpArrow
                             label="Gradebook (beta)"
                             path="/gradebook"
                             is_expanded=is_expanded.into()
@@ -228,7 +229,7 @@ pub fn DashboardSidebar(
                             is_small_screen=is_small_screen.into()
                         />
                         <SidebarNavLink
-                            icon=IoPricetagOutline
+                            icon=BsClipboardCheck
                             label="Tests"
                             path="/test-manager"
                             is_expanded=is_expanded.into()

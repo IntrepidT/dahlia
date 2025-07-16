@@ -56,6 +56,16 @@ pub struct TestSessionMessage {
     pub room_id: Uuid,
 }
 
+// NEW: Anonymous student join message
+#[cfg(feature = "ssr")]
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct AnonymousStudentJoinMessage {
+    pub student_data: serde_json::Value,
+    pub user_id: Uuid,
+    pub room_id: Uuid,
+}
+
 #[cfg(feature = "ssr")]
 #[derive(Debug, Serialize, Deserialize)]
 pub enum TestMessageType {

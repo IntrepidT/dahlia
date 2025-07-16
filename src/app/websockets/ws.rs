@@ -1,6 +1,6 @@
 #[cfg(feature = "ssr")]
 use {
-    crate::app::websockets::lobby::Lobby,
+    crate::app::websockets::lobby::{AnonymousStudentJoinMessage, Lobby},
     crate::app::websockets::messages::{
         ClientActorMessage, Connect, Disconnect, TestMessageType, TestSessionMessage,
         UserInfoMessage, WsMessage,
@@ -9,7 +9,7 @@ use {
     actix::{Actor, Addr, Running, StreamHandler},
     actix::{ActorFutureExt, AsyncContext, Handler},
     actix_web_actors::ws,
-    serde_json::{from_str, json, Value}, // Added json! macro here
+    serde_json::{from_str, json, Value},
 };
 
 use std::time::{Duration, Instant};
@@ -117,19 +117,18 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsConn {
                         log::info!("Processing message type: {}", msg_type);
 
                         match msg_type {
-                            "user_info" => {
-                                log::info!("Handling user_info from user {}", self.id);
-                                // Send user info to lobby for role assignment
-                                self.lobby_addr.do_send(UserInfoMessage {
-                                    user_data: json_value,
+                            "anonymous_student_join" => {
+                                log::info!("Handling anonymous student join from user {}", self.id);
+                                self.lobby_addr.do_send(AnonymousStudentJoinMessage {
+                                    student_data: json_value,
                                     user_id: self.id,
                                     room_id: self.room,
                                 });
                                 return;
                             }
                             "user_info" => {
-                                log::info!("Handling user info from user {}", self.id);
-                                //Send user info to lobby for role assignment
+                                log::info!("Handling user_info from user {}", self.id);
+                                // Send user info to lobby for role assignment
                                 self.lobby_addr.do_send(UserInfoMessage {
                                     user_data: json_value,
                                     user_id: self.id,

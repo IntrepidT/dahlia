@@ -13,7 +13,7 @@ use {
         ClientActorMessage, Connect, Disconnect, TestMessageType, TestSessionMessage,
         UserInfoMessage, WsMessage,
     },
-    actix::prelude::{Actor, Context, Handler, Recipient},
+    actix::prelude::{Actor, Context, Handler, Message, Recipient},
     serde_json::{json, Value},
     sqlx::PgPool,
 };
@@ -22,12 +22,23 @@ use {
 type Socket = Recipient<WsMessage>;
 
 #[cfg(feature = "ssr")]
+#[derive(Debug, Clone)]
+pub struct AnonymousStudent {
+    pub id: String,
+    pub name: String,
+    pub session_id: Uuid,
+    pub test_id: String,
+    pub joined_at: chrono::DateTime<chrono::Utc>,
+}
+
+#[cfg(feature = "ssr")]
 pub struct Lobby {
     sessions: HashMap<Uuid, Socket>,
     rooms: HashMap<Uuid, HashSet<Uuid>>,
     room_roles: HashMap<(Uuid, Uuid), String>,
     active_tests: HashMap<Uuid, String>,
     test_questions: HashMap<String, Vec<Value>>,
+    anonymous_students: HashMap<Uuid, AnonymousStudent>, // New field for anonymous students
     db_pool: Option<sqlx::PgPool>,
 }
 
@@ -40,6 +51,7 @@ impl Default for Lobby {
             room_roles: HashMap::new(),
             active_tests: HashMap::new(),
             test_questions: HashMap::new(),
+            anonymous_students: HashMap::new(),
             db_pool: None,
         }
     }
@@ -55,6 +67,7 @@ impl Lobby {
             room_roles: HashMap::new(),
             active_tests: HashMap::new(),
             test_questions: HashMap::new(),
+            anonymous_students: HashMap::new(),
         }
     }
 
@@ -101,6 +114,74 @@ impl Lobby {
         }
     }
 
+    // NEW: Handle anonymous student join
+    fn handle_anonymous_student_join(
+        &mut self,
+        msg: serde_json::Value,
+        user_id: Uuid,
+        room_id: Uuid,
+    ) {
+        if let (Some(name), Some(student_id), Some(test_id)) = (
+            msg.get("student_name").and_then(|n| n.as_str()),
+            msg.get("student_id").and_then(|s| s.as_str()),
+            msg.get("test_id").and_then(|t| t.as_str()),
+        ) {
+            log::info!(
+                "Anonymous student joining: {} (ID: {}) for test {}",
+                name,
+                student_id,
+                test_id
+            );
+
+            // Store anonymous student info
+            let anon_student = AnonymousStudent {
+                id: student_id.to_string(),
+                name: name.to_string(),
+                session_id: room_id,
+                test_id: test_id.to_string(),
+                joined_at: chrono::Utc::now(),
+            };
+
+            self.anonymous_students
+                .insert(user_id, anon_student.clone());
+
+            // Assign student role automatically
+            self.room_roles
+                .insert((room_id, user_id), "student".to_string());
+
+            // Send role confirmation with student info
+            let role_msg = json!({
+                "type": "role_assigned",
+                "role": "student",
+                "user_id": user_id.to_string(),
+                "room_id": room_id.to_string(),
+                "student_info": {
+                    "name": name,
+                    "student_id": student_id,
+                    "is_anonymous": true
+                }
+            });
+
+            log::info!("Assigning student role to anonymous user {}", user_id);
+            self.send_message(&role_msg.to_string(), &user_id);
+
+            // Broadcast student joined event with proper student data
+            self.broadcast_user_event(
+                &room_id,
+                &user_id,
+                "student_joined",
+                Some(json!({
+                    "name": name,
+                    "student_id": student_id,
+                    "is_anonymous": true,
+                    "joined_at": anon_student.joined_at.to_rfc3339()
+                })),
+            );
+        } else {
+            log::warn!("Invalid anonymous student join message format");
+        }
+    }
+
     fn send_message(&self, message: &str, id_to: &Uuid) {
         if let Some(socket_recipient) = self.sessions.get(id_to) {
             let _ = socket_recipient.do_send(WsMessage(message.to_owned()));
@@ -121,6 +202,7 @@ impl Lobby {
         }
     }
 
+    // ENHANCED: Send participants list with anonymous student info
     fn send_participants_list(&self, room_id: &Uuid, requesting_user_id: &Uuid) {
         if let Some(room_users) = self.rooms.get(room_id) {
             let participants: Vec<serde_json::Value> = room_users
@@ -132,18 +214,32 @@ impl Lobby {
                         .cloned()
                         .unwrap_or_else(|| "unknown".to_string());
 
-                    // Create a participant entry
-                    json!({
-                        "id": user_id.to_string(),
-                        "name": format!("User {}", user_id.to_string()[..8].to_uppercase()), // Short display name
-                        "type": match role.as_str() {
-                            "teacher" => "Teacher",
-                            "student" => "Student",
-                            _ => "User"
-                        },
-                        "status": "Connected",
-                        "role": role
-                    })
+                    // Check if this is an anonymous student
+                    if let Some(anon_student) = self.anonymous_students.get(user_id) {
+                        json!({
+                            "id": anon_student.id,
+                            "name": anon_student.name,
+                            "type": "Student",
+                            "status": "Connected",
+                            "role": role,
+                            "is_anonymous": true,
+                            "joined_at": anon_student.joined_at.to_rfc3339()
+                        })
+                    } else {
+                        // Regular logged-in user
+                        json!({
+                            "id": user_id.to_string(),
+                            "name": format!("User {}", user_id.to_string()[..8].to_uppercase()),
+                            "type": match role.as_str() {
+                                "teacher" => "Teacher",
+                                "student" => "Student",
+                                _ => "User"
+                            },
+                            "status": "Connected",
+                            "role": role,
+                            "is_anonymous": false
+                        })
+                    }
                 })
                 .collect();
 
@@ -165,7 +261,7 @@ impl Lobby {
         }
     }
 
-    // Enhanced method to broadcast user joined/left events
+    // ENHANCED: Broadcast user event with anonymous student support
     fn broadcast_user_event(
         &self,
         room_id: &Uuid,
@@ -180,17 +276,30 @@ impl Lobby {
                 .cloned()
                 .unwrap_or_else(|| "unknown".to_string());
 
-            let event_msg = json!({
-                "type": event_type,
-                "id": user_id.to_string(),
-                "user_data": user_data.unwrap_or_else(|| json!({
-                    "name": format!("User {}", user_id.to_string()[..8].to_uppercase()),
-                    "username": format!("User {}", user_id.to_string()[..8].to_uppercase()),
-                    "role": role
-                })),
-                "room_id": room_id.to_string(),
-                "timestamp": chrono::Utc::now().to_rfc3339()
-            });
+            let event_msg = if let Some(provided_data) = user_data {
+                // Use provided data (for anonymous students)
+                json!({
+                    "type": event_type,
+                    "id": provided_data.get("student_id").unwrap_or(&json!(user_id.to_string())),
+                    "user_data": provided_data,
+                    "room_id": room_id.to_string(),
+                    "timestamp": chrono::Utc::now().to_rfc3339()
+                })
+            } else {
+                // Default data for regular users
+                json!({
+                    "type": event_type,
+                    "id": user_id.to_string(),
+                    "user_data": json!({
+                        "name": format!("User {}", user_id.to_string()[..8].to_uppercase()),
+                        "username": format!("User {}", user_id.to_string()[..8].to_uppercase()),
+                        "role": role,
+                        "is_anonymous": false
+                    }),
+                    "room_id": room_id.to_string(),
+                    "timestamp": chrono::Utc::now().to_rfc3339()
+                })
+            };
 
             log::info!(
                 "Broadcasting {} event for user {} in room {}",
@@ -237,9 +346,26 @@ impl Lobby {
             }
             TestMessageType::SubmitAnswer => {
                 if let Some(room_users) = self.rooms.get(&msg.room_id) {
+                    // Get student info for the answer
+                    let student_info =
+                        if let Some(anon_student) = self.anonymous_students.get(&msg.id) {
+                            json!({
+                                "student_id": anon_student.id,
+                                "name": anon_student.name,
+                                "is_anonymous": true
+                            })
+                        } else {
+                            json!({
+                                "student_id": msg.id.to_string(),
+                                "name": format!("User {}", msg.id.to_string()[..8].to_uppercase()),
+                                "is_anonymous": false
+                            })
+                        };
+
                     let answer_msg = json!({
                         "type": "student_answer",
                         "student_id": msg.id.to_string(),
+                        "student_info": student_info,
                         "answer_data": msg.payload,
                     });
 
@@ -331,8 +457,29 @@ impl Handler<Disconnect> for Lobby {
         log::info!("User {} disconnecting from room {}", msg.id, msg.room_id);
 
         if self.sessions.remove(&msg.id).is_some() {
-            // Broadcast user left event to other participants
-            self.broadcast_user_event(&msg.room_id, &msg.id, "user_left", None);
+            // ENHANCED: Handle anonymous student disconnect
+            if let Some(anon_student) = self.anonymous_students.remove(&msg.id) {
+                log::info!(
+                    "Anonymous student {} ({}) disconnected from test session",
+                    anon_student.name,
+                    anon_student.id
+                );
+
+                // Broadcast student left event with student info
+                self.broadcast_user_event(
+                    &msg.room_id,
+                    &msg.id,
+                    "student_left",
+                    Some(json!({
+                        "name": anon_student.name,
+                        "student_id": anon_student.id,
+                        "is_anonymous": true
+                    })),
+                );
+            } else {
+                // Broadcast regular user left event
+                self.broadcast_user_event(&msg.room_id, &msg.id, "user_left", None);
+            }
 
             // Remove user from room
             if let Some(lobby) = self.rooms.get_mut(&msg.room_id) {
@@ -549,5 +696,28 @@ impl Handler<UserInfoMessage> for Lobby {
 
     fn handle(&mut self, msg: UserInfoMessage, _ctx: &mut Context<Self>) -> Self::Result {
         self.handle_user_info_message(msg.user_data, msg.user_id, msg.room_id);
+    }
+}
+
+// NEW: Handler for anonymous student joins
+#[cfg(feature = "ssr")]
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct AnonymousStudentJoinMessage {
+    pub student_data: serde_json::Value,
+    pub user_id: Uuid,
+    pub room_id: Uuid,
+}
+
+#[cfg(feature = "ssr")]
+impl Handler<AnonymousStudentJoinMessage> for Lobby {
+    type Result = ();
+
+    fn handle(
+        &mut self,
+        msg: AnonymousStudentJoinMessage,
+        _ctx: &mut Context<Self>,
+    ) -> Self::Result {
+        self.handle_anonymous_student_join(msg.student_data, msg.user_id, msg.room_id);
     }
 }

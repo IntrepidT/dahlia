@@ -71,13 +71,14 @@ pub struct Session {
     pub end_time: Option<DateTime<Utc>>,
     #[serde(skip_serializing)]
     pub metadata: Option<serde_json::Value>,
+    pub teacher_id: Option<i32>,
 }
 
 impl Session {
     pub fn new(
         name: String,
         description: Option<String>,
-        owner_id: Option<Uuid>,
+        teacher_id: Option<i32>,
         session_type: SessionType,
         test_id: Option<String>,
     ) -> Self {
@@ -87,7 +88,7 @@ impl Session {
             description,
             created_at: Utc::now(),
             last_active: Utc::now(),
-            owner_id,
+            owner_id: None,
             status: SessionStatus::Active,
             max_users: 0, // 0 means unlimited
             current_users: 0,
@@ -98,6 +99,7 @@ impl Session {
             start_time: None,
             end_time: None,
             metadata: None,
+            teacher_id,
         }
     }
 }
@@ -112,6 +114,7 @@ pub struct CreateSessionRequest {
     pub session_type: Option<SessionType>,
     pub test_id: Option<String>,
     pub metadata: Option<serde_json::Value>,
+    pub teacher_id: Option<i32>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
@@ -128,6 +131,7 @@ pub struct SessionSummary {
     pub test_id: Option<String>,
     pub start_time: Option<DateTime<Utc>>,
     pub end_time: Option<DateTime<Utc>>,
+    pub teacher_id: Option<i32>,
 }
 
 impl From<Session> for SessionSummary {
@@ -145,6 +149,7 @@ impl From<Session> for SessionSummary {
             test_id: session.test_id,
             start_time: session.start_time,
             end_time: session.end_time,
+            teacher_id: session.teacher_id,
         }
     }
 }
