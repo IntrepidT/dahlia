@@ -1,10 +1,73 @@
+use crate::app::models::test::Test;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::str::FromStr;
 use strum_macros::EnumIter;
 use uuid::Uuid;
-//This file primarily defines data structures to be called and used within the assessment structs.
-//Theses data structures allow for complex sequencing and branching logic in assessments.
+
+#[derive(Debug, Clone)]
+pub enum TestStatus {
+    NotAttempted,
+    Completed(i32),
+    Passed(i32),
+    Failed(i32),
+}
+
+#[derive(Debug, Clone)]
+pub struct VariationStatus {
+    pub level: i32,
+    pub test_name: String,
+    pub test_id: Uuid,
+    pub status: TestStatus,
+    pub description: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct LearningPathItem {
+    pub test_name: String,
+    pub test_id: Uuid,
+    pub behavior: SequenceBehavior,
+    pub status: TestStatus,
+    pub required_score: Option<i32>,
+    pub variations: Vec<VariationStatus>,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+pub struct VariationLevel {
+    pub level: i32, // 1, 2, or 3
+    pub test_id: Uuid,
+    pub required_score: Option<i32>, // Score needed to pass this variation
+    pub max_attempts: Option<i32>,   // Attempts allowed at this level
+    pub description: String,         // "Practice A", "Remedial", "Guided", etc.
+}
+
+impl VariationLevel {
+    pub fn new(level: i32, test_id: Uuid, description: String) -> Self {
+        VariationLevel {
+            level,
+            test_id,
+            required_score: Some(60), // Default lower threshold for variations
+            max_attempts: Some(2),
+            description,
+        }
+    }
+
+    pub fn new_with_score(
+        level: i32,
+        test_id: Uuid,
+        description: String,
+        required_score: i32,
+    ) -> Self {
+        VariationLevel {
+            level,
+            test_id,
+            required_score: Some(required_score),
+            max_attempts: Some(2),
+            description,
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, EnumIter)]
 pub enum SequenceBehavior {
     #[strum(to_string = "attainment")]
@@ -12,13 +75,13 @@ pub enum SequenceBehavior {
     #[strum(to_string = "node")]
     Node,
     #[strum(to_string = "optional")]
-    Optional, // Can be skipped, doesn't affect progression
+    Optional,
     #[strum(to_string = "diagnostic")]
-    Diagnostic, // For assessment only, doesn't block progression
+    Diagnostic,
     #[strum(to_string = "remediation")]
-    Remediation, // Only shown if previous test failed
+    Remediation,
     #[strum(to_string = "branching")]
-    Branching, // Multiple paths based on score ranges
+    Branching,
 }
 
 impl fmt::Display for SequenceBehavior {
@@ -59,6 +122,7 @@ pub struct ScoreRange {
     pub max: i32,
     pub next_test: Option<Uuid>,
 }
+
 impl ScoreRange {
     pub fn new(min: i32, max: i32, next_test: Option<Uuid>) -> Self {
         ScoreRange {
@@ -69,25 +133,25 @@ impl ScoreRange {
     }
 }
 
+// Updated TestSequenceItem with multi-level variation support
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct TestSequenceItem {
     pub test_id: Uuid,
     pub sequence_behavior: SequenceBehavior,
     pub sequence_order: i32,
-    pub required_score: Option<i32>, // Only used for attainment tests
-    pub next_on_pass: Option<Uuid>,  // Next test if this test is passed
-    pub next_on_fail: Option<Uuid>,  // Next test if this test is failed
-
-    // Advanced sequencing options
-    pub score_ranges: Option<Vec<ScoreRange>>, // For branching behavior
-    pub max_attempts: Option<i32>,             // How many times can this test be retaken
-    pub time_limit_minutes: Option<i32>,       // Time limit for this test
-    pub prerequisite_tests: Option<Vec<Uuid>>, // Tests that must be completed first
-    pub skip_conditions: Option<Vec<Uuid>>,    // If these tests are passed, skip this one
-    pub show_feedback: bool,                   // Whether to show immediate feedback
-    pub allow_review: bool,                    // Whether student can review answers
-    pub randomize_questions: bool,             // Whether to randomize question order
-    pub adaptive_difficulty: bool,             // Whether test adapts based on performance
+    pub required_score: Option<i32>,
+    pub next_on_pass: Option<Uuid>,
+    pub next_on_fail: Option<Uuid>,
+    pub variation_levels: Option<Vec<VariationLevel>>,
+    pub score_ranges: Option<Vec<ScoreRange>>,
+    pub max_attempts: Option<i32>,
+    pub time_limit_minutes: Option<i32>,
+    pub prerequisite_tests: Option<Vec<Uuid>>,
+    pub skip_conditions: Option<Vec<Uuid>>,
+    pub show_feedback: bool,
+    pub allow_review: bool,
+    pub randomize_questions: bool,
+    pub adaptive_difficulty: bool,
 }
 
 impl TestSequenceItem {
@@ -99,6 +163,7 @@ impl TestSequenceItem {
             required_score: None,
             next_on_pass: None,
             next_on_fail: None,
+            variation_levels: None,
             score_ranges: None,
             max_attempts: Some(1),
             time_limit_minutes: None,
@@ -125,8 +190,36 @@ impl TestSequenceItem {
             required_score: Some(required_score),
             next_on_pass,
             next_on_fail,
+            variation_levels: None,
             score_ranges: None,
-            max_attempts: Some(3), // Allow retakes for attainment tests
+            max_attempts: Some(3),
+            time_limit_minutes: None,
+            prerequisite_tests: None,
+            skip_conditions: None,
+            show_feedback: true,
+            allow_review: true,
+            randomize_questions: false,
+            adaptive_difficulty: false,
+        }
+    }
+
+    // NEW: Create attainment with multi-level variations
+    pub fn new_attainment_with_variations(
+        test_id: Uuid,
+        sequence_order: i32,
+        required_score: i32,
+        variation_levels: Vec<VariationLevel>,
+    ) -> Self {
+        TestSequenceItem {
+            test_id,
+            sequence_behavior: SequenceBehavior::Attainment,
+            sequence_order,
+            required_score: Some(required_score),
+            next_on_pass: None,
+            next_on_fail: None,
+            variation_levels: Some(variation_levels),
+            score_ranges: None,
+            max_attempts: Some(3),
             time_limit_minutes: None,
             prerequisite_tests: None,
             skip_conditions: None,
@@ -149,6 +242,7 @@ impl TestSequenceItem {
             required_score: None,
             next_on_pass: None,
             next_on_fail: None,
+            variation_levels: None,
             score_ranges: Some(score_ranges),
             max_attempts: Some(1),
             time_limit_minutes: None,
@@ -169,6 +263,7 @@ impl TestSequenceItem {
             required_score: None,
             next_on_pass: None,
             next_on_fail: None,
+            variation_levels: None,
             score_ranges: None,
             max_attempts: Some(1),
             time_limit_minutes: None,
@@ -189,15 +284,16 @@ impl TestSequenceItem {
             required_score: None,
             next_on_pass: None,
             next_on_fail: None,
+            variation_levels: None,
             score_ranges: None,
             max_attempts: Some(1),
             time_limit_minutes: None,
             prerequisite_tests: None,
             skip_conditions: None,
-            show_feedback: false, // Often diagnostic tests don't show immediate feedback
+            show_feedback: false,
             allow_review: false,
-            randomize_questions: true, // Good for diagnostic assessments
-            adaptive_difficulty: true, // Diagnostics often adapt
+            randomize_questions: true,
+            adaptive_difficulty: true,
         }
     }
 
@@ -213,8 +309,9 @@ impl TestSequenceItem {
             required_score: None,
             next_on_pass: None,
             next_on_fail: None,
+            variation_levels: None,
             score_ranges: None,
-            max_attempts: Some(5), // More attempts for remediation
+            max_attempts: Some(5),
             time_limit_minutes: None,
             prerequisite_tests: Some(prerequisite_tests),
             skip_conditions: None,
@@ -224,6 +321,43 @@ impl TestSequenceItem {
             adaptive_difficulty: false,
         }
     }
+
+    // NEW: Helper methods for variation support
+    pub fn has_variations(&self) -> bool {
+        self.variation_levels
+            .as_ref()
+            .map(|v| !v.is_empty())
+            .unwrap_or(false)
+    }
+
+    pub fn get_variation_count(&self) -> usize {
+        self.variation_levels.as_ref().map(|v| v.len()).unwrap_or(0)
+    }
+
+    pub fn get_variation_by_level(&self, level: i32) -> Option<&VariationLevel> {
+        self.variation_levels
+            .as_ref()?
+            .iter()
+            .find(|v| v.level == level)
+    }
+
+    pub fn add_variation_level(&mut self, variation: VariationLevel) {
+        if let Some(ref mut variations) = self.variation_levels {
+            variations.push(variation);
+            variations.sort_by_key(|v| v.level);
+        } else {
+            self.variation_levels = Some(vec![variation]);
+        }
+    }
+
+    pub fn remove_variation_level(&mut self, level: i32) {
+        if let Some(ref mut variations) = self.variation_levels {
+            variations.retain(|v| v.level != level);
+            if variations.is_empty() {
+                self.variation_levels = None;
+            }
+        }
+    }
 }
 
 cfg_if::cfg_if! {
@@ -231,7 +365,6 @@ cfg_if::cfg_if! {
         use sqlx::{Postgres, Encode, Decode, Type, postgres::{PgTypeInfo, PgValueRef, PgArgumentBuffer}, encode::IsNull};
         use sqlx::types::Json;
 
-        // Add SequenceBehavior SQL support
         impl<'q> sqlx::encode::Encode<'q, sqlx::Postgres> for SequenceBehavior {
             fn encode_by_ref(&self, buf: &mut PgArgumentBuffer) -> Result<IsNull, Box<dyn std::error::Error + Send + Sync>> {
                 let s = self.to_string();
@@ -250,7 +383,23 @@ cfg_if::cfg_if! {
             }
         }
 
-        // Add TestSequenceItem SQL support
+        impl<'q> sqlx::encode::Encode<'q, sqlx::Postgres> for VariationLevel {
+            fn encode_by_ref(&self, buf: &mut PgArgumentBuffer) -> Result<IsNull, Box<dyn std::error::Error + Send + Sync>> {
+                Json(self).encode_by_ref(buf)
+            }
+        }
+        impl sqlx::Type<sqlx::Postgres> for VariationLevel {
+            fn type_info() -> sqlx::postgres::PgTypeInfo {
+                sqlx::postgres::PgTypeInfo::with_name("jsonb")
+            }
+        }
+        impl<'r> sqlx::decode::Decode<'r, sqlx::Postgres> for VariationLevel {
+            fn decode(value: sqlx::postgres::PgValueRef<'r>) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+                let json: Json<VariationLevel> = sqlx::decode::Decode::decode(value)?;
+                Ok(json.0)
+            }
+        }
+
         impl<'q> sqlx::encode::Encode<'q, sqlx::Postgres> for TestSequenceItem {
             fn encode_by_ref(&self, buf: &mut PgArgumentBuffer) -> Result<IsNull, Box<dyn std::error::Error + Send + Sync>> {
                 Json(self).encode_by_ref(buf)

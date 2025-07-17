@@ -8,6 +8,7 @@ use validator::Validate;
 #[derive(Debug, Deserialize, Serialize, PartialEq, Eq, Clone, EnumIter)]
 pub enum QuestionType {
     MultipleChoice,
+    WeightedMultipleChoice,
     Written,
     Selection,
     TrueFalse,
@@ -20,6 +21,7 @@ impl fmt::Display for QuestionType {
             "{}",
             match self {
                 QuestionType::MultipleChoice => "Multiple choice".to_string(),
+                QuestionType::WeightedMultipleChoice => "Weighted Multiple Choice".to_string(),
                 QuestionType::Written => "Written".to_string(),
                 QuestionType::Selection => "Selection".to_string(),
                 QuestionType::TrueFalse => "True False".to_string(),
@@ -34,10 +36,28 @@ impl FromStr for QuestionType {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "Multiple choice" => Ok(QuestionType::MultipleChoice),
+            "Weighted Multiple Choice" => Ok(QuestionType::WeightedMultipleChoice),
             "Written" => Ok(QuestionType::Written),
             "Selection" => Ok(QuestionType::Selection),
             "True False" => Ok(QuestionType::TrueFalse),
             _ => Err(format!("Invalid QuestionType (enum) value: {}", s)),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize, PartialEq, Eq, Clone)]
+pub struct WeightedOption {
+    pub text: String,
+    pub points: i32,
+    pub is_selectable: bool, // Whether this option can be selected for points
+}
+
+impl WeightedOption {
+    pub fn new(text: String, points: i32, is_selectable: bool) -> Self {
+        Self {
+            text,
+            points,
+            is_selectable,
         }
     }
 }
@@ -56,6 +76,7 @@ pub struct Question {
     pub correct_answer: String,
     pub qnumber: i32,
     pub testlinker: String,
+    pub weighted_options: Option<String>,
 }
 
 impl Question {
@@ -76,7 +97,42 @@ impl Question {
             correct_answer,
             qnumber,
             testlinker,
+            weighted_options: None, // Default to None, can be set later if needed
         }
+    }
+    //
+    // Helper methods for weighted options
+    pub fn get_weighted_options(&self) -> Vec<WeightedOption> {
+        match &self.weighted_options {
+            Some(json_str) => serde_json::from_str(json_str).unwrap_or_default(),
+            None => Vec::new(),
+        }
+    }
+
+    pub fn set_weighted_options(&mut self, options: Vec<WeightedOption>) {
+        self.weighted_options = Some(serde_json::to_string(&options).unwrap_or_default());
+    }
+
+    // Calculate score for weighted multiple choice based on selected options
+    pub fn calculate_weighted_score(&self, selected_options: &[String]) -> i32 {
+        if self.question_type != QuestionType::WeightedMultipleChoice {
+            return 0;
+        }
+
+        let weighted_opts = self.get_weighted_options();
+        let mut total_score = 0;
+
+        for selected in selected_options {
+            if let Some(option) = weighted_opts
+                .iter()
+                .find(|opt| opt.text == *selected && opt.is_selectable)
+            {
+                total_score += option.points;
+            }
+        }
+
+        // Cap the score at the question's point_value
+        total_score.min(self.point_value)
     }
 }
 
@@ -94,6 +150,7 @@ pub struct CreateNewQuestionRequest {
     pub correct_answer: String,
     pub qnumber: i32,
     pub testlinker: String,
+    pub weighted_options: Option<String>,
 }
 
 impl CreateNewQuestionRequest {
@@ -114,6 +171,20 @@ impl CreateNewQuestionRequest {
             correct_answer,
             qnumber,
             testlinker,
+            weighted_options: None,
+        }
+    }
+
+    pub fn from_question(question: &Question) -> Self {
+        Self {
+            word_problem: question.word_problem.clone(),
+            point_value: question.point_value,
+            question_type: question.question_type.clone(),
+            options: question.options.clone(),
+            correct_answer: question.correct_answer.clone(),
+            qnumber: question.qnumber,
+            testlinker: question.testlinker.clone(),
+            weighted_options: question.weighted_options.clone(),
         }
     }
 }
@@ -131,6 +202,7 @@ pub struct UpdateQuestionRequest {
     pub correct_answer: String,
     pub qnumber: i32,
     pub testlinker: String,
+    pub weighted_options: Option<String>,
 }
 
 impl UpdateQuestionRequest {
@@ -151,6 +223,7 @@ impl UpdateQuestionRequest {
             correct_answer,
             qnumber,
             testlinker,
+            weighted_options: None,
         }
     }
 }

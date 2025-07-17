@@ -22,6 +22,16 @@ use wasm_bindgen::JsCast;
 struct QuestionResponse {
     answer: String,
     comment: String,
+    selected_options: Option<Vec<String>>,
+}
+impl QuestionResponse {
+    fn new() -> Self {
+        Self {
+            answer: String::new(),
+            comment: String::new(),
+            selected_options: None,
+        }
+    }
 }
 
 #[component]
@@ -93,21 +103,25 @@ pub fn FlashCardSet() -> impl IntoView {
     // Handler for answer updates - using a local memo to prevent full re-renders
     let handle_answer_change = move |qnumber: i32, value: String| {
         set_responses.update(|r| {
-            let response = r.entry(qnumber).or_insert(QuestionResponse {
-                answer: String::new(),
-                comment: String::new(),
-            });
+            let response = r.entry(qnumber).or_insert_with(QuestionResponse::new);
             response.answer = value;
+        });
+    };
+
+    //Handler for weighted multiple choice selection
+    let handle_weighted_selection = move |qnumber: i32, selected_options: Vec<String>| {
+        set_responses.update(|r| {
+            let response = r.entry(qnumber).or_insert_with(QuestionResponse::new);
+            response.selected_options = Some(selected_options.clone()); // Use correct field name
+                                                                        // Also update answer field with JSON for compatibility
+            response.answer = serde_json::to_string(&selected_options).unwrap_or_default();
         });
     };
 
     // Handler for comment updates
     let handle_comment_change = move |qnumber: i32, value: String| {
         set_responses.update(|r| {
-            let response = r.entry(qnumber).or_insert(QuestionResponse {
-                answer: String::new(),
-                comment: String::new(),
-            });
+            let response = r.entry(qnumber).or_insert_with(QuestionResponse::new);
             response.comment = value;
         });
     };
@@ -136,34 +150,44 @@ pub fn FlashCardSet() -> impl IntoView {
         let evaluator = evaluator_id();
         let test_variant = 1;
 
-        // Collect all scores and comments
         let mut test_scores = Vec::new();
         let mut comments = Vec::new();
 
         if let Some(questions) = questions.get() {
-            // Sort questions by qnumber to ensure correct order
             let mut sorted_questions = questions.clone();
             sorted_questions.sort_by_key(|q| q.qnumber);
 
             for question in sorted_questions {
                 if let Some(response) = current_responses.get(&question.qnumber) {
-                    // Calculate score for this question
-                    let score = if response.answer == question.correct_answer {
-                        question.point_value
-                    } else {
-                        0
+                    let score = match question.question_type {
+                        QuestionType::WeightedMultipleChoice => {
+                            // Calculate weighted score
+                            if let Some(ref selected_opts) = response.selected_options {
+                                // Use correct field name
+                                question.calculate_weighted_score(selected_opts)
+                            } else {
+                                0
+                            }
+                        }
+                        _ => {
+                            // Regular scoring logic
+                            if response.answer == question.correct_answer {
+                                question.point_value
+                            } else {
+                                0
+                            }
+                        }
                     };
+
                     test_scores.push(score);
                     comments.push(response.comment.clone());
                 } else {
-                    // If no response, push 0 score and empty comment
                     test_scores.push(0);
                     comments.push(String::new());
                 }
             }
         }
 
-        // Create score request
         let score_request = CreateScoreRequest {
             student_id,
             test_id: current_test_id,
@@ -173,7 +197,6 @@ pub fn FlashCardSet() -> impl IntoView {
             evaluator,
         };
 
-        // Submit score to server
         match add_score(score_request).await {
             Ok(score) => {
                 log::info!(
@@ -308,6 +331,8 @@ pub fn FlashCardSet() -> impl IntoView {
                                                 </label>
                                                 {move || {
                                                     let q = current_question();
+                                                    let q_clone_for_calc = q.clone(); // Clone for the calculation closure
+                                                    let q_point_value = q.point_value;
                                                     match q.question_type {
                                                         QuestionType::MultipleChoice => view! {
                                                             <div class="space-y-2 max-h-48 overflow-y-auto">
@@ -346,6 +371,129 @@ pub fn FlashCardSet() -> impl IntoView {
                                                                 />
                                                             </div>
                                                         },
+                                                        QuestionType::WeightedMultipleChoice => {
+                                                            let qnumber = q.qnumber;
+                                                            let weighted_options = q.get_weighted_options();
+
+                                                            view! {
+                                                                <div class="space-y-3">
+                                                                    <div class="bg-blue-50 border border-blue-200 rounded p-3 text-sm text-blue-800">
+                                                                        <p><strong>"Instructions:"</strong> " You can select multiple answers. Each answer has different point values."</p>
+                                                                    </div>
+
+                                                                    <div class="space-y-2 max-h-64 overflow-y-auto">
+                                                                        <For
+                                                                            each=move || weighted_options.clone()
+                                                                            key=|option| option.text.clone()
+                                                                            children=move |option| {
+                                                                                let option_clone = option.clone();
+                                                                                let option_text = option.text.clone();
+                                                                                let option_text_for_memo = option_text.clone();
+                                                                                let option_text_for_change = option_text.clone();
+                                                                                let qnumber = q.qnumber;
+
+                                                                                let is_selected = create_memo(move |_| {
+                                                                                    responses.with(|r| {
+                                                                                        r.get(&qnumber)
+                                                                                            .and_then(|resp| resp.selected_options.as_ref())
+                                                                                            .map(|opts| opts.contains(&option_text_for_memo))
+                                                                                            .unwrap_or(false)
+                                                                                    })
+                                                                                });
+
+                                                                                // Show ALL options, but only make selectable ones clickable
+                                                                                view! {
+                                                                                    <div class=move || {
+                                                                                        if option_clone.is_selectable {
+                                                                                            "flex items-center justify-between p-3 rounded-lg border border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-colors cursor-pointer"
+                                                                                        } else {
+                                                                                            "flex items-center justify-between p-3 rounded-lg border border-gray-300 bg-gray-100 transition-colors cursor-not-allowed opacity-60"
+                                                                                        }
+                                                                                    }
+                                                                                    on:click=move |_| {
+                                                                                        if option_clone.is_selectable {
+                                                                                            // Toggle this option in the selected list
+                                                                                            let current_selected = responses.with(|r| {
+                                                                                                r.get(&qnumber)
+                                                                                                    .and_then(|resp| resp.selected_options.as_ref())
+                                                                                                    .cloned()
+                                                                                                    .unwrap_or_default()
+                                                                                            });
+
+                                                                                            let mut new_selected = current_selected;
+                                                                                            if new_selected.contains(&option_text_for_change) {
+                                                                                                new_selected.retain(|x| x != &option_text_for_change);
+                                                                                            } else {
+                                                                                                new_selected.push(option_text_for_change.clone());
+                                                                                            }
+
+                                                                                            handle_weighted_selection(qnumber, new_selected);
+                                                                                        }
+                                                                                    }>
+                                                                                        <div class="flex items-center">
+                                                                                            {if option_clone.is_selectable {
+                                                                                                view! {
+                                                                                                    <input
+                                                                                                        type="checkbox"
+                                                                                                        class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded pointer-events-none"
+                                                                                                        prop:checked=move || is_selected()
+                                                                                                        tabindex="-1"
+                                                                                                    />
+                                                                                                }.into_view()
+                                                                                            } else {
+                                                                                                view! {
+                                                                                                    <div class="h-4 w-4 border border-gray-400 rounded bg-gray-200"></div>
+                                                                                                }.into_view()
+                                                                                            }}
+                                                                                            <span class="ml-2 break-words">{option_clone.text.clone()}</span>
+                                                                                        </div>
+                                                                                        <div class="flex items-center space-x-2">
+                                                                                            <span class=move || {
+                                                                                                if option_clone.points >= 0 {
+                                                                                                    "text-green-600 font-semibold"
+                                                                                                } else {
+                                                                                                    "text-red-600 font-semibold"
+                                                                                                }
+                                                                                            }>
+                                                                                                {if option_clone.points >= 0 { "+" } else { "" }}
+                                                                                                {option_clone.points}
+                                                                                                " pts"
+                                                                                            </span>
+                                                                                            {if !option_clone.is_selectable {
+                                                                                                view! {
+                                                                                                    <span class="text-xs text-gray-500 italic">"(info only)"</span>
+                                                                                                }.into_view()
+                                                                                            } else {
+                                                                                                view! { <span></span> }.into_view()
+                                                                                            }}
+                                                                                        </div>
+                                                                                    </div>
+                                                                                }
+                                                                            }
+                                                                        />
+                                                                    </div>
+
+                                                                    // Show current score calculation
+                                                                    <div class="bg-gray-50 border border-gray-200 rounded p-3">
+                                                                        <div class="text-sm text-gray-700">
+                                                                            "Current selection score: "
+                                                                            <span class="font-semibold text-blue-600">
+                                                                                {move || {
+                                                                                    let selected = responses.with(|r| {
+                                                                                        r.get(&qnumber)
+                                                                                            .and_then(|resp| resp.selected_options.as_ref())
+                                                                                            .cloned()
+                                                                                            .unwrap_or_default()
+                                                                                    });
+                                                                                    q_clone_for_calc.calculate_weighted_score(&selected)
+                                                                                }}
+                                                                                " / " {q_point_value} " points"
+                                                                            </span>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            }
+                                                        }
                                                         QuestionType::TrueFalse => {
                                                             let qnumber = q.qnumber;
                                                             let is_true = create_memo(move |_| {
@@ -402,7 +550,6 @@ pub fn FlashCardSet() -> impl IntoView {
                                                         },
                                                         _ => {
                                                             let qnumber = q.qnumber;
-                                                            // Create a memo for the answer value to prevent unnecessary re-renders
                                                             let answer_value = create_memo(move |_| {
                                                                 responses.with(|r| {
                                                                     r.get(&qnumber)

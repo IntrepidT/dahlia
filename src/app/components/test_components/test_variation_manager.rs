@@ -271,7 +271,7 @@ pub fn TestVariationManagerContent() -> impl IntoView {
     let (selected_variation_type, set_selected_variation_type) =
         create_signal::<Option<VariationType>>(None);
     let (is_creating, set_is_creating) = create_signal(false);
-    let (show_info_panel, set_show_info_panel) = create_signal(true);
+    let (show_info_panel, set_show_info_panel) = create_signal(false);
 
     // Load all tests
     let tests_resource = create_resource(

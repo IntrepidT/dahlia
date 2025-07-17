@@ -14,7 +14,7 @@ pub mod question;
 pub use question::CreateNewQuestionRequest;
 pub use question::DeleteQuestionRequest;
 pub use question::UpdateQuestionRequest;
-pub use question::{Question, QuestionType};
+pub use question::{Question, QuestionType, WeightedOption};
 
 pub mod score;
 pub use score::CreateScoreRequest;

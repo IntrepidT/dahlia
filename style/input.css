@@ -14,3 +14,400 @@
     @apply bg-page;
   }
 }
+
+@layer components {
+  /* Node-based sequence styles */
+  .sequence-flow-container {
+    background-color: white !important;
+    border: 2px dashed #d1d5db !important;
+    transition: all 0.3s ease;
+  }
+
+  .sequence-node {
+    position: relative;
+    margin-bottom: 5rem; /* Increased space for labels and details */
+    user-select: none;
+    transition: all 0.2s ease-in-out;
+  }
+
+  .sequence-node:hover .node-actions {
+    opacity: 1;
+  }
+
+  .sequence-node.dragging {
+    opacity: 0.6;
+    transform: rotate(5deg) scale(1.1);
+    z-index: 1000;
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.3);
+  }
+
+  .sequence-node .node-circle {
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  }
+
+  .sequence-node:hover .node-circle {
+    transform: scale(1.1);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+  }
+
+  .sequence-node .node-actions {
+    opacity: 0;
+    transition: opacity 0.2s ease;
+  }
+
+  /* Enhanced drag feedback */
+  .sequence-flow-container.drag-over {
+    border-color: #3b82f6 !important;
+    background-color: #f0f9ff !important;
+    transform: scale(1.02);
+  }
+
+  /* Drag states */
+  .sequence-node[draggable="true"] {
+    cursor: grab;
+  }
+
+  .sequence-node[draggable="true"]:active {
+    cursor: grabbing;
+  }
+
+  .sequence-node:hover {
+    z-index: 10;
+  }
+
+  /* Drop zone indicators */
+  .sequence-node::before {
+    content: '';
+    position: absolute;
+    top: -10px;
+    left: -10px;
+    right: -10px;
+    bottom: -10px;
+    border: 2px dashed transparent;
+    border-radius: 50%;
+    transition: all 0.2s ease;
+    pointer-events: none;
+    z-index: -1;
+  }
+
+  .sequence-node:hover::before,
+  .sequence-node.drag-over::before {
+    border-color: #3b82f6;
+    background-color: rgba(59, 130, 246, 0.1);
+  }
+
+  /* Connection arrows */
+  .connection-arrow {
+    color: #9ca3af;
+    transition: color 0.2s ease;
+  }
+
+  .connection-arrow:hover {
+    color: #6b7280;
+  }
+
+  /* Node type colors with enhanced gradients */
+  .node-standard {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    border-color: #2563eb;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+  }
+
+  .node-attainment {
+    background: linear-gradient(135deg, #10b981, #059669);
+    border-color: #059669;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+  }
+
+  .node-optional {
+    background: linear-gradient(135deg, #6b7280, #4b5563);
+    border-color: #4b5563;
+    box-shadow: 0 4px 12px rgba(107, 114, 128, 0.3);
+  }
+
+  .node-diagnostic {
+    background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+    border-color: #7c3aed;
+    box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+  }
+
+  .node-remediation {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    border-color: #d97706;
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+  }
+
+  .node-branching {
+    background: linear-gradient(135deg, #eab308, #ca8a04);
+    border-color: #ca8a04;
+    box-shadow: 0 4px 12px rgba(234, 179, 8, 0.3);
+  }
+
+  /* Multi-level variation styles */
+  .variation-stack {
+    position: relative;
+    z-index: 5;
+  }
+
+  .variation-node {
+    position: relative;
+    transition: all 0.2s ease;
+  }
+
+  .variation-node:hover {
+    transform: scale(1.1);
+    z-index: 10;
+  }
+
+  .variation-arrow {
+    color: #f97316;
+    transition: color 0.2s ease;
+  }
+
+  .variation-arrow:hover {
+    color: #ea580c;
+  }
+
+  /* Variation level colors */
+  .variation-level-1 {
+    background: linear-gradient(135deg, #fb923c, #f97316);
+    border-color: #f97316;
+    box-shadow: 0 2px 8px rgba(251, 146, 60, 0.3);
+  }
+
+  .variation-level-2 {
+    background: linear-gradient(135deg, #f97316, #ea580c);
+    border-color: #ea580c;
+    box-shadow: 0 2px 8px rgba(249, 115, 22, 0.3);
+  }
+
+  .variation-level-3 {
+    background: linear-gradient(135deg, #ea580c, #c2410c);
+    border-color: #c2410c;
+    box-shadow: 0 2px 8px rgba(234, 88, 12, 0.3);
+  }
+
+  /* Vertical flow indicators */
+  .vertical-flow {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .vertical-arrow {
+    animation: bounce-vertical 2s infinite;
+  }
+
+  @keyframes bounce-vertical {
+    0%, 20%, 50%, 80%, 100% {
+      transform: translateY(0);
+    }
+    40% {
+      transform: translateY(-4px);
+    }
+    60% {
+      transform: translateY(-2px);
+    }
+  }
+
+  /* Enhanced main sequence node when it has variations */
+  .has-variations {
+    margin-bottom: 8rem; /* Extra space for variation stack */
+  }
+
+  .has-variations::after {
+    content: '📚';
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background: #f97316;
+    color: white;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    border: 2px solid white;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  }
+
+  /* Responsive adjustments for variations */
+  @media (max-width: 768px) {
+    .variation-stack {
+      margin-top: 2rem;
+    }
+    
+    .variation-node {
+      width: 48px;
+      height: 48px;
+    }
+    
+    .has-variations {
+      margin-bottom: 6rem;
+    }
+  }
+
+  /* Details panel animation */
+  .sequence-details {
+    animation: slideInUp 0.3s ease-out;
+  }
+
+  /* Benchmark section improvements */
+  .benchmark-item {
+    transition: all 0.2s ease;
+  }
+
+  .benchmark-item:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+
+  .benchmark-form {
+    background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+  }
+
+  .benchmark-score-badge {
+    background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+    border: 1px solid #93c5fd;
+    transition: all 0.2s ease;
+  }
+
+  .benchmark-score-badge:hover {
+    background: linear-gradient(135deg, #bfdbfe, #93c5fd);
+    transform: scale(1.05);
+  }
+
+  /* Improved form controls */
+  .form-control {
+    transition: all 0.2s ease;
+  }
+
+  .form-control:focus {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+  }
+
+  /* Responsive adjustments */
+  @media (max-width: 768px) {
+    .sequence-flow-container {
+      padding: 1rem;
+    }
+    
+    .sequence-node {
+      margin-bottom: 4rem;
+    }
+    
+    .sequence-node .node-circle {
+      width: 60px;
+      height: 60px;
+      font-size: 0.75rem;
+    }
+    
+    .sequence-flow-container .flex {
+      flex-direction: column;
+      gap: 2rem;
+    }
+    
+    .connection-arrow {
+      transform: rotate(90deg);
+      margin: 1rem 0;
+    }
+
+    .benchmark-item {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0.5rem;
+    }
+
+    .benchmark-item .flex {
+      justify-content: space-between;
+    }
+  }
+
+  /* Smooth transitions for all interactive elements */
+  .sequence-node,
+  .sequence-node *,
+  .benchmark-item,
+  .form-control,
+  button {
+    transition: all 0.2s ease;
+  }
+
+  /* Focus states for accessibility */
+  .sequence-node:focus-within {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+    border-radius: 50%;
+  }
+
+  /* Enhanced button styles */
+  .btn-primary {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    border: none;
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+    transition: all 0.2s ease;
+  }
+
+  .btn-primary:hover {
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+  }
+
+  .btn-secondary {
+    background: linear-gradient(135deg, #6b7280, #4b5563);
+    border: none;
+    box-shadow: 0 2px 8px rgba(107, 114, 128, 0.3);
+  }
+
+  .btn-secondary:hover {
+    background: linear-gradient(135deg, #4b5563, #374151);
+    transform: translateY(-1px);
+  }
+
+  .btn-danger {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    border: none;
+    box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
+  }
+
+  .btn-danger:hover {
+    background: linear-gradient(135deg, #dc2626, #b91c1c);
+    transform: translateY(-1px);
+  }
+}
+
+/* Keyframes for animations */
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes bounce {
+  0%, 20%, 53%, 80%, 100% {
+    transform: translate3d(0, 0, 0);
+  }
+  40%, 43% {
+    transform: translate3d(0, -8px, 0);
+  }
+  70% {
+    transform: translate3d(0, -4px, 0);
+  }
+  90% {
+    transform: translate3d(0, -2px, 0);
+  }
+}
+
+.bounce-animation {
+  animation: bounce 1s ease-in-out;
+}

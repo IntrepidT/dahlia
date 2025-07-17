@@ -330,6 +330,16 @@ pub fn TestBuilderContent() -> impl IntoView {
                             && (q.correct_answer == "true" || q.correct_answer == "false")
                             && !q.correct_answer.is_empty()
                     }
+                    QuestionType::WeightedMultipleChoice => {
+                        let weighted_options = q.get_weighted_options();
+                        !q.word_problem.is_empty()
+                            && q.point_value > 0
+                            && !weighted_options.is_empty()
+                            && weighted_options.iter().any(|opt| opt.is_selectable)
+                            && weighted_options
+                                .iter()
+                                .all(|opt| !opt.text.trim().is_empty())
+                    }
                     _ => false,
                 };
                 if !is_valid {
@@ -346,15 +356,9 @@ pub fn TestBuilderContent() -> impl IntoView {
         let question_requests: Vec<CreateNewQuestionRequest> = valid_questions
             .into_iter()
             .map(|q| {
-                CreateNewQuestionRequest::new(
-                    q.word_problem.clone(),
-                    q.point_value,
-                    q.question_type.clone(),
-                    q.options.clone(),
-                    q.correct_answer.clone(),
-                    q.qnumber,
-                    q.testlinker.clone(), // Use existing test_id for edit mode
-                )
+                let mut request = CreateNewQuestionRequest::from_question(&q);
+                request.testlinker = q.testlinker.clone();
+                request
             })
             .collect();
 

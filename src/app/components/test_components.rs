@@ -17,3 +17,6 @@ pub mod test_variation_manager;
 pub use test_variation_manager::{
     TestVariationInfo, TestVariationManager, TestVariationManagerContent,
 };
+
+pub mod select_test_modal;
+pub use select_test_modal::SelectTestModal;

@@ -73,8 +73,13 @@ pub async fn add_question(
             .map_err(|e| ServerFnError::new(format!("Failed to extract pool: {}", e)))?;
 
         log::info!("Attempting to add new question to the database");
+        log::info!("Question type: {:?}", add_question_request.question_type);
+        log::info!(
+            "Weighted options: {:?}",
+            add_question_request.weighted_options
+        );
 
-        let buffer_question = Question::new(
+        let mut buffer_question = Question::new(
             add_question_request.word_problem,
             add_question_request.point_value,
             add_question_request.question_type,
@@ -84,18 +89,31 @@ pub async fn add_question(
             test_id.clone(),
         );
 
+        // IMPORTANT: Copy the weighted_options from the request!
+        buffer_question.weighted_options = add_question_request.weighted_options.clone();
+
+        log::info!(
+            "Buffer question weighted_options: {:?}",
+            buffer_question.weighted_options
+        );
+
         match question_database::add_question(&buffer_question, &pool).await {
             Ok(created_question) => {
                 log::info!(
                     "Successfully created question with ID: {}",
                     created_question.testlinker
                 );
+                log::info!(
+                    "Created question weighted_options: {:?}",
+                    created_question.weighted_options
+                );
                 Ok(created_question)
             }
             Err(e) => {
-                log::info!("Failed to create question: {:?}", e);
+                log::error!("Failed to create question: {:?}", e);
                 Err(ServerFnError::new(format!(
-                    "The question created was not a question"
+                    "Failed to create question: {}",
+                    e
                 )))
             }
         }

@@ -1,5 +1,6 @@
 use crate::app::components::auth::server_auth_components::ServerAuthGuard;
 use crate::app::components::dashboard::dashboard_sidebar::{DashboardSidebar, SidebarSelected};
+use crate::app::components::test_components::select_test_modal::SelectTestModal;
 use crate::app::components::{Header, MathTestDisplay, Toast, ToastMessage, ToastMessageType};
 use crate::app::models::test::CreateNewTestRequest;
 use crate::app::models::{DeleteTestRequest, Test, TestType};
@@ -16,18 +17,19 @@ use std::rc::Rc;
 // TYPES AND ENUMS
 // =============================================================================
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum ViewMode {
-    AllTests,
-    GroupedByBase,
-}
-
 #[derive(Debug, Clone, PartialEq, Copy)]
 pub enum TestFilter {
     All,
     Math,
     Reading,
     Other,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ViewMode {
+    Cards,   // Your existing card view
+    Table,   // New dense table view
+    Compact, // Ultra-compact list
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -52,6 +54,15 @@ mod styles {
         "fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4";
     pub const MODAL_CONTAINER: &str = "bg-white rounded-xl shadow-2xl max-w-md w-full";
     pub const CARD: &str = "bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-all duration-200";
+    pub const TABLE_CONTAINER: &str =
+        "bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm";
+    pub const TABLE_HEADER: &str = "bg-gray-50 border-b border-gray-200";
+    pub const TABLE_ROW: &str = "border-b border-gray-100 hover:bg-gray-50 transition-colors";
+    pub const TABLE_ROW_DELETE: &str =
+        "border-b border-gray-100 hover:bg-red-50 bg-red-25 transition-colors";
+    pub const TABLE_CELL: &str = "px-3 py-2 text-sm";
+    pub const TABLE_HEADER_CELL: &str =
+        "px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider";
 }
 
 // =============================================================================
@@ -318,76 +329,99 @@ fn ActionButtons(
     if_show_edit: ReadSignal<bool>,
     if_show_delete: ReadSignal<bool>,
     view_mode: ReadSignal<ViewMode>,
+    set_view_mode: WriteSignal<ViewMode>,
     on_click_add: impl Fn(ev::MouseEvent) + 'static + Clone,
-    on_click_edit: impl Fn(ev::MouseEvent) + 'static + Clone,
     on_click_delete_mode: impl Fn(ev::MouseEvent) + 'static + Clone,
-    on_toggle_view_mode: impl Fn(ev::MouseEvent) + 'static + Clone,
 ) -> impl IntoView {
     view! {
-        <div class="flex space-x-2">
-            <button on:click=on_click_add class=styles::PRIMARY_BUTTON>
-                "New Test"
-            </button>
+        <div class="grid grid-cols-2 items-center w-full gap-3">
 
-            <button
-                on:click=on_toggle_view_mode
-                class=move || {
-                    if view_mode() == ViewMode::GroupedByBase {
-                        styles::SECONDARY_BUTTON_ACTIVE
-                    } else {
-                        styles::SECONDARY_BUTTON
-                    }
-                }
-            >
-                {move || match view_mode() {
-                    ViewMode::AllTests => "Group View",
-                    ViewMode::GroupedByBase => "List View",
-                }}
-            </button>
+            // Center section - view mode toggle on desktop
+            <div class="sm:flex justify-end mr-10">
+                <div class="flex items-center space-x-1 bg-gray-100 rounded-lg p-1">
+                    <button
+                        class=move || {
+                            if view_mode() == ViewMode::Cards {
+                                "px-3 py-1.5 text-sm font-medium bg-white text-gray-900 rounded-md shadow-sm"
+                            } else {
+                                "px-3 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
+                            }
+                        }
+                        on:click=move |_| set_view_mode(ViewMode::Cards)
+                    >
+                        "Cards"
+                    </button>
 
-            <button
-                class="px-4 py-2 bg-purple-600 text-white rounded-md font-medium text-sm shadow-sm hover:bg-purple-700 transition-all focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2"
-                on:click=move |_| {
-                    let navigate = leptos_router::use_navigate();
-                    navigate("/test-variations", Default::default());
-                }
-            >
-                "Manage Variations"
-            </button>
+                    <button
+                        class=move || {
+                            if view_mode() == ViewMode::Table {
+                                "px-3 py-1.5 text-sm font-medium bg-white text-gray-900 rounded-md shadow-sm"
+                            } else {
+                                "px-3 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
+                            }
+                        }
+                        on:click=move |_| set_view_mode(ViewMode::Table)
+                    >
+                        "Table"
+                    </button>
 
-            <button
-                on:click=on_click_edit
-                class=move || if if_show_edit() { styles::SECONDARY_BUTTON_ACTIVE } else { styles::SECONDARY_BUTTON }
-            >
-                "Edit Mode"
-            </button>
+                    <button
+                        class=move || {
+                            if view_mode() == ViewMode::Compact {
+                                "px-3 py-1.5 text-sm font-medium bg-white text-gray-900 rounded-md shadow-sm"
+                            } else {
+                                "px-3 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
+                            }
+                        }
+                        on:click=move |_| set_view_mode(ViewMode::Compact)
+                    >
+                        "Compact"
+                    </button>
+                </div>
+            </div>
 
-            // Enhanced Delete Mode Button
-            <button
-                on:click=on_click_delete_mode
-                class=move || {
-                    if if_show_delete() {
-                        "px-4 py-2 bg-red-600 text-white rounded-md font-medium text-sm shadow-sm hover:bg-red-700 transition-all focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
-                    } else {
-                        styles::DANGER_BUTTON
+            // Right section - action buttons
+            <div class="flex space-x-2 justify-end col-span-2 sm:col-span-1">
+                <button on:click=on_click_add class=styles::PRIMARY_BUTTON>
+                    "New Test"
+                </button>
+
+                <button
+                    class="px-4 py-2 bg-purple-600 text-white rounded-md font-medium text-sm shadow-sm hover:bg-purple-700 transition-all focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2"
+                    on:click=move |_| {
+                        let navigate = leptos_router::use_navigate();
+                        navigate("/test-variations", Default::default());
                     }
-                }
-                title=move || {
-                    if if_show_delete() {
-                        "Exit Delete Mode - Click to stop deleting"
-                    } else {
-                        "Enter Delete Mode - Show delete buttons"
+                >
+                    "Manage Variations"
+                </button>
+
+                <button
+                    on:click=on_click_delete_mode
+                    class=move || {
+                        if if_show_delete() {
+                            "px-4 py-2 bg-red-600 text-white rounded-md font-medium text-sm shadow-sm hover:bg-red-700 transition-all focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                        } else {
+                            styles::DANGER_BUTTON
+                        }
                     }
-                }
-            >
-                {move || {
-                    if if_show_delete() {
-                        "🗑️ Exit Delete Mode"
-                    } else {
-                        "Delete Mode"
+                    title=move || {
+                        if if_show_delete() {
+                            "Exit Delete Mode - Click to stop deleting"
+                        } else {
+                            "Enter Delete Mode - Show delete buttons"
+                        }
                     }
-                }}
-            </button>
+                >
+                    {move || {
+                        if if_show_delete() {
+                            "🗑️ Exit Delete Mode"
+                        } else {
+                            "Delete Mode"
+                        }
+                    }}
+                </button>
+            </div>
         </div>
     }
 }
@@ -579,6 +613,473 @@ fn TestGroupCard(
 }
 
 #[component]
+fn CompactListView(
+    all_tests: Vec<Test>,
+    if_show_delete: ReadSignal<bool>,
+    on_delete_test: Callback<String>,
+    on_create_variation: Callback<Test>,
+) -> impl IntoView {
+    // Group tests by base name for compact display
+    let grouped_tests = create_memo(move |_| {
+        let tests = all_tests.clone();
+        let mut groups: std::collections::HashMap<String, (Test, Vec<Test>)> =
+            std::collections::HashMap::new();
+
+        for test in tests {
+            let base_name = if test.name.contains(" - ") {
+                test.name
+                    .split(" - ")
+                    .next()
+                    .unwrap_or(&test.name)
+                    .to_string()
+            } else {
+                test.name.clone()
+            };
+
+            if is_variation_test(&test) {
+                groups
+                    .entry(base_name)
+                    .and_modify(|(_, variations)| variations.push(test.clone()))
+                    .or_insert((test.clone(), vec![test.clone()])); // fallback if no base test
+            } else {
+                groups
+                    .entry(base_name.clone())
+                    .and_modify(|(base, _)| *base = test.clone())
+                    .or_insert((test.clone(), Vec::new()));
+            }
+        }
+
+        let mut sorted_groups: Vec<(Test, Vec<Test>)> = groups.into_values().collect();
+        sorted_groups.sort_by(|a, b| a.0.name.cmp(&b.0.name));
+        sorted_groups
+    });
+
+    view! {
+    <div class="space-y-2">
+        <For
+            each=move || grouped_tests()
+            key=|(base_test, _)| base_test.test_id.clone()
+            children=move |(base_test, variations): (Test, Vec<Test>)| {
+                let (type_class, type_label) = get_test_type_styling(&base_test.testarea);
+                let variation_count = variations.len();
+
+                view! {
+                    <div class=move || {
+                        let base_class = "bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-sm transition-all";
+                        if if_show_delete() {
+                            format!("{} ring-2 ring-red-200", base_class)
+                        } else {
+                            base_class.to_string()
+                        }
+                    }>
+                        // Base test row
+                        <div class="flex items-center justify-between p-4 border-b border-gray-100 last:border-b-0">
+                            <div class="flex items-center space-x-3 flex-1 min-w-0">
+                                <span class=format!("inline-flex px-2 py-1 text-xs font-medium rounded {}", type_class)>
+                                    {type_label}
+                                </span>
+                                <span class="font-medium text-gray-900 truncate" title=base_test.name.clone()>
+                                    {base_test.name.clone()}
+                                </span>
+                                <span class="text-sm text-gray-500 font-mono">{base_test.score}"pts"</span>
+                                {if variation_count > 0 {
+                                    view! {
+                                        <span class="inline-flex px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded">
+                                            {variation_count}" var"
+                                        </span>
+                                    }.into_view()
+                                } else {
+                                    view! { <span></span> }.into_view()
+                                }}
+                                {move || {
+                                    if if_show_delete() {
+                                        view! {
+                                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 border border-red-300">
+                                                "🗑️ Delete Mode"
+                                            </span>
+                                        }.into_view()
+                                    } else {
+                                        view! { <span></span> }.into_view()
+                                    }
+                                }}
+                            </div>
+
+                            <CompactActions
+                                test=base_test.clone()
+                                is_variation=false
+                                if_show_delete=if_show_delete
+                                on_delete_test=on_delete_test.clone()
+                                on_create_variation=Some(on_create_variation.clone())
+                            />
+                        </div>
+
+                        // Variations (if any)
+                        {if !variations.is_empty() {
+                            view! {
+                                <div class=move || {
+                                    if if_show_delete() {
+                                        "bg-red-25"
+                                    } else {
+                                        "bg-gray-50"
+                                    }
+                                }>
+                                    <For
+                                        each=move || variations.clone()
+                                        key=|var| var.test_id.clone()
+                                        children=move |variation: Test| {
+                                            let var_name = if variation.name.contains(" - ") {
+                                                variation.name.split(" - ").nth(1).unwrap_or("Variation").to_string()
+                                            } else {
+                                                "Variation".to_string()
+                                            };
+
+                                            view! {
+                                                <div class="flex items-center justify-between px-6 py-3 border-b border-gray-200 last:border-b-0">
+                                                    <div class="flex items-center space-x-3">
+                                                            <span class="text-sm text-gray-600" title=variation.name.clone()>{var_name}</span>
+                                                            <span class="text-xs text-gray-500 font-mono">{variation.score}"pts"</span>
+                                                            <span class="text-xs text-gray-500">v{variation.test_variant}</span>
+                                                            {move || {
+                                                                if if_show_delete() {
+                                                                    view! {
+                                                                        <span class="text-xs text-red-600 font-medium">
+                                                                            "⚠️ Can delete"
+                                                                        </span>
+                                                                    }.into_view()
+                                                                } else {
+                                                                    view! { <span></span> }.into_view()
+                                                                }
+                                                            }}
+                                                        </div>
+
+                                                        <CompactActions
+                                                            test=variation.clone()
+                                                            is_variation=true
+                                                            if_show_delete=if_show_delete
+                                                            on_delete_test=on_delete_test.clone()
+                                                            on_create_variation=None
+                                                        />
+                                                    </div>
+                                                }
+                                            }
+                                        />
+                                    </div>
+                                }.into_view()
+                            } else {
+                                view! { <div></div> }.into_view()
+                            }}
+                        </div>
+                    }
+                }
+            />
+        </div>
+    }
+}
+
+#[component]
+fn DenseTableView(
+    all_tests: Vec<Test>,
+    if_show_delete: ReadSignal<bool>,
+    on_delete_test: Callback<String>,
+    on_create_variation: Callback<Test>,
+) -> impl IntoView {
+    // Sort tests: base tests first, then variations grouped under them
+    let sorted_tests = create_memo(move |_| {
+        let tests = all_tests.clone();
+
+        // Separate base tests and variations
+        let mut base_tests: Vec<Test> = tests
+            .iter()
+            .filter(|t| !is_variation_test(t))
+            .cloned()
+            .collect();
+
+        let variations: Vec<Test> = tests
+            .iter()
+            .filter(|t| is_variation_test(t))
+            .cloned()
+            .collect();
+
+        // Sort base tests by name
+        base_tests.sort_by(|a, b| a.name.cmp(&b.name));
+
+        // Build final list: base test followed by its variations
+        let mut final_tests = Vec::new();
+
+        for base_test in base_tests {
+            final_tests.push(base_test.clone());
+
+            // Add variations for this base test
+            let mut test_variations: Vec<Test> = variations
+                .iter()
+                .filter(|v| {
+                    let base_name = if v.name.contains(" - ") {
+                        v.name.split(" - ").next().unwrap_or(&v.name)
+                    } else {
+                        &v.name
+                    };
+                    base_name == base_test.name
+                })
+                .cloned()
+                .collect();
+
+            test_variations.sort_by(|a, b| a.name.cmp(&b.name));
+            final_tests.extend(test_variations);
+        }
+
+        final_tests
+    });
+
+    view! {
+        <div class=styles::TABLE_CONTAINER>
+            // Table header
+            <div class=styles::TABLE_HEADER>
+                <div class="grid grid-cols-12 gap-2">
+                    <div class=format!("{} col-span-4", styles::TABLE_HEADER_CELL)>"Test Name"</div>
+                    <div class=format!("{} col-span-1", styles::TABLE_HEADER_CELL)>"Type"</div>
+                    <div class=format!("{} col-span-1", styles::TABLE_HEADER_CELL)>"Score"</div>
+                    <div class=format!("{} col-span-1", styles::TABLE_HEADER_CELL)>"Grade"</div>
+                    <div class=format!("{} col-span-1", styles::TABLE_HEADER_CELL)>"Variant"</div>
+                    <div class=format!("{} col-span-2", styles::TABLE_HEADER_CELL)>"Status"</div>
+                    <div class=format!("{} col-span-2", styles::TABLE_HEADER_CELL)>"Actions"</div>
+                </div>
+            </div>
+
+            // Table body with max height and scroll
+            <div class="max-h-[600px] overflow-y-auto">
+                <For
+                    each=move || sorted_tests()
+                    key=|test| test.test_id.clone()
+                    children=move |test: Test| {
+                        let is_variation = is_variation_test(&test);
+                        let (test_type_class, test_type_label) = get_test_type_styling(&test.testarea);
+
+                        // Extract variation info
+                        let (display_name, _variation_type) = if is_variation {
+                            if let Some(var_part) = test.name.split(" - ").nth(1) {
+                                (format!("  ↳ {}", var_part), var_part.to_string())
+                            } else {
+                                (format!("  ↳ Variation"), "Variation".to_string())
+                            }
+                        } else {
+                            (test.name.clone(), String::new())
+                        };
+
+                        let grade_display = test.grade_level.as_ref()
+                            .map(|g| format!("{:?}", g))
+                            .unwrap_or("—".to_string());
+
+                        view! {
+                            <div class=move || {
+                                if if_show_delete() {
+                                    styles::TABLE_ROW_DELETE
+                                } else {
+                                    styles::TABLE_ROW
+                                }
+                            }>
+                                <div class="grid grid-cols-12 gap-2 items-center">
+                                    // Test Name
+                                    <div class=format!("{} col-span-4", styles::TABLE_CELL)>
+                                        <div class=move || {
+                                            if is_variation {
+                                                "text-gray-600 text-sm pl-4"
+                                            } else {
+                                                "font-medium text-gray-900"
+                                            }
+                                        }>
+                                            <span
+                                                title=test.name.clone()
+                                                class="truncate block"
+                                            >
+                                                {display_name}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    // Type
+                                    <div class=format!("{} col-span-1", styles::TABLE_CELL)>
+                                        <span class=format!("inline-flex px-2 py-1 text-xs font-medium rounded-full {}", test_type_class)>
+                                            {test_type_label}
+                                        </span>
+                                    </div>
+
+                                    // Score
+                                    <div class=format!("{} col-span-1 font-mono text-center", styles::TABLE_CELL)>
+                                        {test.score}
+                                    </div>
+
+                                    // Grade
+                                    <div class=format!("{} col-span-1 text-center", styles::TABLE_CELL)>
+                                        <span class="text-xs">{grade_display}</span>
+                                    </div>
+
+                                    // Variant Number
+                                    <div class=format!("{} col-span-1 font-mono text-center", styles::TABLE_CELL)>
+                                        {if test.test_variant > 0 { test.test_variant.to_string() } else { "—".to_string() }}
+                                    </div>
+
+                                    // Status
+                                    <div class=format!("{} col-span-2", styles::TABLE_CELL)>
+                                        <TestStatusBadges test=test.clone() />
+                                    </div>
+
+                                    // Actions
+                                    <div class=format!("{} col-span-2", styles::TABLE_CELL)>
+                                        <CompactActions
+                                            test=test.clone()
+                                            is_variation=is_variation
+                                            if_show_delete=if_show_delete
+                                            on_delete_test=on_delete_test.clone()
+                                            on_create_variation=if !is_variation { Some(on_create_variation.clone()) } else { None }
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    }
+                />
+            </div>
+        </div>
+    }
+}
+
+#[component]
+fn CompactActions(
+    test: Test,
+    is_variation: bool,
+    if_show_delete: ReadSignal<bool>,
+    on_delete_test: Callback<String>,
+    on_create_variation: Option<Callback<Test>>,
+) -> impl IntoView {
+    let test_id_edit = test.test_id.clone();
+    let test_id_use = test.test_id.clone();
+    let test_id_delete = test.test_id.clone();
+    let test_for_modal = Rc::new(test.clone());
+    let test_for_variation = test.clone();
+
+    //Modal state for selecting a test
+    let (show_select_test_modal, set_show_select_test_modal) = create_signal(false);
+
+    view! {
+        <div class="flex items-center space-x-1">
+            // Edit button
+            <button
+                class="p-1.5 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                title="Edit Test"
+                on:click=move |_| {
+                    let navigate = leptos_router::use_navigate();
+                    navigate(&format!("/testbuilder/{}", test_id_edit.clone()), Default::default());
+                }
+            >
+                <span class="text-sm">"✏️"</span>
+            </button>
+
+            // Use button
+            <button
+                class="p-1.5 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
+                title="Use Test"
+                on:click=move |_| {
+                    let navigate = leptos_router::use_navigate();
+                    navigate(&format!("/test-session/{}", test_id_use.clone()), Default::default());
+                }
+            >
+                <span class="text-sm">"▶️"</span>
+            </button>
+
+            // Test button (purple button from original)
+            <button
+                class="p-1.5 text-gray-600 hover:text-purple-600 hover:bg-purple-50 rounded transition-colors"
+                title="Test"
+                on:click=move |_| set_show_select_test_modal.set(true)
+            >
+                <span class="text-sm">"🧪"</span>
+            </button>
+
+            // Create variation button (only for base tests)
+            {if !is_variation && on_create_variation.is_some() {
+                let callback = on_create_variation.unwrap();
+                let test_clone = test_for_variation.clone();
+                view! {
+                    <button
+                        class="p-1.5 text-gray-600 hover:text-orange-600 hover:bg-orange-50 rounded transition-colors"
+                        title="Create Variation"
+                        on:click=move |_| leptos::Callable::call(&callback, test_clone.clone())
+                    >
+                        <span class="text-sm">"📝"</span>
+                    </button>
+                }.into_view()
+            } else {
+                view! { <span></span> }.into_view()
+            }}
+
+            // Delete button (only in delete mode)
+            <Show
+                when=move || if_show_delete()
+                fallback=|| view! { <span></span> }
+            >
+                {
+                    let delete_id = test_id_delete.clone();
+                    let delete_cb = on_delete_test.clone();
+                    view! {
+                        <button
+                            class="p-1.5 text-red-600 hover:bg-red-100 rounded transition-colors"
+                            title="Delete Test"
+                            on:click=move |_| leptos::Callable::call(&delete_cb, delete_id.clone())
+                        >
+                            <span class="text-sm">"🗑️"</span>
+                        </button>
+                    }
+                }
+            </Show>
+        </div>
+
+        // Keep the modal from original TestActionButtons
+        <SelectTestModal
+            test=test_for_modal
+            show_modal=show_select_test_modal
+            set_show_modal=set_show_select_test_modal
+        />
+    }
+}
+
+#[component]
+fn TestStatusBadges(test: Test) -> impl IntoView {
+    let is_variation = is_variation_test(&test);
+
+    view! {
+        <div class="flex items-center space-x-1">
+            {if is_variation {
+                let (var_class, var_label) = get_variation_styling(&test.name);
+                view! {
+                    <span class=format!("inline-flex px-1.5 py-0.5 text-xs rounded {}", var_class)>
+                        {var_label}
+                    </span>
+                }.into_view()
+            } else {
+                view! {
+                    <span class="inline-flex px-1.5 py-0.5 text-xs bg-gray-100 text-gray-800 rounded">
+                        "Base"
+                    </span>
+                }.into_view()
+            }}
+
+            {if !test.comments.is_empty() {
+                view! {
+                    <span
+                        class="inline-flex px-1.5 py-0.5 text-xs bg-yellow-100 text-yellow-800 rounded cursor-help"
+                        title=test.comments.clone()
+                    >
+                        "💬"
+                    </span>
+                }.into_view()
+            } else {
+                view! { <span></span> }.into_view()
+            }}
+        </div>
+    }
+}
+
+#[component]
 fn VariationCard(
     variation: Test,
     if_show_delete: ReadSignal<bool>,
@@ -659,7 +1160,11 @@ fn TestActionButtons(test: Test, on_create_variation: Option<Callback<Test>>) ->
     let test_id_for_use = test.test_id.clone();
     let test_id_for_flash = test.test_id.clone();
     let test_for_variation = test.clone();
+    let test_for_modal = Rc::new(test.clone());
     let is_base_test = !is_variation_test(&test);
+
+    //Modal state for selecting a test
+    let (show_select_test_modal, set_show_select_test_modal) = create_signal(false);
 
     view! {
         <div class="flex space-x-2">
@@ -671,7 +1176,7 @@ fn TestActionButtons(test: Test, on_create_variation: Option<Callback<Test>>) ->
                     navigate(&format!("/testbuilder/{}", test_id), Default::default());
                 }
             >
-                "Edit"
+                "Edit Test"
             </button>
             <button
                 class="flex-1 px-3 py-2 bg-green-50 hover:bg-green-100 text-green-700 text-xs font-medium rounded-md transition-colors"
@@ -683,16 +1188,14 @@ fn TestActionButtons(test: Test, on_create_variation: Option<Callback<Test>>) ->
             >
                 "Use"
             </button>
+
             <button
                 class="flex-1 px-3 py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 text-xs font-medium rounded-md transition-colors"
-                on:click=move |_| {
-                    let test_id = test_id_for_flash.clone();
-                    let navigate = leptos_router::use_navigate();
-                    navigate(&format!("/flashcardset/{}", test_id), Default::default());
-                }
+                on:click=move |_| set_show_select_test_modal.set(true)
             >
-                "Flash"
+                "Test"
             </button>
+
             {if is_base_test && on_create_variation.is_some() {
                 let create_variation_callback = on_create_variation.unwrap();
                 view! {
@@ -701,13 +1204,20 @@ fn TestActionButtons(test: Test, on_create_variation: Option<Callback<Test>>) ->
                         on:click=move |_| leptos::Callable::call(&create_variation_callback, test_for_variation.clone())
                         title="Create variation"
                     >
-                        "Vary"
+                        "New Variation"
                     </button>
                 }.into_view()
             } else {
                 view! { <span></span> }.into_view()
             }}
         </div>
+
+        // Modal component
+        <SelectTestModal
+            test=test_for_modal
+            show_modal=show_select_test_modal
+            set_show_modal=set_show_select_test_modal
+        />
     }
 }
 
@@ -734,7 +1244,7 @@ pub fn UnifiedTestManagerContent() -> impl IntoView {
     let (if_show_toast, set_if_show_toast) = create_signal(false);
     let (toast_message, set_toast_message) = create_signal(ToastMessage::new());
     let (search_term, set_search_term) = create_signal(String::new());
-    let (view_mode, set_view_mode) = create_signal(ViewMode::GroupedByBase);
+    let (view_mode, set_view_mode) = create_signal(ViewMode::Table);
     let (test_filter, set_test_filter) = create_signal(TestFilter::All);
     let (expanded_groups, set_expanded_groups) =
         create_signal(std::collections::HashSet::<String>::new());
@@ -854,17 +1364,25 @@ pub fn UnifiedTestManagerContent() -> impl IntoView {
                 .collect()
         };
 
-        match view_mode.get() {
-            ViewMode::AllTests => {
-                let mut all_tests = Vec::new();
-                for group in filtered_groups {
-                    all_tests.push(group.base_test);
-                    all_tests.extend(group.variations);
-                }
-                (all_tests, Vec::new())
-            }
-            ViewMode::GroupedByBase => (Vec::new(), filtered_groups),
+        // Extract all tests for table/compact views
+        let mut all_tests = Vec::new();
+        for group in &filtered_groups {
+            all_tests.push(group.base_test.clone());
+            all_tests.extend(group.variations.clone());
         }
+
+        // Apply test filter to all tests
+        let filtered_all_tests: Vec<Test> = all_tests
+            .into_iter()
+            .filter(|test| match test_filter.get() {
+                TestFilter::All => true,
+                TestFilter::Math => test.testarea == TestType::Math,
+                TestFilter::Reading => test.testarea == TestType::Reading,
+                TestFilter::Other => test.testarea == TestType::Other,
+            })
+            .collect();
+
+        (filtered_all_tests, filtered_groups)
     });
 
     let create_variation = move |_| {
@@ -985,19 +1503,15 @@ pub fn UnifiedTestManagerContent() -> impl IntoView {
         navigate("/testbuilder", Default::default());
     };
 
-    let on_click_edit = move |_| {
-        set_if_show_edit(!if_show_edit());
-        set_if_show_delete(false);
-    };
-
     let on_click_delete_mode = move |_| {
         set_if_show_delete(!if_show_delete());
         set_if_show_edit(false);
     };
 
-    let on_toggle_view_mode = move |_| match view_mode.get() {
-        ViewMode::AllTests => set_view_mode(ViewMode::GroupedByBase),
-        ViewMode::GroupedByBase => set_view_mode(ViewMode::AllTests),
+    let on_toggle_view_mode = move |_: ev::MouseEvent| match view_mode.get() {
+        ViewMode::Cards => set_view_mode(ViewMode::Table),
+        ViewMode::Table => set_view_mode(ViewMode::Compact),
+        ViewMode::Compact => set_view_mode(ViewMode::Cards),
     };
 
     let on_delete_test = Callback::new(move |test_id: String| {
@@ -1068,21 +1582,26 @@ pub fn UnifiedTestManagerContent() -> impl IntoView {
                                 set_test_filter=set_test_filter
                             />
 
-                            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                                <SearchBar
-                                    search_term=search_term
-                                    set_search_term=set_search_term
-                                />
+                            <div class="flex flex-col sm:flex-row sm:items-center gap-3">
+                                // Search bar with fixed width - maintains its size
+                                <div class="w-full sm:w-80 flex-shrink-0">
+                                    <SearchBar
+                                        search_term=search_term
+                                        set_search_term=set_search_term
+                                    />
+                                </div>
 
-                                <ActionButtons
-                                    if_show_edit=if_show_edit
-                                    if_show_delete=if_show_delete
-                                    view_mode=view_mode
-                                    on_click_add=on_click_add
-                                    on_click_edit=on_click_edit
-                                    on_click_delete_mode=on_click_delete_mode
-                                    on_toggle_view_mode=on_toggle_view_mode
-                                />
+                                // Action buttons container - takes remaining space
+                                <div class="flex-1 min-w-0">
+                                    <ActionButtons
+                                        if_show_edit=if_show_edit
+                                        if_show_delete=if_show_delete
+                                        view_mode=view_mode
+                                        set_view_mode=set_view_mode
+                                        on_click_add=on_click_add
+                                        on_click_delete_mode=on_click_delete_mode
+                                    />
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1108,7 +1627,7 @@ pub fn UnifiedTestManagerContent() -> impl IntoView {
                             let (all_tests, grouped_tests) = filtered_display.get();
 
                             match view_mode.get() {
-                                ViewMode::AllTests => {
+                                ViewMode::Table => {
                                     if all_tests.is_empty() {
                                         view! {
                                             <EmptyState
@@ -1118,37 +1637,36 @@ pub fn UnifiedTestManagerContent() -> impl IntoView {
                                         }.into_view()
                                     } else {
                                         view! {
-                                            <div class="grid grid-cols-1 gap-6">
-                                                <For
-                                                    each=move || all_tests.clone()
-                                                    key=|test| test.test_id.clone()
-                                                    children=move |each_test| {
-                                                        view! {
-                                                            <div class="group relative bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200">
-                                                                <MathTestDisplay
-                                                                    test=Rc::new(each_test.clone())
-                                                                    test_resource=get_tests_info
-                                                                    set_if_show_toast
-                                                                    set_toast_message
-                                                                    editing_mode=if_show_edit
-                                                                    on_delete=Some(on_delete_test.clone())
-                                                                    show_delete_mode=if_show_delete
-                                                                    show_variations=Some(true)
-                                                                    all_tests=Some(create_signal({
-                                                                        get_tests_info.get()
-                                                                            .map(|result| result.unwrap_or_default())
-                                                                            .unwrap_or_default()
-                                                                    }).0)
-                                                                />
-                                                            </div>
-                                                        }
-                                                    }
-                                                />
-                                            </div>
+                                            <DenseTableView
+                                                all_tests=all_tests
+                                                if_show_delete=if_show_delete
+                                                on_delete_test=on_delete_test
+                                                on_create_variation=on_create_variation.clone()
+                                            />
                                         }.into_view()
                                     }
                                 }
-                                ViewMode::GroupedByBase => {
+                                ViewMode::Compact => {
+                                    if all_tests.is_empty() {
+                                        view! {
+                                            <EmptyState
+                                                test_filter=test_filter
+                                                on_click_add=on_click_add
+                                            />
+                                        }.into_view()
+                                    } else {
+                                        view! {
+                                            <CompactListView
+                                                all_tests=all_tests
+                                                if_show_delete=if_show_delete
+                                                on_delete_test=on_delete_test
+                                                on_create_variation=on_create_variation.clone()
+                                            />
+                                        }.into_view()
+                                    }
+                                }
+                                ViewMode::Cards => {
+                                    // Your existing grouped card view
                                     if grouped_tests.is_empty() {
                                         view! {
                                             <EmptyState
