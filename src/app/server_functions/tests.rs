@@ -105,6 +105,7 @@ pub async fn add_test(add_test_request: CreateNewTestRequest) -> Result<Test, Se
         let bufferTest = Test::new(
             add_test_request.name,
             add_test_request.score,
+            add_test_request.instructions,
             add_test_request.comments,
             add_test_request.testarea,
             add_test_request.school_year,
@@ -159,6 +160,7 @@ pub async fn update_test(update_test_request: UpdateTestRequest) -> Result<Test,
         let buffer_test = Test::new(
             update_test_request.name,
             update_test_request.score,
+            update_test_request.instructions,
             update_test_request.comments,
             update_test_request.testarea,
             update_test_request.school_year,

@@ -297,6 +297,7 @@ pub async fn generate_randomized_test(
         let variation_test_request = CreateNewTestRequest::new(
             variation_name,
             base_test.score,
+            base_test.instructions,
             format!("Randomized variation of {}", base_test.name),
             base_test.testarea,
             base_test.school_year,

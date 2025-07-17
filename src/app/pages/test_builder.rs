@@ -231,6 +231,7 @@ pub fn TestBuilderContent() -> impl IntoView {
             set_test_variant(test.test_variant);
             set_scope(test.scope.clone());
             set_course_id(test.course_id.clone());
+            set_test_instructions(test.instructions.clone().unwrap_or_default());
 
             // Convert BenchmarkCategory to our internal tuple representation
             let categories = test.benchmark_categories.clone().unwrap_or_default();
@@ -417,6 +418,7 @@ pub fn TestBuilderContent() -> impl IntoView {
         let grade_level_clone = grade_level();
         let scope_value_clone = scope_value.clone();
         let course_id_value_clone = course_id_value.clone();
+        let test_instructions_clone = test_instructions();
 
         spawn_local(async move {
             let current_test_id = test_id();
@@ -448,6 +450,7 @@ pub fn TestBuilderContent() -> impl IntoView {
                 let update_test_request = UpdateTestRequest::new(
                     test_title_clone.clone(),
                     total_points,
+                    Some(test_instructions_clone.clone()),
                     test_comments_clone.clone(),
                     test_type.clone(),
                     Some(school_year_clone.clone()),
@@ -478,6 +481,7 @@ pub fn TestBuilderContent() -> impl IntoView {
                 let add_test_request = CreateNewTestRequest::new(
                     test_title_clone.clone(),
                     total_points,
+                    Some(test_instructions_clone.clone()),
                     test_comments_clone.clone(),
                     test_type.clone(),
                     Some(school_year_clone.clone()),

@@ -221,6 +221,7 @@ fn group_tests_by_base(tests: Vec<Test>) -> Vec<TestVariationInfo> {
                     group.base_test = Test::new(
                         base_name.clone(),
                         0,
+                        Some(String::new()),
                         String::new(),
                         test.testarea.clone(),
                         test.school_year.clone(),
@@ -349,6 +350,7 @@ pub fn TestVariationManagerContent() -> impl IntoView {
                     let create_request = CreateNewTestRequest::new(
                         variation_name,
                         base_test_clone.score,
+                        base_test_clone.instructions.clone(),
                         variation_comments,
                         base_test_clone.testarea.clone(),
                         base_test_clone.school_year.clone(),

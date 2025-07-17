@@ -1,6 +1,7 @@
 use crate::app::components::enhanced_login_form::{
     use_student_mapping_service, DeAnonymizedStudent,
 };
+use crate::app::components::test_components::test_instructions::TestInstructions;
 use crate::app::middleware::global_settings::use_settings;
 use crate::app::models::question::QuestionType;
 use crate::app::models::score::CreateScoreRequest;
@@ -287,6 +288,18 @@ pub fn GridTest() -> impl IntoView {
                         </h1>
                         <div class="mt-2 h-1 w-20 bg-gradient-to-r from-indigo-400 to-purple-400 rounded-full mx-auto"></div>
                     </div>
+
+                    {/* Test Instructions */}
+                    <Suspense fallback=move || view! { <div></div> }>
+                        {move || match test_details.get() {
+                            Some(Some(test)) => view! {
+                                <div class="max-w-7xl mx-auto px-6 mb-6">
+                                    <TestInstructions instructions=test.instructions.clone() />
+                                </div>
+                            }.into_view(),
+                            _ => view! { <div></div> }.into_view()
+                        }}
+                    </Suspense>
                 </div>
             </div>
 

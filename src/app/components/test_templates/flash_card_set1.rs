@@ -1,6 +1,7 @@
 use crate::app::components::auth::enhanced_login_form::{
     use_student_mapping_service, DeAnonymizedStudent,
 };
+use crate::app::components::test_components::test_instructions::TestInstructions;
 use crate::app::middleware::global_settings::use_settings;
 use crate::app::models::question::QuestionType;
 use crate::app::models::score::CreateScoreRequest;
@@ -259,6 +260,16 @@ pub fn FlashCardSet() -> impl IntoView {
                     }}
                 </h2>
             </div>
+
+            {/* Instructions */}
+            <Suspense fallback=move || view! { <div></div> }>
+                {move || match test_details.get() {
+                    Some(Some(test)) => view! {
+                        <TestInstructions instructions=test.instructions.clone() />
+                    }.into_view(),
+                    _ => view! { <div></div> }.into_view()
+                }}
+            </Suspense>
 
             {/* Questions View */}
             <Suspense

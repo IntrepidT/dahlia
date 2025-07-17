@@ -1415,6 +1415,7 @@ pub fn UnifiedTestManagerContent() -> impl IntoView {
                 let create_request = CreateNewTestRequest::new(
                     variation_name,
                     base_test_clone.score,
+                    base_test_clone.instructions.clone(),
                     variation_comments,
                     base_test_clone.testarea.clone(),
                     base_test_clone.school_year.clone(),

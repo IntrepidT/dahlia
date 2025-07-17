@@ -48,6 +48,7 @@ pub struct Test {
     pub name: String,
     #[validate(range(min = -20000, max = 99999, message = "score is required"))]
     pub score: i32,
+    pub instructions: Option<String>,
     pub comments: String,
     pub testarea: TestType,
     pub school_year: Option<String>,
@@ -63,6 +64,7 @@ impl Test {
     pub fn new(
         name: String,
         score: i32,
+        instructions: Option<String>,
         comments: String,
         testarea: TestType,
         school_year: Option<String>,
@@ -76,6 +78,7 @@ impl Test {
         Test {
             name,
             score,
+            instructions,
             comments,
             testarea,
             school_year,
@@ -95,6 +98,7 @@ pub struct CreateNewTestRequest {
     pub name: String,
     #[validate(range(min = 0, max = 99999, message = "a score is required"))]
     pub score: i32,
+    pub instructions: Option<String>,
     pub comments: String,
     pub testarea: TestType,
     pub school_year: Option<String>,
@@ -109,6 +113,7 @@ impl CreateNewTestRequest {
     pub fn new(
         name: String,
         score: i32,
+        instructions: Option<String>,
         comments: String,
         testarea: TestType,
         school_year: Option<String>,
@@ -121,6 +126,7 @@ impl CreateNewTestRequest {
         CreateNewTestRequest {
             name,
             score,
+            instructions,
             comments,
             testarea,
             school_year,
@@ -139,6 +145,7 @@ pub struct UpdateTestRequest {
     pub name: String,
     #[validate(range(min = -20000, max = 99999, message = "a score is required"))]
     pub score: i32,
+    pub instructions: Option<String>,
     pub comments: String,
     pub testarea: TestType,
     pub school_year: Option<String>,
@@ -154,6 +161,7 @@ impl UpdateTestRequest {
     pub fn new(
         name: String,
         score: i32,
+        instructions: Option<String>,
         comments: String,
         testarea: TestType,
         school_year: Option<String>,
@@ -167,6 +175,7 @@ impl UpdateTestRequest {
         UpdateTestRequest {
             name,
             score,
+            instructions,
             comments,
             testarea,
             school_year,

@@ -20,3 +20,6 @@ pub use test_variation_manager::{
 
 pub mod select_test_modal;
 pub use select_test_modal::SelectTestModal;
+
+pub mod test_instructions;
+pub use test_instructions::TestInstructions;
