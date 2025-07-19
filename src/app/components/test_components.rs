@@ -23,3 +23,6 @@ pub use select_test_modal::SelectTestModal;
 
 pub mod test_instructions;
 pub use test_instructions::TestInstructions;
+
+pub mod font_controls;
+pub use font_controls::*;

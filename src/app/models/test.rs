@@ -12,9 +12,53 @@ pub struct BenchmarkCategory {
     pub max: i32,
     pub label: String,
 }
+
 impl BenchmarkCategory {
+    // Original constructor (now for ranges)
     pub fn new(min: i32, max: i32, label: String) -> BenchmarkCategory {
         BenchmarkCategory { min, max, label }
+    }
+
+    // Constructor for range (alias for clarity)
+    pub fn new_range(min: i32, max: i32, label: String) -> BenchmarkCategory {
+        BenchmarkCategory { min, max, label }
+    }
+
+    // Constructor for single value
+    pub fn new_single(value: i32, label: String) -> BenchmarkCategory {
+        BenchmarkCategory {
+            min: value,
+            max: value,
+            label,
+        }
+    }
+
+    // Helper method to check if this is a single value
+    pub fn is_single_value(&self) -> bool {
+        self.min == self.max
+    }
+
+    // Helper method to check if a score falls within this category
+    pub fn contains(&self, score: i32) -> bool {
+        score >= self.min && score <= self.max
+    }
+
+    // Helper method to get the display text for the range
+    pub fn range_display(&self) -> String {
+        if self.is_single_value() {
+            self.min.to_string()
+        } else {
+            format!("{}-{}", self.min, self.max)
+        }
+    }
+
+    // Helper method to get the value for single-value categories
+    pub fn get_single_value(&self) -> Option<i32> {
+        if self.is_single_value() {
+            Some(self.min)
+        } else {
+            None
+        }
     }
 }
 

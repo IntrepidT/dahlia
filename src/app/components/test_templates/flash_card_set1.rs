@@ -1,6 +1,9 @@
 use crate::app::components::auth::enhanced_login_form::{
     use_student_mapping_service, DeAnonymizedStudent,
 };
+use crate::app::components::test_components::font_controls::{
+    use_font_settings, FontControls, FontSettings,
+};
 use crate::app::components::test_components::test_instructions::TestInstructions;
 use crate::app::middleware::global_settings::use_settings;
 use crate::app::models::question::QuestionType;
@@ -41,6 +44,12 @@ pub fn FlashCardSet() -> impl IntoView {
     let params = use_params_map();
     let test_id = move || params.with(|params| params.get("test_id").cloned().unwrap_or_default());
     let user = use_context::<ReadSignal<Option<SessionUser>>>().expect("AuthProvider not Found");
+    let (font_settings, set_font_settings) = use_font_settings();
+
+    // Add state for collapsible sections
+    let (shortcuts_expanded, set_shortcuts_expanded) = create_signal(false);
+    let (instructions_expanded, set_instructions_expanded) = create_signal(false);
+
     let user_data = create_resource(
         move || user.get().map(|u| u.id),
         move |id| async move {
@@ -79,7 +88,11 @@ pub fn FlashCardSet() -> impl IntoView {
             return Vec::new();
         }
         match get_questions(tid).await {
-            Ok(questions) => questions,
+            Ok(mut questions) => {
+                // Sort questions by qnumber to ensure consistent ordering
+                questions.sort_by_key(|q| q.qnumber);
+                questions
+            }
             Err(e) => {
                 log::error!("Failed to fetch questions: {}", e);
                 Vec::new()
@@ -128,7 +141,7 @@ pub fn FlashCardSet() -> impl IntoView {
     };
 
     // Navigation handlers
-    let go_to_next_card = move |_| {
+    let go_to_next_card = move |_ev| {
         set_current_card_index.update(|index| {
             if let Some(questions_vec) = questions.get() {
                 *index = (*index + 1).min(questions_vec.len() - 1);
@@ -136,10 +149,86 @@ pub fn FlashCardSet() -> impl IntoView {
         });
     };
 
-    let go_to_previous_card = move |_| {
+    let go_to_previous_card = move |_ev| {
         set_current_card_index.update(|index| {
             *index = index.saturating_sub(1);
         });
+    };
+
+    // Jump to specific question (for keyboard shortcuts)
+    let jump_to_question = move |question_number: usize| {
+        questions.with(|questions_opt| {
+            if let Some(questions_vec) = questions_opt {
+                if question_number > 0 && question_number <= questions_vec.len() {
+                    set_current_card_index.set(question_number - 1);
+                }
+            }
+        });
+    };
+
+    // Focus comments box
+    let focus_comments = move || {
+        #[cfg(feature = "hydrate")]
+        {
+            if let Some(window) = web_sys::window() {
+                if let Some(document) = window.document() {
+                    if let Some(textarea) = document
+                        .query_selector("textarea[placeholder*='notes']")
+                        .ok()
+                        .flatten()
+                    {
+                        let _ = textarea.unchecked_ref::<web_sys::HtmlElement>().focus();
+                    }
+                }
+            }
+        }
+    };
+
+    // De-focus/blur current active element
+    let blur_active_element = move || {
+        #[cfg(feature = "hydrate")]
+        {
+            if let Some(window) = web_sys::window() {
+                if let Some(document) = window.document() {
+                    // Get the currently active element and blur it directly
+                    if let Some(active_element) = document.active_element() {
+                        log::info!("Blurring element: {}", active_element.tag_name());
+
+                        // Try multiple approaches to ensure blur works
+                        if let Some(html_element) = active_element.dyn_ref::<web_sys::HtmlElement>()
+                        {
+                            let _ = html_element.blur();
+                        }
+
+                        // Additional approaches for stubborn elements
+                        if let Some(input_element) =
+                            active_element.dyn_ref::<web_sys::HtmlInputElement>()
+                        {
+                            let _ = input_element.blur();
+                        }
+
+                        if let Some(textarea_element) =
+                            active_element.dyn_ref::<web_sys::HtmlTextAreaElement>()
+                        {
+                            let _ = textarea_element.blur();
+                        }
+                    }
+
+                    // Force focus to main container to ensure nothing has focus
+                    if let Some(main_container) =
+                        document.query_selector(".min-h-screen").ok().flatten()
+                    {
+                        if let Some(html_element) = main_container.dyn_ref::<web_sys::HtmlElement>()
+                        {
+                            let _ = html_element.focus();
+
+                            // Immediately blur it so nothing has focus
+                            let _ = html_element.blur();
+                        }
+                    }
+                }
+            }
+        }
     };
 
     // Submit handler
@@ -213,6 +302,158 @@ pub fn FlashCardSet() -> impl IntoView {
         }
     });
 
+    // Keyboard event handler
+    #[cfg(feature = "hydrate")]
+    {
+        use leptos::ev::KeyboardEvent;
+
+        let handle_keydown = move |ev: KeyboardEvent| {
+            let target = ev.target().unwrap();
+            let tag_name = target
+                .unchecked_ref::<web_sys::Element>()
+                .tag_name()
+                .to_lowercase();
+
+            // Handle Tab to blur from textarea/input
+            if ev.key().as_str() == "Tab" && (tag_name == "textarea" || tag_name == "input") {
+                if let Some(html_element) = target.dyn_ref::<web_sys::HtmlElement>() {
+                    let _ = html_element.blur();
+                    ev.prevent_default();
+                }
+                return;
+            }
+
+            // Only handle navigation shortcuts when not typing in input fields
+            if tag_name == "input" || tag_name == "textarea" || tag_name == "select" {
+                return;
+            }
+
+            match ev.key().as_str() {
+                "ArrowRight" | "n" | "N" => {
+                    ev.prevent_default();
+                    set_current_card_index.update(|index| {
+                        if let Some(questions_vec) = questions.get() {
+                            *index = (*index + 1).min(questions_vec.len() - 1);
+                        }
+                    });
+                }
+                "ArrowLeft" | "p" | "P" => {
+                    ev.prevent_default();
+                    set_current_card_index.update(|index| {
+                        *index = index.saturating_sub(1);
+                    });
+                }
+                "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" => {
+                    if !ev.ctrl_key() && !ev.alt_key() && !ev.meta_key() {
+                        ev.prevent_default();
+                        if let Ok(num) = ev.key().parse::<usize>() {
+                            // Check if we're on a multiple choice question
+                            if let Some(questions_vec) = questions.get() {
+                                let current_question = &questions_vec[current_card_index.get()];
+                                match current_question.question_type {
+                                    QuestionType::MultipleChoice => {
+                                        if num <= current_question.options.len() {
+                                            let option = current_question.options[num - 1].clone();
+                                            handle_answer_change(current_question.qnumber, option);
+                                        }
+                                    }
+                                    QuestionType::WeightedMultipleChoice => {
+                                        let weighted_options =
+                                            current_question.get_weighted_options();
+                                        if num <= weighted_options.len() {
+                                            let option = &weighted_options[num - 1];
+                                            if option.is_selectable {
+                                                let current_selected = responses.with(|r| {
+                                                    r.get(&current_question.qnumber)
+                                                        .and_then(|resp| {
+                                                            resp.selected_options.as_ref()
+                                                        })
+                                                        .cloned()
+                                                        .unwrap_or_default()
+                                                });
+
+                                                let mut new_selected = current_selected;
+                                                if new_selected.contains(&option.text) {
+                                                    new_selected.retain(|x| x != &option.text);
+                                                } else {
+                                                    new_selected.push(option.text.clone());
+                                                }
+
+                                                handle_weighted_selection(
+                                                    current_question.qnumber,
+                                                    new_selected,
+                                                );
+                                            }
+                                        }
+                                    }
+                                    QuestionType::TrueFalse => {
+                                        if num == 1 {
+                                            handle_answer_change(
+                                                current_question.qnumber,
+                                                "true".to_string(),
+                                            );
+                                        } else if num == 2 {
+                                            handle_answer_change(
+                                                current_question.qnumber,
+                                                "false".to_string(),
+                                            );
+                                        }
+                                    }
+                                    _ => {
+                                        // For other question types, jump to question
+                                        jump_to_question(num);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                "c" | "C" => {
+                    if !ev.ctrl_key() && !ev.alt_key() && !ev.meta_key() {
+                        ev.prevent_default();
+                        focus_comments();
+                    }
+                }
+                "Enter" => {
+                    if ev.ctrl_key() || ev.meta_key() {
+                        ev.prevent_default();
+                        if let Some(questions_vec) = questions.get() {
+                            if current_card_index.get() == questions_vec.len() - 1
+                                && !is_submitted.get()
+                            {
+                                // Submit on last question
+                                if selected_student_id.get().is_some() {
+                                    handle_submit.dispatch(());
+                                    set_is_submitted.set(true);
+                                }
+                            } else {
+                                set_current_card_index.update(|index| {
+                                    *index = (*index + 1).min(questions_vec.len() - 1);
+                                });
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            }
+        };
+
+        create_effect(move |_| {
+            let window = web_sys::window().unwrap();
+            let document = window.document().unwrap();
+
+            let closure = wasm_bindgen::closure::Closure::wrap(
+                Box::new(handle_keydown) as Box<dyn Fn(KeyboardEvent)>
+            );
+
+            document
+                .add_event_listener_with_callback("keydown", closure.as_ref().unchecked_ref())
+                .unwrap();
+
+            closure.forget(); // Keep the closure alive
+        });
+    }
+
     // Memoize the percentage calculation to avoid recalculating on every render
     let calculate_answered_percentage = create_memo(move |_| {
         let answered_count = responses.with(|r| {
@@ -235,125 +476,222 @@ pub fn FlashCardSet() -> impl IntoView {
     });
 
     view! {
-        <div class="p-4 max-w-screen h-screen overflow-y-auto bg-gray-50 mx-auto">
-            {/* Header with Student Selection and Evaluator */}
-            <div class="flex flex-wrap items-center justify-between mb-8 max-w-4xl mx-auto">
-                <div class="w-full md:w-1/2 mb-4 md:mb-0">
-                    <StudentSelect set_selected_student_id=set_selected_student_id />
-                </div>
-                <div class="text-sm text-gray-600 font-medium">
-                    {"Evaluator: "}
-                    {move || match user_data.get() {
-                        Some(Some(user)) => format!("{} {}", user.first_name.unwrap_or("None".to_string()), user.last_name.unwrap_or("None".to_string())),
-                        Some(None) => evaluator_id(),
-                        None => "Loading...".to_string(),
-                    }}
-                </div>
-            </div>
+        <div class="min-h-screen bg-gray-50" tabindex="-1">
+            {/* Minimal Top Bar */}
+            <div class="sticky top-0 z-10 bg-white/80 backdrop-blur-md border-b border-gray-100">
+                <div class="max-w-5xl mx-auto px-6 py-3">
+                    <div class="flex items-center justify-between">
+                        {/* Left: Student Select */}
+                        <div class="flex-shrink-0">
+                            <StudentSelect set_selected_student_id=set_selected_student_id />
+                        </div>
 
-            {/* Test Title */}
-            <div class="text-center mb-8">
-                <h2 class="text-xl font-medium text-gray-700 break-words">
-                    {move || match &test_details.get() {
-                        Some(Some(test)) => test.name.clone(),
-                        _ => test_id()
-                    }}
-                </h2>
-            </div>
+                        {/* Center: Test Title */}
+                        <div class="flex-1 text-center px-8">
+                            <h1 class="text-lg font-medium text-gray-900 truncate">
+                                {move || match &test_details.get() {
+                                    Some(Some(test)) => test.name.clone(),
+                                    _ => test_id()
+                                }}
+                            </h1>
+                        </div>
 
-            {/* Instructions */}
-            <Suspense fallback=move || view! { <div></div> }>
-                {move || match test_details.get() {
-                    Some(Some(test)) => view! {
-                        <TestInstructions instructions=test.instructions.clone() />
-                    }.into_view(),
-                    _ => view! { <div></div> }.into_view()
-                }}
-            </Suspense>
-
-            {/* Questions View */}
-            <Suspense
-                fallback=move || view! { <div class="flex justify-center items-center h-64">
-                    <div class="animate-pulse bg-white rounded-lg shadow-md w-full max-w-2xl h-64 flex items-center justify-center">
-                        <p class="text-gray-400">"Loading questions..."</p>
+                        {/* Right: Controls */}
+                        <div class="flex items-center gap-3">
+                            <FontControls
+                                font_settings=font_settings
+                                set_font_settings=set_font_settings
+                            />
+                            <div class="text-sm text-gray-500 font-medium hidden sm:block">
+                                {move || match user_data.get() {
+                                    Some(Some(user)) => format!("{} {}",
+                                        user.first_name.unwrap_or("".to_string()),
+                                        user.last_name.unwrap_or("".to_string())
+                                    ).trim().to_string(),
+                                    Some(None) => evaluator_id(),
+                                    None => "Loading...".to_string(),
+                                }}
+                            </div>
+                        </div>
                     </div>
-                </div> }
-            >
-                {move || match (questions.get(), test_details.get()) {
-                    (None, _) => view! { <div class="text-center py-8">"Loading..."</div> }.into_view(),
-                    (Some(questions), _) if questions.is_empty() => {
-                        view! { <div class="text-center py-8 text-red-500">"No questions found for this test ID."</div> }.into_view()
-                    },
-                    (Some(questions), _) => {
-                        let total_questions = questions.len();
+                </div>
+            </div>
 
-                        // Create a memo to get the current question
-                        let current_question = create_memo(move |_| {
-                            questions.get(current_card_index.get()).cloned().unwrap_or_else(|| {
-                                log::warn!("Question index out of bounds");
-                                questions.first().cloned().unwrap_or_else(|| panic!("No questions available"))
-                            })
-                        });
-
-                        view! {
-                            <div class="flex flex-col items-center justify-center">
-                                {/* Flash Card */}
-                                <div class="relative w-full max-w-2xl transition-all duration-300 my-2">
-                                    {/* Progress Bar */}
-                                    <div class="mb-4 w-full bg-gray-200 rounded-full h-2.5">
-                                        <div
-                                            class="bg-gradient-to-r from-blue-500 to-purple-600 h-2.5 rounded-full transition-all duration-1500 ease-in"
-                                            style=move || format!("width: {}%", calculate_answered_percentage())
-                                        ></div>
+            {/* Instructions - Collapsible */}
+            <div class="max-w-5xl mx-auto px-6 pt-4">
+                <Suspense fallback=move || view! { <div></div> }>
+                    {move || match test_details.get() {
+                        Some(Some(test)) => {
+                            if test.instructions.as_ref().map_or(false, |inst| !inst.is_empty()) {
+                                view! {
+                                    <div class="mb-2">
+                                        <button
+                                            class="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 font-medium"
+                                            on:click=move |_| set_instructions_expanded.update(|x| *x = !*x)
+                                        >
+                                            <svg class=move || format!("w-4 h-4 transition-transform {}",
+                                                if instructions_expanded() { "rotate-90" } else { "" }
+                                            ) fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                                            </svg>
+                                            "Test Instructions"
+                                        </button>
+                                        <Show when=move || instructions_expanded()>
+                                            <div class="mt-2">
+                                                <TestInstructions instructions=test.instructions.clone() />
+                                            </div>
+                                        </Show>
                                     </div>
+                                }.into_view()
+                            } else {
+                                view! { <div></div> }.into_view()
+                            }
+                        },
+                        _ => view! { <div></div> }.into_view()
+                    }}
+                </Suspense>
+            </div>
 
-                                    {/* Card Counter */}
-                                    <div class="text-center mb-4">
-                                        <span class="inline-flex items-center justify-center bg-white text-sm font-medium text-gray-700 px-3 py-1 rounded-full shadow-sm border border-gray-200">
-                                            {move || current_card_index.get() + 1}
-                                            {" / "}
-                                            {total_questions}
-                                            <span class="ml-2 text-purple-600 font-semibold">
-                                                {move || current_question().point_value}
-                                                {" pts"}
+            {/* Keyboard Shortcuts Help - Collapsible */}
+            <div class="max-w-5xl mx-auto px-6">
+                <div class="mb-4">
+                    <button
+                        class="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 font-medium"
+                        on:click=move |_| set_shortcuts_expanded.update(|x| *x = !*x)
+                    >
+                        <svg class=move || format!("w-4 h-4 transition-transform {}",
+                            if shortcuts_expanded() { "rotate-90" } else { "" }
+                        ) fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                        </svg>
+                        "Keyboard Shortcuts"
+                    </button>
+                    <Show when=move || shortcuts_expanded()>
+                        <div class="mt-2 bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                                <span>"← → or P/N: Navigate (works in textarea)"</span>
+                                <span>"1-9: Select answers (Ctrl+1-9 in textarea)"</span>
+                                <span>"Ctrl+Enter: Next/Submit (works everywhere)"</span>
+                                <span>"C or Ctrl+C: Focus comments"</span>
+                            </div>
+                        </div>
+                    </Show>
+                </div>
+            </div>
+
+            {/* Main Content */}
+            <div class="max-w-5xl mx-auto px-6 pb-8">
+                <Suspense
+                    fallback=move || view! {
+                        <div class="flex items-center justify-center h-96">
+                            <div class="flex flex-col items-center gap-4">
+                                <div class="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                                <p class="text-gray-500 text-sm">"Loading questions..."</p>
+                            </div>
+                        </div>
+                    }
+                >
+                    {move || match (questions.get(), test_details.get()) {
+                        (None, _) => view! {
+                            <div class="flex items-center justify-center h-96">
+                                <div class="text-center">
+                                    <div class="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                                    <p class="text-gray-500">"Loading..."</p>
+                                </div>
+                            </div>
+                        }.into_view(),
+                        (Some(questions), _) if questions.is_empty() => {
+                            view! {
+                                <div class="flex items-center justify-center h-96">
+                                    <div class="text-center">
+                                        <div class="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                                            <svg class="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.268 18.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                                            </svg>
+                                        </div>
+                                        <p class="text-gray-500">"No questions found for this test."</p>
+                                    </div>
+                                </div>
+                            }.into_view()
+                        },
+                        (Some(questions), _) => {
+                            let total_questions = questions.len();
+
+                            // Create a memo to get the current question
+                            let current_question = create_memo(move |_| {
+                                questions.get(current_card_index.get()).cloned().unwrap_or_else(|| {
+                                    log::warn!("Question index out of bounds");
+                                    questions.first().cloned().unwrap_or_else(|| panic!("No questions available"))
+                                })
+                            });
+
+                            view! {
+                                <div class="space-y-6">
+                                    {/* Progress Section */}
+                                    <div class="text-center space-y-3">
+                                        {/* Minimalist Progress Bar */}
+                                        <div class="w-full max-w-md mx-auto">
+                                            <div class="bg-gray-100 rounded-full h-1">
+                                                <div
+                                                    class="bg-gradient-to-r from-blue-500 to-indigo-600 h-1 rounded-full transition-all duration-700 ease-out"
+                                                    style=move || format!("width: {}%", calculate_answered_percentage())
+                                                ></div>
+                                            </div>
+                                        </div>
+
+                                        {/* Question Counter */}
+                                        <div class="flex items-center justify-center gap-6 text-sm">
+                                            <span class="text-gray-500">
+                                                "Question " {move || current_card_index.get() + 1} " of " {total_questions}
                                             </span>
-                                        </span>
+                                            <span class="px-3 py-1 bg-indigo-50 text-indigo-700 rounded-full font-medium">
+                                                {move || current_question().point_value} " points"
+                                            </span>
+                                        </div>
                                     </div>
 
-                                    {/* Unified Flash Card - No flipping */}
-                                    <div
-                                        class="bg-white rounded-xl shadow-lg overflow-hidden"
-                                        style="min-height: 450px;"
-                                    >
-                                        <div class="p-8 flex flex-col justify-start items-center w-full h-full overflow-y-auto">
-                                            {/* Question Section */}
-                                            <div class="text-center w-full overflow-auto mb-6">
-                                                //to fix the sizing for another user, we need to
-                                                //reduce the font size to text-4xl or smth for sm:
-                                                <p class="text-sm sm:text-9xl text-gray-800 break-words mb-8 font-custom font-bold">
-                                                    {move || current_question().word_problem.clone()}
-                                                </p>
+                                    {/* Card Container - Compact */}
+                                    <div class="max-w-4xl mx-auto">
+                                        <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                                            {/* Question Header - Compact */}
+                                            <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-100 px-6 py-3">
+                                                <div class="flex items-center justify-between">
+                                                    <h2 class="text-lg font-semibold text-gray-900">
+                                                        "Question " {move || current_card_index.get() + 1}
+                                                    </h2>
+                                                    <span class="text-sm text-gray-600 font-medium">
+                                                        {move || current_question().point_value} " points"
+                                                    </span>
+                                                </div>
                                             </div>
 
-                                            {/* Answer Section - Using a local view! to isolate renders */}
-                                            <div class="w-full mt-2">
-                                                <label class="block text-sm font-medium text-gray-700 mb-2">
-                                                    "Your Answer:"
-                                                </label>
-                                                {move || {
-                                                    let q = current_question();
-                                                    let q_clone_for_calc = q.clone(); // Clone for the calculation closure
-                                                    let q_point_value = q.point_value;
-                                                    match q.question_type {
-                                                        QuestionType::MultipleChoice => view! {
-                                                            <div class="space-y-2 max-h-48 overflow-y-auto">
-                                                                <For
-                                                                    each=move || q.options.clone()
-                                                                    key=|option| option.clone()
-                                                                    children=move |option| {
+                                            <div class="p-6">
+                                                {/* Question - Compact */}
+                                                <div class="mb-6">
+                                                    <div class=move || {
+                                                        let question_text = current_question().word_problem.clone();
+                                                        let is_long = question_text.len() > 10;
+                                                        let alignment = if is_long { "text-left" } else { "text-center" };
+                                                        format!("leading-relaxed {} {}", font_settings.get().get_question_classes(), alignment)
+                                                    }>
+                                                        {move || current_question().word_problem.clone()}
+                                                    </div>
+                                                </div>
+
+                                                {/* Answer Section - Compact */}
+                                                <div class="space-y-4">
+                                                    {move || {
+                                                        let q = current_question();
+                                                        let q_clone_for_calc = q.clone();
+                                                        let q_point_value = q.point_value;
+                                                        match q.question_type {
+                                                            QuestionType::MultipleChoice => view! {
+                                                                <div class="space-y-2">
+                                                                    {q.options.clone().into_iter().enumerate().map(|(index, option)| {
                                                                         let option_value = option.clone();
                                                                         let option_value_clone = option_value.clone();
                                                                         let qnumber = q.qnumber;
+                                                                        let choice_number = index + 1;
                                                                         let is_checked = create_memo(move |_| {
                                                                             responses.with(|r| {
                                                                                 r.get(&qnumber)
@@ -363,44 +701,61 @@ pub fn FlashCardSet() -> impl IntoView {
                                                                         });
 
                                                                         view! {
-                                                                            <label class="flex items-center p-3 rounded-lg border border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-colors cursor-pointer">
-                                                                                <input
-                                                                                    type="radio"
-                                                                                    name=format!("q_{}", qnumber)
-                                                                                    value=option_value.clone()
-                                                                                    class="h-4 w-4 text-blue-600 focus:ring-blue-500"
-                                                                                    prop:checked=move || is_checked()
-                                                                                    on:change=move |ev| {
-                                                                                        let value = event_target_value(&ev);
-                                                                                        handle_answer_change(qnumber, value);
-                                                                                    }
-                                                                                />
-                                                                                <span class="ml-2 break-words">{option_value}</span>
+                                                                            <label class="group flex items-start gap-3 p-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50/50 transition-all duration-200 cursor-pointer">
+                                                                                <div class="relative flex-shrink-0 mt-0.5">
+                                                                                    <input
+                                                                                        type="radio"
+                                                                                        name=format!("q_{}", qnumber)
+                                                                                        value=option_value.clone()
+                                                                                        class="sr-only"
+                                                                                        prop:checked=move || is_checked()
+                                                                                        on:change=move |ev| {
+                                                                                            let value = event_target_value(&ev);
+                                                                                            handle_answer_change(qnumber, value);
+                                                                                        }
+                                                                                    />
+                                                                                    <div class=move || {
+                                                                                        if is_checked() {
+                                                                                            "w-5 h-5 rounded-full border-2 border-blue-500 bg-blue-500 flex items-center justify-center"
+                                                                                        } else {
+                                                                                            "w-5 h-5 rounded-full border-2 border-gray-300 group-hover:border-blue-400 transition-colors"
+                                                                                        }
+                                                                                    }>
+                                                                                        <Show when=move || is_checked()>
+                                                                                            <div class="w-2 h-2 bg-white rounded-full"></div>
+                                                                                        </Show>
+                                                                                    </div>
+                                                                                </div>
+                                                                                <div class="flex-1 flex items-start gap-3">
+                                                                                    <span class="text-xs text-gray-500 font-medium mt-1 min-w-[1rem]">
+                                                                                        {choice_number}
+                                                                                    </span>
+                                                                                    <span class=move || format!("leading-relaxed {}", font_settings.get().get_answer_classes())>
+                                                                                        {option_value}
+                                                                                    </span>
+                                                                                </div>
                                                                             </label>
                                                                         }
-                                                                    }
-                                                                />
-                                                            </div>
-                                                        },
-                                                        QuestionType::WeightedMultipleChoice => {
-                                                            let qnumber = q.qnumber;
-                                                            let weighted_options = q.get_weighted_options();
+                                                                    }).collect_view()}
+                                                                </div>
+                                                            },
+                                                            QuestionType::WeightedMultipleChoice => {
+                                                                let qnumber = q.qnumber;
+                                                                let weighted_options = q.get_weighted_options();
 
-                                                            view! {
-                                                                <div class="space-y-3">
-                                                                    <div class="bg-blue-50 border border-blue-200 rounded p-3 text-sm text-blue-800">
-                                                                        <p><strong>"Instructions:"</strong> " You can select multiple answers. Each answer has different point values."</p>
-                                                                    </div>
+                                                                view! {
+                                                                    <div class="space-y-3">
+                                                                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
+                                                                            <p><strong>"Multiple selections allowed."</strong> " Each answer has different point values."</p>
+                                                                        </div>
 
-                                                                    <div class="space-y-2 max-h-64 overflow-y-auto">
-                                                                        <For
-                                                                            each=move || weighted_options.clone()
-                                                                            key=|option| option.text.clone()
-                                                                            children=move |option| {
+                                                                        <div class="space-y-2">
+                                                                            {weighted_options.clone().into_iter().enumerate().map(|(index, option)| {
                                                                                 let option_clone = option.clone();
                                                                                 let option_text = option.text.clone();
                                                                                 let option_text_for_memo = option_text.clone();
                                                                                 let option_text_for_change = option_text.clone();
+                                                                                let choice_number = index + 1;
                                                                                 let qnumber = q.qnumber;
 
                                                                                 let is_selected = create_memo(move |_| {
@@ -412,18 +767,17 @@ pub fn FlashCardSet() -> impl IntoView {
                                                                                     })
                                                                                 });
 
-                                                                                // Show ALL options, but only make selectable ones clickable
                                                                                 view! {
                                                                                     <div class=move || {
+                                                                                        let base_classes = "group flex items-center justify-between p-3 rounded-lg border transition-all duration-200";
                                                                                         if option_clone.is_selectable {
-                                                                                            "flex items-center justify-between p-3 rounded-lg border border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-colors cursor-pointer"
+                                                                                            format!("{} border-gray-200 hover:border-blue-300 hover:bg-blue-50/50 cursor-pointer", base_classes)
                                                                                         } else {
-                                                                                            "flex items-center justify-between p-3 rounded-lg border border-gray-300 bg-gray-100 transition-colors cursor-not-allowed opacity-60"
+                                                                                            format!("{} border-gray-200 bg-gray-50 cursor-not-allowed opacity-60", base_classes)
                                                                                         }
                                                                                     }
                                                                                     on:click=move |_| {
                                                                                         if option_clone.is_selectable {
-                                                                                            // Toggle this option in the selected list
                                                                                             let current_selected = responses.with(|r| {
                                                                                                 r.get(&qnumber)
                                                                                                     .and_then(|resp| resp.selected_options.as_ref())
@@ -441,29 +795,45 @@ pub fn FlashCardSet() -> impl IntoView {
                                                                                             handle_weighted_selection(qnumber, new_selected);
                                                                                         }
                                                                                     }>
-                                                                                        <div class="flex items-center">
-                                                                                            {if option_clone.is_selectable {
-                                                                                                view! {
-                                                                                                    <input
-                                                                                                        type="checkbox"
-                                                                                                        class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded pointer-events-none"
-                                                                                                        prop:checked=move || is_selected()
-                                                                                                        tabindex="-1"
-                                                                                                    />
-                                                                                                }.into_view()
-                                                                                            } else {
-                                                                                                view! {
-                                                                                                    <div class="h-4 w-4 border border-gray-400 rounded bg-gray-200"></div>
-                                                                                                }.into_view()
-                                                                                            }}
-                                                                                            <span class="ml-2 break-words">{option_clone.text.clone()}</span>
+                                                                                        <div class="flex items-center gap-3">
+                                                                                            <div class="relative flex-shrink-0">
+                                                                                                {if option_clone.is_selectable {
+                                                                                                    view! {
+                                                                                                        <div class=move || {
+                                                                                                            if is_selected() {
+                                                                                                                "w-5 h-5 rounded border-2 border-blue-500 bg-blue-500 flex items-center justify-center"
+                                                                                                            } else {
+                                                                                                                "w-5 h-5 rounded border-2 border-gray-300 group-hover:border-blue-400 transition-colors"
+                                                                                                            }
+                                                                                                        }>
+                                                                                                            <Show when=move || is_selected()>
+                                                                                                                <svg class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                                                                                                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                                                                                                                </svg>
+                                                                                                            </Show>
+                                                                                                        </div>
+                                                                                                    }.into_view()
+                                                                                                } else {
+                                                                                                    view! {
+                                                                                                        <div class="w-5 h-5 rounded border-2 border-gray-300 bg-gray-100"></div>
+                                                                                                    }.into_view()
+                                                                                                }}
+                                                                                            </div>
+                                                                                            <div class="flex items-start gap-3">
+                                                                                                <span class="text-xs text-gray-500 font-medium mt-1 min-w-[1rem]">
+                                                                                                    {choice_number}
+                                                                                                </span>
+                                                                                                <span class=move || format!("leading-relaxed {}", font_settings.get().get_answer_classes())>
+                                                                                                    {option_clone.text.clone()}
+                                                                                                </span>
+                                                                                            </div>
                                                                                         </div>
-                                                                                        <div class="flex items-center space-x-2">
+                                                                                        <div class="flex items-center gap-2">
                                                                                             <span class=move || {
                                                                                                 if option_clone.points >= 0 {
-                                                                                                    "text-green-600 font-semibold"
+                                                                                                    "text-green-600 font-semibold text-sm"
                                                                                                 } else {
-                                                                                                    "text-red-600 font-semibold"
+                                                                                                    "text-red-600 font-semibold text-sm"
                                                                                                 }
                                                                                             }>
                                                                                                 {if option_clone.points >= 0 { "+" } else { "" }}
@@ -472,7 +842,7 @@ pub fn FlashCardSet() -> impl IntoView {
                                                                                             </span>
                                                                                             {if !option_clone.is_selectable {
                                                                                                 view! {
-                                                                                                    <span class="text-xs text-gray-500 italic">"(info only)"</span>
+                                                                                                    <span class="text-xs text-gray-400 italic">"(info only)"</span>
                                                                                                 }.into_view()
                                                                                             } else {
                                                                                                 view! { <span></span> }.into_view()
@@ -480,224 +850,230 @@ pub fn FlashCardSet() -> impl IntoView {
                                                                                         </div>
                                                                                     </div>
                                                                                 }
-                                                                            }
-                                                                        />
-                                                                    </div>
+                                                                            }).collect_view()}
+                                                                        </div>
 
-                                                                    // Show current score calculation
-                                                                    <div class="bg-gray-50 border border-gray-200 rounded p-3">
-                                                                        <div class="text-sm text-gray-700">
-                                                                            "Current selection score: "
-                                                                            <span class="font-semibold text-blue-600">
-                                                                                {move || {
-                                                                                    let selected = responses.with(|r| {
-                                                                                        r.get(&qnumber)
-                                                                                            .and_then(|resp| resp.selected_options.as_ref())
-                                                                                            .cloned()
-                                                                                            .unwrap_or_default()
-                                                                                    });
-                                                                                    q_clone_for_calc.calculate_weighted_score(&selected)
-                                                                                }}
-                                                                                " / " {q_point_value} " points"
-                                                                            </span>
+                                                                        <div class="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                                                                            <div class="text-sm text-gray-700">
+                                                                                "Current score: "
+                                                                                <span class="font-semibold text-indigo-600">
+                                                                                    {move || {
+                                                                                        let selected = responses.with(|r| {
+                                                                                            r.get(&qnumber)
+                                                                                                .and_then(|resp| resp.selected_options.as_ref())
+                                                                                                .cloned()
+                                                                                                .unwrap_or_default()
+                                                                                        });
+                                                                                        q_clone_for_calc.calculate_weighted_score(&selected)
+                                                                                    }}
+                                                                                    " / " {q_point_value} " points"
+                                                                                </span>
+                                                                            </div>
                                                                         </div>
                                                                     </div>
-                                                                </div>
+                                                                }
+                                                            }
+                                                            QuestionType::TrueFalse => {
+                                                                let qnumber = q.qnumber;
+                                                                let is_true = create_memo(move |_| {
+                                                                    responses.with(|r| {
+                                                                        r.get(&qnumber)
+                                                                         .map(|resp| resp.answer == "true")
+                                                                         .unwrap_or(false)
+                                                                    })
+                                                                });
+                                                                let is_false = create_memo(move |_| {
+                                                                    responses.with(|r| {
+                                                                        r.get(&qnumber)
+                                                                         .map(|resp| resp.answer == "false")
+                                                                         .unwrap_or(false)
+                                                                    })
+                                                                });
+
+                                                                view! {
+                                                                    <div class="flex gap-4">
+                                                                        <button
+                                                                            type="button"
+                                                                            class=move || format!("flex-1 py-3 px-4 rounded-lg font-medium transition-all duration-200 flex items-center justify-center gap-2 {}",
+                                                                                if is_true() {
+                                                                                    "bg-green-500 text-white shadow-lg transform scale-105"
+                                                                                } else {
+                                                                                    "bg-white text-gray-700 border-2 border-gray-200 hover:border-green-400 hover:bg-green-50"
+                                                                                }
+                                                                            )
+                                                                            on:click=move |_| {
+                                                                                handle_answer_change(qnumber, "true".to_string());
+                                                                            }
+                                                                        >
+                                                                            <span class="text-xs text-gray-500 font-medium">1</span>
+                                                                            <span class=move || font_settings.get().get_answer_classes()>
+                                                                                "True"
+                                                                            </span>
+                                                                        </button>
+                                                                        <button
+                                                                            type="button"
+                                                                            class=move || format!("flex-1 py-3 px-4 rounded-lg font-medium transition-all duration-200 flex items-center justify-center gap-2 {}",
+                                                                                if is_false() {
+                                                                                    "bg-red-500 text-white shadow-lg transform scale-105"
+                                                                                } else {
+                                                                                    "bg-white text-gray-700 border-2 border-gray-200 hover:border-red-400 hover:bg-red-50"
+                                                                                }
+                                                                            )
+                                                                            on:click=move |_| {
+                                                                                handle_answer_change(qnumber, "false".to_string());
+                                                                            }
+                                                                        >
+                                                                            <span class="text-xs text-gray-500 font-medium">2</span>
+                                                                            <span class=move || font_settings.get().get_answer_classes()>
+                                                                                "False"
+                                                                            </span>
+                                                                        </button>
+                                                                    </div>
+                                                                }
+                                                            }
+                                                            _ => {
+                                                                let qnumber = q.qnumber;
+                                                                let answer_value = create_memo(move |_| {
+                                                                    responses.with(|r| {
+                                                                        r.get(&qnumber)
+                                                                         .map(|resp| resp.answer.clone())
+                                                                         .unwrap_or_default()
+                                                                    })
+                                                                });
+
+                                                                view! {
+                                                                    <div>
+                                                                        <textarea
+                                                                            class=move || format!("w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none transition-all duration-200 {}",
+                                                                                font_settings.get().get_answer_classes())
+                                                                            prop:value=move || answer_value()
+                                                                            on:input=move |ev| {
+                                                                                let value = event_target_value(&ev);
+                                                                                handle_answer_change(qnumber, value);
+                                                                            }
+                                                                            placeholder="Type your answer here..."
+                                                                            rows="3"
+                                                                        ></textarea>
+                                                                    </div>
+                                                                }
                                                             }
                                                         }
-                                                        QuestionType::TrueFalse => {
-                                                            let qnumber = q.qnumber;
-                                                            let is_true = create_memo(move |_| {
-                                                                responses.with(|r| {
-                                                                    r.get(&qnumber)
-                                                                     .map(|resp| resp.answer == "true")
-                                                                     .unwrap_or(false)
-                                                                })
-                                                            });
-                                                            let is_false = create_memo(move |_| {
-                                                                responses.with(|r| {
-                                                                    r.get(&qnumber)
-                                                                     .map(|resp| resp.answer == "false")
-                                                                     .unwrap_or(false)
-                                                                })
-                                                            });
+                                                    }}
 
-                                                            view! {
-                                                                <div class="w-full flex flex-col sm:flex-row gap-4 items-center justify-center">
-                                                                    <button
-                                                                        type="button"
-                                                                        class="px-6 py-3 w-full rounded-lg font-medium text-center transition-colors"
-                                                                        class:bg-white={move || !is_true()}
-                                                                        class:text-gray-800={move || !is_true()}
-                                                                        class:border-gray-200={move || !is_true()}
-                                                                        class:border={move || !is_true()}
-                                                                        class:bg-green-500={move || is_true()}
-                                                                        class:text-white={move || is_true()}
-                                                                        class:border-transparent={move || is_true()}
-                                                                        on:click=move |_| {
-                                                                            handle_answer_change(qnumber, "true".to_string());
-                                                                        }
-                                                                    >
-                                                                        "Yes"
-                                                                    </button>
-                                                                    <button
-                                                                        type="button"
-                                                                        class="px-6 py-3 w-full rounded-lg font-medium text-center transition-colors"
-                                                                        class:bg-white={move || !is_false()}
-                                                                        class:text-gray-800={move || !is_false()}
-                                                                        class:border-gray-200={move || !is_false()}
-                                                                        class:border={move || !is_false()}
-                                                                        class:bg-red-500={move || is_false()}
-                                                                        class:text-white={move || is_false()}
-                                                                        class:border-transparent={move || is_false()}
-                                                                        on:click=move |_| {
-                                                                            handle_answer_change(qnumber, "false".to_string());
-                                                                        }
-                                                                    >
-                                                                        "No"
-                                                                    </button>
-                                                                </div>
-                                                            }
-                                                        },
-                                                        _ => {
-                                                            let qnumber = q.qnumber;
-                                                            let answer_value = create_memo(move |_| {
+                                                    {/* Comments Section - Compact */}
+                                                    <div class="border-t border-gray-100 pt-4">
+                                                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                                                            "Notes & Comments " <span class="text-xs text-gray-400">"(Press C to focus)"</span>
+                                                        </label>
+                                                        {move || {
+                                                            let qnumber = current_question().qnumber;
+
+                                                            // Create a memo for the comment value to prevent unnecessary re-renders
+                                                            let comment_value = create_memo(move |_| {
                                                                 responses.with(|r| {
                                                                     r.get(&qnumber)
-                                                                     .map(|resp| resp.answer.clone())
+                                                                     .map(|resp| resp.comment.clone())
                                                                      .unwrap_or_default()
                                                                 })
                                                             });
 
                                                             view! {
-                                                                <div>
-                                                                    <textarea
-                                                                        class="w-full p-3 border border-gray-200 rounded-lg focus:ring-blue-500 focus:border-blue-500"
-                                                                        prop:value=move || answer_value()
-                                                                        on:input=move |ev| {
-                                                                            let value = event_target_value(&ev);
-                                                                            handle_answer_change(qnumber, value);
-                                                                        }
-                                                                        placeholder="Enter your answer here..."
-                                                                        rows="3"
-                                                                    ></textarea>
-                                                                </div>
+                                                                <textarea
+                                                                    class="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none transition-all duration-200 text-sm"
+                                                                    prop:value=move || comment_value()
+                                                                    on:input=move |ev| {
+                                                                        let value = event_target_value(&ev);
+                                                                        handle_comment_change(qnumber, value);
+                                                                    }
+                                                                    placeholder="Add any notes or observations about this question..."
+                                                                    rows="2"
+                                                                ></textarea>
                                                             }
-                                                        }
-                                                    }
-                                                }}
-                                            </div>
-
-                                            {/* Comments Section - THIS NEEDS SPECIAL ATTENTION TO FIX THE FOCUS ISSUE */}
-                                            <div class="w-full mt-4">
-                                                <label class="block text-sm font-medium text-gray-700 mb-2">
-                                                    "Comments:"
-                                                </label>
-                                                {move || {
-                                                    let qnumber = current_question().qnumber;
-
-                                                    // Create a memo for the comment value to prevent unnecessary re-renders
-                                                    let comment_value = create_memo(move |_| {
-                                                        responses.with(|r| {
-                                                            r.get(&qnumber)
-                                                             .map(|resp| resp.comment.clone())
-                                                             .unwrap_or_default()
-                                                        })
-                                                    });
-
-                                                    view! {
-                                                        <textarea
-                                                            class="w-full p-3 border border-gray-200 rounded-lg focus:ring-blue-500 focus:border-blue-500"
-                                                            prop:value=move || comment_value()
-                                                            on:input=move |ev| {
-                                                                let value = event_target_value(&ev);
-                                                                handle_comment_change(qnumber, value);
-                                                            }
-                                                            placeholder="Add any comments or notes here..."
-                                                            rows="2"
-                                                        ></textarea>
-                                                    }
-                                                }}
+                                                        }}
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
-                                </div>
 
-                                {/* Navigation Buttons */}
-                                <div class="flex flex-wrap items-center justify-center gap-4 mt-8">
-                                    <button
-                                        class="flex items-center justify-center px-5 py-2 bg-white border border-gray-200 rounded-lg shadow-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                        disabled=move || current_card_index.get() == 0
-                                        on:click=go_to_previous_card
-                                    >
-                                        <span class="mr-1">"←"</span>
-                                        "Previous"
-                                    </button>
+                                    {/* Navigation - Compact */}
+                                    <div class="flex items-center justify-center gap-4 pt-4">
+                                        <button
+                                            class="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-sm"
+                                            disabled=move || current_card_index.get() == 0
+                                            on:click=go_to_previous_card
+                                        >
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                                            </svg>
+                                            "Previous"
+                                        </button>
 
-                                    {move || {
-                                        if current_card_index.get() == total_questions - 1 {
-                                            view! {
-                                                <Show when=move || !is_submitted.get()>
+                                        {move || {
+                                            if current_card_index.get() == total_questions - 1 {
+                                                view! {
+                                                    <Show when=move || !is_submitted.get() fallback=move || view! {
+                                                        <button
+                                                            class="flex items-center gap-2 px-6 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
+                                                            on:click=move |_| {
+                                                                let navigate=leptos_router::use_navigate();
+                                                                navigate("/dashboard", Default::default());
+                                                            }
+                                                        >
+                                                            "Return to Dashboard"
+                                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+                                                            </svg>
+                                                        </button>
+                                                    }>
+                                                        <button
+                                                            class="flex items-center gap-2 px-6 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                                                            on:click=move |_| {
+                                                                handle_submit.dispatch(());
+                                                                set_is_submitted.set(true);
+                                                            }
+                                                            disabled=move || selected_student_id.get().is_none()
+                                                        >
+                                                            "Submit Assessment"
+                                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                                            </svg>
+                                                        </button>
+                                                    </Show>
+                                                }.into_view()
+                                            } else {
+                                                view! {
                                                     <button
-                                                        class="flex items-center justify-center px-5 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg shadow-sm hover:from-blue-700 hover:to-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                                        on:click=move |_| {
-                                                            handle_submit.dispatch(());
-                                                            set_is_submitted.set(true);
-                                                        }
-                                                        disabled=move || selected_student_id.get().is_none()
-                                                    >
-                                                        "Submit Assessment"
-                                                        <span class="ml-1">"✓"</span>
-                                                    </button>
-                                                </Show>
-                                            }.into_view()
-                                        } else {
-                                            view! {
-                                                <div>
-                                                    <button
-                                                        class="flex items-center justify-center px-5 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg shadow-sm hover:from-blue-700 hover:to-purple-700 transition-colors"
+                                                        class="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
                                                         on:click=go_to_next_card
                                                     >
                                                         "Next"
-                                                        <span class="ml-1">"→"</span>
+                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                                                        </svg>
                                                     </button>
-                                                </div>
-                                            }.into_view()
-                                        }
-                                    }}
-                                </div>
+                                                }.into_view()
+                                            }
+                                        }}
+                                    </div>
 
-                                {/* Submission Status */}
-                                {move || {
-                                    if is_submitted.get() {
-                                        view! {
-                                            <div class="mt-8 text-center">
-                                                <div class="inline-flex items-center px-4 py-2 rounded-full bg-green-100 text-green-800 mb-4">
-                                                    <span class="mr-2">"✓"</span>
-                                                    "Assessment submitted successfully!"
-                                                </div>
-                                                <div>
-                                                    <button
-                                                        class="px-5 py-2 mt-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-colors"
-                                                        on:click=move |_| {
-                                                            let navigate=leptos_router::use_navigate();
-                                                            navigate("/dashboard", Default::default());
-                                                        }
-                                                    >
-                                                        "Return to Dashboard"
-                                                    </button>
-                                                </div>
+                                    {/* Success Message */}
+                                    <Show when=move || is_submitted.get()>
+                                        <div class="text-center pt-4">
+                                            <div class="inline-flex items-center gap-3 px-6 py-3 bg-green-50 border border-green-200 rounded-lg text-green-800">
+                                                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                                                </svg>
+                                                "Assessment submitted successfully!"
                                             </div>
-                                        }
-                                    } else {
-                                        view! {<div></div>}
-                                    }
-                                }}
-                            </div>
-                        }.into_view()
-                    }
-                }}
-            </Suspense>
+                                        </div>
+                                    </Show>
+                                </div>
+                            }.into_view()
+                        }
+                    }}
+                </Suspense>
+            </div>
         </div>
     }
 }
@@ -758,18 +1134,17 @@ pub fn StudentSelect(set_selected_student_id: WriteSignal<Option<i32>>) -> impl 
     });
 
     view! {
-        <div class="mb-2 max-w-[20rem]">
-            <label class="block text-sm font-medium mb-1">"Select Student:"</label>
+        <div class="min-w-[200px]">
             <select
-                class="w-full p-2 border rounded-md"
+                class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-all duration-200"
                 on:change=move |ev| {
                     let value = event_target_value(&ev).parse().ok();
                     set_selected_student_id.set(value);
                 }
             >
-                <option value="">"Select a student..."</option>
+                <option value="">"Select student..."</option>
                 <Suspense fallback=move || view! {
-                    <option>"Loading students..."</option>
+                    <option>"Loading..."</option>
                 }>
                     {move || {
                         enhanced_students().into_iter().map(|(student, de_anon_opt)| {

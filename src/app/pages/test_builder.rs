@@ -5,17 +5,21 @@ use crate::app::models::assessment::ScopeEnum;
 use crate::app::models::student::GradeEnum;
 use crate::app::models::test::BenchmarkCategory;
 use crate::app::models::test::{CreateNewTestRequest, Test, TestType, UpdateTestRequest};
-use crate::app::models::{CreateNewQuestionRequest, Question, QuestionType};
+use crate::app::models::{CreateNewQuestionRequest, Question, QuestionType, WeightedOption};
 use crate::app::server_functions::assessments::update_assessment_score;
 use crate::app::server_functions::courses::get_courses;
 use crate::app::server_functions::questions::{add_question, delete_questions, get_questions};
 use crate::app::server_functions::tests::get_tests;
 use crate::app::server_functions::tests::{add_test, get_test, score_overrider, update_test};
+use crate::app::utils::BenchmarkUtils;
 use leptos::prelude::*;
 use leptos::*;
 use leptos_router::*;
 use std::str::FromStr;
 use strum::IntoEnumIterator;
+
+#[cfg(feature = "hydrate")]
+use leptos::wasm_bindgen::JsCast;
 
 #[component]
 pub fn TestBuilder() -> impl IntoView {
@@ -105,6 +109,12 @@ pub fn TestBuilderContent() -> impl IntoView {
     let (scope, set_scope) = create_signal::<Option<ScopeEnum>>(None);
     let (course_id, set_course_id) = create_signal::<Option<i32>>(None);
 
+    //Signal to track which question to autofocus
+    let (auto_focus_question, set_auto_focus_question) = create_signal::<Option<i32>>(None);
+    let (default_point_value, set_default_point_value) = create_signal::<Option<i32>>(None);
+    let (default_question_type, set_default_question_type) =
+        create_signal::<Option<QuestionType>>(None);
+
     //Signals for TestVariation Management
     let (is_variation, set_is_variation) = create_signal(false);
     let (base_test_name, set_base_test_name) = create_signal(String::new());
@@ -116,6 +126,8 @@ pub fn TestBuilderContent() -> impl IntoView {
     let (is_submitting, set_is_submitting) = create_signal(false);
 
     let (questions, set_questions) = create_signal(Vec::<Question>::new());
+
+    let (force_update_key, set_force_update_key) = create_signal(0);
 
     // Resource to load questions when in edit mode
     let questions_resource = create_resource(
@@ -135,18 +147,73 @@ pub fn TestBuilderContent() -> impl IntoView {
     );
 
     let add_new_question = move |_| {
+        let new_question_number = questions().len() + 1;
         set_questions.update(|qs| {
-            let new_question = Question::new(
+            // Use the default question type if set, otherwise fall back to MultipleChoice
+            let question_type = default_question_type
+                .get()
+                .unwrap_or(QuestionType::MultipleChoice);
+
+            let mut new_question = Question::new(
                 String::new(),
-                0,
-                QuestionType::Selection,
-                Vec::new(),
+                default_point_value.get().unwrap_or(1),
+                question_type.clone(), // Use the variable directly
+                vec![],
                 String::new(),
-                (qs.len() + 1) as i32, // Use 1-based indexing for question numbers
+                new_question_number as i32,
                 test_id(),
             );
+
+            // Set up initial options based on the ACTUAL question type being used
+            match question_type {
+                QuestionType::MultipleChoice => {
+                    new_question.options = vec!["".to_string(), "".to_string()];
+                    new_question.correct_answer = "".to_string();
+                    new_question.weighted_options = None;
+                }
+                QuestionType::TrueFalse => {
+                    new_question.options = vec!["true".to_string(), "false".to_string()];
+                    new_question.correct_answer = "true".to_string();
+                    new_question.weighted_options = None;
+                }
+                QuestionType::WeightedMultipleChoice => {
+                    new_question.options = Vec::new();
+                    new_question.correct_answer = String::new();
+                    let default_weighted_options = vec![
+                        WeightedOption::new("".to_string(), 1, true),
+                        WeightedOption::new("".to_string(), 1, true),
+                    ];
+                    new_question.set_weighted_options(default_weighted_options);
+                }
+                _ => {
+                    // Fallback for any other types
+                    new_question.options = vec!["".to_string(), "".to_string()];
+                    new_question.correct_answer = "".to_string();
+                    new_question.weighted_options = None;
+                }
+            }
+
             qs.push(new_question);
         });
+
+        // Focus logic remains the same
+        #[cfg(feature = "hydrate")]
+        {
+            request_animation_frame(move || {
+                set_auto_focus_question(Some(new_question_number as i32));
+            });
+        }
+        #[cfg(not(feature = "hydrate"))]
+        {
+            set_auto_focus_question(Some(new_question_number as i32));
+        }
+    };
+
+    let clear_auto_focus = move |question_number: i32| {
+        // Only clear if this is the currently focused question
+        if auto_focus_question() == Some(question_number) {
+            set_auto_focus_question(None);
+        }
     };
 
     let update_question = move |index: usize, updated_question: Question| {
@@ -218,6 +285,16 @@ pub fn TestBuilderContent() -> impl IntoView {
         },
     );
 
+    //Helper to display benchmark categories in test summary
+    let benchmark_summary = move || {
+        if benchmark_categories().is_empty() {
+            "No benchmark categories defined".to_string()
+        } else {
+            let temp_categories = BenchmarkUtils::from_tuples(benchmark_categories());
+            BenchmarkUtils::format_summary(&temp_categories)
+        }
+    };
+
     // Effect to load test data when a test_id is available
     create_effect(move |_| {
         if let Some(Some(test)) = test_resource.get() {
@@ -233,13 +310,9 @@ pub fn TestBuilderContent() -> impl IntoView {
             set_course_id(test.course_id.clone());
             set_test_instructions(test.instructions.clone().unwrap_or_default());
 
-            // Convert BenchmarkCategory to our internal tuple representation
+            // Convert BenchmarkCategory to our internal tuple representation using utilities
             let categories = test.benchmark_categories.clone().unwrap_or_default();
-            let tuple_categories = categories
-                .iter()
-                .enumerate()
-                .map(|(idx, cat)| (idx as i32, cat.min, cat.max, cat.label.clone()))
-                .collect::<Vec<_>>();
+            let tuple_categories = BenchmarkUtils::to_tuples(categories);
             set_benchmark_categories(tuple_categories);
         }
     });
@@ -288,6 +361,48 @@ pub fn TestBuilderContent() -> impl IntoView {
                     set_variation_type_display(variation_part.to_string());
                 }
             }
+        }
+    });
+
+    create_effect(move |_| {
+        #[cfg(feature = "hydrate")]
+        {
+            use wasm_bindgen::prelude::*;
+            use wasm_bindgen::JsCast;
+            use web_sys::KeyboardEvent;
+
+            let handle_keydown = Closure::wrap(Box::new(move |event: KeyboardEvent| {
+                // Check if we're on the questions tab (tab 1)
+                if selected_tab() == 1 {
+                    // Check for Ctrl++ (Ctrl + Plus/Equal key)
+                    if event.ctrl_key() && (event.key() == "+" || event.key() == "=") {
+                        event.prevent_default();
+                        add_new_question(());
+                    }
+                }
+            }) as Box<dyn FnMut(KeyboardEvent)>);
+
+            let window = web_sys::window().unwrap();
+
+            // Convert the closure to a Function - use into() instead of unchecked_into on reference
+            let function = handle_keydown.as_ref().unchecked_ref::<js_sys::Function>();
+            window
+                .add_event_listener_with_callback("keydown", function)
+                .unwrap();
+
+            // Store the closure
+            let stored_closure = store_value(handle_keydown);
+
+            // Cleanup function
+            on_cleanup(move || {
+                let window = web_sys::window().unwrap();
+                stored_closure.with_value(|closure| {
+                    let function = closure.as_ref().unchecked_ref::<js_sys::Function>();
+                    window
+                        .remove_event_listener_with_callback("keydown", function)
+                        .unwrap();
+                });
+            });
         }
     });
 
@@ -392,16 +507,22 @@ pub fn TestBuilderContent() -> impl IntoView {
         let converted_cats = if benchmark_categories().is_empty() {
             None
         } else {
-            Some(
-                benchmark_categories()
-                    .iter()
-                    .map(|(_, min, max, label)| BenchmarkCategory {
-                        min: *min,
-                        max: *max,
-                        label: label.clone(),
-                    })
-                    .collect::<Vec<BenchmarkCategory>>(),
-            )
+            // Convert tuples to BenchmarkCategory objects
+            let temp_categories = BenchmarkUtils::from_tuples(benchmark_categories());
+
+            // Validate all categories
+            match BenchmarkUtils::validate_all(&temp_categories) {
+                Ok(_) => Some(temp_categories),
+                Err(validation_error) => {
+                    set_show_error(true);
+                    set_error_message(format!(
+                        "Benchmark category validation failed: {}",
+                        validation_error
+                    ));
+                    set_is_submitting(false);
+                    return;
+                }
+            }
         };
 
         // Convert scope back to Enum and course_id to i32
@@ -938,9 +1059,11 @@ pub fn TestBuilderContent() -> impl IntoView {
                                         key=|(id, _, _, _)| *id
                                         children=move |(id, min_score, max_score, label): (i32, i32, i32, String)| {
                                             let id_clone = id;
+                                            let (is_single_value, set_is_single_value) = create_signal(min_score == max_score);
+
                                             view! {
                                                 <div class="flex items-center space-x-3">
-                                                    <div class="flex-1 grid grid-cols-3 gap-3">
+                                                    <div class="flex-1 grid grid-cols-4 gap-3">
                                                         <input
                                                             type="text"
                                                             placeholder="Category (e.g. A+)"
@@ -955,41 +1078,108 @@ pub fn TestBuilderContent() -> impl IntoView {
                                                                 });
                                                             }
                                                         />
-                                                        <div class="flex items-center">
-                                                            <input
-                                                                type="number"
-                                                                placeholder="Min"
-                                                                min="0"
-                                                                class="w-full px-3 py-2 rounded-l border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                                                value=min_score.to_string()
-                                                                on:input=move |ev| {
-                                                                    if let Ok(new_min) = event_target_value(&ev).parse::<i32>() {
+
+                                                        // Toggle between single value and range
+                                                        <div class="flex items-center space-x-2">
+                                                            <label class="flex items-center space-x-1 text-sm">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                                    checked=is_single_value.get()
+                                                                    on:change=move |ev| {
+                                                                        let checked = event_target_checked(&ev);
+                                                                        set_is_single_value.set(checked);
+
                                                                         set_benchmark_categories.update(|cats| {
                                                                             if let Some(cat) = cats.iter_mut().find(|(cid, _, _, _)| *cid == id) {
-                                                                                cat.1 = new_min;
+                                                                                if checked {
+                                                                                    // Convert to single value - use min as the single value
+                                                                                    cat.2 = cat.1; // max = min
+                                                                                } else {
+                                                                                    // Convert to range - ensure max >= min
+                                                                                    if cat.2 <= cat.1 {
+                                                                                        cat.2 = cat.1 + 10; // Set a reasonable default range
+                                                                                    }
+                                                                                }
                                                                             }
                                                                         });
                                                                     }
-                                                                }
-                                                            />
-                                                            <span class="px-2 py-2 bg-gray-200 border-t border-b border-gray-300">-</span>
-                                                            <input
-                                                                type="number"
-                                                                placeholder="Max"
-                                                                min="0"
-                                                                class="w-full px-3 py-2 rounded-r border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                                                value=max_score.to_string()
-                                                                on:input=move |ev| {
-                                                                    if let Ok(new_max) = event_target_value(&ev).parse::<i32>() {
-                                                                        set_benchmark_categories.update(|cats| {
-                                                                            if let Some(cat) = cats.iter_mut().find(|(cid, _, _, _)| *cid == id) {
-                                                                                cat.2 = new_max;
-                                                                            }
-                                                                        });
-                                                                    }
-                                                                }
-                                                            />
+                                                                />
+                                                                <span>"Single Value"</span>
+                                                            </label>
                                                         </div>
+
+                                                        // Input fields that change based on single value vs range
+                                                        {move || {
+                                                            if is_single_value.get() {
+                                                                // Single value input
+                                                                view! {
+                                                                    <div class="col-span-2">
+                                                                        <input
+                                                                            type="number"
+                                                                            placeholder="Value"
+                                                                            min="0"
+                                                                            class="w-full px-3 py-2 rounded border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                                            value=min_score.to_string()
+                                                                            on:input=move |ev| {
+                                                                                if let Ok(new_value) = event_target_value(&ev).parse::<i32>() {
+                                                                                    set_benchmark_categories.update(|cats| {
+                                                                                        if let Some(cat) = cats.iter_mut().find(|(cid, _, _, _)| *cid == id) {
+                                                                                            cat.1 = new_value; // min
+                                                                                            cat.2 = new_value; // max = min for single value
+                                                                                        }
+                                                                                    });
+                                                                                }
+                                                                            }
+                                                                        />
+                                                                    </div>
+                                                                }.into_view()
+                                                            } else {
+                                                                // Range inputs
+                                                                view! {
+                                                                    <div class="col-span-2 flex items-center">
+                                                                        <input
+                                                                            type="number"
+                                                                            placeholder="Min"
+                                                                            min="0"
+                                                                            class="w-full px-3 py-2 rounded-l border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                                            value=min_score.to_string()
+                                                                            on:input=move |ev| {
+                                                                                if let Ok(new_min) = event_target_value(&ev).parse::<i32>() {
+                                                                                    set_benchmark_categories.update(|cats| {
+                                                                                        if let Some(cat) = cats.iter_mut().find(|(cid, _, _, _)| *cid == id) {
+                                                                                            cat.1 = new_min;
+                                                                                            // Ensure max is at least equal to min
+                                                                                            if cat.2 < new_min {
+                                                                                                cat.2 = new_min;
+                                                                                            }
+                                                                                        }
+                                                                                    });
+                                                                                }
+                                                                            }
+                                                                        />
+                                                                        <span class="px-2 py-2 bg-gray-200 border-t border-b border-gray-300">-</span>
+                                                                        <input
+                                                                            type="number"
+                                                                            placeholder="Max"
+                                                                            min=min_score.to_string()
+                                                                            class="w-full px-3 py-2 rounded-r border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                                            value=max_score.to_string()
+                                                                            on:input=move |ev| {
+                                                                                if let Ok(new_max) = event_target_value(&ev).parse::<i32>() {
+                                                                                    set_benchmark_categories.update(|cats| {
+                                                                                        if let Some(cat) = cats.iter_mut().find(|(cid, _, _, _)| *cid == id) {
+                                                                                            // Ensure max is at least equal to min
+                                                                                            cat.2 = if new_max >= cat.1 { new_max } else { cat.1 };
+                                                                                        }
+                                                                                    });
+                                                                                }
+                                                                            }
+                                                                        />
+                                                                    </div>
+                                                                }.into_view()
+                                                            }
+                                                        }}
                                                     </div>
                                                     <button
                                                         type="button"
@@ -1010,22 +1200,51 @@ pub fn TestBuilderContent() -> impl IntoView {
                                     />
 
                                     // Add new category button
-                                    <button
-                                        type="button"
-                                        class="flex items-center px-4 py-2 text-sm font-medium text-blue-700 bg-blue-50 border border-blue-300 rounded-md hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                                        on:click=move |_| {
-                                            set_benchmark_categories.update(|cats| {
-                                                // Generate a unique ID for the new category
-                                                let new_id = cats.iter().map(|(id, _, _, _)| *id).max().unwrap_or(0) + 1;
-                                                cats.push((new_id, 0, 0, String::new()));
-                                            });
-                                        }
-                                    >
-                                        <svg class="w-4 h-4 mr-2" viewBox="0 0 20 20" fill="currentColor">
-                                            <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" />
-                                        </svg>
-                                        "Add Benchmark Category"
-                                    </button>
+                                    <div class="flex space-x-2">
+                                        <button
+                                            type="button"
+                                            class="flex items-center px-4 py-2 text-sm font-medium text-blue-700 bg-blue-50 border border-blue-300 rounded-md hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                            on:click=move |_| {
+                                                set_benchmark_categories.update(|cats| {
+                                                    // Generate a unique ID for the new category
+                                                    let new_id = cats.iter().map(|(id, _, _, _)| *id).max().unwrap_or(0) + 1;
+                                                    cats.push((new_id, 0, 10, String::new())); // Default range
+                                                });
+                                            }
+                                        >
+                                            <svg class="w-4 h-4 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                                                <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" />
+                                            </svg>
+                                            "Add Range Category"
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            class="flex items-center px-4 py-2 text-sm font-medium text-green-700 bg-green-50 border border-green-300 rounded-md hover:bg-green-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                                            on:click=move |_| {
+                                                set_benchmark_categories.update(|cats| {
+                                                    // Generate a unique ID for the new category
+                                                    let new_id = cats.iter().map(|(id, _, _, _)| *id).max().unwrap_or(0) + 1;
+                                                    cats.push((new_id, 0, 0, String::new())); // Single value (min = max)
+                                                });
+                                            }
+                                        >
+                                            <svg class="w-4 h-4 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                                                <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" />
+                                            </svg>
+                                            "Add Single Value"
+                                        </button>
+                                    </div>
+
+                                    // Help text
+                                    <div class="text-xs text-gray-600 bg-blue-50 p-3 rounded border-l-4 border-blue-400">
+                                        <p class="font-medium mb-1">Usage Examples:</p>
+                                        <ul class="space-y-1">
+                                            <li>"•" <strong>Range:</strong> "B" with 70-79 (students scoring 70-79 get a B)</li>
+                                            <li>"•" <strong>Single Value:</strong> "Perfect" with 100 (only students scoring exactly 100 get "Perfect")</li>
+                                            <li>"•" <strong>Mixed:</strong> You can have both ranges and single values in the same test</li>
+                                        </ul>
+                                    </div>
                                 </div>
                             </div>
 
@@ -1096,24 +1315,212 @@ pub fn TestBuilderContent() -> impl IntoView {
                     }.into_any(),
                     1 => view!{
                         <div class="space-y-8">
-                            <div class="flex justify-end">
-                                <button
-                                    class="flex items-center px-5 py-2 bg-[#00356b] text-white rounded-md font-medium shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all"
-                                    on:click=add_new_question
-                                >
-                                    <svg class="w-5 h-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-                                        <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" />
-                                    </svg>
-                                    "Add New Question"
-                                </button>
+                            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                                <div class="flex justify-between items-center mb-4">
+                                    <h3 class="text-lg font-medium text-gray-800">"Question Management"</h3>
+                                    <div class="flex items-center space-x-4">
+                                        <div class="text-sm text-gray-600">
+                                            <span class="font-medium">
+                                                {move || {
+                                                    let count = questions().len();
+                                                    let total = questions().iter().map(|q| q.point_value).sum::<i32>();
+                                                    format!("{} questions • {} total points", count, total)
+                                                }}
+                                            </span>
+                                        </div>
+                                        <button
+                                            class="flex items-center px-4 py-2 bg-[#00356b] text-white rounded-md font-medium shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all"
+                                            on:click=move |_| add_new_question(())
+                                            title="Add New Question (Ctrl + +)"
+                                        >
+                                            <svg class="w-5 h-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                                                <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" />
+                                            </svg>
+                                            "Add Question"
+                                            <span class="ml-2 text-xs opacity-75 bg-blue-600 px-2 py-1 rounded">
+                                                "Ctrl + +"
+                                            </span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                // Preset controls section
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                                    // Point value preset
+                                    <div class="flex items-center space-x-2">
+                                        <label class="text-sm text-gray-600 whitespace-nowrap">"Set all points to:"</label>
+                                        <select
+                                            class="flex-1 px-3 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500"
+                                            prop:value=move || default_point_value().map(|p| p.to_string()).unwrap_or_default()
+                                            on:change=move |event| {
+                                                let value = event_target_value(&event);
+                                                if !value.is_empty() {
+                                                    if let Ok(points) = value.parse::<i32>() {
+                                                        // Set the default for new questions
+                                                        set_default_point_value(Some(points));
+
+                                                        // Update existing questions
+                                                        set_questions.update(|qs| {
+                                                            for q in qs.iter_mut() {
+                                                                q.point_value = points;
+                                                            }
+                                                        });
+                                                        // Force re-render by updating the key
+                                                        set_force_update_key.update(|k| *k += 1);
+                                                    }
+                                                } else {
+                                                    // Clear default when "Select..." is chosen
+                                                    set_default_point_value(None);
+                                                }
+                                            }
+                                        >
+                                            <option value="">"Select..."</option>
+                                            <option value="1">"1 point"</option>
+                                            <option value="2">"2 points"</option>
+                                            <option value="3">"3 points"</option>
+                                            <option value="5">"5 points"</option>
+                                            <option value="10">"10 points"</option>
+                                        </select>
+                                        {move || {
+                                            if let Some(points) = default_point_value() {
+                                                view! {
+                                                    <span class="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded whitespace-nowrap">
+                                                        "New: " {points} " pts"
+                                                    </span>
+                                                }.into_view()
+                                            } else {
+                                                view! { <div></div> }.into_view()
+                                            }
+                                        }}
+                                    </div>
+
+                                    // Question type preset
+                                    <div class="flex items-center space-x-2">
+                                        <label class="text-sm text-gray-600 whitespace-nowrap">"Default question type:"</label>
+                                        <select
+                                            class="flex-1 px-3 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500"
+                                            prop:value=move || {
+                                                default_question_type().map(|qt| {
+                                                    match qt {
+                                                        QuestionType::MultipleChoice => "MultipleChoice",
+                                                        QuestionType::TrueFalse => "TrueFalse",
+                                                        QuestionType::WeightedMultipleChoice => "WeightedMultipleChoice",
+                                                        _ => "MultipleChoice"
+                                                    }
+                                                }).unwrap_or("")
+                                            }
+                                            on:change=move |event| {
+                                                let value = event_target_value(&event);
+                                                if !value.is_empty() {
+                                                    let question_type = match value.as_str() {
+                                                        "MultipleChoice" => QuestionType::MultipleChoice,
+                                                        "TrueFalse" => QuestionType::TrueFalse,
+                                                        "WeightedMultipleChoice" => QuestionType::WeightedMultipleChoice,
+                                                        _ => QuestionType::MultipleChoice,
+                                                    };
+                                                    set_default_question_type(Some(question_type));
+                                                } else {
+                                                    set_default_question_type(None);
+                                                }
+                                            }
+                                        >
+                                            <option value="">"Select..."</option>
+                                            <option value="MultipleChoice">"Multiple Choice"</option>
+                                            <option value="TrueFalse">"True/False"</option>
+                                            <option value="WeightedMultipleChoice">"Weighted Multiple Choice"</option>
+                                        </select>
+                                        {move || {
+                                            if let Some(qt) = default_question_type() {
+                                                let display_name = match qt {
+                                                    QuestionType::MultipleChoice => "MC",
+                                                    QuestionType::TrueFalse => "T/F",
+                                                    QuestionType::WeightedMultipleChoice => "WMC",
+                                                    _ => "MC"
+                                                };
+                                                view! {
+                                                    <span class="text-xs text-green-600 bg-green-50 px-2 py-1 rounded whitespace-nowrap">
+                                                        "New: " {display_name}
+                                                    </span>
+                                                }.into_view()
+                                            } else {
+                                                view! { <div></div> }.into_view()
+                                            }
+                                        }}
+                                    </div>
+                                </div>
+
+                                // Help text for the preset controls
+                                <div class="mt-3 text-xs text-gray-600 bg-blue-50 p-3 rounded border-l-4 border-blue-400">
+                                    <p class="font-medium mb-1">Quick Setup Tips:</p>
+                                    <ul class="space-y-1">
+                                        <li>"•" <strong>Points:</strong> " Sets point value for all questions (existing + new)"</li>
+                                        <li>"•" <strong>Default Type:</strong> " Sets question type for newly added questions"</li>
+                                    </ul>
+                                </div>
                             </div>
 
-                            <div class="space-y-8">
+                            // Show message if no questions exist
+                            <Show when=move || questions().is_empty()>
+                                <div class="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+                                    <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                    </svg>
+                                    <h3 class="mt-2 text-sm font-medium text-gray-900">"No questions added yet"</h3>
+                                    <p class="mt-1 text-sm text-gray-500">
+                                        {move || {
+                                            if let Some(qt) = default_question_type() {
+                                                let type_name = match qt {
+                                                    QuestionType::MultipleChoice => "Multiple Choice",
+                                                    QuestionType::TrueFalse => "True/False",
+                                                    QuestionType::WeightedMultipleChoice => "Weighted Multiple Choice",
+                                                    _ => "Multiple Choice"
+                                                };
+                                                format!("New questions will be {} type.", type_name)
+                                            } else {
+                                                "Get started by adding your first question.".to_string()
+                                            }
+                                        }}
+                                    </p>
+                                    <div class="mt-6">
+                                        <button
+                                            class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-[#00356b] hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                            on:click=move |_| add_new_question(())
+                                            title="Add Question (Ctrl + +)"
+                                        >
+                                            <svg class="-ml-1 mr-2 h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                                <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" />
+                                            </svg>
+                                            "Add Question"
+                                            <span class="ml-2 text-xs opacity-75 bg-blue-600 px-2 py-1 rounded">
+                                                "Ctrl + +"
+                                            </span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </Show>
+
+                            // Existing questions list
+                            <div class="space-y-6">
                                 <For
-                                    each=move || questions.get()
-                                    key=|question| question.qnumber
-                                    children=move |question: Question| {
-                                        let index= questions.get().iter().position(|q| q.qnumber == question.qnumber).unwrap_or(0);
+                                    each={move || questions.get().into_iter().enumerate().collect::<Vec<_>>()}
+                                    key={move |(index, question)| (*index, question.qnumber, force_update_key.get())}
+                                    children={move |(index, question): (usize, Question)| {
+                                        // Create duplicate callback
+                                        let duplicate_question = move |q: Question| {
+                                            set_questions.update(|qs| {
+                                                let mut new_q = q.clone();
+                                                new_q.qnumber = (qs.len() + 1) as i32;
+                                                new_q.word_problem = if new_q.word_problem.is_empty() {
+                                                    "Copy of question".to_string()
+                                                } else {
+                                                    format!("{} (Copy)", new_q.word_problem)
+                                                };
+                                                // Reset the test linker to current test
+                                                new_q.testlinker = test_id();
+                                                qs.push(new_q);
+                                            });
+                                        };
+
                                         view! {
                                             <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
                                                 <div class="bg-gray-50 px-4 py-2 border-b border-gray-200">
@@ -1124,36 +1531,50 @@ pub fn TestBuilderContent() -> impl IntoView {
                                                         initial_question=question.clone()
                                                         on_update=Callback::new(move |updated_q| update_question(index, updated_q))
                                                         on_remove=Callback::new(move |_| remove_question(index))
+                                                        on_duplicate=Some(Callback::new(duplicate_question))
+                                                        should_auto_focus={
+                                                            let current_question_number = question.qnumber;
+                                                            create_memo(move |_| auto_focus_question() == Some(current_question_number))
+                                                        }
+                                                        on_focus_complete=Callback::new(move |_| clear_auto_focus(question.qnumber))
                                                     />
                                                 </div>
                                             </div>
                                         }
-                                    }
+                                    }}
                                 />
                             </div>
 
-                            <div class="flex justify-between pt-6">
+                            // Bottom actions
+                            <div class="flex justify-between items-center pt-6 border-t">
                                 <button
                                     class="flex items-center px-5 py-2 bg-[#00356b] text-white rounded-md font-medium shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all"
-                                    on:click=add_new_question
+                                    on:click=move |_| add_new_question(())
+                                    title="Add Another Question (Ctrl + +)"
                                 >
                                     <svg class="w-5 h-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
                                         <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" />
                                     </svg>
-                                    "Add New Question"
+                                    "Add Another Question"
+                                    <span class="ml-2 text-xs opacity-75 bg-blue-600 px-2 py-1 rounded">
+                                        "Ctrl + +"
+                                    </span>
                                 </button>
-                                <button
-                                    class="px-5 py-2 bg-gray-100 text-gray-700 rounded-md font-medium hover:bg-gray-200 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-all"
-                                    on:click=move |_| set_selected_tab.set(0)
-                                >
-                                    "Back to Test Details"
-                                </button>
-                                <button
-                                    class="px-5 py-2 bg-[#00356b] text-white rounded-md font-medium shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all"
-                                    on:click=move |_| set_selected_tab.set(2)
-                                >
-                                    "Continue to Review"
-                                </button>
+
+                                <div class="flex space-x-3">
+                                    <button
+                                        class="px-5 py-2 bg-gray-100 text-gray-700 rounded-md font-medium hover:bg-gray-200 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-all"
+                                        on:click=move |_| set_selected_tab.set(0)
+                                    >
+                                        "Back to Test Details"
+                                    </button>
+                                    <button
+                                        class="px-5 py-2 bg-[#00356b] text-white rounded-md font-medium shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all"
+                                        on:click=move |_| set_selected_tab.set(2)
+                                    >
+                                        "Continue to Review"
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     }.into_any(),
@@ -1182,6 +1603,10 @@ pub fn TestBuilderContent() -> impl IntoView {
                                             <p class="mt-1 text-lg text-gray-800">{move || {
                                                 questions().iter().map(|q| q.point_value).sum::<i32>()
                                             }}</p>
+                                        </div>
+                                        <div>
+                                            <h3 class="text-sm font-medium text-gray-500">Benchmark Categories</h3>
+                                            <p class="mt-1 text-lg text-gray-800">{benchmark_summary}</p>
                                         </div>
                                     </div>
                                 </div>

@@ -974,18 +974,6 @@ fn CompactActions(
                 <span class="text-sm">"✏️"</span>
             </button>
 
-            // Use button
-            <button
-                class="p-1.5 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
-                title="Use Test"
-                on:click=move |_| {
-                    let navigate = leptos_router::use_navigate();
-                    navigate(&format!("/test-session/{}", test_id_use.clone()), Default::default());
-                }
-            >
-                <span class="text-sm">"▶️"</span>
-            </button>
-
             // Test button (purple button from original)
             <button
                 class="p-1.5 text-gray-600 hover:text-purple-600 hover:bg-purple-50 rounded transition-colors"
@@ -1177,16 +1165,6 @@ fn TestActionButtons(test: Test, on_create_variation: Option<Callback<Test>>) ->
                 }
             >
                 "Edit Test"
-            </button>
-            <button
-                class="flex-1 px-3 py-2 bg-green-50 hover:bg-green-100 text-green-700 text-xs font-medium rounded-md transition-colors"
-                on:click=move |_| {
-                    let test_id = test_id_for_use.clone();
-                    let navigate = leptos_router::use_navigate();
-                    navigate(&format!("/test-session/{}", test_id), Default::default());
-                }
-            >
-                "Use"
             </button>
 
             <button

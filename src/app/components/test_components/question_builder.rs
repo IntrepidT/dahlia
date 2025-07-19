@@ -3,6 +3,9 @@ use leptos::*;
 use std::rc::Rc;
 use std::str::FromStr;
 
+#[cfg(feature = "hydrate")]
+use wasm_bindgen::JsCast;
+
 const FIELD_TITLE: &str = "mt-5 font-base text-[#00356b] text-xl";
 const INPUT: &str = "w-40 h-12 border-[#00356b] border pr-4 pl-6 py-4 text-[#00356b] rounded transition-all duration-1000 ease-in-out";
 const INPUT_QUESTION: &str = "w-full h-12 border-[#00356b] border pr-4 pl-6 py-4 text-[#00356b] rounded transition-all duration-1000 ease-in-out";
@@ -15,13 +18,58 @@ pub fn BuildingQuestion(
     initial_question: Question,
     on_update: Callback<Question>,
     on_remove: Callback<()>,
+    on_duplicate: Option<Callback<Question>>,
+    should_auto_focus: Memo<bool>,   // Changed from ReadSignal to Memo
+    on_focus_complete: Callback<()>, // New callback to clear auto-focus
 ) -> impl IntoView {
     let (question_data, set_question_data) = create_signal(initial_question.clone());
+    let question_input_ref = create_node_ref::<html::Textarea>();
+
+    // Store initial_question for use in different closures
+    let initial_question_clone = initial_question.clone();
+    let initial_question_for_header = initial_question.clone();
+
+    // Effect to update question_data when initial_question changes (for edit mode)
+    create_effect(move |_| {
+        let current_initial = initial_question_clone.clone();
+        set_question_data.update(|q| {
+            // Only update if the question actually changed to avoid infinite loops
+            if q.testlinker != current_initial.testlinker
+                || q.qnumber != current_initial.qnumber
+                || (q.word_problem.is_empty() && !current_initial.word_problem.is_empty())
+            {
+                *q = current_initial;
+            }
+        });
+    });
+
+    // Improved auto-focus mechanism with cleanup
+    create_effect(move |_| {
+        if should_auto_focus() {
+            if let Some(input) = question_input_ref.get() {
+                #[cfg(feature = "hydrate")]
+                {
+                    request_animation_frame(move || {
+                        let focus_result = input.focus();
+                        if focus_result.is_ok() {
+                            // Call the completion callback after successful focus
+                            on_focus_complete(());
+                        }
+                    });
+                }
+                #[cfg(not(feature = "hydrate"))]
+                {
+                    // On server side, just call the completion callback immediately
+                    on_focus_complete(());
+                }
+            }
+        }
+    });
 
     let update_field = move |field: &'static str, value: String| {
         set_question_data.update(|q| match field {
             "word_problem" => q.word_problem = value,
-            "point_value" => q.point_value = value.parse().unwrap_or(0),
+            "point_value" => q.point_value = value.parse().unwrap_or(1), // Default to 1 instead of 0
             "question_type" => {
                 if !value.is_empty() {
                     let new_type = QuestionType::from_str(match value.as_str() {
@@ -32,31 +80,49 @@ pub fn BuildingQuestion(
                         "WeightedMultipleChoice" => "Weighted Multiple Choice",
                         _ => "",
                     })
-                    .unwrap_or(QuestionType::TrueFalse);
-                    q.question_type = new_type.clone();
+                    .unwrap_or(QuestionType::MultipleChoice);
 
-                    match new_type {
-                        QuestionType::TrueFalse => {
-                            q.options = vec!["true".to_string(), "false".to_string()];
-                            q.correct_answer = "true".to_string();
-                            q.weighted_options = None;
-                        }
-                        QuestionType::WeightedMultipleChoice => {
-                            q.options = Vec::new();
-                            q.correct_answer = String::new();
-                            // Initialize with some default weighted options if none exist
-                            if q.weighted_options.is_none() || q.get_weighted_options().is_empty() {
-                                let default_options = vec![
-                                    WeightedOption::new("Option 1".to_string(), 1, true),
-                                    WeightedOption::new("Option 2".to_string(), 1, true),
-                                ];
-                                q.set_weighted_options(default_options);
+                    // Only update if the type is actually different to avoid unnecessary resets
+                    if q.question_type != new_type {
+                        q.question_type = new_type.clone();
+
+                        match new_type {
+                            QuestionType::TrueFalse => {
+                                q.options = vec!["true".to_string(), "false".to_string()];
+                                q.correct_answer = "true".to_string();
+                                q.weighted_options = None;
                             }
-                        }
-                        _ => {
-                            q.options = Vec::new();
-                            q.correct_answer = String::new();
-                            q.weighted_options = None;
+                            QuestionType::MultipleChoice => {
+                                // Preserve existing options if they exist and are valid
+                                if q.options.is_empty() || q.weighted_options.is_some() {
+                                    q.options = vec!["".to_string(), "".to_string()];
+                                }
+                                // Set first option as correct if no correct answer or if coming from weighted
+                                if q.correct_answer.is_empty() || q.weighted_options.is_some() {
+                                    q.correct_answer =
+                                        q.options.first().cloned().unwrap_or_default();
+                                }
+                                q.weighted_options = None;
+                            }
+                            QuestionType::WeightedMultipleChoice => {
+                                // Clear regular options when switching to weighted
+                                q.options = Vec::new();
+                                q.correct_answer = String::new();
+                                if q.weighted_options.is_none()
+                                    || q.get_weighted_options().is_empty()
+                                {
+                                    let default_options = vec![
+                                        WeightedOption::new("".to_string(), 1, true),
+                                        WeightedOption::new("".to_string(), 1, true),
+                                    ];
+                                    q.set_weighted_options(default_options);
+                                }
+                            }
+                            _ => {
+                                q.options = Vec::new();
+                                q.correct_answer = String::new();
+                                q.weighted_options = None;
+                            }
                         }
                     }
                 }
@@ -77,12 +143,10 @@ pub fn BuildingQuestion(
     let handle_weighted_options_update = move |weighted_options: Vec<WeightedOption>| {
         set_question_data.update(|q| {
             q.set_weighted_options(weighted_options.clone());
-            // Update regular options and correct_answer for compatibility
             q.options = weighted_options
                 .iter()
                 .map(|opt| opt.text.clone())
                 .collect();
-            // For weighted questions, correct_answer can be a JSON array of selectable options
             let selectable_options: Vec<String> = weighted_options
                 .iter()
                 .filter(|opt| opt.is_selectable)
@@ -93,7 +157,6 @@ pub fn BuildingQuestion(
         on_update(question_data());
     };
 
-    // Function to convert QuestionType to dropdown value - Fixed to match dropdown options
     let question_type_to_value = move |question_type: &QuestionType| -> String {
         match question_type {
             QuestionType::MultipleChoice => "MultipleChoice".to_string(),
@@ -105,70 +168,140 @@ pub fn BuildingQuestion(
     };
 
     view! {
-        <div class="question-builder p-4 border rounded mb-4">
-            <h1 class=FIELD_TITLE>Question: </h1>
-            <input type="text" placeholder="Question" class=INPUT_QUESTION
-                prop:value=move || question_data.with(|q| q.word_problem.clone())
-                on:input=move |event| update_field("word_problem", event_target_value(&event))
-            />
-            <h1 class=FIELD_TITLE>Point Value</h1>
-            <input type="number" placeholder="Points" class=INPUT
-                prop:value=move || question_data.with(|q| q.point_value.to_string())
-                on:input=move |event| update_field("point_value", event_target_value(&event))
-            />
-            <h1 class=FIELD_TITLE>Question Type</h1>
-            <select class=INPUT_SELECTOR
-                prop:value=move || question_data.with(|q| question_type_to_value(&q.question_type))
-                on:change=move |event| update_field("question_type", event_target_value(&event))
-            >
-                <option value="">Please Select a Value</option>
-                <option value="MultipleChoice">Multiple Choice</option>
-                /*<option value="Written">Written</option>
-                <option value="Selection">Selection</option>*/
-                <option value="TrueFalse">True-False</option>
-                <option value="WeightedMultipleChoice">Weighted Multiple Choice</option>
-            </select>
-            {move || match question_data.with(|q| q.question_type.clone()) {
-                QuestionType::MultipleChoice => {
-                    let options = question_data.with(|q| q.options.clone());
-                    let correct_answer = question_data.with(|q| q.correct_answer.clone());
-                    view! {
-                        <MultipleChoice
-                        options=options
-                        designated_answer=correct_answer
-                        on_change=Callback::new(handle_options_update)
-                        />
-                    }
-                },
-                QuestionType::TrueFalse => {
-                    let designated_answer = question_data.with(|q| q.correct_answer.clone());
-                    view! {
-                        <TrueFalse
-                            designated_answer=designated_answer
-                            on_change=Callback::new(handle_options_update)
-                        />
-                    }
-                },
-                QuestionType::WeightedMultipleChoice => {
-                    let weighted_options = question_data.with(|q| q.get_weighted_options());
-                    let max_points = question_data.with(|q| q.point_value);
-                    view! {
-                        <WeightedMultipleChoice
-                            weighted_options=weighted_options
-                            max_points=max_points
-                            on_change=Callback::new(handle_weighted_options_update)
-                        />
-                    }
-                },
-                _ => view! {<p>"Please select an option"</p>}.into_view(),
-            }}
-            <hr class="w-full mt-10" />
-            <button
-                class="bg-red-500 text-white px-2 py-1 rounded"
-                on:click=move |_| on_remove(())
-            >
-                Remove Question
-            </button>
+        <div class="question-builder p-6 border rounded-lg mb-6 bg-white shadow-sm hover:shadow-md transition-shadow">
+            // Question header with actions
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold text-[#00356b]">
+                    "Question " {initial_question.qnumber}
+                </h3>
+                <div class="flex space-x-2">
+                    {move || {
+                        if let Some(duplicate_callback) = on_duplicate {
+                            view! {
+                                <button
+                                    type="button"
+                                    class="px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
+                                    on:click=move |_| duplicate_callback(question_data())
+                                    title="Duplicate this question"
+                                >
+                                    "Duplicate"
+                                </button>
+                            }.into_view()
+                        } else {
+                            view! { <div></div> }.into_view()
+                        }
+                    }}
+                    <button
+                        type="button"
+                        class="px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors"
+                        on:click=move |_| on_remove(())
+                        title="Remove this question"
+                    >
+                        "Remove"
+                    </button>
+                </div>
+            </div>
+
+            // Question text with enhanced input
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    "Question Text"
+                    <span class="text-red-500">"*"</span>
+                </label>
+                <textarea
+                    node_ref=question_input_ref
+                    placeholder="Enter your question here..."
+                    class="w-full h-20 px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all resize-none"
+                    prop:value=move || question_data.with(|q| q.word_problem.clone())
+                    on:input=move |event| update_field("word_problem", event_target_value(&event))
+                ></textarea>
+            </div>
+
+            // Point value and question type in a row
+            <div class="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        "Point Value" <span class="text-red-500">"*"</span>
+                    </label>
+                    <input
+                        type="number"
+                        min="1"
+                        placeholder="Points"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        prop:value=move || question_data.with(|q| q.point_value.to_string())
+                        on:input=move |event| update_field("point_value", event_target_value(&event))
+                        on:focus=move |event| {
+                            // Select all text when focused - only on client side
+                            #[cfg(feature = "hydrate")]
+                            {
+                                if let Some(target) = event.target() {
+                                    if let Ok(input) = target.dyn_into::<web_sys::HtmlInputElement>() {
+                                        let _ = input.select();
+                                    }
+                                }
+                            }
+                        }
+                    />
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        "Question Type" <span class="text-red-500">"*"</span>
+                    </label>
+                    <select
+                        class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        prop:value=move || question_data.with(|q| question_type_to_value(&q.question_type))
+                        on:change=move |event| update_field("question_type", event_target_value(&event))
+                    >
+                        // Most common types first
+                        <option value="MultipleChoice">"Multiple Choice"</option>
+                        <option value="TrueFalse">"True/False"</option>
+                        <option value="WeightedMultipleChoice">"Weighted Multiple Choice"</option>
+                    </select>
+                </div>
+            </div>
+
+            // Question type specific content
+            <div class="border-t pt-4">
+                {move || match question_data.with(|q| q.question_type.clone()) {
+                    QuestionType::MultipleChoice => {
+                        let options = question_data.with(|q| q.options.clone());
+                        let correct_answer = question_data.with(|q| q.correct_answer.clone());
+                        view! {
+                            <MultipleChoice
+                                options=options
+                                designated_answer=correct_answer
+                                on_change=Callback::new(handle_options_update)
+                            />
+                        }.into_view()
+                    },
+                    QuestionType::TrueFalse => {
+                        let designated_answer = question_data.with(|q| q.correct_answer.clone());
+                        view! {
+                            <TrueFalse
+                                designated_answer=designated_answer
+                                on_change=Callback::new(handle_options_update)
+                            />
+                        }.into_view()
+                    },
+                    QuestionType::WeightedMultipleChoice => {
+                        let weighted_options = question_data.with(|q| q.get_weighted_options());
+                        let max_points = question_data.with(|q| q.point_value);
+                        view! {
+                            <WeightedMultipleChoice
+                                weighted_options=weighted_options
+                                max_points=max_points
+                                on_change=Callback::new(handle_weighted_options_update)
+                            />
+                        }.into_view()
+                    },
+                    _ => view! {
+                        <div class="bg-gray-50 border border-gray-200 rounded p-4 text-center text-gray-500">
+                            "Please select a question type to continue"
+                        </div>
+                    }.into_view(),
+                }}
+            </div>
         </div>
     }
 }
@@ -215,10 +348,29 @@ pub fn WeightedMultipleChoice(
 
     // Add a new option
     let add_option = move |_| {
+        let new_id = get_next_id();
         set_option_items.update(|items| {
-            items.push((get_next_id(), WeightedOption::new(String::new(), 0, false)));
+            items.push((new_id, WeightedOption::new(String::new(), 0, false)));
         });
         debounced_update.with_value(|update| update());
+
+        // Focus the newly added input with better timing
+        #[cfg(feature = "hydrate")]
+        {
+            request_animation_frame(move || {
+                request_animation_frame(move || {
+                    if let Some(document) = web_sys::window().and_then(|w| w.document()) {
+                        // Use data attribute for more reliable selection
+                        let selector = &format!("input[data-weighted-option-id='{}']", new_id);
+                        if let Ok(Some(element)) = document.query_selector(selector) {
+                            if let Ok(input) = element.dyn_into::<web_sys::HtmlInputElement>() {
+                                let _ = input.focus();
+                            }
+                        }
+                    }
+                });
+            });
+        }
     };
 
     // Update option text
@@ -228,6 +380,7 @@ pub fn WeightedMultipleChoice(
                 option.text = new_text;
             }
         });
+        // No immediate parent notification
     };
 
     // Update option points
@@ -255,11 +408,6 @@ pub fn WeightedMultipleChoice(
         set_option_items.update(|items| {
             items.retain(|(item_id, _)| *item_id != id);
         });
-        debounced_update.with_value(|update| update());
-    };
-
-    // Handle blur events
-    let on_text_blur = move |_| {
         debounced_update.with_value(|update| update());
     };
 
@@ -293,72 +441,90 @@ pub fn WeightedMultipleChoice(
             </div>
 
             <For
-                each=move || option_items.get()
-                key=|(id, _)| *id
-                children=move |(id, option)| {
+                each=move || {
+                    option_items.get()
+                        .into_iter()
+                        .enumerate()
+                        .collect::<Vec<_>>()
+                }
+                key=|(index, (id, _))| (*index, *id)
+                children=move |(index, (id, option)): (usize, (usize, WeightedOption))| {
                     let option_id = id;
-                    let option_clone = option.clone();
+                    let option_index = index;
+                    let option_text = option.text.clone();
+                    let option_points = option.points;
+                    let option_selectable = option.is_selectable;
 
                     view! {
-                        <div class="bg-gray-50 border border-gray-200 rounded p-4 space-y-3">
-                            <div class="flex items-center gap-3">
-                                <div class="flex-grow">
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">
-                                        "Option Text"
-                                    </label>
-                                    <input
-                                        type="text"
-                                        placeholder=format!("Option {}", option_id + 1)
-                                        class="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                        prop:value=option_clone.text.clone()
-                                        on:input=move |event| {
-                                            update_option_text(option_id, event_target_value(&event))
+                        <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                            // Text input for option - natural tab order
+                            <input
+                                type="text"
+                                placeholder=format!("Option {}", option_index + 1)
+                                class="flex-grow px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                prop:value=option_text
+                                on:input=move |event| update_option_text(option_id, event_target_value(&event))
+                                // No parent notifications, no blur handlers, no debouncing
+                                // Use data attribute for more reliable selection
+                                attr:data-weighted-option-id=option_id.to_string()
+                                // NO tabindex - let browser use natural DOM order
+                            />
+
+                            // Points input - natural tab order
+                            <div class="flex items-center space-x-2">
+                                <label class="text-sm text-gray-600">"Points:"</label>
+                                <input
+                                    type="number"
+                                    class="w-20 px-2 py-1 border border-gray-300 rounded text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    prop:value=option_points.to_string()
+                                    on:input=move |event| {
+                                        if let Ok(points) = event_target_value(&event).parse::<i32>() {
+                                            update_option_points(option_id, points);
                                         }
-                                        on:blur=move |_| on_text_blur(option_id)
-                                    />
-                                </div>
-                                <div class="w-24">
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">
-                                        "Points"
-                                    </label>
-                                    <input
-                                        type="number"
-                                        class="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                        prop:value=option_clone.points.to_string()
-                                        on:input=move |event| {
-                                            let value = event_target_value(&event).parse().unwrap_or(0);
-                                            update_option_points(option_id, value);
-                                        }
-                                    />
-                                </div>
+                                    }
+                                    // NO tabindex - let browser use natural DOM order
+                                />
                             </div>
 
-                            <div class="flex items-center justify-between">
-                                <label class="flex items-center cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        class="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                                        prop:checked=option_clone.is_selectable
-                                        on:change=move |_| toggle_selectable(option_id)
-                                    />
-                                    <span class="text-sm text-gray-700">"Selectable by students"</span>
-                                </label>
-
-                                <button
-                                    class="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600 transition-colors"
-                                    on:click=move |_| remove_option(option_id)
-                                >
-                                    "Remove"
-                                </button>
+                            // Selectable checkbox - natural tab order
+                            <div class="flex items-center space-x-2">
+                                <label class="text-sm text-gray-600">"Selectable:"</label>
+                                <input
+                                    type="checkbox"
+                                    class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                    prop:checked=option_selectable
+                                    on:change=move |_| toggle_selectable(option_id)
+                                    // NO tabindex - let browser use natural DOM order
+                                />
                             </div>
+
+                            // Remove button - excluded from tab order
+                            <button
+                                type="button"
+                                class="flex-shrink-0 p-2 text-red-600 hover:bg-red-100 rounded-full transition-colors"
+                                on:click=move |_| {
+                                    remove_option(option_id);
+                                    debounced_update.with_value(|update| update()); // Only notify on remove
+                                }
+                                title="Remove option"
+                                // Remove buttons from tab order
+                                prop:tabindex=-1
+                            >
+                                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                                </svg>
+                            </button>
                         </div>
                     }
                 }
             />
 
             <button
+                type="button"
                 class="bg-[#00356b] text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors"
                 on:click=add_option
+                // Ensure add button doesn't interfere with tab order
+                prop:tabindex=-1
             >
                 "Add Option"
             </button>
@@ -385,7 +551,6 @@ pub fn MultipleChoice(
     designated_answer: String,
     on_change: Callback<(Vec<String>, String)>,
 ) -> impl IntoView {
-    // Generate initial IDs
     let next_id = std::cell::Cell::new(0);
     let get_next_id = move || {
         let id = next_id.get();
@@ -393,13 +558,11 @@ pub fn MultipleChoice(
         id
     };
 
-    // Create initial options with IDs
     let initial_options = options
         .into_iter()
         .map(|value| (get_next_id(), value))
         .collect::<Vec<_>>();
 
-    // Create signals
     let (option_items, set_option_items) = create_signal(initial_options);
     let (correct_answer, set_correct_answer) = create_signal(if designated_answer.is_empty() {
         option_items.with(|items| items.first().map(|(_, v)| v.clone()).unwrap_or_default())
@@ -407,68 +570,71 @@ pub fn MultipleChoice(
         designated_answer
     });
 
-    // Create a debounced update callback to reduce renders
-    let debounced_update = store_value(move || {
-        // Only call this when we want to notify the parent
+    let notify_parent = move || {
         let values =
             option_items.with(|items| items.iter().map(|(_, v)| v.clone()).collect::<Vec<_>>());
         on_change((values, correct_answer()));
-    });
-
-    // Add a new option
-    let add_option = move |_| {
-        set_option_items.update(|items| {
-            items.push((get_next_id(), String::new()));
-        });
-        // Update callback after adding
-        debounced_update.with_value(|update| update());
     };
 
-    // Create a stored callback for updating options
+    let add_option = move |_| {
+        let new_id = get_next_id();
+        set_option_items.update(|items| {
+            items.push((new_id, String::new()));
+        });
+        notify_parent();
+
+        // Focus the newly added input with better timing
+        #[cfg(feature = "hydrate")]
+        {
+            request_animation_frame(move || {
+                request_animation_frame(move || {
+                    if let Some(document) = web_sys::window().and_then(|w| w.document()) {
+                        // Use a more specific selector that targets the actual input
+                        let selector = &format!("input[data-option-id='{}']", new_id);
+                        if let Ok(Some(element)) = document.query_selector(selector) {
+                            if let Ok(input) = element.dyn_into::<web_sys::HtmlInputElement>() {
+                                let _ = input.focus();
+                            }
+                        }
+                    }
+                });
+            });
+        }
+    };
+
     let update_option = move |id: usize, new_value: String| {
         set_option_items.update(|items| {
             if let Some(item) = items.iter_mut().find(|(item_id, _)| *item_id == id) {
+                let old_value = item.1.clone();
                 item.1 = new_value.clone();
 
-                // If this was the correct answer, update the correct_answer signal
-                if correct_answer() == item.1 {
+                // If this was the correct answer, update it
+                if correct_answer() == old_value {
                     set_correct_answer.set(new_value);
                 }
             }
         });
-        // Don't update the parent on every keystroke
-        // We'll update on blur or other significant events
+        // No immediate parent notification - let the parent component handle this
     };
 
-    // Handle option blur - this is when we'll notify the parent
-    let on_option_blur = move |_| {
-        debounced_update.with_value(|update| update());
-    };
-
-    // Handle removing options
     let remove_option = move |id: usize| {
         set_option_items.update(|items| {
-            // Check if we're removing the correct answer
             let removing_correct = items
                 .iter()
                 .find(|(item_id, _)| *item_id == id)
                 .map(|(_, value)| value == &correct_answer())
                 .unwrap_or(false);
 
-            // Remove the item
             items.retain(|(item_id, _)| *item_id != id);
 
-            // Update correct answer if needed
             if removing_correct && !items.is_empty() {
                 let new_correct = items[0].1.clone();
                 set_correct_answer.set(new_correct);
             }
         });
-        // Update callback after removing
-        debounced_update.with_value(|update| update());
+        notify_parent();
     };
 
-    // Set the correct answer
     let set_as_correct = move |id: usize| {
         if let Some(value) = option_items.with(|items| {
             items
@@ -477,68 +643,96 @@ pub fn MultipleChoice(
                 .map(|(_, v)| v.clone())
         }) {
             set_correct_answer.set(value);
-            // Update callback after changing correct answer
-            debounced_update.with_value(|update| update());
+            notify_parent();
         }
     };
 
     view! {
-       <div class="mt-4 space-y-4">
-           <h3 class="text-[#00356b] font-semibold">"Multiple Choice Options"</h3>
-           <For
-               each=move || option_items.get()
-               key=|(id, _)| *id
-               children=move |(id, value)| {
-                   let option_id = id;
-                   // Clone the value for use in closures
-                   let option_value = value.clone();
-                   let option_value_cloned = option_value.clone();
+        <div class="space-y-3">
+            <div class="flex justify-between items-center">
+                <h4 class="font-medium text-gray-700">"Answer Options"</h4>
+                <span class="text-sm text-gray-500">"Select the correct answer"</span>
+            </div>
 
-                   // Create a derived signal that checks if this option is the correct answer
-                   let is_correct = create_memo(move |_| correct_answer() == option_value_cloned);
+            <For
+                each=move || {
+                    option_items.get()
+                        .into_iter()
+                        .enumerate()
+                        .collect::<Vec<_>>()
+                }
+                key=|(index, (id, _))| (*index, *id)
+                children=move |(index, (id, value)): (usize, (usize, String))| {
+                    let option_id = id;
+                    let option_index = index;
+                    let option_value_for_memo = value.clone();
+                    let option_value_for_input = value.clone();
 
-                   view! {
-                       <div class="flex items-center gap-2">
-                           <input
-                               type="text"
-                               placeholder=format!("Option {}", option_id + 1)
-                               class="flex-grow p-2 border rounded"
-                               prop:value=option_value.clone()
-                               on:input=move |event| {
-                                   update_option(option_id, event_target_value(&event))
-                               }
-                               on:blur=move |_| on_option_blur(option_id)
-                           />
-                           <button
-                               class=move || {
-                                   if is_correct() {
-                                       "bg-green-500 text-white p-2 rounded"
-                                   } else {
-                                       "bg-gray-200 text-gray-700 p-2 rounded"
-                                   }
-                               }
-                               on:click=move |_| set_as_correct(option_id)
-                           >
-                               "Correct"
-                           </button>
-                           <button
-                               class="bg-red-500 text-white p-2 rounded"
-                               on:click=move |_| remove_option(option_id)
-                           >
-                               "Remove"
-                           </button>
-                       </div>
-                   }
-               }
-           />
+                    let is_correct = create_memo(move |_| correct_answer() == option_value_for_memo);
 
-           <button
-               class="bg-[#00356b] text-white p-2 rounded mt-2"
-               on:click=add_option
-           >
-               "Add Option"
-           </button>
-       </div>
+                    view! {
+                        <div class=move || {
+                            if is_correct() {
+                                "flex items-center gap-3 p-3 bg-green-50 border border-green-200 rounded-lg"
+                            } else {
+                                "flex items-center gap-3 p-3 bg-gray-50 rounded-lg"
+                            }
+                        }>
+                            <div class="flex-shrink-0">
+                                <input
+                                    type="radio"
+                                    name="correct_answer"
+                                    class="h-4 w-4 text-blue-600 focus:ring-blue-500"
+                                    prop:checked=is_correct.get()
+                                    on:change=move |_| {
+                                        set_as_correct(option_id);
+                                        notify_parent(); // Only notify on radio button changes
+                                    }
+                                    // Remove radio buttons from tab order completely
+                                    prop:tabindex=-1
+                                />
+                            </div>
+                            <input
+                                type="text"
+                                placeholder=format!("Option {}", option_index + 1)
+                                class="flex-grow px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                prop:value=option_value_for_input
+                                on:input=move |event| update_option(option_id, event_target_value(&event))
+                                // No parent notifications, no blur handlers, no debouncing
+                                // Use data attribute for more reliable selection
+                                attr:data-option-id=option_id.to_string()
+                                // NO tabindex - let browser use natural DOM order
+                            />
+                            <button
+                                type="button"
+                                class="flex-shrink-0 p-2 text-red-600 hover:bg-red-100 rounded-full transition-colors"
+                                on:click=move |_| {
+                                    remove_option(option_id);
+                                    notify_parent(); // Only notify on remove
+                                }
+                                title="Remove option"
+                                // Remove buttons from tab order
+                                prop:tabindex=-1
+                            >
+                                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                                </svg>
+                            </button>
+                        </div>
+                    }
+                }
+            />
+
+            <button
+                type="button"
+                class="w-full py-2 px-4 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-blue-500 hover:text-blue-600 transition-colors"
+                on:click=add_option
+                // Ensure add button doesn't interfere with tab order
+                prop:tabindex=-1
+            >
+                "+ Add Option"
+            </button>
+        </div>
     }
 }
 
@@ -563,37 +757,47 @@ pub fn TrueFalse(
     on_change: Callback<(Vec<String>, String)>,
 ) -> impl IntoView {
     let options = store_value(vec!["true".to_string(), "false".to_string()]);
-    let (selected_answer, set_selected_answer) = create_signal(designated_answer);
-    let stored_callback = store_value(on_change);
+    let (selected_answer, set_selected_answer) = create_signal(if designated_answer.is_empty() {
+        "true".to_string()
+    } else {
+        designated_answer
+    });
 
-    let true_click = move |_| {
-        set_selected_answer.set("true".to_string());
-        stored_callback.with_value(|cb| cb.call((options.get_value(), "true".to_string())))
-    };
-
-    let false_click = move |_| {
-        set_selected_answer.set("false".to_string());
-        stored_callback.with_value(|cb| cb.call((options.get_value(), "false".to_string())))
+    let update_answer = move |answer: String| {
+        set_selected_answer.set(answer.clone());
+        on_change((options.get_value(), answer));
     };
 
     view! {
-        <div class="flex gap=4 items-center mt-4">
-            <div class="flex-col flex gap-y-4">
-                <h3 class="text-[#00356b] font-semibold">True/False Answer</h3>
-                <div class="space-x-4">
-                    <button
-                        class=move || if selected_answer() == "true" {SELECTED_BUTTON } else {UNSELECTED_BUTTON }
-                        on:click=true_click
-                    >
-                        "True"
-                    </button>
-                    <button
-                        class=move || if selected_answer() == "false" {SELECTED_BUTTON} else {UNSELECTED_BUTTON }
-                        on:click=false_click
-                    >
-                        "False"
-                    </button>
-                </div>
+        <div class="space-y-4">
+            <h4 class="font-medium text-gray-700">"Select the correct answer:"</h4>
+            <div class="flex gap-4">
+                <button
+                    type="button"
+                    class=move || {
+                        if selected_answer() == "true" {
+                            "px-8 py-3 bg-green-500 text-white rounded-lg font-medium transition-all"
+                        } else {
+                            "px-8 py-3 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 transition-all"
+                        }
+                    }
+                    on:click=move |_| update_answer("true".to_string())
+                >
+                    "True"
+                </button>
+                <button
+                    type="button"
+                    class=move || {
+                        if selected_answer() == "false" {
+                            "px-8 py-3 bg-green-500 text-white rounded-lg font-medium transition-all"
+                        } else {
+                            "px-8 py-3 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 transition-all"
+                        }
+                    }
+                    on:click=move |_| update_answer("false".to_string())
+                >
+                    "False"
+                </button>
             </div>
         </div>
     }
