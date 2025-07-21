@@ -1222,7 +1222,7 @@ pub fn UnifiedTestManagerContent() -> impl IntoView {
     let (if_show_toast, set_if_show_toast) = create_signal(false);
     let (toast_message, set_toast_message) = create_signal(ToastMessage::new());
     let (search_term, set_search_term) = create_signal(String::new());
-    let (view_mode, set_view_mode) = create_signal(ViewMode::Table);
+    let (view_mode, set_view_mode) = create_signal(ViewMode::Cards);
     let (test_filter, set_test_filter) = create_signal(TestFilter::All);
     let (expanded_groups, set_expanded_groups) =
         create_signal(std::collections::HashSet::<String>::new());

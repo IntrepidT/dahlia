@@ -1,7 +1,6 @@
 use leptos::*;
 use leptos_router::*;
 // Importing necessary components and pages
-use crate::app::pages::*;
 use crate::app::components::{
     live_testing::{test_session::RealtimeTestSession, AnonymousStudentTest},
     login_components::{RequestPasswordResetForm, ResetPasswordForm},
@@ -9,6 +8,7 @@ use crate::app::components::{
     test_components::test_variation_manager::TestVariationManager,
     test_templates::{FlashCardSet, GridTest},
 };
+use crate::app::pages::*;
 
 #[component]
 pub fn AppRoutes() -> impl IntoView {
@@ -19,44 +19,44 @@ pub fn AppRoutes() -> impl IntoView {
             <Route path="/login" view=LoginPage/>
             <Route path="/forgot-password" view=RequestPasswordResetForm/>
             <Route path="/reset-password/:token" view=ResetPasswordForm/>
-            
+
             // Dashboard routes
             <Route path="/dashboard" view=Dashboard/>
             <Route path="/admindashboard" view=AdminDashboard/>
             <Route path="/studentview" view=StudentView/>
-            
+
             // Test management routes
             <Route path="/test-manager" view=UnifiedTestManager/>
             <Route path="/testbuilder" view=TestBuilder/>
             <Route path="/testbuilder/:test_id" view=TestBuilder/>
             <Route path="/test-variations" view=TestVariationManager/>
-            
+
             // Assessment routes
             <Route path="/assessments" view=AssessmentPage/>
             <Route path="/assessment/:test_id" view=Assessment/>
             <Route path="/admintest" view=AdministerTest/>
             <Route path="/gradebook" view=Gradebook/>
-            
+
             // Test session routes
             <Route path="/test-session/:test_id" view=RealtimeTestSession/>
             <Route path="/student-test/:test_id/:session_id" view=AnonymousStudentTest/>
             <Route path="/tests/:test_id/sessions/:session_id" view=RealtimeTestSession/>
             <Route path="/testsessions" view=TestSessionsList/>
-            
+
             // Test template routes
             <Route path="/flashcardset/:test_id" view=FlashCardSet/>
             <Route path="/gridtest/:test_id" view=GridTest/>
-            
+
             // Review and results routes
             <Route path="/reviewtest/:test_id/:student_id/:test_variant/:attempt" view=ReviewTest/>
             <Route path="/studentview/:student_id/results" view=TestResultsPage/>
-            
+
             // Settings and admin routes
             <Route path="/settings" view=Settings/>
             <Route path="/myaccount" view=MyAccount/>
             <Route path="/teachers" view=Teachers/>
             <Route path="/admin/saml" view=SamlAdminPanel/>
-            
+
             // 404 fallback
             <Route path="/*any" view=NotFound/>
         </Routes>
