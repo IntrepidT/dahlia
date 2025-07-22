@@ -2,6 +2,7 @@ use super::types::*;
 use crate::app::models::question::Question;
 use crate::app::models::user::SessionUser;
 use crate::app::server_functions::websocket_sessions::cleanup_teacher_session_endpoint;
+use crate::app::websockets::lobby::AnonymousStudent;
 use leptos::*;
 use log;
 use serde_json::{json, Value};
@@ -27,8 +28,10 @@ pub struct WebSocketActions {
     pub go_to_previous_card: Callback<()>,
     pub handle_answer_change: Callback<(i32, String)>,
     pub handle_comment_change: Callback<(i32, String)>,
+    pub handle_weighted_selection: Callback<(i32, Vec<String>)>, // New for weighted multiple choice
     pub request_participants: Callback<()>,
     pub send_heartbeat: Callback<()>,
+    pub join_as_anonymous_student: Callback<AnonymousStudent>,
 }
 
 #[cfg(feature = "hydrate")]
@@ -81,7 +84,7 @@ pub fn use_websocket_connection(
         }
     };
 
-    //Heartbeat sender to keep connection alive
+    // Heartbeat sender to keep connection alive
     let send_heartbeat = Callback::new(move |_| {
         let heartbeat_message = json!({
             "type": "heartbeat",
@@ -158,6 +161,8 @@ pub fn use_websocket_connection(
 
     // End test handler
     let end_test = Callback::new(move |_| {
+        let test_id_value = test_id.get().clone();
+
         let end_message = json!({
             "type": "test_message",
             "test_message_type": "end_test",
@@ -166,6 +171,11 @@ pub fn use_websocket_connection(
         .to_string();
 
         send_ws_message(end_message);
+
+        if !test_id_value.is_empty() {
+            handle_teacher_disconnect(test_id_value.clone());
+            log::info!("Cleared test form ACTIVE_TEACHERS: {}", test_id.get());
+        }
     });
 
     // Navigation handlers
@@ -205,14 +215,11 @@ pub fn use_websocket_connection(
         });
     });
 
-    // Answer change handler
+    // Answer change handler (for regular questions)
     let handle_answer_change = Callback::new(move |(qnumber, value): (i32, String)| {
         // Update local state
         set_responses.update(|r| {
-            let response = r.entry(qnumber).or_insert(QuestionResponse {
-                answer: String::new(),
-                comment: String::new(),
-            });
+            let response = r.entry(qnumber).or_insert(QuestionResponse::new());
             response.answer = value.clone();
         });
 
@@ -222,7 +229,8 @@ pub fn use_websocket_connection(
             "test_message_type": "submit_answer",
             "payload": {
                 "question_id": qnumber,
-                "answer": value
+                "answer": value,
+                "answer_type": "regular"
             }
         })
         .to_string();
@@ -230,13 +238,35 @@ pub fn use_websocket_connection(
         send_ws_message(answer_message);
     });
 
+    let handle_weighted_selection =
+        Callback::new(move |(qnumber, selected_options): (i32, Vec<String>)| {
+            // Update local state
+            set_responses.update(|r| {
+                let response = r.entry(qnumber).or_insert(QuestionResponse::new());
+                response.selected_options = Some(selected_options.clone());
+                // Also update answer field with JSON for compatibility
+                response.answer = serde_json::to_string(&selected_options).unwrap_or_default();
+            });
+
+            // Send to server
+            let weighted_message = json!({
+                "type": "test_message",
+                "test_message_type": "submit_answer",
+                "payload": {
+                    "question_id": qnumber,
+                    "selected_options": selected_options,
+                    "answer_type": "weighted_multiple_choice"
+                }
+            })
+            .to_string();
+
+            send_ws_message(weighted_message);
+        });
+
     // Comment change handler
     let handle_comment_change = Callback::new(move |(qnumber, value): (i32, String)| {
         set_responses.update(|r| {
-            let response = r.entry(qnumber).or_insert(QuestionResponse {
-                answer: String::new(),
-                comment: String::new(),
-            });
+            let response = r.entry(qnumber).or_insert(QuestionResponse::new());
             response.comment = value.clone();
         });
 
@@ -251,6 +281,23 @@ pub fn use_websocket_connection(
         .to_string();
 
         send_ws_message(comment_message);
+    });
+
+    let join_as_anonymous_student = Callback::new(move |student_data: AnonymousStudent| {
+        let join_message = json!({
+            "type": "anonymous_student_join",
+            "name": student_data.name,
+            "student_id": student_data.id,
+            "timestamp": chrono::Utc::now().timestamp()
+        })
+        .to_string();
+
+        send_ws_message(join_message);
+
+        log::info!(
+            "Sent anonymous student join message for: {}",
+            student_data.name
+        );
     });
 
     // Request participants
@@ -277,8 +324,10 @@ pub fn use_websocket_connection(
         go_to_previous_card,
         handle_answer_change,
         handle_comment_change,
+        handle_weighted_selection,
         request_participants,
         send_heartbeat,
+        join_as_anonymous_student,
     }
 }
 
@@ -556,6 +605,31 @@ fn handle_websocket_message(
                     }
                 }
             }
+            "anonymous_student_joined" => {
+                // Handle confirmation that anonymous student has joined
+                if let Some(student_id) = json_value.get("student_id").and_then(|s| s.as_str()) {
+                    if let Some(name) = json_value.get("name").and_then(|n| n.as_str()) {
+                        let display_name = format!("{} (Anonymous Student)", name);
+
+                        set_connected_students.update(|students| {
+                            if let Some(pos) =
+                                students.iter().position(|s| s.student_id == student_id)
+                            {
+                                students[pos].status = "Connected".to_string();
+                                students[pos].name = display_name;
+                            } else {
+                                students.push(ConnectedStudent {
+                                    student_id: student_id.to_string(),
+                                    name: display_name,
+                                    status: "Connected".to_string(),
+                                });
+                            }
+                        });
+
+                        log::info!("Anonymous student joined: {} ({})", name, student_id);
+                    }
+                }
+            }
             "student_left" | "user_left" => {
                 let is_student = msg_type == "student_left";
                 let id_field = if is_student { "student_id" } else { "id" };
@@ -570,17 +644,47 @@ fn handle_websocket_message(
             }
             "student_answer" => {
                 if let Some(answer_data) = json_value.get("answer_data") {
-                    if let (Some(qnumber), Some(answer)) = (
-                        answer_data.get("question_id").and_then(|q| q.as_i64()),
-                        answer_data.get("answer").and_then(|a| a.as_str()),
-                    ) {
+                    if let Some(qnumber) = answer_data.get("question_id").and_then(|q| q.as_i64()) {
+                        let qnumber = qnumber as i32;
+
                         set_responses.update(|r| {
-                            let qnumber = qnumber as i32;
-                            let response = r.entry(qnumber).or_insert(QuestionResponse {
-                                answer: String::new(),
-                                comment: String::new(),
-                            });
-                            response.answer = answer.to_string();
+                            let response = r.entry(qnumber).or_insert(QuestionResponse::new());
+
+                            // Handle different answer types
+                            if let Some(answer_type) =
+                                answer_data.get("answer_type").and_then(|t| t.as_str())
+                            {
+                                match answer_type {
+                                    "weighted_multiple_choice" => {
+                                        if let Some(selected_options) = answer_data
+                                            .get("selected_options")
+                                            .and_then(|opts| opts.as_array())
+                                        {
+                                            let options: Vec<String> = selected_options
+                                                .iter()
+                                                .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                                                .collect();
+                                            response.selected_options = Some(options.clone());
+                                            response.answer =
+                                                serde_json::to_string(&options).unwrap_or_default();
+                                        }
+                                    }
+                                    _ => {
+                                        if let Some(answer) =
+                                            answer_data.get("answer").and_then(|a| a.as_str())
+                                        {
+                                            response.answer = answer.to_string();
+                                        }
+                                    }
+                                }
+                            } else {
+                                // Fallback for regular answers
+                                if let Some(answer) =
+                                    answer_data.get("answer").and_then(|a| a.as_str())
+                                {
+                                    response.answer = answer.to_string();
+                                }
+                            }
                         });
                     }
                 }
@@ -641,8 +745,10 @@ pub fn use_websocket_connection(
         go_to_previous_card: Callback::new(|_| {}),
         handle_answer_change: Callback::new(|_| {}),
         handle_comment_change: Callback::new(|_| {}),
+        handle_weighted_selection: Callback::new(|_| {}), // NEW
         request_participants: Callback::new(|_| {}),
         send_heartbeat: Callback::new(|_| {}),
+        join_as_anonymous_student: Callback::new(|_| {}),
     }
 }
 

@@ -7,7 +7,7 @@ use super::{
     types::*,
     websocket_handler::{use_websocket_connection, WebSocketActions},
 };
-use crate::app::models::question::Question;
+use crate::app::models::question::{Question, QuestionType};
 use crate::app::models::score::CreateScoreRequest;
 use crate::app::models::test::Test;
 use crate::app::models::user::SessionUser;
@@ -24,10 +24,8 @@ use uuid::Uuid;
 
 #[component]
 pub fn RealtimeTestSession() -> impl IntoView {
-    // Get test_id from URL parameters - FIXED: Create proper signal instead of closure
+    // Get test_id from URL parameters
     let params = use_params_map();
-
-    // Create a memo that properly implements signals
     let test_id_memo = create_memo(move |_| {
         params.with(|params| params.get("test_id").cloned().unwrap_or_default())
     });
@@ -48,8 +46,9 @@ pub fn RealtimeTestSession() -> impl IntoView {
     let (is_submitted, set_is_submitted) = create_signal(false);
     let (remaining_time, set_remaining_time) = create_signal::<Option<i32>>(None);
     let (should_disable_inputs, set_should_disable_inputs) = create_signal(true);
+    let (show_participants, set_show_participants) = create_signal(false);
 
-    // Initialize role based on user - Enhanced logging
+    // Initialize role based on user
     create_effect(move |_| {
         log::info!("=== Role Assignment Effect Triggered ===");
 
@@ -92,7 +91,7 @@ pub fn RealtimeTestSession() -> impl IntoView {
         set_should_disable_inputs.set(should_disable);
     });
 
-    // Fetch test details and questions - FIXED: Use the memo signal
+    // Fetch test details and questions
     let test_details = create_resource(test_id_memo, move |tid| async move {
         if tid.is_empty() {
             log::warn!("No test ID provided in the URL");
@@ -113,7 +112,11 @@ pub fn RealtimeTestSession() -> impl IntoView {
             return Vec::new();
         }
         match get_questions(tid).await {
-            Ok(questions) => questions,
+            Ok(mut questions) => {
+                // Sort questions by qnumber to ensure consistent ordering
+                questions.sort_by_key(|q| q.qnumber);
+                questions
+            }
             Err(e) => {
                 log::error!("Failed to fetch questions: {}", e);
                 Vec::new()
@@ -121,7 +124,7 @@ pub fn RealtimeTestSession() -> impl IntoView {
         }
     });
 
-    // WebSocket connection and actions - FIXED: Use memo signal
+    // WebSocket connection and actions
     #[cfg(feature = "hydrate")]
     let ws_actions = use_websocket_connection(
         room_id.into(),
@@ -135,17 +138,16 @@ pub fn RealtimeTestSession() -> impl IntoView {
         set_remaining_time,
         set_is_test_active,
         set_is_submitted,
-        test_id_memo.into(), // Use the memo signal here - this should work now
+        test_id_memo.into(),
         room_id.into(),
         questions.into(),
     );
 
-    //heartbeat system
+    // Heartbeat system
     #[cfg(feature = "hydrate")]
     {
         create_effect(move |_| {
             if matches!(connection_status.get(), ConnectionStatus::Connected) {
-                // Send heartbeat every 30 seconds
                 let send_heartbeat = ws_actions.send_heartbeat.clone();
                 let interval_handle = super::utils::set_interval_with_handle(
                     move || {
@@ -163,7 +165,7 @@ pub fn RealtimeTestSession() -> impl IntoView {
         });
     }
 
-    //detect tab close for user
+    // Detect tab close for user
     #[cfg(feature = "hydrate")]
     {
         use wasm_bindgen::prelude::*;
@@ -172,7 +174,6 @@ pub fn RealtimeTestSession() -> impl IntoView {
             if matches!(role.get(), Role::Teacher) {
                 let user_for_cleanup = user.clone();
 
-                // Only set up the event listener, don't trigger cleanup
                 let beforeunload_closure =
                     Closure::wrap(Box::new(move |_: web_sys::BeforeUnloadEvent| {
                         if let Some(current_user) = user_for_cleanup.get_untracked() {
@@ -202,10 +203,10 @@ pub fn RealtimeTestSession() -> impl IntoView {
         });
     }
 
-    // Submit handler
+    // Submit handler with weighted multiple choice support
     let handle_submit = create_action(move |_: &()| async move {
         let current_responses = responses.get();
-        let current_test_id = test_id_memo.get(); // Use memo instead of closure
+        let current_test_id = test_id_memo.get();
         let student_id = selected_student_id.get().unwrap_or(0);
         let evaluator = user().map(|u| u.id.to_string()).unwrap_or_default();
         let test_variant = 1;
@@ -219,11 +220,25 @@ pub fn RealtimeTestSession() -> impl IntoView {
 
             for question in sorted_questions {
                 if let Some(response) = current_responses.get(&question.qnumber) {
-                    let score = if response.answer == question.correct_answer {
-                        question.point_value
-                    } else {
-                        0
+                    let score = match question.question_type {
+                        QuestionType::WeightedMultipleChoice => {
+                            // Calculate weighted score
+                            if let Some(ref selected_opts) = response.selected_options {
+                                question.calculate_weighted_score(selected_opts)
+                            } else {
+                                0
+                            }
+                        }
+                        _ => {
+                            // Regular scoring logic
+                            if response.answer == question.correct_answer {
+                                question.point_value
+                            } else {
+                                0
+                            }
+                        }
                     };
+
                     test_scores.push(score);
                     comments.push(response.comment.clone());
                 } else {
@@ -259,9 +274,9 @@ pub fn RealtimeTestSession() -> impl IntoView {
         }
     });
 
-    // Create or join session - Enhanced error handling
+    // Create or join session
     create_effect(move |_| {
-        let tid = test_id_memo.get(); // Use memo instead of closure
+        let tid = test_id_memo.get();
         let test_name = match &test_details() {
             Some(Some(test)) => test.name.clone(),
             _ => "Unknown Test".to_string(),
@@ -365,29 +380,6 @@ pub fn RealtimeTestSession() -> impl IntoView {
         }
     });
 
-    //periodic heartbeat to keep WebSocket connection alive
-    #[cfg(feature = "hydrate")]
-    {
-        create_effect(move |_| {
-            if matches!(connection_status.get(), ConnectionStatus::Connected) {
-                // Send heartbeat every 30 seconds using the WebSocketActions
-                let send_heartbeat = ws_actions.send_heartbeat.clone();
-                let interval_handle = super::utils::set_interval_with_handle(
-                    move || {
-                        send_heartbeat.call(()); // Just call the callback, no direct WebSocket access
-                    },
-                    std::time::Duration::from_secs(30),
-                );
-
-                on_cleanup(move || {
-                    if let Ok(handle) = interval_handle {
-                        handle.clear();
-                    }
-                });
-            }
-        });
-    }
-
     // Cleanup on unmount
     #[cfg(feature = "hydrate")]
     on_cleanup(move || {
@@ -408,212 +400,272 @@ pub fn RealtimeTestSession() -> impl IntoView {
     });
 
     view! {
-        <div class="p-4 max-w-screen h-screen overflow-y-auto bg-gray-50 mx-auto">
-            {/* Header */}
-            <div class="text-center mb-8">
-                <h2 class="text-2xl font-bold text-gray-800">
-                    {move || match &test_details.get() {
-                        Some(Some(test)) => format!("Realtime Test Session: {}", test.name.clone()),
-                        _ => format!("Test Session: {}", test_id_memo.get())
-                    }}
-                </h2>
-                <div class="mt-2 text-sm text-gray-600">
-                    {move || match role.get() {
-                        Role::Teacher => "You are the teacher for this session",
-                        Role::Student => "You are a student in this session",
-                        Role::Unknown => "Connecting to session..."
-                    }}
-                </div>
-            </div>
+        <div class="min-h-screen bg-gray-50">
+            {/* Minimal Top Bar */}
+            <div class="sticky top-0 z-10 bg-white/80 backdrop-blur-md border-b border-gray-100">
+                <div class="max-w-5xl mx-auto px-6 py-3">
+                    <div class="flex items-center justify-between">
+                        {/* Left: Student Select (Teacher only) */}
+                        <div class="flex-shrink-0">
+                            <Show when=move || matches!(role.get(), Role::Teacher)>
+                                <super::student_select::StudentSelect set_selected_student_id=set_selected_student_id />
+                            </Show>
+                        </div>
 
-            {/* Connection Status - FIXED: Explicit signal conversions */}
-            <ConnectionStatusIndicator
-                connection_status=Signal::derive(move || connection_status.get())
-                error_message=Signal::derive(move || error_message.get())
-            />
+                        {/* Center: Test Title */}
+                        <div class="flex-1 text-center px-8">
+                            <h1 class="text-lg font-medium text-gray-900 truncate">
+                                {move || match &test_details.get() {
+                                    Some(Some(test)) => format!("Live Test: {}", test.name),
+                                    _ => format!("Live Test: {}", test_id_memo.get())
+                                }}
+                            </h1>
+                        </div>
 
-            {/* Session Status */}
-            <div class="flex justify-between items-center mb-6 max-w-4xl mx-auto">
-                <div class="text-sm text-gray-600">
-                    <span class="font-medium">"Session ID: "</span>
-                    {move || room_id.get().map(|id| id.to_string()).unwrap_or_else(|| "Connecting...".to_string())}
-                </div>
-                <div class="text-sm text-gray-600">
-                    <span class="font-medium">"Status: "</span>
-                    {move || if is_test_active.get() { "Active" } else { "Waiting" }}
-                </div>
-                <div class="text-sm text-gray-600">
-                    <span class="font-medium">"Time: "</span>
-                    {move || formatted_time()}
-                </div>
-            </div>
-
-            {/* Teacher Controls - FIXED: Explicit signal conversions */}
-            <TestControls
-                role=Signal::derive(move || role.get())
-                is_test_active=Signal::derive(move || is_test_active.get())
-                is_submitted=Signal::derive(move || is_submitted.get())
-                connection_status=Signal::derive(move || connection_status.get())
-                selected_student_id=Signal::derive(move || selected_student_id.get())
-                room_id=Signal::derive(move || room_id.get())
-                test_id=Signal::derive(move || test_id_memo.get())
-                set_selected_student_id=set_selected_student_id
-                start_test={
-                    #[cfg(feature = "hydrate")]
-                    {ws_actions.start_test}
-                    #[cfg(not(feature = "hydrate"))]
-                    {Callback::new(|_| {})}
-                }
-                end_test={
-                    #[cfg(feature = "hydrate")]
-                    {ws_actions.end_test}
-                    #[cfg(not(feature = "hydrate"))]
-                    {Callback::new(|_| {})}
-                }
-            />
-
-            {/* Participants List - FIXED: Explicit signal conversions */}
-            <ParticipantsList
-                connected_students=Signal::derive(move || connected_students.get())
-                role=Signal::derive(move || role.get())
-            />
-
-            {/* Test Content */}
-            <Show when=move || is_test_active.get() || matches!(role.get(), Role::Teacher)>
-                <Suspense fallback=move || view! {
-                    <div class="flex justify-center items-center h-64">
-                        <div class="animate-pulse bg-white rounded-lg shadow-md w-full max-w-2xl h-64 flex items-center justify-center">
-                            <p class="text-gray-400">"Loading questions..."</p>
+                        {/* Right: Role and Status */}
+                        <div class="flex items-center gap-3">
+                            <div class="text-sm text-gray-500 font-medium hidden sm:block">
+                                {move || match role.get() {
+                                    Role::Teacher => "Teacher",
+                                    Role::Student => "Student",
+                                    Role::Unknown => "Connecting..."
+                                }}
+                            </div>
                         </div>
                     </div>
-                }>
-                    {move || match questions.get() {
-                        None => view! {<div class="text-center py-8">"Loading..."</div>}.into_view(),
-                        Some(questions_vec) if questions_vec.is_empty() => {
-                            view! {<div class="text-center py-8 text-red-500">"No questions found for this test ID."</div>}.into_view()
-                        },
-                        Some(questions_vec) => {
-                            let total_questions = questions_vec.len();
-                            let current_question = create_memo(move |_| {
-                                questions_vec.get(current_card_index.get()).cloned().unwrap_or_else(|| {
-                                    questions_vec.first().cloned().unwrap()
-                                })
-                            });
+                </div>
+            </div>
 
-                            view! {
-                                <div class="flex flex-col items-center justify-center">
-                                    {/* Progress Bar */}
-                                    <div class="w-full max-w-2xl mb-4">
-                                        <div class="flex justify-between mb-1 text-xs text-gray-700">
-                                            <span>"Progress"</span>
-                                            <span>{move || format!("{:.1}%", calculate_answered_percentage())}</span>
-                                        </div>
-                                        <div class="mb-4 w-full bg-gray-200 rounded-full h-2.5">
-                                            <div
-                                                class="bg-gradient-to-r from-blue-500 to-purple-600 h-2.5 rounded-full transition-all duration-1500 ease-in"
-                                                style=move || format!("width: {}%", calculate_answered_percentage())
-                                            ></div>
-                                        </div>
-                                    </div>
+            <div class="max-w-5xl mx-auto px-6 py-4">
+                {/* Connection Status */}
+                <ConnectionStatusIndicator
+                    connection_status=Signal::derive(move || connection_status.get())
+                    error_message=Signal::derive(move || error_message.get())
+                />
 
-                                    {/* Card Counter */}
-                                    <div class="text-center mb-4">
-                                        <span class="inline-flex items-center justify-center bg-white text-sm font-medium text-gray-700 px-3 py-1 rounded-full shadow-sm border border-gray-200">
-                                            {move || current_card_index.get() + 1}
-                                            " / "
-                                            {total_questions}
-                                            <span class="ml-2 text-purple-600 font-semibold">
-                                                {move || current_question().point_value}
-                                                " pts"
-                                            </span>
-                                        </span>
-                                    </div>
+                {/* Session Status */}
+                <div class="flex justify-center items-center mb-3 space-x-8 text-sm">
+                    <Show when=move || !formatted_time().is_empty()>
+                        <div class="text-gray-600">
+                            <span class="font-medium">"Time: "</span>
+                            {move || formatted_time()}
+                        </div>
+                    </Show>
+                </div>
 
-                                    {/* Question Card - FIXED: Explicit signal conversions */}
-                                    <QuestionCard
-                                        question=current_question()
-                                        role=Signal::derive(move || role.get())
-                                        responses=Signal::derive(move || responses.get())
-                                        should_disable_inputs=Signal::derive(move || should_disable_inputs.get())
-                                        on_answer_change={
-                                            #[cfg(feature = "hydrate")]
-                                            {ws_actions.handle_answer_change}
-                                            #[cfg(not(feature = "hydrate"))]
-                                            {Callback::new(|_| {})}
-                                        }
-                                        on_comment_change={
-                                            #[cfg(feature = "hydrate")]
-                                            {ws_actions.handle_comment_change}
-                                            #[cfg(not(feature = "hydrate"))]
-                                            {Callback::new(|_| {})}
-                                        }
-                                    />
-
-                                    {/* Navigation Controls - FIXED: Explicit signal conversions */}
-                                    <NavigationControls
-                                        role=Signal::derive(move || role.get())
-                                        is_test_active=Signal::derive(move || is_test_active.get())
-                                        is_submitted=Signal::derive(move || is_submitted.get())
-                                        should_disable_inputs=Signal::derive(move || should_disable_inputs.get())
-                                        current_card_index=Signal::derive(move || current_card_index.get())
-                                        total_questions=Signal::derive(move || total_questions)
-                                        selected_student_id=Signal::derive(move || selected_student_id.get())
-                                        on_previous={
-                                            #[cfg(feature = "hydrate")]
-                                            {ws_actions.go_to_previous_card}
-                                            #[cfg(not(feature = "hydrate"))]
-                                            {Callback::new(|_| {})}
-                                        }
-                                        on_next={
-                                            #[cfg(feature = "hydrate")]
-                                            {ws_actions.go_to_next_card}
-                                            #[cfg(not(feature = "hydrate"))]
-                                            {Callback::new(|_| {})}
-                                        }
-                                        on_submit=Callback::new(move |_| handle_submit.dispatch(()))
-                                    />
-
-                                    {/* Submission Status */}
-                                    <Show when=move || is_submitted.get()>
-                                        <div class="mt-8 text-center">
-                                            <div class="inline-flex items-center px-4 py-2 rounded-full bg-green-100 text-green-800 mb-4">
-                                                <span class="mr-2">"✓"</span>
-                                                "Assessment submitted successfully!"
-                                            </div>
-                                            <div>
-                                                <button
-                                                    class="px-5 py-2 mt-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-colors"
-                                                    on:click=move |_| {
-                                                        let navigate = leptos_router::use_navigate();
-                                                        navigate("/dashboard", Default::default());
-                                                    }
-                                                >
-                                                    "Return to Dashboard"
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </Show>
-                                </div>
-                            }.into_view()
+                {/* Teacher Controls */}
+                <div class="mb-4">
+                    <TestControls
+                        role=Signal::derive(move || role.get())
+                        is_test_active=Signal::derive(move || is_test_active.get())
+                        is_submitted=Signal::derive(move || is_submitted.get())
+                        connection_status=Signal::derive(move || connection_status.get())
+                        selected_student_id=Signal::derive(move || selected_student_id.get())
+                        room_id=Signal::derive(move || room_id.get())
+                        test_id=Signal::derive(move || test_id_memo.get())
+                        start_test={
+                            #[cfg(feature = "hydrate")]
+                            {ws_actions.start_test}
+                            #[cfg(not(feature = "hydrate"))]
+                            {Callback::new(|_| {})}
                         }
-                    }}
-                </Suspense>
-            </Show>
+                        end_test={
+                            #[cfg(feature = "hydrate")]
+                            {ws_actions.end_test}
+                            #[cfg(not(feature = "hydrate"))]
+                            {Callback::new(|_| {})}
+                        }
+                    />
+                </div>
 
-            {/* Session Join Information (when test is not active and for students) */}
-            <Show when=move || !is_test_active.get() && matches!(role.get(), Role::Student)>
-                <div class="flex flex-col items-center justify-center py-12 max-w-md mx-auto">
-                    <div class="bg-white p-8 rounded-lg shadow-md w-full text-center">
-                        <h3 class="text-xl font-medium mb-4">"Waiting for Test to Start"</h3>
-                        <p class="text-gray-600 mb-6">"Your teacher will start the test soon. Please stand by."</p>
-                        <div class="animate-pulse flex justify-center">
-                            <div class="h-4 w-4 bg-blue-400 rounded-full mr-1"></div>
-                            <div class="h-4 w-4 bg-blue-500 rounded-full mr-1 animation-delay-200"></div>
-                            <div class="h-4 w-4 bg-blue-600 rounded-full animation-delay-400"></div>
+                {/* Compact Participants Dropdown */}
+                <div class="mb-4">
+                    <button
+                        class="w-full flex items-center justify-between px-4 py-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                        on:click=move |_| set_show_participants.update(|show| *show = !*show)
+                    >
+                        <div class="flex items-center gap-3">
+                            <div class="w-2 h-2 bg-green-400 rounded-full"></div>
+                            <span class="font-medium text-gray-700">
+                                {move || format!("{} Connected", connected_students.get().len())}
+                            </span>
+                        </div>
+                        <svg
+                            class=move || format!("w-4 h-4 text-gray-400 transition-transform {}",
+                                if show_participants.get() { "rotate-180" } else { "" })
+                            fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                        >
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
+
+                    <Show when=move || show_participants.get()>
+                        <div class="mt-2 p-3 bg-white border border-gray-200 rounded-lg shadow-sm">
+                            <ParticipantsList
+                                connected_students=Signal::derive(move || connected_students.get())
+                                role=Signal::derive(move || role.get())
+                            />
+                        </div>
+                    </Show>
+                </div>
+
+                {/* Test Content */}
+                <Show when=move || is_test_active.get() || matches!(role.get(), Role::Teacher)>
+                    <Suspense fallback=move || view! {
+                        <div class="flex items-center justify-center h-96">
+                            <div class="flex flex-col items-center gap-4">
+                                <div class="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                                <p class="text-gray-500 text-sm">"Loading questions..."</p>
+                            </div>
+                        </div>
+                    }>
+                        {move || match questions.get() {
+                            None => view! {
+                                <div class="text-center py-8">"Loading..."</div>
+                            }.into_view(),
+                            Some(questions_vec) if questions_vec.is_empty() => {
+                                view! {
+                                    <div class="flex items-center justify-center h-96">
+                                        <div class="text-center">
+                                            <div class="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                                                <svg class="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.268 18.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                                                </svg>
+                                            </div>
+                                            <p class="text-gray-500">"No questions found for this test."</p>
+                                        </div>
+                                    </div>
+                                }.into_view()
+                            },
+                            Some(questions_vec) => {
+                                let total_questions = questions_vec.len();
+                                let current_question = create_memo(move |_| {
+                                    questions_vec.get(current_card_index.get()).cloned().unwrap_or_else(|| {
+                                        questions_vec.first().cloned().unwrap()
+                                    })
+                                });
+
+                                view! {
+                                    <div class="space-y-6">
+                                        {/* Progress Section */}
+                                        <div class="text-center space-y-2">
+                                            {/* Progress Bar */}
+                                            <div class="w-full max-w-md mx-auto">
+                                                <div class="bg-gray-100 rounded-full h-1">
+                                                    <div
+                                                        class="bg-gradient-to-r from-blue-500 to-indigo-600 h-1 rounded-full transition-all duration-700 ease-out"
+                                                        style=move || format!("width: {}%", calculate_answered_percentage())
+                                                    ></div>
+                                                </div>
+                                            </div>
+
+                                            {/* Question Counter */}
+                                            <div class="flex items-center justify-center gap-6 text-sm">
+                                                <span class="text-gray-500">
+                                                    "Question " {move || current_card_index.get() + 1} " of " {total_questions}
+                                                </span>
+                                                <span class="px-3 py-1 bg-indigo-50 text-indigo-700 rounded-full font-medium">
+                                                    {move || current_question().point_value} " points"
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        {/* Question Card */}
+                                        <div class="max-w-4xl mx-auto">
+                                            <QuestionCard
+                                                question=current_question()
+                                                role=Signal::derive(move || role.get())
+                                                responses=Signal::derive(move || responses.get())
+                                                should_disable_inputs=Signal::derive(move || should_disable_inputs.get())
+                                                on_answer_change={
+                                                    #[cfg(feature = "hydrate")]
+                                                    {ws_actions.handle_answer_change}
+                                                    #[cfg(not(feature = "hydrate"))]
+                                                    {Callback::new(|_| {})}
+                                                }
+                                                on_comment_change={
+                                                    #[cfg(feature = "hydrate")]
+                                                    {ws_actions.handle_comment_change}
+                                                    #[cfg(not(feature = "hydrate"))]
+                                                    {Callback::new(|_| {})}
+                                                }
+                                                on_weighted_selection={
+                                                    #[cfg(feature = "hydrate")]
+                                                    {ws_actions.handle_weighted_selection}
+                                                    #[cfg(not(feature = "hydrate"))]
+                                                    {Callback::new(|_| {})}
+                                                }
+                                            />
+                                        </div>
+
+                                        {/* Navigation Controls */}
+                                        <NavigationControls
+                                            role=Signal::derive(move || role.get())
+                                            is_test_active=Signal::derive(move || is_test_active.get())
+                                            is_submitted=Signal::derive(move || is_submitted.get())
+                                            should_disable_inputs=Signal::derive(move || should_disable_inputs.get())
+                                            current_card_index=Signal::derive(move || current_card_index.get())
+                                            total_questions=Signal::derive(move || total_questions)
+                                            selected_student_id=Signal::derive(move || selected_student_id.get())
+                                            on_previous={
+                                                #[cfg(feature = "hydrate")]
+                                                {ws_actions.go_to_previous_card}
+                                                #[cfg(not(feature = "hydrate"))]
+                                                {Callback::new(|_| {})}
+                                            }
+                                            on_next={
+                                                #[cfg(feature = "hydrate")]
+                                                {ws_actions.go_to_next_card}
+                                                #[cfg(not(feature = "hydrate"))]
+                                                {Callback::new(|_| {})}
+                                            }
+                                            on_submit=Callback::new(move |_| handle_submit.dispatch(()))
+                                        />
+
+                                        {/* Submission Status */}
+                                        <Show when=move || is_submitted.get()>
+                                            <div class="text-center pt-4">
+                                                <div class="inline-flex items-center gap-3 px-6 py-3 bg-green-50 border border-green-200 rounded-lg text-green-800">
+                                                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                                                    </svg>
+                                                    "Assessment submitted successfully!"
+                                                </div>
+                                                <div class="mt-4">
+                                                    <button
+                                                        class="px-5 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                                                        on:click=move |_| {
+                                                            let navigate = leptos_router::use_navigate();
+                                                            navigate("/dashboard", Default::default());
+                                                        }
+                                                    >
+                                                        "Return to Dashboard"
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </Show>
+                                    </div>
+                                }.into_view()
+                            }
+                        }}
+                    </Suspense>
+                </Show>
+
+                {/* Waiting Message for Students */}
+                <Show when=move || !is_test_active.get() && matches!(role.get(), Role::Student)>
+                    <div class="flex flex-col items-center justify-center py-12 max-w-md mx-auto">
+                        <div class="bg-white p-8 rounded-lg shadow-md w-full text-center">
+                            <h3 class="text-xl font-medium mb-4">"Waiting for Test to Start"</h3>
+                            <p class="text-gray-600 mb-6">"Your teacher will start the test soon. Please stay connected."</p>
+                            <div class="animate-pulse flex justify-center">
+                                <div class="h-4 w-4 bg-blue-400 rounded-full mr-1"></div>
+                                <div class="h-4 w-4 bg-blue-500 rounded-full mr-1 animation-delay-200"></div>
+                                <div class="h-4 w-4 bg-blue-600 rounded-full animation-delay-400"></div>
+                            </div>
                         </div>
                     </div>
-                </div>
-            </Show>
+                </Show>
+            </div>
         </div>
     }
 }

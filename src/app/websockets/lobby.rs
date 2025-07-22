@@ -21,7 +21,6 @@ use {
 #[cfg(feature = "ssr")]
 type Socket = Recipient<WsMessage>;
 
-#[cfg(feature = "ssr")]
 #[derive(Debug, Clone)]
 pub struct AnonymousStudent {
     pub id: String,
@@ -114,7 +113,6 @@ impl Lobby {
         }
     }
 
-    // NEW: Handle anonymous student join
     fn handle_anonymous_student_join(
         &mut self,
         msg: serde_json::Value,
@@ -362,13 +360,25 @@ impl Lobby {
                             })
                         };
 
+                    // Enhanced answer message to include answer type
+                    let mut answer_data = msg.payload.clone();
+
+                    // Ensure we preserve the answer_type if it exists
+                    if !answer_data.as_object().unwrap().contains_key("answer_type") {
+                        answer_data
+                            .as_object_mut()
+                            .unwrap()
+                            .insert("answer_type".to_string(), json!("regular"));
+                    }
+
                     let answer_msg = json!({
                         "type": "student_answer",
                         "student_id": msg.id.to_string(),
                         "student_info": student_info,
-                        "answer_data": msg.payload,
+                        "answer_data": answer_data,
                     });
 
+                    // Send to all teachers in the room
                     for user_id in room_users.iter() {
                         if let Some(role) = self.room_roles.get(&(msg.room_id, *user_id)) {
                             if role == "teacher" {
@@ -385,8 +395,13 @@ impl Lobby {
                         "comment": msg.payload,
                     });
 
+                    // Send to all students in the room
                     for user_id in room_users.iter() {
-                        self.send_message(&comment_msg.to_string(), user_id);
+                        if let Some(role) = self.room_roles.get(&(msg.room_id, *user_id)) {
+                            if role == "student" {
+                                self.send_message(&comment_msg.to_string(), user_id);
+                            }
+                        }
                     }
                 }
             }
@@ -410,8 +425,13 @@ impl Lobby {
                         "question_data": msg.payload,
                     });
 
+                    // Send to all students in the room
                     for user_id in room_users.iter() {
-                        self.send_message(&focus_msg.to_string(), user_id);
+                        if let Some(role) = self.room_roles.get(&(msg.room_id, *user_id)) {
+                            if role == "student" {
+                                self.send_message(&focus_msg.to_string(), user_id);
+                            }
+                        }
                     }
                 }
             }
@@ -428,6 +448,7 @@ impl Lobby {
                 }
             }
             _ => {
+                // Handle other message types
                 if let Some(room_users) = self.rooms.get(&msg.room_id) {
                     let msg_json = json!({
                         "type": format!("{:?}", msg.message_type).to_lowercase(),
@@ -550,26 +571,30 @@ impl Handler<Connect> for Lobby {
 
         // Improved role assignment logic
         if !self.room_roles.contains_key(&(msg.lobby_id, msg.self_id)) {
-            let room_users_count = self.rooms.get(&msg.lobby_id).map_or(0, |users| users.len());
+            let is_anonymous_student = self.anonymous_students.contains_key(&msg.self_id);
 
-            // For now, assign teacher to first user in test sessions
-            // You might want to pass user permissions through the Connect message
-            let role = if room_users_count <= 1 {
-                // First user in the room gets teacher role
-                "teacher"
+            if is_anonymous_student {
+                self.room_roles
+                    .insert((msg.lobby_id, msg.self_id), "student".to_string());
             } else {
-                "student"
-            };
+                let room_users_count = self.rooms.get(&msg.lobby_id).map_or(0, |users| users.len());
+                let role = if room_users_count < 1 {
+                    // First user in the room gets teacher role
+                    "teacher"
+                } else {
+                    "student"
+                };
 
-            self.room_roles
-                .insert((msg.lobby_id, msg.self_id), role.to_string());
-            log::info!(
-                "Assigned role '{}' to user {} in room {} (room size: {})",
-                role,
-                msg.self_id,
-                msg.lobby_id,
-                room_users_count
-            );
+                self.room_roles
+                    .insert((msg.lobby_id, msg.self_id), role.to_string());
+                log::info!(
+                    "Assigned role '{}' to user {} in room {} (room size: {})",
+                    role,
+                    msg.self_id,
+                    msg.lobby_id,
+                    room_users_count
+                );
+            }
         }
 
         // Store the connection
@@ -699,7 +724,7 @@ impl Handler<UserInfoMessage> for Lobby {
     }
 }
 
-// NEW: Handler for anonymous student joins
+// Handler for anonymous student joins
 #[cfg(feature = "ssr")]
 #[derive(Message)]
 #[rtype(result = "()")]

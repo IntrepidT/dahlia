@@ -14,6 +14,17 @@ pub enum ConnectionStatus {
 pub struct QuestionResponse {
     pub answer: String,
     pub comment: String,
+    pub selected_options: Option<Vec<String>>,
+}
+
+impl QuestionResponse {
+    pub fn new() -> Self {
+        Self {
+            answer: String::new(),
+            comment: String::new(),
+            selected_options: None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]

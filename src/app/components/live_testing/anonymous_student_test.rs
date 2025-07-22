@@ -5,7 +5,7 @@ use leptos::*;
 use leptos_router::*;
 use log;
 use std::collections::HashMap;
-use uuid::Uuid; // Import QuestionResponse from types
+use uuid::Uuid;
 
 #[cfg(feature = "hydrate")]
 use {
@@ -30,6 +30,13 @@ pub fn AnonymousStudentTest() -> impl IntoView {
     let (current_card_index, set_current_card_index) = create_signal(0);
     let (responses, set_responses) = create_signal(HashMap::<i32, QuestionResponse>::new());
     let (remaining_time, set_remaining_time) = create_signal::<Option<i32>>(None);
+    let (user_role, set_user_role) = create_signal(Role::Student);
+
+    //Read-only mode control signal
+    let (is_read_only, set_is_read_only) = create_signal(true);
+
+    let should_disable_inputs =
+        create_memo(move |_| matches!(user_role.get(), Role::Student | Role::Unknown));
 
     #[cfg(feature = "hydrate")]
     let (ws, set_ws) = create_signal::<Option<WebSocket>>(None);
@@ -56,7 +63,11 @@ pub fn AnonymousStudentTest() -> impl IntoView {
             return Vec::new();
         }
         match get_questions(tid).await {
-            Ok(questions) => questions,
+            Ok(mut questions) => {
+                // Sort questions by qnumber to ensure consistent ordering
+                questions.sort_by_key(|q| q.qnumber);
+                questions
+            }
             Err(e) => {
                 log::error!("Failed to fetch questions: {}", e);
                 Vec::new()
@@ -121,7 +132,24 @@ pub fn AnonymousStudentTest() -> impl IntoView {
                                     {
                                         match msg_type {
                                             "role_assigned" => {
-                                                log::info!("Anonymous student role assigned");
+                                                if let Some(role_str) =
+                                                    json_value.get("role").and_then(|r| r.as_str())
+                                                {
+                                                    match role_str {
+                                                        "teacher" => {
+                                                            log::warn!("anonymous student incorrectly assigned teacher role, forcing to student");
+                                                            set_user_role.set(Role::Student);
+                                                        }
+                                                        "student" => {
+                                                            log::info!("Anonymous student correctly assigned student role");
+                                                            set_user_role.set(Role::Student);
+                                                        }
+                                                        _ => {
+                                                            log::warn!("Anonymous student assigned unknown role, defaulting to student");
+                                                            set_user_role.set(Role::Student);
+                                                        }
+                                                    }
+                                                }
                                             }
                                             "test_started" => {
                                                 log::info!("Test started for anonymous student");
@@ -156,7 +184,6 @@ pub fn AnonymousStudentTest() -> impl IntoView {
                                                 }
                                             }
                                             "teacher_comment" => {
-                                                // Handle teacher comments if needed
                                                 log::info!(
                                                     "Received teacher comment: {:?}",
                                                     json_value
@@ -257,15 +284,19 @@ pub fn AnonymousStudentTest() -> impl IntoView {
         }
     });
 
-    // Handle answer submission
+    // Handle answer submission (regular questions)
     #[cfg(feature = "hydrate")]
     let handle_answer_change = move |qnumber: i32, value: String| {
         // Update local state
+        //
+        //return early if read-only
+        if is_read_only.get() {
+            log::warn!("Attempted to change answer in read-only mode");
+            return;
+        }
+
         set_responses.update(|r| {
-            let response = r.entry(qnumber).or_insert(QuestionResponse {
-                answer: String::new(),
-                comment: String::new(),
-            });
+            let response = r.entry(qnumber).or_insert(QuestionResponse::new());
             response.answer = value.clone();
         });
 
@@ -275,13 +306,48 @@ pub fn AnonymousStudentTest() -> impl IntoView {
             "test_message_type": "submit_answer",
             "payload": {
                 "question_id": qnumber,
-                "answer": value
+                "answer": value,
+                "answer_type": "regular"
             }
         })
         .to_string();
 
         if let Some(socket) = ws.get() {
             let _ = socket.send_with_str(&answer_message);
+        }
+    };
+
+    // Handle weighted selection (WeightedMultipleChoice questions)
+    #[cfg(feature = "hydrate")]
+    let handle_weighted_selection = move |qnumber: i32, selected_options: Vec<String>| {
+        // Update local state
+
+        // Return early if read-only
+        if is_read_only.get() {
+            log::warn!("Attempted to change weighted selection in read-only mode");
+            return;
+        }
+
+        set_responses.update(|r| {
+            let response = r.entry(qnumber).or_insert(QuestionResponse::new());
+            response.selected_options = Some(selected_options.clone());
+            response.answer = serde_json::to_string(&selected_options).unwrap_or_default();
+        });
+
+        // Send to teacher
+        let weighted_message = json!({
+            "type": "test_message",
+            "test_message_type": "submit_answer",
+            "payload": {
+                "question_id": qnumber,
+                "selected_options": selected_options,
+                "answer_type": "weighted_multiple_choice"
+            }
+        })
+        .to_string();
+
+        if let Some(socket) = ws.get() {
+            let _ = socket.send_with_str(&weighted_message);
         }
     };
 
@@ -377,6 +443,9 @@ pub fn AnonymousStudentTest() -> impl IntoView {
                         <div class="mt-2 text-sm text-gray-600">
                             "Welcome, " {move || student_name.get()} " (ID: " {move || student_id_input.get()} ")"
                         </div>
+                        <div class="mt-1 text-xs text-gray-400">
+                            "Role: " {move || format!("{:?}", user_role.get())}
+                        </div>
                     </div>
 
                     {/* Connection Status */}
@@ -433,7 +502,6 @@ pub fn AnonymousStudentTest() -> impl IntoView {
                                     view! {<div class="text-center py-8 text-red-500">"No questions found."</div>}.into_view()
                                 },
                                 Some(questions_vec) => {
-                                    // FIXED: Clone questions_vec to avoid borrow after move
                                     let questions_len = questions_vec.len();
                                     let questions_clone = questions_vec.clone();
 
@@ -501,8 +569,10 @@ pub fn AnonymousStudentTest() -> impl IntoView {
                                                                                             on:change=move |ev| {
                                                                                                 #[cfg(feature = "hydrate")]
                                                                                                 {
-                                                                                                    let value = event_target_value(&ev);
-                                                                                                    handle_answer_change(qnumber, value);
+                                                                                                    if !is_read_only.get() {
+                                                                                                        let value = event_target_value(&ev);
+                                                                                                        handle_answer_change(qnumber, value);
+                                                                                                    }
                                                                                                 }
                                                                                             }
                                                                                         />
@@ -513,6 +583,144 @@ pub fn AnonymousStudentTest() -> impl IntoView {
                                                                         />
                                                                     </div>
                                                                 }.into_view(),
+                                                                QuestionType::WeightedMultipleChoice => {
+                                                                    let qnumber = q.qnumber;
+                                                                    let weighted_options = q.get_weighted_options();
+                                                                    let q_clone_for_calc = q.clone();
+
+                                                                    view! {
+                                                                        <div class="space-y-3">
+                                                                            <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
+                                                                                <p><strong>"Multiple selections allowed."</strong> " Each answer has different point values."</p>
+                                                                            </div>
+
+                                                                            <div class="space-y-2">
+                                                                                {weighted_options.clone().into_iter().enumerate().map(|(index, option)| {
+                                                                                    let option_clone = option.clone();
+                                                                                    let option_text = option.text.clone();
+                                                                                    let option_text_for_memo = option_text.clone();
+                                                                                    let option_text_for_change = option_text.clone();
+                                                                                    let choice_number = index + 1;
+
+                                                                                    let is_selected = create_memo(move |_| {
+                                                                                        responses.with(|r| {
+                                                                                            r.get(&qnumber)
+                                                                                                .and_then(|resp| resp.selected_options.as_ref())
+                                                                                                .map(|opts| opts.contains(&option_text_for_memo))
+                                                                                                .unwrap_or(false)
+                                                                                        })
+                                                                                    });
+
+                                                                                    view! {
+                                                                                        <div class=move || {
+                                                                                            let base_classes = "group flex items-center justify-between p-3 rounded-lg border transition-all duration-200";
+                                                                                            if option_clone.is_selectable {
+                                                                                                format!("{} border-gray-200 hover:border-blue-300 hover:bg-blue-50/50 cursor-pointer", base_classes)
+                                                                                            } else {
+                                                                                                format!("{} border-gray-200 bg-gray-50 cursor-not-allowed opacity-60", base_classes)
+                                                                                            }
+                                                                                        }
+                                                                                        on:click=move |_| {
+                                                                                            #[cfg(feature = "hydrate")]
+                                                                                            {
+                                                                                                if !is_read_only.get() && option_clone.is_selectable {
+                                                                                                    let current_selected = responses.with(|r| {
+                                                                                                        r.get(&qnumber)
+                                                                                                            .and_then(|resp| resp.selected_options.as_ref())
+                                                                                                            .cloned()
+                                                                                                            .unwrap_or_default()
+                                                                                                    });
+
+                                                                                                    let mut new_selected = current_selected;
+                                                                                                    if new_selected.contains(&option_text_for_change) {
+                                                                                                        new_selected.retain(|x| x != &option_text_for_change);
+                                                                                                    } else {
+                                                                                                        new_selected.push(option_text_for_change.clone());
+                                                                                                    }
+
+                                                                                                    handle_weighted_selection(qnumber, new_selected);
+                                                                                                }
+                                                                                            }
+                                                                                        }>
+                                                                                            <div class="flex items-center gap-3">
+                                                                                                <div class="relative flex-shrink-0">
+                                                                                                    {if option_clone.is_selectable {
+                                                                                                        view! {
+                                                                                                            <div class=move || {
+                                                                                                                if is_selected() {
+                                                                                                                    "w-5 h-5 rounded border-2 border-blue-500 bg-blue-500 flex items-center justify-center"
+                                                                                                                } else {
+                                                                                                                    "w-5 h-5 rounded border-2 border-gray-300 group-hover:border-blue-400 transition-colors"
+                                                                                                                }
+                                                                                                            }>
+                                                                                                                <Show when=move || is_selected()>
+                                                                                                                    <svg class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                                                                                                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                                                                                                                    </svg>
+                                                                                                                </Show>
+                                                                                                            </div>
+                                                                                                        }.into_view()
+                                                                                                    } else {
+                                                                                                        view! {
+                                                                                                            <div class="w-5 h-5 rounded border-2 border-gray-300 bg-gray-100"></div>
+                                                                                                        }.into_view()
+                                                                                                    }}
+                                                                                                </div>
+                                                                                                <div class="flex items-start gap-3">
+                                                                                                    <span class="text-xs text-gray-500 font-medium mt-1 min-w-[1rem]">
+                                                                                                        {choice_number}
+                                                                                                    </span>
+                                                                                                    <span class="leading-relaxed break-words">
+                                                                                                        {option_clone.text.clone()}
+                                                                                                    </span>
+                                                                                                </div>
+                                                                                            </div>
+                                                                                            <div class="flex items-center gap-2">
+                                                                                                // Dont display bc this is the student screen
+                                                                                                /*<span class=move || {
+                                                                                                    if option_clone.points >= 0 {
+                                                                                                        "text-green-600 font-semibold text-sm"
+                                                                                                    } else {
+                                                                                                        "text-red-600 font-semibold text-sm"
+                                                                                                    }
+                                                                                                }>
+                                                                                                    {if option_clone.points >= 0 { "+" } else { "" }}
+                                                                                                    {option_clone.points}
+                                                                                                    " pts"
+                                                                                                </span>*/
+                                                                                                {if !option_clone.is_selectable {
+                                                                                                    view! {
+                                                                                                        <span class="text-xs text-gray-400 italic">"(info only)"</span>
+                                                                                                    }.into_view()
+                                                                                                } else {
+                                                                                                    view! { <span></span> }.into_view()
+                                                                                                }}
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    }
+                                                                                }).collect_view()}
+                                                                            </div>
+
+                                                                            <div class="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                                                                                <div class="text-sm text-gray-700">
+                                                                                    "Current score: "
+                                                                                    <span class="font-semibold text-indigo-600">
+                                                                                        {move || {
+                                                                                            let selected = responses.with(|r| {
+                                                                                                r.get(&qnumber)
+                                                                                                    .and_then(|resp| resp.selected_options.as_ref())
+                                                                                                    .cloned()
+                                                                                                    .unwrap_or_default()
+                                                                                            });
+                                                                                            q_clone_for_calc.calculate_weighted_score(&selected)
+                                                                                        }}
+                                                                                        " / " {q.point_value} " points"
+                                                                                    </span>
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    }.into_view()
+                                                                },
                                                                 QuestionType::TrueFalse => {
                                                                     let qnumber = q.qnumber;
                                                                     let is_true = create_memo(move |_| {
@@ -543,8 +751,11 @@ pub fn AnonymousStudentTest() -> impl IntoView {
                                                                                 class:text-white={move || is_true()}
                                                                                 class:border-transparent={move || is_true()}
                                                                                 on:click=move |_| {
-                                                                                    #[cfg(feature = "hydrate")]
-                                                                                    handle_answer_change(qnumber, "true".to_string());
+                                                                                    #[cfg(feature = "hydrate")]{
+                                                                                        if !is_read_only.get() {
+                                                                                            handle_answer_change(qnumber, "true".to_string());
+                                                                                        }
+                                                                                    }
                                                                                 }
                                                                             >
                                                                                 "True"
@@ -587,8 +798,10 @@ pub fn AnonymousStudentTest() -> impl IntoView {
                                                                                 on:input=move |ev| {
                                                                                     #[cfg(feature = "hydrate")]
                                                                                     {
-                                                                                        let value = event_target_value(&ev);
-                                                                                        handle_answer_change(qnumber, value);
+                                                                                        if !is_read_only.get() {
+                                                                                            let value = event_target_value(&ev);
+                                                                                            handle_answer_change(qnumber, value);
+                                                                                        }
                                                                                     }
                                                                                 }
                                                                                 placeholder="Enter your answer here..."

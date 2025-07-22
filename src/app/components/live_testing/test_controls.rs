@@ -1,4 +1,3 @@
-use super::student_select::StudentSelect;
 use super::types::{ConnectionStatus, Role};
 use leptos::*;
 use uuid::Uuid;
@@ -15,7 +14,6 @@ pub fn TestControls(
     #[prop(into)] selected_student_id: Signal<Option<i32>>,
     #[prop(into)] room_id: Signal<Option<Uuid>>,
     #[prop(into)] test_id: Signal<String>,
-    set_selected_student_id: WriteSignal<Option<i32>>,
     #[prop(into)] start_test: Callback<()>,
     #[prop(into)] end_test: Callback<()>,
 ) -> impl IntoView {
@@ -80,21 +78,16 @@ pub fn TestControls(
     };
 
     // Quick start for anonymous mode - FIXED: removed the argument expectation
-    let quick_start_test = move |_| {
+    /*let quick_start_test = move |_| {
         // Start test without requiring student selection for anonymous mode
         start_test.call(());
-    };
+    };*/
 
     view! {
         <Show when=move || matches!(role.get(), Role::Teacher)>
             <div class="mb-8 flex flex-wrap gap-4 justify-center">
                 <Show when=move || !is_test_active.get() && !is_submitted.get()>
                     <div class="w-full mb-4 flex flex-col items-center space-y-4">
-                        // Traditional mode with student selection
-                        <div class="w-full md:w-1/2">
-                            <StudentSelect set_selected_student_id=set_selected_student_id />
-                        </div>
-
                         // Action buttons
                         <div class="flex flex-wrap gap-2 justify-center">
                             // Share Link Button
@@ -108,14 +101,14 @@ pub fn TestControls(
                             </button>
 
                             // Quick Start (Anonymous Mode) - FIXED: call with empty argument
-                            <button
+                            /*<button
                                 class="px-5 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                                 on:click=move |ev| quick_start_test(ev)
                                 disabled=move || !matches!(connection_status.get(), ConnectionStatus::Connected)
                             >
                                 <span>"⚡"</span>
                                 "Quick Start"
-                            </button>
+                            </button>*/
 
                             // Traditional Start
                             <button
@@ -129,7 +122,7 @@ pub fn TestControls(
                         </div>
 
                         // Helper text
-                        <div class="text-sm text-gray-600 text-center max-w-2xl">
+                        /*<div class="text-sm text-gray-600 text-center max-w-2xl">
                             <p class="mb-2">
                                 <strong>"Share Test Link:"</strong> " Students join instantly without logging in"
                             </p>
@@ -139,7 +132,7 @@ pub fn TestControls(
                             <p>
                                 <strong>"Traditional:"</strong> " Select a specific student first"
                             </p>
-                        </div>
+                        </div>*/
                     </div>
                 </Show>
 
