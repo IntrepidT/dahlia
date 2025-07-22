@@ -907,7 +907,8 @@ pub fn FlashCardSet() -> impl IntoView {
                                                                         >
                                                                             <span class="text-xs text-gray-500 font-medium">1</span>
                                                                             <span class=move || font_settings.get().get_answer_classes()>
-                                                                                "True"
+                                                                                "Yes" //manually
+                                                                            //changed to "Yes" for consistency
                                                                             </span>
                                                                         </button>
                                                                         <button
@@ -925,7 +926,8 @@ pub fn FlashCardSet() -> impl IntoView {
                                                                         >
                                                                             <span class="text-xs text-gray-500 font-medium">2</span>
                                                                             <span class=move || font_settings.get().get_answer_classes()>
-                                                                                "False"
+                                                                                "No" //manually
+                                                                            //changed to "No" for consistency
                                                                             </span>
                                                                         </button>
                                                                     </div>

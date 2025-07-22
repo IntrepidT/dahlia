@@ -902,6 +902,8 @@ pub fn TestBuilderContent() -> impl IntoView {
                                         <option value="">"Please Select a Value"</option>
                                         <option value="Reading">"Reading"</option>
                                         <option value="Math">"Math"</option>
+                                        <option value="PhonemicAwareness">"Phonemic Awareness"</option>
+                                        <option value="Spelling">"Spelling"</option>
                                     </select>
                                 </div>
 
@@ -932,12 +934,18 @@ pub fn TestBuilderContent() -> impl IntoView {
                                     <select
                                         required
                                         class="w-full px-4 py-3 rounded-md border border-gray-300 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                                        prop:value={move || grade_level.get().map(|g| g.to_string()).unwrap_or_else(|| "None".to_string())}
+                                        prop:value={move || grade_level.get().map(|g| g.to_string()).unwrap_or_else(|| "".to_string())}
                                         on:change=move |event| {
                                             let value = event_target_value(&event);
-                                            match value.parse::<GradeEnum>() {
-                                                Ok(grade_enum) => set_grade_level(Some(grade_enum)),
-                                                Err(_) => ()
+                                            if value.is_empty() || value == "None" {
+                                                set_grade_level(None);
+                                            } else {
+                                                match value.parse::<GradeEnum>() {
+                                                    Ok(grade_enum) => set_grade_level(Some(grade_enum)),
+                                                    Err(_) => {
+                                                        set_grade_level(None);
+                                                    }
+                                                }
                                             }
                                         }
                                     >

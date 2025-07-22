@@ -76,40 +76,49 @@ impl Lobby {
             msg.get("is_teacher").and_then(|t| t.as_bool()),
             msg.get("is_admin").and_then(|a| a.as_bool()),
         ) {
-            log::info!(
-                "Received user info - role: {}, is_teacher: {}, is_admin: {}",
-                role_str,
-                is_teacher,
-                is_admin
-            );
-
-            // Assign role based on actual permissions
             let assigned_role = if is_admin || is_teacher {
                 "teacher"
             } else {
                 "student"
             };
 
-            // Update or set the role
+            // Check if this is a teacher reconnecting/taking over
+            if assigned_role == "teacher"
+                && msg
+                    .get("is_reconnecting")
+                    .and_then(|r| r.as_bool())
+                    .unwrap_or(false)
+            {
+                log::info!("Teacher {} taking over session {}", user_id, room_id);
+
+                if let Some(room_users) = self.rooms.get(&room_id) {
+                    let reset_msg = json!({
+                        "type": "session_reset",
+                        "message": "Teacher has reconnected. Session is being reset."
+                    });
+
+                    for other_user_id in room_users.iter() {
+                        if other_user_id != &user_id {
+                            self.send_message(&reset_msg.to_string(), other_user_id);
+                        }
+                    }
+                }
+
+                self.active_tests.remove(&room_id);
+            }
+
             self.room_roles
                 .insert((room_id, user_id), assigned_role.to_string());
 
-            // Send role confirmation
-            let role_msg = serde_json::json!({
+            let role_msg = json!({
                 "type": "role_assigned",
                 "role": assigned_role,
                 "user_id": user_id.to_string(),
-                "room_id": room_id.to_string()
+                "room_id": room_id.to_string(),
+                "is_takeover": assigned_role == "teacher" && msg.get("is_reconnecting").and_then(|r| r.as_bool()).unwrap_or(false)
             });
 
-            log::info!(
-                "Assigning role '{}' to user {} based on permissions",
-                assigned_role,
-                user_id
-            );
             self.send_message(&role_msg.to_string(), &user_id);
-        } else {
-            log::warn!("Invalid user info message format");
         }
     }
 

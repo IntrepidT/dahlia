@@ -62,16 +62,14 @@ impl BenchmarkCategory {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Eq, Clone, EnumString)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Eq, Clone)]
 pub enum TestType {
-    #[strum(to_string = "Reading")]
     Reading,
-    #[strum(to_string = "Math")]
     Math,
-    #[strum(to_string = "Other")]
+    PhonemicAwareness,
+    Spelling,
     Other,
 }
-
 impl fmt::Display for TestType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
@@ -79,10 +77,26 @@ impl fmt::Display for TestType {
             "{}",
             match self {
                 TestType::Reading => "Reading".to_string(),
+                TestType::PhonemicAwareness => "PhonemicAwareness".to_string(),
+                TestType::Spelling => "Spelling".to_string(),
                 TestType::Math => "Math".to_string(),
                 TestType::Other => "Other".to_string(),
             }
         )
+    }
+}
+impl FromStr for TestType {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "Reading" => Ok(TestType::Reading),
+            "Math" => Ok(TestType::Math),
+            "PhonemicAwareness" | "Phonemic Awareness" => Ok(TestType::PhonemicAwareness),
+            "Spelling" => Ok(TestType::Spelling),
+            "Other" => Ok(TestType::Other),
+            _ => Err(format!("Invalid TestType: {}", s)),
+        }
     }
 }
 

@@ -17,10 +17,6 @@ use {
     web_sys::{CloseEvent, MessageEvent, WebSocket},
 };
 
-lazy_static::lazy_static! {
-    static ref ACTIVE_TEACHERS: Mutex<HashMap<String, Uuid>> = Mutex::new(HashMap::new());
-}
-
 pub struct WebSocketActions {
     pub start_test: Callback<()>,
     pub end_test: Callback<()>,
@@ -171,11 +167,6 @@ pub fn use_websocket_connection(
         .to_string();
 
         send_ws_message(end_message);
-
-        if !test_id_value.is_empty() {
-            handle_teacher_disconnect(test_id_value.clone());
-            log::info!("Cleared test form ACTIVE_TEACHERS: {}", test_id.get());
-        }
     });
 
     // Navigation handlers
@@ -454,7 +445,8 @@ fn setup_websocket_handlers(
                 "user_id": current_user.id,
                 "role": current_user.role,
                 "is_teacher": current_user.is_teacher(),
-                "is_admin": current_user.is_admin()
+                "is_admin": current_user.is_admin(),
+                "is_reconnecting": true,
             })
             .to_string();
 
@@ -544,6 +536,14 @@ fn handle_websocket_message(
                         _ => set_role.set(Role::Unknown),
                     }
                 }
+            }
+            "session_reset" => {
+                log::info!("Session reset by teacher - clearing local state");
+                set_responses.set(HashMap::new());
+                set_current_card_index.set(0);
+                set_is_test_active.set(false);
+                set_is_submitted.set(false);
+                set_remaining_time.set(None);
             }
             "participants_list" => {
                 if let Some(participants) =
@@ -750,28 +750,4 @@ pub fn use_websocket_connection(
         send_heartbeat: Callback::new(|_| {}),
         join_as_anonymous_student: Callback::new(|_| {}),
     }
-}
-
-// When teacher connects
-fn handle_teacher_connection(
-    test_id: String,
-    teacher_id: i32,
-    session_id: Uuid,
-) -> Result<(), String> {
-    let mut active_teachers = ACTIVE_TEACHERS.lock().unwrap();
-
-    if let Some(existing_session) = active_teachers.get(&test_id) {
-        if *existing_session != session_id {
-            return Err("Another teacher is already conducting this test".to_string());
-        }
-    }
-
-    active_teachers.insert(test_id, session_id);
-    Ok(())
-}
-
-// When teacher disconnects
-fn handle_teacher_disconnect(test_id: String) {
-    let mut active_teachers = ACTIVE_TEACHERS.lock().unwrap();
-    active_teachers.remove(&test_id);
 }

@@ -278,7 +278,7 @@ fn AnswerInput(
                             }
                         }
                     >
-                        "True"
+                        "Yes" //manually changed from "True" to "Yes" for clarity
                     </button>
                     <button
                         type="button"
@@ -297,7 +297,7 @@ fn AnswerInput(
                             }
                         }
                     >
-                        "False"
+                        "No" //manually changed from "False" to "No" for clarity
                     </button>
                 </div>
             }.into_view()

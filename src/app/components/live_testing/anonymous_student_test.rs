@@ -758,7 +758,9 @@ pub fn AnonymousStudentTest() -> impl IntoView {
                                                                                     }
                                                                                 }
                                                                             >
-                                                                                "True"
+                                                                                "Yes" //manually
+                                                                                //equivalent to
+                                                                                //"True"
                                                                             </button>
                                                                             <button
                                                                                 type="button"
@@ -775,7 +777,7 @@ pub fn AnonymousStudentTest() -> impl IntoView {
                                                                                     handle_answer_change(qnumber, "false".to_string());
                                                                                 }
                                                                             >
-                                                                                "False"
+                                                                                "No" //manuallyequivalent to "False"
                                                                             </button>
                                                                         </div>
                                                                     }.into_view()

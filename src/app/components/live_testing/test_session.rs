@@ -22,6 +22,38 @@ use serde_json::json;
 use std::collections::HashMap;
 use uuid::Uuid;
 
+// Helper function using your existing create_or_join_session - FIXED
+async fn create_new_session_with_existing_function(
+    tid: String,
+    test_name: String,
+    teacher_id: i32,
+    set_room_id: WriteSignal<Option<Uuid>>,
+    set_error_message: WriteSignal<Option<String>>,
+) {
+    let request = crate::app::models::websocket_session::CreateSessionRequest {
+        name: format!("Test Session for {}", test_name),
+        description: Some(format!("Test session for {}", tid)),
+        session_type: Some(crate::app::models::websocket_session::SessionType::Test),
+        test_id: Some(tid.clone()),
+        max_users: Some(30),
+        is_private: Some(false),
+        password: None,
+        metadata: None,
+        teacher_id: Some(teacher_id),
+    };
+
+    match websocket_sessions::create_or_join_session(request).await {
+        Ok(session) => {
+            log::info!("Created/joined session: {}", session.id);
+            set_room_id.set(Some(session.id)); // FIXED: Remove Uuid::parse_str()
+        }
+        Err(e) => {
+            log::error!("Failed to create/join session: {}", e);
+            set_error_message.set(Some(format!("Failed to create session: {}", e)));
+        }
+    }
+}
+
 #[component]
 pub fn RealtimeTestSession() -> impl IntoView {
     // Get test_id from URL parameters
@@ -283,64 +315,69 @@ pub fn RealtimeTestSession() -> impl IntoView {
         };
 
         if !tid.is_empty() {
-            spawn_local(async move {
-                log::info!("Attempting to create or join session for test: {}", tid);
+            if let Some(current_user) = user() {
+                let teacher_id = current_user.id as i32;
 
-                match websocket_sessions::get_test_sessions_by_test_id(tid.clone()).await {
-                    Ok(sessions) => {
-                        log::info!(
-                            "Found {} existing sessions for test {}",
-                            sessions.len(),
-                            tid
-                        );
+                spawn_local(async move {
+                    log::info!("Checking for existing teacher sessions for test: {}", tid);
 
-                        if let Some(active_session) = sessions.iter().find(|s| {
-                            let now = chrono::Utc::now();
-                            let active_threshold = now - chrono::Duration::minutes(5);
-                            s.last_active > active_threshold
-                                && s.start_time.is_none()
-                                && s.end_time.is_none()
-                        }) {
-                            log::info!("Joining existing active session: {}", active_session.id);
-                            set_room_id.set(Some(active_session.id));
-                        } else {
-                            log::info!("Creating new session for test: {}", test_name);
-                            let request =
-                                crate::app::models::websocket_session::CreateSessionRequest {
-                                    name: format!("Test Session for {}", test_name),
-                                    description: Some(format!("Test session for {}", tid)),
-                                    session_type: Some(
-                                        crate::app::models::websocket_session::SessionType::Test,
-                                    ),
-                                    test_id: Some(tid.clone()),
-                                    max_users: Some(30),
-                                    is_private: Some(false),
-                                    password: None,
-                                    metadata: None,
-                                    teacher_id: Some(
-                                        user().map(|u| u.id as i32).unwrap_or_default(),
-                                    ),
-                                };
+                    match websocket_sessions::get_teacher_active_session(teacher_id).await {
+                        Ok(Some(existing_session)) => {
+                            // Check if it's for the same test
+                            if existing_session
+                                .test_id
+                                .as_ref()
+                                .map_or(false, |test_id| test_id == &tid)
+                            {
+                                log::info!(
+                                    "Found existing session for same test - taking over: {}",
+                                    existing_session.id
+                                );
+                                set_room_id.set(Some(existing_session.id)); // FIXED: session.id is already Uuid
+                            } else {
+                                log::info!("Found session for different test - cleaning up and creating new");
+                                // Clean up old session
+                                let _ = websocket_sessions::cleanup_teacher_session_endpoint(
+                                    teacher_id,
+                                )
+                                .await;
 
-                            match websocket_sessions::create_session(request).await {
-                                Ok(session) => {
-                                    log::info!("Created new session: {}", session.id);
-                                    set_room_id.set(Some(session.id));
-                                }
-                                Err(e) => {
-                                    log::error!("Failed to create session: {}", e);
-                                    set_error_message
-                                        .set(Some(format!("Failed to create session: {}", e)));
-                                }
+                                // Create new session using your existing create_or_join_session
+                                create_new_session_with_existing_function(
+                                    tid,
+                                    test_name,
+                                    teacher_id,
+                                    set_room_id,
+                                    set_error_message,
+                                )
+                                .await;
                             }
                         }
+                        Ok(None) => {
+                            log::info!("No existing session found - creating new");
+                            create_new_session_with_existing_function(
+                                tid,
+                                test_name,
+                                teacher_id,
+                                set_room_id,
+                                set_error_message,
+                            )
+                            .await;
+                        }
+                        Err(e) => {
+                            log::error!("Error checking for teacher session: {}", e);
+                            create_new_session_with_existing_function(
+                                tid,
+                                test_name,
+                                teacher_id,
+                                set_room_id,
+                                set_error_message,
+                            )
+                            .await;
+                        }
                     }
-                    Err(e) => {
-                        log::error!("Failed to fetch test sessions: {}", e);
-                        set_error_message.set(Some(format!("Failed to fetch sessions: {}", e)));
-                    }
-                }
-            });
+                });
+            }
         }
     });
 
