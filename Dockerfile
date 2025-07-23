@@ -72,9 +72,9 @@ RUN chmod +x /app/dahlia
 ENV RUST_LOG="info"
 ENV LEPTOS_SITE_ADDR="0.0.0.0:8080"
 ENV LEPTOS_SITE_ROOT="./site"
-ENV SMTP_SERVER=smtp.sendgrid.net 
+ENV SMTP_SERVER=smtp.gmail.com 
 ENV SMTP_PORT=587 
-ENV SMTP_USERNAME=apikey 
+ENV SMTP_USERNAME=no-reply@teapottesting.com
 ENV APP_URL=https://www.teapottesting.com 
 ENV APP_ENV=production
 ENV RUST_ENV=production

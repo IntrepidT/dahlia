@@ -21,9 +21,11 @@ pub fn UpdateStudent(
     #[prop(optional)] on_cancel: Option<Callback<()>>,
     #[prop(optional)] on_update_success: Option<Callback<Student>>,
 ) -> impl IntoView {
-    // Create signals for each field
-    let (firstname, set_firstname) = create_signal(student.firstname.clone().unwrap());
-    let (lastname, set_lastname) = create_signal(student.lastname.clone().unwrap());
+    // Create signals for each field - FIXED: Handle None values safely
+    let (firstname, set_firstname) =
+        create_signal(student.firstname.clone().unwrap_or_else(|| "".to_string()));
+    let (lastname, set_lastname) =
+        create_signal(student.lastname.clone().unwrap_or_else(|| "".to_string()));
     let (preferred, set_preferred) = create_signal(student.preferred.clone());
     let (gender, set_gender) = create_signal(student.gender.clone().to_string());
     let (date_of_birth, set_date_of_birth) = create_signal(student.date_of_birth);
@@ -50,10 +52,11 @@ pub fn UpdateStudent(
             None => "None".to_string(),
         });
 
-    // Additional information
+    // Additional information - FIXED: Handle None pin value safely
     let (eye_glasses, set_eye_glasses) = create_signal(student.eye_glasses);
     let (notes, set_notes) = create_signal(student.notes.clone());
-    let (pin, set_pin) = create_signal(student.pin.clone().unwrap().to_string());
+    let (pin, set_pin) = create_signal(student.pin.unwrap_or(0).to_string());
+
     // For handling form submission
     let (is_submitting, set_is_submitting) = create_signal(false);
     let (error_message, set_error_message) = create_signal(String::new());
@@ -110,6 +113,21 @@ pub fn UpdateStudent(
         set_is_submitting(true);
         set_error_message(String::new());
         set_if_error(false);
+
+        // Validate required fields - FIXED: Check for empty strings
+        if firstname().trim().is_empty() {
+            set_if_error(true);
+            set_error_message(String::from("First name is required"));
+            set_is_submitting(false);
+            return;
+        }
+
+        if lastname().trim().is_empty() {
+            set_if_error(true);
+            set_error_message(String::from("Last name is required"));
+            set_is_submitting(false);
+            return;
+        }
 
         // Parse and validate student ID
         let validated_student_id = match student_id().parse::<i32>() {
@@ -344,7 +362,7 @@ pub fn UpdateStudent(
                                 <label class=INFO_TITLE_STYLE for="pin">"Pin"</label>
                                 <input
                                     type="number"
-                                    id="birthdate"
+                                    id="pin"
                                     class="mt-1 w-full rounded-md border p-2"
                                     value={pin}
                                     on:input=move |ev| set_pin(event_target_value(&ev))

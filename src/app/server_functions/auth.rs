@@ -507,3 +507,181 @@ pub async fn reset_password(
         Err(ServerFnError::ServerError("Not implemented".to_string()))
     }
 }
+
+// Test cases for the module
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::env;
+
+    // Helper function to check if we're in a testing environment with proper config
+    fn has_email_config() -> bool {
+        env::var("SMTP_USERNAME").is_ok()
+            && env::var("SMTP_PASSWORD").is_ok()
+            && env::var("TEST_EMAIL").is_ok()
+    }
+
+    // Test that validates email configuration without sending
+    #[test]
+    fn test_email_config_validation() {
+        // Load .env for testing
+        dotenv::dotenv().ok();
+
+        if !has_email_config() {
+            println!("⚠️  Skipping email config test - missing environment variables");
+            println!("   Set SMTP_USERNAME, SMTP_PASSWORD, and TEST_EMAIL to run email tests");
+            return;
+        }
+
+        let smtp_server = env::var("SMTP_SERVER").unwrap_or_else(|_| "smtp.gmail.com".to_string());
+        let smtp_username = env::var("SMTP_USERNAME").expect("SMTP_USERNAME should be set");
+        let smtp_password = env::var("SMTP_PASSWORD").expect("SMTP_PASSWORD should be set");
+        let from_email = env::var("FROM_EMAIL").unwrap_or_else(|| smtp_username.clone());
+
+        // Validate configuration
+        assert_eq!(
+            smtp_server, "smtp.gmail.com",
+            "Should use Gmail SMTP server"
+        );
+        assert!(
+            smtp_username.ends_with("@teapottesting.com"),
+            "Username should be from teapottesting.com domain"
+        );
+        assert!(
+            from_email.ends_with("@teapottesting.com"),
+            "From email should be from teapottesting.com domain"
+        );
+
+        // Validate password format (16 chars with or without spaces)
+        let password_clean = smtp_password.replace(" ", "");
+        assert_eq!(
+            password_clean.len(),
+            16,
+            "SMTP password should be 16 characters (Google App Password)"
+        );
+
+        println!("✅ Email configuration validation passed");
+        println!("   SMTP Server: {}", smtp_server);
+        println!("   Username: {}", smtp_username);
+        println!("   From Email: {}", from_email);
+        println!("   Password Length: {} chars", password_clean.len());
+    }
+
+    // Test that actually sends an email (requires network and valid config)
+    #[tokio::test]
+    async fn test_send_reset_email() {
+        // Load .env for testing
+        dotenv::dotenv().ok();
+
+        if !has_email_config() {
+            println!("⚠️  Skipping email send test - missing environment variables");
+            println!("   Set SMTP_USERNAME, SMTP_PASSWORD, and TEST_EMAIL to run email tests");
+            return;
+        }
+
+        let test_email =
+            env::var("TEST_EMAIL").expect("TEST_EMAIL should be set for integration tests");
+
+        // Import the email service
+        #[cfg(feature = "ssr")]
+        {
+            use crate::app::services::email_service;
+
+            println!("🧪 Testing email send to: {}", test_email);
+
+            match email_service::send_reset_email(&test_email, "test-token-from-cargo-test").await {
+                Ok(_) => {
+                    println!("✅ Test email sent successfully!");
+                    println!("   Check {} for the test email", test_email);
+                    println!("   Subject: TeaPot Testing - Password Reset Request");
+                }
+                Err(e) => {
+                    panic!("❌ Failed to send test email: {}", e);
+                }
+            }
+        }
+
+        #[cfg(not(feature = "ssr"))]
+        {
+            println!("⚠️  Email sending test skipped - not in SSR mode");
+        }
+    }
+
+    // Test password reset token generation and validation
+    #[tokio::test]
+    async fn test_password_reset_flow() {
+        dotenv::dotenv().ok();
+
+        if !has_email_config() {
+            println!("⚠️  Skipping password reset flow test - missing environment variables");
+            return;
+        }
+
+        let test_email = env::var("TEST_EMAIL").expect("TEST_EMAIL should be set");
+
+        #[cfg(feature = "ssr")]
+        {
+            println!("🧪 Testing full password reset flow for: {}", test_email);
+
+            // Test the request_password_reset function
+            match request_password_reset(test_email.clone()).await {
+                Ok(response) => {
+                    assert!(response.success, "Password reset request should succeed");
+                    println!("✅ Password reset request successful");
+                    println!("   Message: {}", response.message);
+                    println!("   Check {} for the reset email", test_email);
+                }
+                Err(e) => {
+                    panic!("❌ Password reset request failed: {:?}", e);
+                }
+            }
+        }
+
+        #[cfg(not(feature = "ssr"))]
+        {
+            println!("⚠️  Password reset flow test skipped - not in SSR mode");
+        }
+    }
+
+    // Benchmark test to check email sending performance
+    #[tokio::test]
+    async fn test_email_performance() {
+        dotenv::dotenv().ok();
+
+        if !has_email_config() {
+            println!("⚠️  Skipping email performance test - missing environment variables");
+            return;
+        }
+
+        #[cfg(feature = "ssr")]
+        {
+            use crate::app::services::email_service;
+            use std::time::Instant;
+
+            let test_email = env::var("TEST_EMAIL").expect("TEST_EMAIL should be set");
+
+            println!("⏱️  Testing email sending performance...");
+            let start = Instant::now();
+
+            match email_service::send_reset_email(&test_email, "performance-test-token").await {
+                Ok(_) => {
+                    let duration = start.elapsed();
+                    println!("✅ Email sent in {:?}", duration);
+
+                    // Email should send within reasonable time (30 seconds with our timeout)
+                    assert!(
+                        duration.as_secs() < 30,
+                        "Email should send within 30 seconds"
+                    );
+
+                    if duration.as_secs() > 10 {
+                        println!("⚠️  Email took longer than 10 seconds - consider checking network/SMTP config");
+                    }
+                }
+                Err(e) => {
+                    panic!("❌ Performance test failed: {}", e);
+                }
+            }
+        }
+    }
+}
