@@ -7,6 +7,8 @@ use super::{
     types::*,
     websocket_handler::{use_websocket_connection, WebSocketActions},
 };
+use crate::app::components::test_components::balloon_celebration::BalloonCelebration;
+use crate::app::components::test_components::font_controls::{use_font_settings, FontControls};
 use crate::app::models::question::{Question, QuestionType};
 use crate::app::models::score::CreateScoreRequest;
 use crate::app::models::test::Test;
@@ -79,6 +81,8 @@ pub fn RealtimeTestSession() -> impl IntoView {
     let (remaining_time, set_remaining_time) = create_signal::<Option<i32>>(None);
     let (should_disable_inputs, set_should_disable_inputs) = create_signal(true);
     let (show_participants, set_show_participants) = create_signal(false);
+    let (font_settings, set_font_settings) = use_font_settings();
+    let (show_celebration, set_show_celebration) = create_signal(false);
 
     // Initialize role based on user
     create_effect(move |_| {
@@ -295,6 +299,10 @@ pub fn RealtimeTestSession() -> impl IntoView {
                     "Successfully submitted score for student {}",
                     score.student_id
                 );
+
+                set_show_celebration.set(true);
+                set_is_submitted.set(true);
+
                 #[cfg(feature = "hydrate")]
                 ws_actions.end_test.call(());
                 Ok(())
@@ -461,6 +469,10 @@ pub fn RealtimeTestSession() -> impl IntoView {
 
                         {/* Right: Role and Status */}
                         <div class="flex items-center gap-3">
+                            <FontControls
+                                font_settings=font_settings
+                                set_font_settings=set_font_settings
+                            />
                             <div class="text-sm text-gray-500 font-medium hidden sm:block">
                                 {move || match role.get() {
                                     Role::Teacher => "Teacher",
@@ -614,6 +626,7 @@ pub fn RealtimeTestSession() -> impl IntoView {
                                                 role=Signal::derive(move || role.get())
                                                 responses=Signal::derive(move || responses.get())
                                                 should_disable_inputs=Signal::derive(move || should_disable_inputs.get())
+                                                font_settings=font_settings
                                                 on_answer_change={
                                                     #[cfg(feature = "hydrate")]
                                                     {ws_actions.handle_answer_change}
@@ -704,5 +717,12 @@ pub fn RealtimeTestSession() -> impl IntoView {
                 </Show>
             </div>
         </div>
+
+        {/* Balloon Celebration */}
+        <BalloonCelebration
+            show=Signal::derive(move || show_celebration.get())
+            message="🎉 Assessment Complete! 🎉"
+            duration=5000
+        />
     }
 }

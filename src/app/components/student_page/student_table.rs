@@ -22,14 +22,13 @@ const COLOR_ACCENT_TERRACOTTA: &str = "#D3A588";
 
 // Table styles - Updated for better responsiveness
 const TABLE_CONTAINER_STYLE: &str =
-    "bg-[#F9F9F8] rounded-lg shadow-sm border border-[#DADADA] overflow-hidden";
+    "bg-[#F9F9F8] rounded-lg shadow-sm border border-[#DADADA] overflow-hidden flex flex-col h-full";
 const TABLE_HEADER_STYLE: &str =
-    "py-3 md:py-5 px-4 md:px-6 flex justify-between items-center bg-[#2E3A59] border-b border-[#2E3A59]";
-const TABLE_WRAPPER_STYLE: &str =
-    "overflow-x-auto h-[calc(100vh-15rem)] md:h-[42rem] overflow-y-auto scroll-smooth";
-const TABLE_STYLE: &str = "min-w-full divide-y divide-[#DADADA]";
+    "py-3 md:py-5 px-4 md:px-6 flex justify-between items-center bg-[#2E3A59] border-b border-[#2E3A59] flex-shrink-0";
+const TABLE_WRAPPER_STYLE: &str = "overflow-auto flex-1 min-h-0 scroll-smooth";
+const TABLE_STYLE: &str = "w-full min-w-[800px] divide-y divide-[#DADADA]";
 const HEADER_CELL_STYLE: &str =
-    "px-2 md:px-6 py-2 md:py-3 text-left text-sm font-medium text-[#2E3A59] uppercase tracking-wider";
+    "px-2 md:px-6 py-2 md:py-3 text-left text-sm font-medium text-[#2E3A59] uppercase tracking-wider whitespace-nowrap";
 const CELL_STYLE: &str =
     "px-2 md:px-6 py-2 md:py-4 whitespace-nowrap text-sm md:text-md bg-[#F9F9F8]";
 const SELECTED_ROW_STYLE: &str =
@@ -188,211 +187,209 @@ pub fn StudentTable(
                 </span>
             </div>
             <div class=TABLE_WRAPPER_STYLE>
-                <div class="overflow-y-auto h-full relative">
-                    <table class=TABLE_STYLE>
-                        <thead class="bg-[#DADADA] sticky top-0 z-10">
-                            <tr>
-                                <th class=HEADER_CELL_STYLE>"First"</th>
-                                <th class=HEADER_CELL_STYLE>"Last"</th>
-                                <th class=HEADER_CELL_STYLE>"ID"</th>
-                                <th class=format!("{} {}", HEADER_CELL_STYLE, "whitespace-nowrap")>"Grade"</th>
-                                <th class=format!("{} {}", HEADER_CELL_STYLE, "whitespace-nowrap")>"Teacher"</th>
-                                <th class=format!("{} {}", HEADER_CELL_STYLE, "whitespace-nowrap")>"IEP"</th>
-                                <th class=format!("{} {}", HEADER_CELL_STYLE, "whitespace-nowrap")>"ESL"</th>
-                                <th class=format!("{} {}", HEADER_CELL_STYLE, "whitespace-nowrap")>"Intervention"</th>
+                <table class=TABLE_STYLE>
+                    <thead class="bg-[#DADADA] sticky top-0 z-10">
+                        <tr>
+                            <th class=HEADER_CELL_STYLE>"First"</th>
+                            <th class=HEADER_CELL_STYLE>"Last"</th>
+                            <th class=HEADER_CELL_STYLE>"ID"</th>
+                            <th class=format!("{} {}", HEADER_CELL_STYLE, "whitespace-nowrap")>"Grade"</th>
+                            <th class=format!("{} {}", HEADER_CELL_STYLE, "whitespace-nowrap")>"Teacher"</th>
+                            <th class=format!("{} {}", HEADER_CELL_STYLE, "whitespace-nowrap")>"IEP"</th>
+                            <th class=format!("{} {}", HEADER_CELL_STYLE, "whitespace-nowrap")>"ESL"</th>
+                            <th class=format!("{} {}", HEADER_CELL_STYLE, "whitespace-nowrap")>"Intervention"</th>
 
-                                // Additional columns that appear regardless of panel state
-                                <th class=format!("{} {}", HEADER_CELL_STYLE, "whitespace-nowrap")>"504 Plan"</th>
-                                <th class=format!("{} {}", HEADER_CELL_STYLE, "whitespace-nowrap")>"Read Plan"</th>
-                                <th class=format!("{} {}", HEADER_CELL_STYLE, "whitespace-nowrap")>"GT"</th>
-                                <th class=format!("{} {}", HEADER_CELL_STYLE, "whitespace-nowrap")>"BEH"</th>
-                            </tr>
-                        </thead>
-                        <Suspense fallback=move || view! {
-                            <tr>
-                                <td colspan="12" class="text-center p-8">
-                                    <div class="inline-block h-6 w-6 animate-spin rounded-full border-2 border-[#DADADA] border-t-[#2E3A59]"></div>
-                                </td>
-                            </tr>
-                        }>
-                            <tbody>
-                                {move || {
-                                    let students = filtered_students();
-                                    if students.is_empty() {
+                            // Additional columns that appear regardless of panel state
+                            <th class=format!("{} {}", HEADER_CELL_STYLE, "whitespace-nowrap")>"504 Plan"</th>
+                            <th class=format!("{} {}", HEADER_CELL_STYLE, "whitespace-nowrap")>"Read Plan"</th>
+                            <th class=format!("{} {}", HEADER_CELL_STYLE, "whitespace-nowrap")>"GT"</th>
+                            <th class=format!("{} {}", HEADER_CELL_STYLE, "whitespace-nowrap")>"BEH"</th>
+                        </tr>
+                    </thead>
+                    <Suspense fallback=move || view! {
+                        <tr>
+                            <td colspan="12" class="text-center p-8">
+                                <div class="inline-block h-6 w-6 animate-spin rounded-full border-2 border-[#DADADA] border-t-[#2E3A59]"></div>
+                            </td>
+                        </tr>
+                    }>
+                        <tbody class="bg-[#F9F9F8]">
+                            {move || {
+                                let students = filtered_students();
+                                if students.is_empty() {
+                                    view! {
+                                        <tr>
+                                            <td colspan="12" class="px-6 py-12 text-center text-sm text-[#2E3A59] text-opacity-70">
+                                                "No students match your search criteria"
+                                            </td>
+                                        </tr>
+                                    }.into_view()
+                                } else {
+                                    students.into_iter().map(|(student, de_anon_opt)| {
+                                        let student_rc = Rc::new(student.clone());
+                                        let student_cmp = Rc::new(student.clone());
+                                        let is_selected = move || selected_student() == Some(student_cmp.clone());
+
+                                        // Determine display values based on anonymization status
+                                        let (display_first, display_last, display_id) = if let Some(de_anon) = &de_anon_opt {
+                                            // Split the display_name for first and last name
+                                            let name_parts: Vec<&str> = de_anon.display_name.split_whitespace().collect();
+                                            let first = name_parts.get(0).unwrap_or(&"Unknown").to_string();
+                                            let last = if name_parts.len() > 1 {
+                                                name_parts[1..].join(" ")
+                                            } else {
+                                                "Unknown".to_string()
+                                            };
+                                            (first, last, de_anon.display_id.clone())
+                                        } else {
+                                            (
+                                                student.firstname.as_ref().unwrap_or(&"Unknown".to_string()).clone(),
+                                                student.lastname.as_ref().unwrap_or(&"Unknown".to_string()).clone(),
+                                                student.student_id.to_string()
+                                            )
+                                        };
+
                                         view! {
-                                            <tr>
-                                                <td colspan="12" class="px-6 py-12 text-center text-sm text-[#2E3A59] text-opacity-70">
-                                                    "No students match your search criteria"
+                                            <tr
+                                                class=move || if is_selected() {
+                                                    format!("{} {}", SELECTED_ROW_STYLE, "cursor-pointer")
+                                                } else {
+                                                    "hover:bg-[#DADADA] hover:bg-opacity-20 cursor-pointer border-b border-[#DADADA]".to_string()
+                                                }
+                                                on:click=move |_| set_selected_student(Some(student_rc.clone()))
+                                            >
+                                                <td class=format!("{} {}", CELL_STYLE, "font-medium text-[#2E3A59]")>{display_first}</td>
+                                                <td class=format!("{} {}", CELL_STYLE, "font-medium text-[#2E3A59]")>{display_last}</td>
+                                                <td class=format!("{} {}", CELL_STYLE, "text-[#2E3A59] text-opacity-70")>{display_id}</td>
+                                                <td class=format!("{} {}", CELL_STYLE, "text-[#2E3A59] text-opacity-70")>{&student.current_grade_level.to_string()}</td>
+                                                <td class=format!("{} {}", CELL_STYLE, "text-[#2E3A59] text-opacity-70")>{&student.teacher.to_string()}</td>
+
+                                                // IEP Column
+                                                <td class=CELL_STYLE>
+                                                    { if student.iep {
+                                                        view! {
+                                                            <span class="px-2 py-1 text-sm font-medium rounded-full bg-[#4CAF50] bg-opacity-40 text-[#2E3A59]">
+                                                                "IEP"
+                                                            </span>
+                                                        }
+                                                    } else {
+                                                        view! {
+                                                            <span class="px-2 py-1 text-sm font-medium rounded-full bg-opacity-40 text-[#2E3A59]">
+                                                                "-"
+                                                            </span>
+                                                        }
+                                                    }}
+                                                </td>
+
+                                                // ESL Column
+                                                <td class=CELL_STYLE>
+                                                    { if student.esl != ESLEnum::NotApplicable {
+                                                        view! {
+                                                            <span class="px-2 py-1 text-sm font-medium rounded-full bg-[#4CAF50] bg-opacity-40 text-[#2E3A59]">
+                                                                {student.esl.to_string()}
+                                                            </span>
+                                                        }
+                                                    } else {
+                                                        view! {
+                                                            <span class="px-2 py-1 text-sm font-medium rounded-full  bg-opacity-40 text-[#2E3A59]">
+                                                                "-"
+                                                            </span>
+                                                        }
+                                                    }}
+                                                </td>
+
+                                                // Intervention Column
+                                                <td class=CELL_STYLE>
+                                                    { if let Some(intervention) = &student.intervention {
+                                                        view! {
+                                                            <span class="px-2 py-1 text-sm font-medium rounded-full bg-[#4CAF50] bg-opacity-40 text-[#2E3A59]">
+                                                                {intervention.to_string()}
+                                                            </span>
+                                                        }
+                                                    } else {
+                                                        view! {
+                                                            <span class="px-2 py-1 text-sm font-medium rounded-full bg-opacity-40 text-[#2E3A59]">
+                                                                "-"
+                                                            </span>
+                                                        }
+                                                    }}
+                                                </td>
+
+                                                // 504 Plan Column
+                                                <td class=CELL_STYLE>
+                                                    { if student.student_504 {
+                                                        view! {
+                                                            <span class="px-2 py-1 text-sm font-medium rounded-full bg-[#4CAF50] bg-opacity-40 text-[#2E3A59]">
+                                                                "504"
+                                                            </span>
+                                                        }
+                                                    } else {
+                                                        view! {
+                                                            <span class="px-2 py-1 text-sm font-medium rounded-full bg-opacity-40 text-[#2E3A59]">
+                                                                "-"
+                                                            </span>
+                                                        }
+                                                    }}
+                                                </td>
+
+                                                // Read Plan Column
+                                                <td class=CELL_STYLE>
+                                                    { if student.readplan {
+                                                        view! {
+                                                            <span class="px-2 py-1 text-sm font-medium rounded-full bg-[#4CAF50] bg-opacity-40 text-[#2E3A59]">
+                                                                "Read Plan"
+                                                            </span>
+                                                        }
+                                                    } else {
+                                                        view! {
+                                                            <span class="px-2 py-1 text-sm font-medium rounded-full bg-opacity-40 text-[#2E3A59]">
+                                                                "-"
+                                                            </span>
+                                                        }
+                                                    }}
+                                                </td>
+
+                                                // GT Column
+                                                <td class=CELL_STYLE>
+                                                    { if student.gt {
+                                                        view! {
+                                                            <span class="px-2 py-1 text-sm font-medium rounded-full bg-[#4CAF50] bg-opacity-40 text-[#2E3A59]">
+                                                                "GT"
+                                                            </span>
+                                                        }
+                                                    } else {
+                                                        view! {
+                                                            <span class="px-2 py-1 text-sm font-medium rounded-full bg-opacity-40 text-[#2E3A59]">
+                                                                "-"
+                                                            </span>
+                                                        }
+                                                    }}
+                                                </td>
+
+                                                //BEH/BIP column
+                                                <td class=CELL_STYLE>
+                                                    { if student.bip {
+                                                        view! {
+                                                            <span class="px-2 py-1 text-sm font-medium rounded-full bg-[#4CAF50] bg-opacity-40 text-[#2E3A59]">
+                                                                "BEH"
+                                                            </span>
+                                                      }
+                                                    } else {
+                                                        view! {
+                                                            <span class="px-2 py-1 text-sm font-medium rounded-full bg-opacity-40 text-[#2E3A59]">
+                                                                "-"
+                                                            </span>
+                                                        }
+                                                    }}
                                                 </td>
                                             </tr>
-                                        }.into_view()
-                                    } else {
-                                        students.into_iter().map(|(student, de_anon_opt)| {
-                                            let student_rc = Rc::new(student.clone());
-                                            let student_cmp = Rc::new(student.clone());
-                                            let is_selected = move || selected_student() == Some(student_cmp.clone());
-
-                                            // Determine display values based on anonymization status
-                                            let (display_first, display_last, display_id) = if let Some(de_anon) = &de_anon_opt {
-                                                // Split the display_name for first and last name
-                                                let name_parts: Vec<&str> = de_anon.display_name.split_whitespace().collect();
-                                                let first = name_parts.get(0).unwrap_or(&"Unknown").to_string();
-                                                let last = if name_parts.len() > 1 {
-                                                    name_parts[1..].join(" ")
-                                                } else {
-                                                    "Unknown".to_string()
-                                                };
-                                                (first, last, de_anon.display_id.clone())
-                                            } else {
-                                                (
-                                                    student.firstname.as_ref().unwrap_or(&"Unknown".to_string()).clone(),
-                                                    student.lastname.as_ref().unwrap_or(&"Unknown".to_string()).clone(),
-                                                    student.student_id.to_string()
-                                                )
-                                            };
-
-                                            view! {
-                                                <tr
-                                                    class=move || if is_selected() {
-                                                        format!("{} {}", SELECTED_ROW_STYLE, "cursor-pointer")
-                                                    } else {
-                                                        "hover:bg-[#DADADA] hover:bg-opacity-20 cursor-pointer border-b border-[#DADADA]".to_string()
-                                                    }
-                                                    on:click=move |_| set_selected_student(Some(student_rc.clone()))
-                                                >
-                                                    <td class=format!("{} {}", CELL_STYLE, "font-medium text-[#2E3A59]")>{display_first}</td>
-                                                    <td class=format!("{} {}", CELL_STYLE, "font-medium text-[#2E3A59]")>{display_last}</td>
-                                                    <td class=format!("{} {}", CELL_STYLE, "text-[#2E3A59] text-opacity-70")>{display_id}</td>
-                                                    <td class=format!("{} {}", CELL_STYLE, "text-[#2E3A59] text-opacity-70")>{&student.current_grade_level.to_string()}</td>
-                                                    <td class=format!("{} {}", CELL_STYLE, "text-[#2E3A59] text-opacity-70")>{&student.teacher.to_string()}</td>
-
-                                                    // IEP Column
-                                                    <td class=CELL_STYLE>
-                                                        { if student.iep {
-                                                            view! {
-                                                                <span class="px-2 py-1 text-sm font-medium rounded-full bg-[#4CAF50] bg-opacity-40 text-[#2E3A59]">
-                                                                    "Yes"
-                                                                </span>
-                                                            }
-                                                        } else {
-                                                            view! {
-                                                                <span class="px-2 py-1 text-sm font-medium rounded-full bg-[#F44336] bg-opacity-40 text-[#2E3A59]">
-                                                                    "No"
-                                                                </span>
-                                                            }
-                                                        }}
-                                                    </td>
-
-                                                    // ESL Column
-                                                    <td class=CELL_STYLE>
-                                                        { if student.esl != ESLEnum::NotApplicable {
-                                                            view! {
-                                                                <span class="px-2 py-1 text-sm font-medium rounded-full bg-[#4CAF50] bg-opacity-40 text-[#2E3A59]">
-                                                                    {student.esl.to_string()}
-                                                                </span>
-                                                            }
-                                                        } else {
-                                                            view! {
-                                                                <span class="px-2 py-1 text-sm font-medium rounded-full bg-[#F44336] bg-opacity-40 text-[#2E3A59]">
-                                                                    "N/A"
-                                                                </span>
-                                                            }
-                                                        }}
-                                                    </td>
-
-                                                    // Intervention Column
-                                                    <td class=CELL_STYLE>
-                                                        { if let Some(intervention) = &student.intervention {
-                                                            view! {
-                                                                <span class="px-2 py-1 text-sm font-medium rounded-full bg-[#4CAF50] bg-opacity-40 text-[#2E3A59]">
-                                                                    {intervention.to_string()}
-                                                                </span>
-                                                            }
-                                                        } else {
-                                                            view! {
-                                                                <span class="px-2 py-1 text-sm font-medium rounded-full bg-[#F44336] bg-opacity-40 text-[#2E3A59]">
-                                                                    "None"
-                                                                </span>
-                                                            }
-                                                        }}
-                                                    </td>
-
-                                                    // 504 Plan Column
-                                                    <td class=CELL_STYLE>
-                                                        { if student.student_504 {
-                                                            view! {
-                                                                <span class="px-2 py-1 text-sm font-medium rounded-full bg-[#4CAF50] bg-opacity-40 text-[#2E3A59]">
-                                                                    "Yes"
-                                                                </span>
-                                                            }
-                                                        } else {
-                                                            view! {
-                                                                <span class="px-2 py-1 text-sm font-medium rounded-full bg-[#F44336] bg-opacity-40 text-[#2E3A59]">
-                                                                    "No"
-                                                                </span>
-                                                            }
-                                                        }}
-                                                    </td>
-
-                                                    // Read Plan Column
-                                                    <td class=CELL_STYLE>
-                                                        { if student.readplan {
-                                                            view! {
-                                                                <span class="px-2 py-1 text-sm font-medium rounded-full bg-[#4CAF50] bg-opacity-40 text-[#2E3A59]">
-                                                                    "Yes"
-                                                                </span>
-                                                            }
-                                                        } else {
-                                                            view! {
-                                                                <span class="px-2 py-1 text-sm font-medium rounded-full bg-[#F44336] bg-opacity-40 text-[#2E3A59]">
-                                                                    "No"
-                                                                </span>
-                                                            }
-                                                        }}
-                                                    </td>
-
-                                                    // GT Column
-                                                    <td class=CELL_STYLE>
-                                                        { if student.gt {
-                                                            view! {
-                                                                <span class="px-2 py-1 text-sm font-medium rounded-full bg-[#4CAF50] bg-opacity-40 text-[#2E3A59]">
-                                                                    "Yes"
-                                                                </span>
-                                                            }
-                                                        } else {
-                                                            view! {
-                                                                <span class="px-2 py-1 text-sm font-medium rounded-full bg-[#F44336] bg-opacity-40 text-[#2E3A59]">
-                                                                    "No"
-                                                                </span>
-                                                            }
-                                                        }}
-                                                    </td>
-
-                                                    //BEH/BIP column
-                                                    <td class=CELL_STYLE>
-                                                        { if student.bip {
-                                                            view! {
-                                                                <span class="px-2 py-1 text-sm font-medium rounded-full bg-[#4CAF50] bg-opacity-40 text-[#2E3A59]">
-                                                                    "Yes"
-                                                                </span>
-                                                          }
-                                                        } else {
-                                                            view! {
-                                                                <span class="px-2 py-1 text-sm font-medium rounded-full bg-[#F44336] bg-opacity-40 text-[#2E3A59]">
-                                                                    "No"
-                                                                </span>
-                                                            }
-                                                        }}
-                                                    </td>
-                                                </tr>
-                                            }
-                                        }).collect_view()
-                                    }
-                                }}
-                            </tbody>
-                        </Suspense>
-                    </table>
-                </div>
+                                        }
+                                    }).collect_view()
+                                }
+                            }}
+                        </tbody>
+                    </Suspense>
+                </table>
             </div>
         </div>
     }

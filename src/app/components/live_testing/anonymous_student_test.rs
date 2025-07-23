@@ -1,4 +1,6 @@
 use super::types::{ConnectionStatus, QuestionResponse, Role};
+use crate::app::components::test_components::balloon_celebration::BalloonCelebration;
+use crate::app::components::test_components::font_controls::{use_font_settings, FontControls};
 use crate::app::models::question::{Question, QuestionType};
 use crate::app::server_functions::{questions::get_questions, tests::get_tests};
 use leptos::*;
@@ -31,6 +33,9 @@ pub fn AnonymousStudentTest() -> impl IntoView {
     let (responses, set_responses) = create_signal(HashMap::<i32, QuestionResponse>::new());
     let (remaining_time, set_remaining_time) = create_signal::<Option<i32>>(None);
     let (user_role, set_user_role) = create_signal(Role::Student);
+
+    let (font_settings, set_font_settings) = use_font_settings();
+    let (show_celebration, set_show_celebration) = create_signal(false);
 
     //Read-only mode control signal
     let (is_read_only, set_is_read_only) = create_signal(true);
@@ -157,6 +162,7 @@ pub fn AnonymousStudentTest() -> impl IntoView {
                                             }
                                             "test_ended" => {
                                                 log::info!("Test ended for anonymous student");
+                                                set_show_celebration.set(true);
                                                 set_is_test_active.set(false);
                                             }
                                             "focus_question" => {
@@ -434,17 +440,28 @@ pub fn AnonymousStudentTest() -> impl IntoView {
                 <div class="p-4 max-w-screen h-screen overflow-y-auto bg-gray-50 mx-auto">
                     {/* Header */}
                     <div class="text-center mb-8">
-                        <h2 class="text-2xl font-bold text-gray-800">
-                            {move || match &test_details.get() {
-                                Some(Some(test)) => format!("Test: {}", test.name),
-                                _ => "Test Session".to_string()
-                            }}
-                        </h2>
-                        <div class="mt-2 text-sm text-gray-600">
-                            "Welcome, " {move || student_name.get()} " (ID: " {move || student_id_input.get()} ")"
-                        </div>
-                        <div class="mt-1 text-xs text-gray-400">
-                            "Role: " {move || format!("{:?}", user_role.get())}
+                        <div class="flex justify-between items-center mb-4">
+                            <div></div> {/* Spacer */}
+                            <div>
+                                <h2 class="text-2xl font-bold text-gray-800">
+                                    {move || match &test_details.get() {
+                                        Some(Some(test)) => format!("Test: {}", test.name),
+                                        _ => "Test Session".to_string()
+                                    }}
+                                </h2>
+                                <div class="mt-2 text-sm text-gray-600">
+                                    "Welcome, " {move || student_name.get()} " (ID: " {move || student_id_input.get()} ")"
+                                </div>
+                                <div class="mt-1 text-xs text-gray-400">
+                                    "Role: " {move || format!("{:?}", user_role.get())}
+                                </div>
+                            </div>
+                            <div class="flex items-center">
+                                <FontControls
+                                    font_settings=font_settings
+                                    set_font_settings=set_font_settings
+                                />
+                            </div>
                         </div>
                     </div>
 
@@ -531,7 +548,7 @@ pub fn AnonymousStudentTest() -> impl IntoView {
                                                 <div class="p-8 flex flex-col justify-start items-center w-full h-full">
                                                     {/* Question */}
                                                     <div class="text-center w-full mb-6">
-                                                        <p class="text-3xl font-bold text-gray-800 break-words">
+                                                        <p class=move || format!("text-3xl font-bold text-gray-800 break-words {}",font_settings.get().get_question_classes())>
                                                             {move || current_question().word_problem.clone()}
                                                         </p>
                                                     </div>
@@ -576,7 +593,7 @@ pub fn AnonymousStudentTest() -> impl IntoView {
                                                                                                 }
                                                                                             }
                                                                                         />
-                                                                                        <span class="ml-2 break-words">{option_value}</span>
+                                                                                        <span class=move || format!("ml-2 break-words {}", font_settings.get().get_answer_classes())>{option_value}</span>
                                                                                     </label>
                                                                                 }
                                                                             }
@@ -670,7 +687,7 @@ pub fn AnonymousStudentTest() -> impl IntoView {
                                                                                                     <span class="text-xs text-gray-500 font-medium mt-1 min-w-[1rem]">
                                                                                                         {choice_number}
                                                                                                     </span>
-                                                                                                    <span class="leading-relaxed break-words">
+                                                                                                    <span class=move ||format!("leading-relaxed break-words {}", font_settings.get().get_answer_classes())>
                                                                                                         {option_clone.text.clone()}
                                                                                                     </span>
                                                                                                 </div>
@@ -758,7 +775,9 @@ pub fn AnonymousStudentTest() -> impl IntoView {
                                                                                     }
                                                                                 }
                                                                             >
-                                                                                "Yes" //manually
+                                                                                <span class=move || font_settings.get().get_answer_classes()>
+                                                                                    "Yes" //manually
+                                                                                </span>
                                                                                 //equivalent to
                                                                                 //"True"
                                                                             </button>
@@ -777,7 +796,9 @@ pub fn AnonymousStudentTest() -> impl IntoView {
                                                                                     handle_answer_change(qnumber, "false".to_string());
                                                                                 }
                                                                             >
-                                                                                "No" //manuallyequivalent to "False"
+                                                                                <span class=move || font_settings.get().get_answer_classes()>
+                                                                                    "No" //manually
+                                                                                </span>
                                                                             </button>
                                                                         </div>
                                                                     }.into_view()
@@ -851,5 +872,12 @@ pub fn AnonymousStudentTest() -> impl IntoView {
                 </div>
             </Show>
         </div>
+
+        {/* Balloon Celebration */}
+        <BalloonCelebration
+            show=Signal::derive(move || show_celebration.get())
+            message="🎉 Test Complete! Great job! 🎉"
+            duration=5000
+        />
     }
 }

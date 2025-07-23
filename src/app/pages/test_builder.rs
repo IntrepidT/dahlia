@@ -1243,16 +1243,6 @@ pub fn TestBuilderContent() -> impl IntoView {
                                             "Add Single Value"
                                         </button>
                                     </div>
-
-                                    // Help text
-                                    <div class="text-xs text-gray-600 bg-blue-50 p-3 rounded border-l-4 border-blue-400">
-                                        <p class="font-medium mb-1">Usage Examples:</p>
-                                        <ul class="space-y-1">
-                                            <li>"•" <strong>Range:</strong> "B" with 70-79 (students scoring 70-79 get a B)</li>
-                                            <li>"•" <strong>Single Value:</strong> "Perfect" with 100 (only students scoring exactly 100 get "Perfect")</li>
-                                            <li>"•" <strong>Mixed:</strong> You can have both ranges and single values in the same test</li>
-                                        </ul>
-                                    </div>
                                 </div>
                             </div>
 

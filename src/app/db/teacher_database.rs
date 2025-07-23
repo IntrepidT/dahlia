@@ -15,7 +15,7 @@ cfg_if::cfg_if! {
                 "SELECT id, firstname, lastname, status, grade
                  FROM employees 
                  WHERE role = 'Teacher'::employee_role
-                 ORDER BY firstname"
+                 ORDER BY lastname DESC"
             )
             .fetch_all(pool)
             .await?;

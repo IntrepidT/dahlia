@@ -22,6 +22,8 @@ pub enum TestFilter {
     All,
     Math,
     Reading,
+    Spelling,
+    PhonemicAwareness,
     Other,
 }
 
@@ -179,14 +181,14 @@ async fn get_next_variant_number_for_base(
 
 #[component]
 fn StatsPanel(
-    test_stats: Memo<(usize, usize, usize, usize, usize)>,
+    test_stats: Memo<(usize, usize, usize, usize, usize, usize, usize)>,
     show_stats: ReadSignal<bool>,
     set_show_stats: WriteSignal<bool>,
 ) -> impl IntoView {
     view! {
         {move || {
             if show_stats() {
-                let (total, math, reading, other, variations) = test_stats();
+                let (total, math, reading, other, spelling, phonemic, variations) = test_stats();
                 view! {
                     <div class="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-200">
                         <div class="flex items-center justify-between mb-3">
@@ -202,8 +204,10 @@ fn StatsPanel(
                             <StatCard value=total label="Total Tests" color="blue" />
                             <StatCard value=math label="Math Tests" color="green" />
                             <StatCard value=reading label="Reading Tests" color="purple" />
+                            <StatCard value=spelling label="Spelling Tests" color="orange" />
+                            <StatCard value=phonemic label="Phonemic Awareness" color="yellow" />
                             <StatCard value=other label="Other Tests" color="gray" />
-                            <StatCard value=variations label="Variations" color="orange" />
+                            <StatCard value=variations label="Variations" color="red" />
                         </div>
                     </div>
                 }
@@ -231,6 +235,8 @@ fn StatCard(value: usize, label: &'static str, color: &'static str) -> impl Into
         "purple" => "text-purple-600",
         "gray" => "text-gray-600",
         "orange" => "text-orange-600",
+        "yellow" => "text-yellow-600",
+        "red" => "text-red-600",
         _ => "text-gray-600",
     };
 
@@ -271,6 +277,20 @@ fn FilterTabs(
                 active_color="purple"
             />
             <FilterTab
+                filter=TestFilter::Spelling
+                label="Spelling"
+                current_filter=test_filter
+                set_filter=set_test_filter
+                active_color="orange"
+            />
+            <FilterTab
+                filter=TestFilter::PhonemicAwareness
+                label="Phonemic Awareness"
+                current_filter=test_filter
+                set_filter=set_test_filter
+                active_color="yellow"
+            />
+            <FilterTab
                 filter=TestFilter::Other
                 label="Other"
                 current_filter=test_filter
@@ -294,6 +314,9 @@ fn FilterTab(
         "green" => "bg-green-100 text-green-700 border border-green-300",
         "purple" => "bg-purple-100 text-purple-700 border border-purple-300",
         "gray" => "bg-gray-100 text-gray-700 border border-gray-300",
+        "orange" => "bg-orange-100 text-orange-700 border border-orange-300",
+        "yellow" => "bg-yellow-100 text-yellow-700 border border-yellow-300",
+        "red" => "bg-red-100 text-red-700 border border-red-300",
         _ => "bg-blue-100 text-blue-700 border border-blue-300",
     };
 
@@ -447,6 +470,8 @@ fn EmptyState(
                     TestFilter::All => "Get started by creating your first test.",
                     TestFilter::Math => "No math tests found. Create a new math test to get started.",
                     TestFilter::Reading => "No reading tests found. Create a new reading test to get started.",
+                    TestFilter::Spelling => "No spelling tests found. Create a new spelling test to get started.",
+                    TestFilter::PhonemicAwareness => "No phonemic awareness tests found. Create a new test to get started.",
                     TestFilter::Other => "No other tests found. Create a new test to get started.",
                 }}
             </p>
@@ -1264,11 +1289,21 @@ pub fn UnifiedTestManagerContent() -> impl IntoView {
             .filter(|t| t.testarea == TestType::Other)
             .count();
         let variations = tests.iter().filter(|t| is_variation_test(t)).count();
+        let spelling_tests = tests
+            .iter()
+            .filter(|t| t.testarea == TestType::Spelling)
+            .count();
+        let phonemic_awareness_tests = tests
+            .iter()
+            .filter(|t| t.testarea == TestType::PhonemicAwareness)
+            .count();
 
         (
             total_tests,
             math_tests,
             reading_tests,
+            spelling_tests,
+            phonemic_awareness_tests,
             other_tests,
             variations,
         )
@@ -1285,6 +1320,8 @@ pub fn UnifiedTestManagerContent() -> impl IntoView {
                 TestFilter::All => true,
                 TestFilter::Math => test.testarea == TestType::Math,
                 TestFilter::Reading => test.testarea == TestType::Reading,
+                TestFilter::Spelling => test.testarea == TestType::Spelling,
+                TestFilter::PhonemicAwareness => test.testarea == TestType::PhonemicAwareness,
                 TestFilter::Other => test.testarea == TestType::Other,
             })
             .collect();
@@ -1364,6 +1401,8 @@ pub fn UnifiedTestManagerContent() -> impl IntoView {
                 TestFilter::All => true,
                 TestFilter::Math => test.testarea == TestType::Math,
                 TestFilter::Reading => test.testarea == TestType::Reading,
+                TestFilter::Spelling => test.testarea == TestType::Spelling,
+                TestFilter::PhonemicAwareness => test.testarea == TestType::PhonemicAwareness,
                 TestFilter::Other => test.testarea == TestType::Other,
             })
             .collect();

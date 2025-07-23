@@ -239,10 +239,10 @@ pub fn SearchFilter(
             </div>
 
             // Clear filters button
-            <div class="flex items-center mt-3">
+            <div class="flex items-center mt-3 flex-shrink-0">
                 <button
                     type="button"
-                    class="inline-flex justify-center items-center px-3 sm:px-4 py-1 sm:py-2 border border-gray-300 rounded-md shadow-sm text-xs sm:text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 h-8 sm:h-10"
+                    class="inline-flex justify-center items-center px-3 sm:px-4 py-1 sm:py-2 border border-gray-300 rounded-md shadow-sm text-xs sm:text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 h-8 sm:h-10 transition-none whitespace-nowrap"
                     on:click=move |_| {
                         if let Some(input) = iep_checkbox_ref.get() {
                             input.set_checked(false);

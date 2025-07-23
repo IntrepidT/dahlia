@@ -26,3 +26,7 @@ pub use test_instructions::TestInstructions;
 
 pub mod font_controls;
 pub use font_controls::*;
+
+pub mod balloon_celebration;
+pub use balloon_celebration::{BalloonCelebration, QuickCelebration};
+pub use font_controls::{use_font_settings, FontControls, FontSettings};

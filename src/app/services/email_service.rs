@@ -14,7 +14,7 @@ use std::time::Duration;
 
 #[cfg(feature = "ssr")]
 pub async fn send_reset_email(email: &str, reset_token: &str) -> Result<(), String> {
-    // TeaPot Testing email configuration
+    // Teapot Testing email configuration
     let smtp_server = env::var("SMTP_SERVER").unwrap_or_else(|_| "smtp.gmail.com".to_string());
     let smtp_port = env::var("SMTP_PORT")
         .unwrap_or_else(|_| "587".to_string())
@@ -46,16 +46,16 @@ pub async fn send_reset_email(email: &str, reset_token: &str) -> Result<(), Stri
     let reset_link = format!("{}/reset-password/{}", app_url, reset_token);
 
     info!(
-        "Creating password reset email for {} from TeaPot Testing",
+        "Creating password reset email for {} from Teapot Testing",
         email
     );
 
-    // Create branded email for TeaPot Testing
+    // Create branded email for Teapot Testing
     let email_message = Message::builder()
-        .from(format!("TeaPot Testing <{}>", from_email).parse()
+        .from(format!("Teapot Testing <{}>", from_email).parse()
             .map_err(|e| format!("Invalid from email: {}", e))?)
         .to(email.parse().map_err(|e| format!("Invalid recipient email: {}", e))?)
-        .subject("TeaPot Testing - Password Reset Request")
+        .subject("Teapot Testing - Password Reset Request")
         .header(lettre::message::header::ContentType::TEXT_HTML)
         .body(format!(
             r#"
@@ -64,14 +64,14 @@ pub async fn send_reset_email(email: &str, reset_token: &str) -> Result<(), Stri
             <head>
                 <meta charset="utf-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>Password Reset - TeaPot Testing</title>
+                <title>Password Reset - Teapot Testing</title>
             </head>
             <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
                 
-                <!-- Header with TeaPot Testing branding -->
+                <!-- Header with Teapot Testing branding -->
                 <div style="text-align: center; margin-bottom: 30px;">
                     <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 8px 8px 0 0;">
-                        <h1 style="margin: 0; font-size: 28px; font-weight: 300;">🫖 TeaPot Testing</h1>
+                        <h1 style="margin: 0; font-size: 28px; font-weight: 300;">🫖 Teapot Testing</h1>
                         <p style="margin: 5px 0 0 0; opacity: 0.9; font-size: 14px;">Quality Assurance Platform</p>
                     </div>
                 </div>
@@ -82,7 +82,7 @@ pub async fn send_reset_email(email: &str, reset_token: &str) -> Result<(), Stri
                     
                     <p style="font-size: 16px; margin-bottom: 20px;">Hello,</p>
                     
-                    <p style="font-size: 16px; margin-bottom: 25px;">We received a request to reset the password for your TeaPot Testing account. Click the button below to set a new password:</p>
+                    <p style="font-size: 16px; margin-bottom: 25px;">We received a request to reset the password for your Teapot Testing account. Click the button below to set a new password:</p>
                     
                     <!-- Reset button -->
                     <div style="text-align: center; margin: 35px 0;">
@@ -112,17 +112,17 @@ pub async fn send_reset_email(email: &str, reset_token: &str) -> Result<(), Stri
                     <!-- Footer -->
                     <div style="margin-top: 40px; padding-top: 25px; border-top: 2px solid #f1f3f4; text-align: center;">
                         <p style="font-size: 16px; margin: 0 0 15px 0; color: #333;">Happy Testing!</p>
-                        <p style="font-size: 16px; margin: 0; font-weight: 600; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">The TeaPot Testing Team</p>
+                        <p style="font-size: 16px; margin: 0; font-weight: 600; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">The Teapot Testing Team</p>
                     </div>
                 </div>
                 
                 <!-- Email footer -->
                 <div style="text-align: center; font-size: 12px; color: #999; margin-top: 25px; padding: 20px;">
-                    <p style="margin: 0 0 5px 0;">This is an automated email from TeaPot Testing</p>
+                    <p style="margin: 0 0 5px 0;">This is an automated email from Teapot Testing</p>
                     <p style="margin: 0 0 5px 0;">Please do not reply to this email address</p>
                     <p style="margin: 0;">Need help? Contact us at <a href="mailto:support@teapottesting.com" style="color: #667eea;">support@teapottesting.com</a></p>
                     <hr style="border: none; border-top: 1px solid #eee; margin: 15px 0;">
-                    <p style="margin: 0; opacity: 0.7;">© 2025 TeaPot Testing. All rights reserved.</p>
+                    <p style="margin: 0; opacity: 0.7;">© 2025 Teapot Testing. All rights reserved.</p>
                 </div>
             </body>
             </html>
@@ -132,7 +132,7 @@ pub async fn send_reset_email(email: &str, reset_token: &str) -> Result<(), Stri
         .map_err(|e| format!("Failed to create email: {}", e))?;
 
     info!(
-        "Sending TeaPot Testing password reset email to {} via Google Workspace ({}:{})",
+        "Sending Teapot Testing password reset email to {} via Google Workspace ({}:{})",
         email, smtp_server, smtp_port
     );
 
@@ -153,14 +153,14 @@ pub async fn send_reset_email(email: &str, reset_token: &str) -> Result<(), Stri
     match mailer.send(&email_message) {
         Ok(response) => {
             info!(
-                "✅ TeaPot Testing password reset email sent successfully to {}",
+                "✅ Teapot Testing password reset email sent successfully to {}",
                 email
             );
             info!("SMTP Response: {:?}", response);
             Ok(())
         }
         Err(e) => {
-            error!("❌ Failed to send TeaPot Testing email to {}: {}", email, e);
+            error!("❌ Failed to send Teapot Testing email to {}: {}", email, e);
 
             // Provide helpful error messages based on error type
             let error_msg = if e.to_string().contains("authentication")

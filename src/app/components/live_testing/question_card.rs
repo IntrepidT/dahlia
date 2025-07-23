@@ -1,4 +1,5 @@
 use super::types::{QuestionResponse, Role};
+use crate::app::components::test_components::font_controls::FontSettings;
 use crate::app::models::question::{Question, QuestionType};
 use leptos::*;
 use std::collections::HashMap;
@@ -9,6 +10,7 @@ pub fn QuestionCard(
     #[prop(into)] role: Signal<Role>,
     #[prop(into)] responses: Signal<HashMap<i32, QuestionResponse>>,
     #[prop(into)] should_disable_inputs: Signal<bool>,
+    #[prop(into)] font_settings: Signal<FontSettings>,
     #[prop(into)] on_answer_change: Callback<(i32, String)>,
     #[prop(into)] on_comment_change: Callback<(i32, String)>,
     #[prop(into)] on_weighted_selection: Callback<(i32, Vec<String>)>,
@@ -21,7 +23,7 @@ pub fn QuestionCard(
             <div class="p-8 flex flex-col justify-start items-center w-full h-full overflow-y-auto">
                 {/* Question Section */}
                 <div class="text-center w-full overflow-auto mb-6">
-                    <p class="text-4xl sm:text-3xl font-bold text-gray-800 break-words mb-8">
+                    <p class=move || format!("text-4xl sm:text-3xl font-bold text-gray-800 break-words mb-8 {}", font_settings.get().get_question_classes())>
                         {question.word_problem.clone()}
                     </p>
                 </div>
@@ -36,6 +38,7 @@ pub fn QuestionCard(
                             question=question_for_answer.clone()
                             responses=responses
                             should_disable_inputs=should_disable_inputs
+                            font_settings=font_settings
                             on_answer_change=on_answer_change
                             on_weighted_selection=on_weighted_selection
                         />
@@ -65,6 +68,7 @@ fn AnswerInput(
     question: Question,
     #[prop(into)] responses: Signal<HashMap<i32, QuestionResponse>>,
     #[prop(into)] should_disable_inputs: Signal<bool>,
+    #[prop(into)] font_settings: Signal<FontSettings>,
     #[prop(into)] on_answer_change: Callback<(i32, String)>,
     #[prop(into)] on_weighted_selection: Callback<(i32, Vec<String>)>,
 ) -> impl IntoView {
@@ -103,7 +107,7 @@ fn AnswerInput(
                                         }
                                     }
                                 />
-                                <span class="ml-2 break-words">{option_value}</span>
+                                <span class=move || format!("ml-2 break-words {}", font_settings.get().get_answer_classes())>{option_value}</span>
                             </label>
                         }
                     }
@@ -193,7 +197,7 @@ fn AnswerInput(
                                             <span class="text-xs text-gray-500 font-medium mt-1 min-w-[1rem]">
                                                 {choice_number}
                                             </span>
-                                            <span class="leading-relaxed break-words">
+                                            <span class=move || format!("leading-relaxed break-words {}", font_settings.get().get_answer_classes())>
                                                 {option_clone.text.clone()}
                                             </span>
                                         </div>
@@ -278,7 +282,9 @@ fn AnswerInput(
                             }
                         }
                     >
-                        "Yes" //manually changed from "True" to "Yes" for clarity
+                        <span class=move || font_settings.get().get_answer_classes()>
+                            "Yes" //manually changed from "True" to "Yes" for clarity
+                        </span>
                     </button>
                     <button
                         type="button"
@@ -297,7 +303,9 @@ fn AnswerInput(
                             }
                         }
                     >
-                        "No" //manually changed from "False" to "No" for clarity
+                        <span class=move || font_settings.get().get_answer_classes()>
+                            "No" //manually changed from "False" to "No" for clarity
+                        </span>
                     </button>
                 </div>
             }.into_view()

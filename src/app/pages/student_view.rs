@@ -18,15 +18,15 @@ use log::{debug, error, info};
 use std::rc::Rc;
 
 // Side panel styles - Updated for responsiveness and toggle behavior
-const SIDE_PANEL_STYLE: &str = "lg:w-[30%] w-full h-[calc(100vh-2rem)] fixed lg:right-0 right-0 top-0 mt-10 p-5 lg:p-10 z-20 lg:z-10 transform transition-transform duration-300 ease-in-out";
-const SIDE_PANEL_STYLE_HIDDEN: &str = "w-0 h-[calc(100vh-2rem)] fixed lg:right-0 right-0 top-0 mt-10 overflow-hidden z-20 lg:z-10 transform transition-all duration-300 ease-in-out";
+const SIDE_PANEL_STYLE: &str = "lg:w-[30%] w-full h-[calc(100vh-2rem)] fixed lg:right-0 right-0 top-0 mt-10 p-5 lg:p-10 z-20 lg:z-10 transform transition-all duration-300 ease-in-out duration-300";
+const SIDE_PANEL_STYLE_HIDDEN: &str = "w-0 h-[calc(100vh-2rem)] fixed lg:right-0 right-0 top-0 mt-10 overflow-hidden z-20 lg:z-10 transform transition-all duration-300 ease-in-out duration-300";
 
 // Toggle button styles
 const TOGGLE_BUTTON_STYLE: &str = "absolute left-0 top-1/2 -ml-8 bg-[#2E3A59] text-white p-2 rounded-l-md shadow-md hidden lg:flex items-center justify-center transition-all duration-300 transform";
 
 // Table styles - Updated to be responsive to panel toggle
-const TABLE_CONTAINER_STYLE_DEFAULT: &str = "w-full lg:w-[68%] fixed p-3 lg:p-5 h-[calc(100vh-2rem)] flex flex-col lg:ml-20 transition-all duration-300 ease-in-out";
-const TABLE_CONTAINER_STYLE_EXPANDED: &str = "w-full lg:w-[92%] fixed p-3 lg:p-5 h-[calc(100vh-2rem)] flex flex-col lg:ml-20 transition-all duration-300 ease-in-out";
+const TABLE_CONTAINER_STYLE_DEFAULT: &str = "w-full lg:w-[68%] fixed p-3 lg:p-5 h-[calc(100vh-2rem)] flex flex-col lg:ml-20 transition-all duration-300 ease-in-out overflow-hidden";
+const TABLE_CONTAINER_STYLE_EXPANDED: &str = "w-full lg:w-[92%] fixed p-3 lg:p-5 h-[calc(100vh-2rem)] flex flex-col lg:ml-20 transition-all duration-300 ease-in-out overflow-hidden";
 
 #[component]
 pub fn StudentView() -> impl IntoView {
@@ -274,22 +274,24 @@ pub fn StudentViewContent() -> impl IntoView {
                 }
             }>
                 // Search and filter component
-                <SearchFilter
-                    set_search_term=set_search_term
-                    set_grade_filter=set_grade_filter
-                    set_teacher_filter=set_teacher_filter
-                    set_iep_filter=set_iep_filter
-                    set_esl_filter=set_esl_filter
-                    set_intervention_filter=set_intervention_filter
-                    set_student_504_filter=set_student_504_filter
-                    set_readplan_filter=set_readplan_filter
-                    set_gt_filter=set_gt_filter
-                    set_bip_filter=set_bip_filter
-                    search_term=search_term
-                    teachers=Signal::derive(move || teacher_names())
-                    on_clear_filters=Callback::new(handle_clear_filters)
-                    is_panel_expanded=Signal::derive(move || panel_expanded())
-                />
+                <div class="flex-shrink-0">
+                    <SearchFilter
+                        set_search_term=set_search_term
+                        set_grade_filter=set_grade_filter
+                        set_teacher_filter=set_teacher_filter
+                        set_iep_filter=set_iep_filter
+                        set_esl_filter=set_esl_filter
+                        set_intervention_filter=set_intervention_filter
+                        set_student_504_filter=set_student_504_filter
+                        set_readplan_filter=set_readplan_filter
+                        set_gt_filter=set_gt_filter
+                        set_bip_filter=set_bip_filter
+                        search_term=search_term
+                        teachers=Signal::derive(move || teacher_names())
+                        on_clear_filters=Callback::new(handle_clear_filters)
+                        is_panel_expanded=Signal::derive(move || panel_expanded())
+                    />
+                </div>
 
                 // Student table component
                 <StudentTable
@@ -311,7 +313,7 @@ pub fn StudentViewContent() -> impl IntoView {
 
 
                 // Bottom action buttons
-                <div class="mt-4 pt-2 flex flex-wrap gap-2 justify-end sticky bottom-0 bg-[#F9F9F8]">
+                <div class="flex-shrink-0 mt-4 pt-2 flex flex-wrap gap-2 justify-end sticky bottom-0 bg-[#F9F9F8] border-t border-[#DADADA]">
                     <button
                         class="px-3 md:px-4 py-2 bg-[#F9F9F8] hover:bg-[#DADADA] hover:bg-opacity-30 font-bold text-[#2E3A59] border-[#DADADA] rounded-md border transition-colors text-sm md:text-base"
                         on:click=move |_| set_show_bulk_upload_modal(true)
