@@ -247,7 +247,9 @@ fn build_assessment_summaries(
                 AssessmentSummary {
                     assessment_id: assessment_id.clone(),
                     assessment_name: assessment.name.clone(),
-                    subject: assessment.subject.to_string(),
+                    subject: assessment
+                        .subject
+                        .map_or("Unknown".to_string(), |s| s.to_string()),
                     total_possible,
                     current_score,
                     grade_level: assessment.grade.as_ref().map(|g| g.to_string()),

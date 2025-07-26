@@ -33,7 +33,6 @@ pub fn AppRoutes() -> impl IntoView {
 
             // Assessment routes
             <Route path="/assessments" view=AssessmentPage/>
-            <Route path="/assessment/:test_id" view=Assessment/>
             <Route path="/admintest" view=AdministerTest/>
             <Route path="/gradebook" view=Gradebook/>
 
@@ -41,7 +40,6 @@ pub fn AppRoutes() -> impl IntoView {
             <Route path="/test-session/:test_id" view=RealtimeTestSession/>
             <Route path="/student-test/:test_id/:session_id" view=AnonymousStudentTest/>
             <Route path="/tests/:test_id/sessions/:session_id" view=RealtimeTestSession/>
-            <Route path="/testsessions" view=TestSessionsList/>
 
             // Test template routes
             <Route path="/flashcardset/:test_id" view=FlashCardSet/>

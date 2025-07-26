@@ -1,10 +1,7 @@
 use crate::app::components::dashboard::dashboard_sidebar::{DashboardSidebar, SidebarSelected};
-#[cfg(feature = "hydrate")]
-use crate::app::components::data_charts::{
-    render_overall_progress, render_score_distribution, render_test_distribution, render_test_plot,
-};
 use crate::app::components::data_processing::{
-    AssessmentSummary, Progress, StudentResultsSummary, TestDetail,
+    AssessmentProgressChart, AssessmentRadarChart, AssessmentSummary, PerformanceDistributionChart,
+    Progress, StudentResultsSummary, TestAreaPerformanceChart, TestDetail, TestScoresTimelineChart,
 };
 use crate::app::components::header::Header;
 use crate::app::components::student_report::sequence_progress_bar::{
@@ -50,7 +47,7 @@ pub fn TestResultsPage() -> impl IntoView {
 
     view! {
         <Header />
-        <div class="p-6 max-w-6xl mx-auto">
+        <div class="p-6 max-w-7xl mx-auto">
             // Student Information Section
             <Suspense fallback=move || view! { <div class="text-center p-4">"Loading student data..."</div> }>
                 {move || student_results_resource.get().map(|results_opt| {
@@ -96,7 +93,19 @@ pub fn TestResultsPage() -> impl IntoView {
                             }
                             on:click=move |_| set_view_mode("overview".to_string())
                         >
-                            "Progress Overview"
+                            "Visual Overview"
+                        </button>
+                        <button
+                            class=move || {
+                                if view_mode.get() == "sequence" {
+                                    "px-6 py-2 bg-blue-500 text-white rounded-lg font-medium transition-all duration-200"
+                                } else {
+                                    "px-6 py-2 text-slate-600 hover:text-slate-800 rounded-lg font-medium transition-all duration-200"
+                                }
+                            }
+                            on:click=move |_| set_view_mode("sequence".to_string())
+                        >
+                            "Progress Sequences"
                         </button>
                         <button
                             class=move || {
@@ -114,6 +123,111 @@ pub fn TestResultsPage() -> impl IntoView {
                 </div>
             </div>
 
+            // Visual Overview Section - Charts and visualizations
+            <Suspense fallback=move || view! { <div>"Loading chart data..."</div> }>
+                {move || {
+                    let results = student_results_resource.get().unwrap_or(None);
+                    match results {
+                        Some(data) => {
+                            let assessments = data.assessment_summaries.clone();
+                            let test_details = data.test_summaries.clone();
+                            let test_history = data.test_history.clone();
+
+                            if view_mode.get() == "overview" && !assessments.is_empty() {
+                                view! {
+                                    <div class="mb-6 space-y-6">
+                                        <h2 class="text-2xl font-bold text-slate-800 mb-4">"Performance Analytics Dashboard"</h2>
+
+                                        // Main charts grid
+                                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                                            // Assessment Progress Chart
+                                            <AssessmentProgressChart
+                                                assessments={assessments.clone()}
+                                                chart_id="assessment-progress-chart".to_string()
+                                            />
+
+                                            // Assessment Radar Chart
+                                            <AssessmentRadarChart
+                                                assessment_data={assessments.clone()}
+                                                radar_chart_id="assessment-radar-chart".to_string()
+                                            />
+                                        </div>
+
+                                        // Timeline chart (full width)
+                                        {if !test_history.is_empty() {
+                                            view! {
+                                                <TestScoresTimelineChart
+                                                    test_history={test_history.clone()}
+                                                    chart_id="test-timeline-chart".to_string()
+                                                />
+                                            }.into_view()
+                                        } else {
+                                            view! { <div></div> }.into_view()
+                                        }}
+
+                                        // Performance distribution and test area charts
+                                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                            // Test Area Performance
+                                            {if !test_details.is_empty() {
+                                                view! {
+                                                    <TestAreaPerformanceChart
+                                                        test_area_data={test_details.clone()}
+                                                        area_chart_id="test-area-chart".to_string()
+                                                    />
+                                                }.into_view()
+                                            } else {
+                                                view! { <div></div> }.into_view()
+                                            }}
+
+                                            // Overall Performance Distribution
+                                            {if !assessments.is_empty() {
+                                                let overall_distribution = calculate_overall_distribution(&assessments);
+                                                view! {
+                                                    <PerformanceDistributionChart
+                                                        distribution_data={overall_distribution}
+                                                        chart_id="overall-distribution-chart".to_string()
+                                                        title="Overall Performance Distribution".to_string()
+                                                    />
+                                                }.into_view()
+                                            } else {
+                                                view! { <div></div> }.into_view()
+                                            }}
+                                        </div>
+
+                                        // Individual assessment distribution charts
+                                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                            {assessments.iter().map(|assessment| {
+                                                if !assessment.distribution_data.is_empty() {
+                                                    view! {
+                                                        <PerformanceDistributionChart
+                                                            distribution_data={assessment.distribution_data.clone()}
+                                                            chart_id={format!("assessment-dist-{}", assessment.assessment_id)}
+                                                            title={assessment.assessment_name.clone()}
+                                                        />
+                                                    }.into_view()
+                                                } else {
+                                                    view! { <div></div> }.into_view()
+                                                }
+                                            }).collect::<Vec<_>>()}
+                                        </div>
+                                    </div>
+                                }
+                            } else if view_mode.get() == "overview" {
+                                view! {
+                                    <div class="mb-6 bg-slate-50 rounded-lg p-8 text-center">
+                                        <h2 class="text-xl font-semibold text-slate-600 mb-2">"No Assessment Data Available"</h2>
+                                        <p class="text-slate-500">"Performance charts will appear here once tests are completed."</p>
+                                    </div>
+                                }
+                            } else {
+                                view! { <div></div> }
+                            }
+                        },
+                        None => view! { <div></div> }
+                    }
+                }}
+            </Suspense>
+
             // Progress Overview Section - Using SequenceWeb components
             <Suspense fallback=move || view! { <div>"Loading progress data..."</div> }>
                 {move || {
@@ -122,10 +236,10 @@ pub fn TestResultsPage() -> impl IntoView {
                         Some(data) => {
                             let assessments = data.assessment_summaries.clone();
 
-                            if view_mode.get() == "overview" && !assessments.is_empty() {
+                            if view_mode.get() == "sequence" && !assessments.is_empty() {
                                 view! {
                                     <div class="mb-6 space-y-4">
-                                        <h2 class="text-2xl font-bold text-slate-800 mb-4">"Assessment Progress Overview"</h2>
+                                        <h2 class="text-2xl font-bold text-slate-800 mb-4">"Assessment Progress Sequences"</h2>
                                         {assessments.iter().map(|assessment| {
                                             view! {
                                                 <SequenceWeb
@@ -136,7 +250,7 @@ pub fn TestResultsPage() -> impl IntoView {
                                         }).collect::<Vec<_>>()}
                                     </div>
                                 }
-                            } else if view_mode.get() == "overview" {
+                            } else if view_mode.get() == "sequence" {
                                 view! {
                                     <div class="mb-6 bg-slate-50 rounded-lg p-8 text-center">
                                         <h2 class="text-xl font-semibold text-slate-600 mb-2">"No Assessment Data Available"</h2>
@@ -380,96 +494,71 @@ pub fn TestResultsPage() -> impl IntoView {
                                                                                     }}
                                                                                 </div>
 
-                                                                                // Performance charts for this assessment
+                                                                                // Replaced old charts with new Chart.js component
                                                                                 <div class="mt-6">
-                                                                                    <h4 class="font-semibold mb-2">"Performance Distribution"</h4>
-                                                                                    <div class="border rounded-lg p-4 bg-white">
-                                                                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                                                            // Distribution chart
-                                                                                            <div class="h-64">
-                                                                                                <h5 class="text-sm font-medium text-gray-500 mb-2">"Performance Categories"</h5>
-                                                                                                <div class="flex space-x-2">
-                                                                                                    {distribution_data.iter().map(|(category, count)| {
-                                                                                                        let category_clone = category.clone();
-                                                                                                        let color = match category.as_str() {
-                                                                                                            cat if cat.contains("Above") || cat.contains("High") => "bg-green-500",
-                                                                                                            cat if cat.contains("Average") || cat.contains("On Track") => "bg-blue-500",
-                                                                                                            cat if cat.contains("Below") || cat.contains("Risk") => "bg-red-500",
-                                                                                                            _ => "bg-gray-500"
-                                                                                                        };
-                                                                                                        let width_percent = *count as f32 / test_details_len as f32 * 100.0;
+                                                                                    <h4 class="font-semibold mb-4">"Assessment Performance Charts"</h4>
+                                                                                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                                                                        // Performance Distribution Chart
+                                                                                        <PerformanceDistributionChart
+                                                                                            distribution_data={distribution_data.clone()}
+                                                                                            chart_id={format!("expanded-dist-{}", assessment_id)}
+                                                                                            title="Performance Categories".to_string()
+                                                                                        />
 
-                                                                                                        view! {
-                                                                                                            <div class="flex flex-col items-center">
-                                                                                                                <div class="w-16 relative h-48 bg-gray-200 rounded overflow-hidden">
-                                                                                                                    <div
-                                                                                                                        class={format!("{} absolute bottom-0 w-full", color)}
-                                                                                                                        style={format!("height: {}%", width_percent)}
-                                                                                                                    ></div>
-                                                                                                                </div>
-                                                                                                                <div class="text-xs mt-1">{category_clone}</div>
-                                                                                                                <div class="text-xs font-bold">{count.to_string()}</div>
-                                                                                                            </div>
+                                                                                        // Overall assessment rating display
+                                                                                        <div class="bg-white rounded-lg border p-6 flex flex-col items-center justify-center">
+                                                                                            <h5 class="text-sm font-medium text-gray-500 mb-2">"Overall Assessment Rating"</h5>
+                                                                                            <div class=move || {
+                                                                                                // Use the cloned value to avoid moving
+                                                                                                let color_class = if rating.contains("Above") || rating.contains("High") {
+                                                                                                    "text-4xl font-bold text-green-600"
+                                                                                                } else if rating.contains("Average") || rating.contains("On Track") {
+                                                                                                    "text-4xl font-bold text-blue-600"
+                                                                                                } else if rating.contains("Below") || rating.contains("Risk") {
+                                                                                                    "text-4xl font-bold text-red-600"
+                                                                                                } else {
+                                                                                                    "text-4xl font-bold text-gray-600"
+                                                                                                };
+                                                                                                color_class
+                                                                                            }>
+                                                                                                {&assessment_rating_clone}
+                                                                                            </div>
+                                                                                            <div class="mt-2 text-sm text-gray-600">
+                                                                                                "Based on " {test_details_len} " completed tests"
+                                                                                            </div>
+                                                                                            <div class="mt-4 flex items-center w-full">
+                                                                                                <div class="w-full bg-gray-200 rounded-full h-2.5">
+                                                                                                    <div
+                                                                                                        class=move || {
+                                                                                                            let score_percent = if let Some(total) = assessment_total_possible {
+                                                                                                                (assessment_current_score as f32 / total as f32 * 100.0) as i32
+                                                                                                            } else {
+                                                                                                                0
+                                                                                                            };
+
+                                                                                                            if score_percent >= 80 {
+                                                                                                                "bg-green-600 h-2.5 rounded-full"
+                                                                                                            } else if score_percent >= 60 {
+                                                                                                                "bg-yellow-400 h-2.5 rounded-full"
+                                                                                                            } else {
+                                                                                                                "bg-red-600 h-2.5 rounded-full"
+                                                                                                            }
                                                                                                         }
-                                                                                                    }).collect::<Vec<_>>()}
+                                                                                                        style=move || {
+                                                                                                            let percent = if let Some(total) = assessment_total_possible {
+                                                                                                                let p = (assessment_current_score as f32 / total as f32 * 100.0) as i32;
+                                                                                                                p.min(100)
+                                                                                                            } else {
+                                                                                                                0
+                                                                                                            };
+                                                                                                            format!("width: {}%", percent)
+                                                                                                        }
+                                                                                                    ></div>
                                                                                                 </div>
                                                                                             </div>
-
-                                                                                            // Overall assessment rating
-                                                                                            <div class="flex flex-col items-center justify-center border rounded-lg p-4">
-                                                                                                <h5 class="text-sm font-medium text-gray-500 mb-2">"Overall Assessment Rating"</h5>
-                                                                                                <div class=move || {
-                                                                                                    // Use the cloned value to avoid moving
-                                                                                                    let color_class = if rating.contains("Above") || rating.contains("High") {
-                                                                                                        "text-4xl font-bold text-green-600"
-                                                                                                    } else if rating.contains("Average") || rating.contains("On Track") {
-                                                                                                        "text-4xl font-bold text-blue-600"
-                                                                                                    } else if rating.contains("Below") || rating.contains("Risk") {
-                                                                                                        "text-4xl font-bold text-red-600"
-                                                                                                    } else {
-                                                                                                        "text-4xl font-bold text-gray-600"
-                                                                                                    };
-                                                                                                    color_class
-                                                                                                }>
-                                                                                                    {&assessment_rating_clone}
-                                                                                                </div>
-                                                                                                <div class="mt-2 text-sm text-gray-600">
-                                                                                                    "Based on " {test_details_len} " completed tests"
-                                                                                                </div>
-                                                                                                <div class="mt-4 flex items-center">
-                                                                                                    <div class="w-full bg-gray-200 rounded-full h-2.5">
-                                                                                                        <div
-                                                                                                            class=move || {
-                                                                                                                let score_percent = if let Some(total) = assessment_total_possible {
-                                                                                                                    (assessment_current_score as f32 / total as f32 * 100.0) as i32
-                                                                                                                } else {
-                                                                                                                    0
-                                                                                                                };
-
-                                                                                                                if score_percent >= 80 {
-                                                                                                                    "bg-green-600 h-2.5 rounded-full"
-                                                                                                                } else if score_percent >= 60 {
-                                                                                                                    "bg-yellow-400 h-2.5 rounded-full"
-                                                                                                                } else {
-                                                                                                                    "bg-red-600 h-2.5 rounded-full"
-                                                                                                                }
-                                                                                                            }
-                                                                                                            style=move || {
-                                                                                                                let percent = if let Some(total) = assessment_total_possible {
-                                                                                                                    let p = (assessment_current_score as f32 / total as f32 * 100.0) as i32;
-                                                                                                                    p.min(100)
-                                                                                                                } else {
-                                                                                                                    0
-                                                                                                                };
-                                                                                                                format!("width: {}%", percent)
-                                                                                                            }
-                                                                                                        ></div>
-                                                                                                    </div>
-                                                                                                </div>
-                                                                                                <div class="mt-1 text-xs">
-                                                                                                    {assessment_current_score}
-                                                                                                    {assessment_total_possible.map(|t| format!(" / {}", t)).unwrap_or_else(|| String::new())}
-                                                                                                </div>
+                                                                                            <div class="mt-1 text-xs">
+                                                                                                {assessment_current_score}
+                                                                                                {assessment_total_possible.map(|t| format!(" / {}", t)).unwrap_or_else(|| String::new())}
                                                                                             </div>
                                                                                         </div>
                                                                                     </div>
@@ -695,4 +784,18 @@ pub fn TestResultsPage() -> impl IntoView {
             </div>
         </div>
     }
+}
+
+// Helper function to calculate overall distribution across all assessments
+fn calculate_overall_distribution(assessments: &[AssessmentSummary]) -> Vec<(String, i32)> {
+    let mut distribution_map: std::collections::HashMap<String, i32> =
+        std::collections::HashMap::new();
+
+    for assessment in assessments {
+        for (category, count) in &assessment.distribution_data {
+            *distribution_map.entry(category.clone()).or_insert(0) += count;
+        }
+    }
+
+    distribution_map.into_iter().collect()
 }

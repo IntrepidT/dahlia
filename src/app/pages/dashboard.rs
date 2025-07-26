@@ -31,8 +31,6 @@ fn DashboardContent() -> impl IntoView {
             set_selected_view(SidebarSelected::StudentView);
         } else if path.starts_with("/teachers") {
             set_selected_view(SidebarSelected::TeacherView);
-        } else if path.starts_with("/testsessions") {
-            set_selected_view(SidebarSelected::Live);
         }
     });
 

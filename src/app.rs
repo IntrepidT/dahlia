@@ -41,7 +41,22 @@ pub fn App() -> impl IntoView {
         <link data-trunk rel="tailwind-css" href="/style/input.css" />
         <link rel="icon" href="/assets/favicon.ico" />
         <Title text="Teapot Testing"/>
-        <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
+        <Script>
+            {r#"
+            if (typeof window !== 'undefined' && !window.Chart) {
+                const script = document.createElement('script');
+                script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js';
+                script.onload = function() {
+                    console.log('Chart.js loaded successfully');
+                    window.dispatchEvent(new Event('chartjs-loaded'));
+                };
+                script.onerror = function() {
+                    console.error('Failed to load Chart.js');
+                };
+                document.head.appendChild(script);
+            }
+            "#}
+        </Script>
 
         <AuthProvider>
             <SettingsProvider>

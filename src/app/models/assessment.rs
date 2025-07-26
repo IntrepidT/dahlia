@@ -128,23 +128,15 @@ impl RangeCategory {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Eq, Clone, EnumIter)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Eq, Clone, EnumIter, Copy)]
 pub enum SubjectEnum {
-    #[strum(to_string = "Reading")]
     Reading,
-    #[strum(to_string = "Math")]
     Math,
-    #[strum(to_string = "Literacy")]
     Literacy,
-    #[strum(to_string = "Phonics")]
     Phonics,
-    #[strum(to_string = "History")]
     History,
-    #[strum(to_string = "Science")]
     Science,
-    #[strum(to_string = "Social Studies")]
     SocialStudies,
-    #[strum(to_string = "Other")]
     Other,
 }
 impl fmt::Display for SubjectEnum {
@@ -194,7 +186,7 @@ pub struct Assessment {
     pub composite_score: Option<i32>,
     pub risk_benchmarks: Option<Vec<RangeCategory>>,
     pub national_benchmarks: Option<Vec<RangeCategory>>,
-    pub subject: SubjectEnum,
+    pub subject: Option<SubjectEnum>,
     pub scope: Option<ScopeEnum>,
     pub course_id: Option<i32>,
     pub test_sequence: Option<Vec<TestSequenceItem>>,
@@ -285,7 +277,7 @@ impl Assessment {
         composite_score: Option<i32>,
         risk_benchmarks: Option<Vec<RangeCategory>>,
         national_benchmarks: Option<Vec<RangeCategory>>,
-        subject: SubjectEnum,
+        subject: Option<SubjectEnum>,
         scope: Option<ScopeEnum>,
         course_id: Option<i32>,
     ) -> Assessment {
@@ -314,7 +306,7 @@ impl Assessment {
         composite_score: Option<i32>,
         risk_benchmarks: Option<Vec<RangeCategory>>,
         national_benchmarks: Option<Vec<RangeCategory>>,
-        subject: SubjectEnum,
+        subject: Option<SubjectEnum>,
         scope: Option<ScopeEnum>,
         course_id: Option<i32>,
         test_sequence: Vec<TestSequenceItem>,
@@ -714,7 +706,7 @@ pub struct CreateNewAssessmentRequest {
     pub composite_score: Option<i32>,
     pub risk_benchmarks: Option<Vec<RangeCategory>>,
     pub national_benchmarks: Option<Vec<RangeCategory>>,
-    pub subject: SubjectEnum,
+    pub subject: Option<SubjectEnum>,
     pub scope: Option<ScopeEnum>,
     pub course_id: Option<i32>,
     pub test_sequence: Option<Vec<TestSequenceItem>>,
@@ -729,7 +721,7 @@ impl CreateNewAssessmentRequest {
         composite_score: Option<i32>,
         risk_benchmarks: Option<Vec<RangeCategory>>,
         national_benchmarks: Option<Vec<RangeCategory>>,
-        subject: SubjectEnum,
+        subject: Option<SubjectEnum>,
         scope: Option<ScopeEnum>,
         course_id: Option<i32>,
     ) -> CreateNewAssessmentRequest {
@@ -756,7 +748,7 @@ impl CreateNewAssessmentRequest {
         composite_score: Option<i32>,
         risk_benchmarks: Option<Vec<RangeCategory>>,
         national_benchmarks: Option<Vec<RangeCategory>>,
-        subject: SubjectEnum,
+        subject: Option<SubjectEnum>,
         scope: Option<ScopeEnum>,
         course_id: Option<i32>,
         test_sequence: Vec<TestSequenceItem>,
@@ -802,7 +794,7 @@ pub struct UpdateAssessmentRequest {
     pub composite_score: Option<i32>,
     pub risk_benchmarks: Option<Vec<RangeCategory>>,
     pub national_benchmarks: Option<Vec<RangeCategory>>,
-    pub subject: SubjectEnum,
+    pub subject: Option<SubjectEnum>,
     pub scope: Option<ScopeEnum>,
     pub course_id: Option<i32>,
     pub test_sequence: Option<Vec<TestSequenceItem>>,
@@ -818,7 +810,7 @@ impl UpdateAssessmentRequest {
         composite_score: Option<i32>,
         risk_benchmarks: Option<Vec<RangeCategory>>,
         national_benchmarks: Option<Vec<RangeCategory>>,
-        subject: SubjectEnum,
+        subject: Option<SubjectEnum>,
         scope: Option<ScopeEnum>,
         course_id: Option<i32>,
     ) -> UpdateAssessmentRequest {
@@ -847,7 +839,7 @@ impl UpdateAssessmentRequest {
         composite_score: Option<i32>,
         risk_benchmarks: Option<Vec<RangeCategory>>,
         national_benchmarks: Option<Vec<RangeCategory>>,
-        subject: SubjectEnum,
+        subject: Option<SubjectEnum>,
         scope: Option<ScopeEnum>,
         course_id: Option<i32>,
         test_sequence: Vec<TestSequenceItem>,

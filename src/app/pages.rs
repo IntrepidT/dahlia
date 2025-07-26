@@ -19,17 +19,11 @@ pub use login_page::LoginPage;
 pub mod test_builder;
 pub use test_builder::TestBuilder;
 
-pub mod assessment;
-pub use assessment::Assessment;
-
 pub mod dashboard;
 pub use dashboard::Dashboard;
 
 pub mod review_test;
 pub use review_test::ReviewTest;
-
-pub mod test_sessions;
-pub use test_sessions::TestSessionsList;
 
 pub mod assessment_page;
 pub use assessment_page::AssessmentPage;

@@ -36,7 +36,6 @@ pub enum SidebarSelected {
     TeacherView,
     AdministerTest,
     AdminDashboard,
-    Live,
     Gradebook,
     Assessments,
 }
@@ -204,14 +203,6 @@ pub fn DashboardSidebar(
                                 is_small_screen=is_small_screen.into()
                             />
                         </Show>
-                        <SidebarNavLink
-                            icon=AiApiOutlined
-                            label="Join Live Session"
-                            path="/testsessions"
-                            is_expanded=is_expanded.into()
-                            is_active=Signal::derive(move || current_path().starts_with("/testsessions"))
-                            is_small_screen=is_small_screen.into()
-                        />
                         <SidebarNavLink
                             icon=ChNotesTick
                             label="Assessments"

@@ -12,12 +12,6 @@ pub use teacher_page::*;
 pub mod student_page;
 pub use student_page::*;
 
-pub mod body;
-pub use body::*;
-
-pub mod nav;
-pub use nav::NavBar;
-
 pub mod auth;
 pub use auth::*;
 
@@ -56,3 +50,5 @@ pub use student_report::*;
 
 pub mod test_components;
 pub use test_components::*;
+
+pub mod assessment_page;

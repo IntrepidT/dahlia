@@ -44,7 +44,7 @@ cfg_if::cfg_if! {
                         Ok(Some(json)) => Some(json.0),
                         _ => None,
                     };
-                    let subject: SubjectEnum = row.get("subject");
+                    let subject: Option<SubjectEnum> = row.get("subject");
                     let scope: Option<ScopeEnum> = row.get("scope");
                     let course_id: Option<i32> = row.get("course_id");
 
