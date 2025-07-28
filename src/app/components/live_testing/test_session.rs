@@ -9,6 +9,7 @@ use super::{
 };
 use crate::app::components::test_components::balloon_celebration::BalloonCelebration;
 use crate::app::components::test_components::font_controls::{use_font_settings, FontControls};
+use crate::app::components::test_components::test_instructions::TestInstructions;
 use crate::app::models::question::{Question, QuestionType};
 use crate::app::models::score::CreateScoreRequest;
 use crate::app::models::test::Test;
@@ -23,6 +24,8 @@ use log;
 use serde_json::json;
 use std::collections::HashMap;
 use uuid::Uuid;
+#[cfg(feature = "hydrate")]
+use wasm_bindgen::JsCast;
 
 // Helper function using your existing create_or_join_session - FIXED
 async fn create_new_session_with_existing_function(
@@ -89,6 +92,8 @@ pub fn RealtimeTestSession() -> impl IntoView {
     let (show_participants, set_show_participants) = create_signal(false);
     let (font_settings, set_font_settings) = use_font_settings();
     let (show_celebration, set_show_celebration) = create_signal(false);
+    let (shortcuts_expanded, set_shortcuts_expanded) = create_signal(false);
+    let (instructions_expanded, set_instructions_expanded) = create_signal(false);
 
     // Initialize role based on user
     create_effect(move |_| {
@@ -395,6 +400,171 @@ pub fn RealtimeTestSession() -> impl IntoView {
         }
     });
 
+    //shortcuts effect ui
+    #[cfg(feature = "hydrate")]
+    {
+        use leptos::ev::KeyboardEvent;
+
+        let handle_keydown = move |ev: KeyboardEvent| {
+            let target = ev.target().unwrap();
+            let tag_name = target
+                .unchecked_ref::<web_sys::Element>()
+                .tag_name()
+                .to_lowercase();
+
+            // Handle Tab to blur from textarea/input
+            if ev.key().as_str() == "Tab" && (tag_name == "textarea" || tag_name == "input") {
+                if let Some(html_element) = target.dyn_ref::<web_sys::HtmlElement>() {
+                    let _ = html_element.blur();
+                    ev.prevent_default();
+                }
+                return;
+            }
+
+            // Only handle navigation shortcuts when not typing in input fields
+            if tag_name == "input" || tag_name == "textarea" || tag_name == "select" {
+                return;
+            }
+
+            match ev.key().as_str() {
+                "ArrowRight" | "n" | "N" => {
+                    ev.prevent_default();
+                    #[cfg(feature = "hydrate")]
+                    ws_actions.go_to_next_card.call(());
+                }
+                "ArrowLeft" | "p" | "P" => {
+                    ev.prevent_default();
+                    #[cfg(feature = "hydrate")]
+                    ws_actions.go_to_previous_card.call(());
+                }
+                "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" => {
+                    if !ev.ctrl_key() && !ev.alt_key() && !ev.meta_key() {
+                        ev.prevent_default();
+                        if let Ok(num) = ev.key().parse::<usize>() {
+                            // Check if we're on a multiple choice question
+                            if let Some(questions_vec) = questions.get() {
+                                let current_question = &questions_vec[current_card_index.get()];
+                                match current_question.question_type {
+                                    QuestionType::MultipleChoice => {
+                                        if num <= current_question.options.len() {
+                                            let option = current_question.options[num - 1].clone();
+                                            #[cfg(feature = "hydrate")]
+                                            ws_actions
+                                                .handle_answer_change
+                                                .call((current_question.qnumber, option));
+                                        }
+                                    }
+                                    QuestionType::WeightedMultipleChoice => {
+                                        let weighted_options =
+                                            current_question.get_weighted_options();
+                                        if num <= weighted_options.len() {
+                                            let option = &weighted_options[num - 1];
+                                            if option.is_selectable {
+                                                let current_selected = responses.with(|r| {
+                                                    r.get(&current_question.qnumber)
+                                                        .and_then(|resp| {
+                                                            resp.selected_options.as_ref()
+                                                        })
+                                                        .cloned()
+                                                        .unwrap_or_default()
+                                                });
+
+                                                let mut new_selected = current_selected;
+                                                if new_selected.contains(&option.text) {
+                                                    new_selected.retain(|x| x != &option.text);
+                                                } else {
+                                                    new_selected.push(option.text.clone());
+                                                }
+
+                                                #[cfg(feature = "hydrate")]
+                                                ws_actions
+                                                    .handle_weighted_selection
+                                                    .call((current_question.qnumber, new_selected));
+                                            }
+                                        }
+                                    }
+                                    QuestionType::TrueFalse => {
+                                        if num == 1 {
+                                            #[cfg(feature = "hydrate")]
+                                            ws_actions.handle_answer_change.call((
+                                                current_question.qnumber,
+                                                "true".to_string(),
+                                            ));
+                                        } else if num == 2 {
+                                            #[cfg(feature = "hydrate")]
+                                            ws_actions.handle_answer_change.call((
+                                                current_question.qnumber,
+                                                "false".to_string(),
+                                            ));
+                                        }
+                                    }
+                                    _ => {
+                                        // For other question types, just navigate normally
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                "c" | "C" => {
+                    if !ev.ctrl_key() && !ev.alt_key() && !ev.meta_key() {
+                        ev.prevent_default();
+                        // Focus comments box
+                        if let Some(window) = web_sys::window() {
+                            if let Some(document) = window.document() {
+                                if let Some(textarea) = document
+                                    .query_selector("textarea[placeholder*='notes']")
+                                    .ok()
+                                    .flatten()
+                                {
+                                    let _ =
+                                        textarea.unchecked_into::<web_sys::HtmlElement>().focus();
+                                }
+                            }
+                        }
+                    }
+                }
+                "Enter" => {
+                    if ev.ctrl_key() || ev.meta_key() {
+                        ev.prevent_default();
+                        if let Some(questions_vec) = questions.get() {
+                            if current_card_index.get() == questions_vec.len() - 1
+                                && !is_submitted.get()
+                            {
+                                // Submit on last question
+                                if selected_student_id.get().is_some()
+                                    && matches!(role.get(), Role::Teacher)
+                                {
+                                    handle_submit.dispatch(());
+                                    set_is_submitted.set(true);
+                                }
+                            } else {
+                                #[cfg(feature = "hydrate")]
+                                ws_actions.go_to_next_card.call(());
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            }
+        };
+
+        create_effect(move |_| {
+            let window = web_sys::window().unwrap();
+            let document = window.document().unwrap();
+
+            let closure = wasm_bindgen::closure::Closure::wrap(
+                Box::new(handle_keydown) as Box<dyn Fn(KeyboardEvent)>
+            );
+
+            document
+                .add_event_listener_with_callback("keydown", closure.as_ref().unchecked_ref())
+                .unwrap();
+
+            closure.forget(); // Keep the closure alive
+        });
+    }
+
     // Format remaining time
     let formatted_time = move || {
         if let Some(seconds) = remaining_time.get() {
@@ -451,7 +621,7 @@ pub fn RealtimeTestSession() -> impl IntoView {
     });
 
     view! {
-        <div class="min-h-screen bg-gray-50">
+        <div class="min-h-screen bg-gray-50" tabindex="-1">
             {/* Minimal Top Bar */}
             <div class="sticky top-0 z-10 bg-white/80 backdrop-blur-md border-b border-gray-100">
                 <div class="max-w-5xl mx-auto px-6 py-3">
@@ -500,6 +670,64 @@ pub fn RealtimeTestSession() -> impl IntoView {
                     connection_status=Signal::derive(move || connection_status.get())
                     error_message=Signal::derive(move || error_message.get())
                 />
+
+                {/* Instructions Toggle */}
+                <Suspense fallback=move || view! { <div></div> }>
+                    {move || match test_details.get() {
+                        Some(Some(test)) => {
+                            if test.instructions.as_ref().map_or(false, |inst| !inst.is_empty()) {
+                                view! {
+                                    <div class="mb-2">
+                                        <button
+                                            class="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 font-medium"
+                                            on:click=move |_| set_instructions_expanded.update(|x| *x = !*x)
+                                        >
+                                            <svg class=move || format!("w-4 h-4 transition-transform {}",
+                                                if instructions_expanded() { "rotate-90" } else { "" }
+                                            ) fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                                            </svg>
+                                            "Test Instructions"
+                                        </button>
+                                        <Show when=move || instructions_expanded()>
+                                            <div class="mt-2">
+                                                <TestInstructions instructions=test.instructions.clone() />
+                                            </div>
+                                        </Show>
+                                    </div>
+                                }.into_view()
+                            } else {
+                                view! { <div></div> }.into_view()
+                            }
+                        },
+                        _ => view! { <div></div> }.into_view()
+                    }}
+                </Suspense>
+
+                {/* Shortcuts Toggle */}
+                <div class="mb-4">
+                    <button
+                        class="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 font-medium"
+                        on:click=move |_| set_shortcuts_expanded.update(|x| *x = !*x)
+                    >
+                        <svg class=move || format!("w-4 h-4 transition-transform {}",
+                            if shortcuts_expanded() { "rotate-90" } else { "" }
+                        ) fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                        </svg>
+                        "Keyboard Shortcuts"
+                    </button>
+                    <Show when=move || shortcuts_expanded()>
+                        <div class="mt-2 bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                                <span>"← → or P/N: Navigate (works in textarea)"</span>
+                                <span>"1-9: Select answers (Ctrl+1-9 in textarea)"</span>
+                                <span>"Ctrl+Enter: Next/Submit (works everywhere)"</span>
+                                <span>"C or Ctrl+C: Focus comments"</span>
+                            </div>
+                        </div>
+                    </Show>
+                </div>
 
                 {/* Session Status */}
                 <div class="flex justify-center items-center mb-3 space-x-8 text-sm">
