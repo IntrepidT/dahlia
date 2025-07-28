@@ -71,7 +71,7 @@ impl FontSettings {
             "font-normal"
         };
         format!(
-            "{} {} {} break-words font-bold",
+            "{} {} {} break-words",
             self.question_font_size, self.question_font_family, bold_class
         )
     }

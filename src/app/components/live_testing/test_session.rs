@@ -47,7 +47,13 @@ async fn create_new_session_with_existing_function(
     match websocket_sessions::create_or_join_session(request).await {
         Ok(session) => {
             log::info!("Created/joined session: {}", session.id);
-            set_room_id.set(Some(session.id)); // FIXED: Remove Uuid::parse_str()
+            #[cfg(feature = "hydrate")]
+            {
+                log::info!("Waiting for 1.5 seconds before setting room ID");
+                gloo_timers::future::TimeoutFuture::new(1500).await; // Wait for 1.5 seconds
+                log::info!("Waiting complete,setting up room");
+            }
+            set_room_id.set(Some(session.id));
         }
         Err(e) => {
             log::error!("Failed to create/join session: {}", e);

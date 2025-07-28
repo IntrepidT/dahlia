@@ -11,38 +11,45 @@ pub struct BenchmarkCategory {
     pub min: i32,
     pub max: i32,
     pub label: String,
+    pub color: Option<String>,
 }
 
 impl BenchmarkCategory {
     // Original constructor (now for ranges)
     pub fn new(min: i32, max: i32, label: String) -> BenchmarkCategory {
-        BenchmarkCategory { min, max, label }
+        BenchmarkCategory {
+            min,
+            max,
+            label,
+            color: None,
+        }
     }
-
     // Constructor for range (alias for clarity)
     pub fn new_range(min: i32, max: i32, label: String) -> BenchmarkCategory {
-        BenchmarkCategory { min, max, label }
+        BenchmarkCategory {
+            min,
+            max,
+            label,
+            color: None,
+        }
     }
-
     // Constructor for single value
     pub fn new_single(value: i32, label: String) -> BenchmarkCategory {
         BenchmarkCategory {
             min: value,
             max: value,
             label,
+            color: None,
         }
     }
-
     // Helper method to check if this is a single value
     pub fn is_single_value(&self) -> bool {
         self.min == self.max
     }
-
     // Helper method to check if a score falls within this category
     pub fn contains(&self, score: i32) -> bool {
         score >= self.min && score <= self.max
     }
-
     // Helper method to get the display text for the range
     pub fn range_display(&self) -> String {
         if self.is_single_value() {
@@ -51,7 +58,6 @@ impl BenchmarkCategory {
             format!("{}-{}", self.min, self.max)
         }
     }
-
     // Helper method to get the value for single-value categories
     pub fn get_single_value(&self) -> Option<i32> {
         if self.is_single_value() {
@@ -59,6 +65,14 @@ impl BenchmarkCategory {
         } else {
             None
         }
+    }
+    //helper method to set color
+    pub fn set_color(&mut self, color: String) {
+        self.color = Some(color);
+    }
+    //helper method to get color if available
+    pub fn get_color(&self) -> String {
+        return self.color.clone().unwrap_or_else(|| "#6b7280".to_string());
     }
 }
 

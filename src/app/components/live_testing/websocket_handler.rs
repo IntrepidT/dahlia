@@ -47,26 +47,32 @@ pub fn use_websocket_connection(
     session_room_id: Signal<Option<Uuid>>,
     questions: Signal<Option<Vec<Question>>>,
 ) -> WebSocketActions {
+    use gloo_timers::future::TimeoutFuture;
     let (ws, set_ws) = create_signal::<Option<WebSocket>>(None);
 
     // Connect to WebSocket when room_id changes
     create_effect(move |_| {
         if let Some(session_id) = room_id.get() {
-            connect_to_session(
-                session_id,
-                set_ws,
-                user,
-                set_connection_status,
-                set_error_message,
-                set_role,
-                set_connected_students,
-                set_responses,
-                set_current_card_index,
-                set_remaining_time,
-                set_is_test_active,
-                set_is_submitted,
-                ws,
-            );
+            spawn_local(async move {
+                //wait for any previous connection to close
+                gloo_timers::future::TimeoutFuture::new(200).await;
+
+                connect_to_session(
+                    session_id,
+                    set_ws,
+                    user,
+                    set_connection_status,
+                    set_error_message,
+                    set_role,
+                    set_connected_students,
+                    set_responses,
+                    set_current_card_index,
+                    set_remaining_time,
+                    set_is_test_active,
+                    set_is_submitted,
+                    ws,
+                );
+            });
         }
     });
 
@@ -434,36 +440,70 @@ fn setup_websocket_handlers(
 
     // Setup onopen handler
     let onopen_callback = Closure::wrap(Box::new(move |_| {
-        log::info!("WebSocket connection established");
+        log::info!("🎉 WebSocket connection established");
         set_connection_status.set(ConnectionStatus::Connected);
         set_error_message.set(None);
 
-        // Send user role information to server
-        if let Some(current_user) = user.get_untracked() {
-            let user_info = json!({
-                "type": "user_info",
-                "user_id": current_user.id,
-                "role": current_user.role,
-                "is_teacher": current_user.is_teacher(),
-                "is_admin": current_user.is_admin(),
-                "is_reconnecting": true,
-            })
-            .to_string();
+        // ROBUST: Try to send user_info with retries
+        spawn_local(async move {
+            let max_attempts = 5;
 
-            if let Some(socket) = ws.get() {
-                let _ = socket.send_with_str(&user_info);
+            for attempt in 1..=max_attempts {
+                log::info!("📤 Attempting to send user_info (attempt {})", attempt);
+
+                if let Some(current_user) = user.get_untracked() {
+                    log::info!("✅ User context available on attempt {}", attempt);
+
+                    let user_info = json!({
+                        "type": "user_info",
+                        "user_id": current_user.id,
+                        "role": current_user.role,
+                        "is_teacher": current_user.is_teacher(),
+                        "is_admin": current_user.is_admin(),
+                        "is_reconnecting": true,
+                    });
+
+                    if let Some(socket) = ws.get() {
+                        match socket.send_with_str(&user_info.to_string()) {
+                            Ok(_) => {
+                                log::info!("✅ user_info sent successfully on attempt {}", attempt);
+
+                                // Send participants request after successful user_info
+                                gloo_timers::future::TimeoutFuture::new(500).await;
+
+                                let participants_request = json!({
+                                    "type": "request_participants"
+                                })
+                                .to_string();
+
+                                let _ = socket.send_with_str(&participants_request);
+                                log::info!("✅ Participants request sent");
+                                return; // Success!
+                            }
+                            Err(e) => {
+                                log::error!(
+                                    "❌ Failed to send user_info on attempt {}: {:?}",
+                                    attempt,
+                                    e
+                                );
+                            }
+                        }
+                    } else {
+                        log::error!("❌ No WebSocket available on attempt {}", attempt);
+                    }
+                } else {
+                    log::warn!("⏳ User context not available on attempt {}", attempt);
+                }
+
+                // Wait before retry (increasing delay)
+                gloo_timers::future::TimeoutFuture::new(300 * attempt as u32).await;
             }
-        }
 
-        // Request participants list
-        if let Some(socket) = ws.get() {
-            let request_participants = json!({
-                "type": "request_participants"
-            })
-            .to_string();
-
-            let _ = socket.send_with_str(&request_participants);
-        }
+            log::error!(
+                "❌ Failed to send user_info after {} attempts",
+                max_attempts
+            );
+        });
     }) as Box<dyn FnMut(JsValue)>);
 
     // Setup onclose handler

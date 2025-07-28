@@ -1,6 +1,7 @@
 use crate::app::components::auth::server_auth_components::ServerAuthGuard;
 use crate::app::components::header::Header;
 use crate::app::components::question_builder::BuildingQuestion;
+use crate::app::components::test_components::benchmark_color_selector::BenchmarkColorSelector;
 use crate::app::models::assessment::ScopeEnum;
 use crate::app::models::student::GradeEnum;
 use crate::app::models::test::BenchmarkCategory;
@@ -102,7 +103,7 @@ pub fn TestBuilderContent() -> impl IntoView {
     let (school_year, set_school_year) = create_signal(String::new());
     let (grade_level, set_grade_level) = create_signal::<Option<GradeEnum>>(None);
     let (benchmark_categories, set_benchmark_categories) =
-        create_signal::<Vec<(i32, i32, i32, String)>>(Vec::new());
+        create_signal::<Vec<(i32, i32, i32, String, String)>>(Vec::new());
     let (test_variant, set_test_variant) = create_signal(0);
     let (test_comments, set_test_comments) = create_signal(String::new());
     let (test_id, set_test_id) = create_signal(String::new());
@@ -1064,13 +1065,37 @@ pub fn TestBuilderContent() -> impl IntoView {
                                     // Display existing benchmark categories
                                     <For
                                         each=move || benchmark_categories.get()
-                                        key=|(id, _, _, _)| *id
-                                        children=move |(id, min_score, max_score, label): (i32, i32, i32, String)| {
+                                        key=|(id, _, _, _, _)| *id
+                                        children=move |(id, min_score, max_score, label, color): (i32, i32, i32, String, String)| {
                                             let id_clone = id;
                                             let (is_single_value, set_is_single_value) = create_signal(min_score == max_score);
 
                                             view! {
                                                 <div class="flex items-center space-x-3">
+                                                    // Color selector
+                                                    <BenchmarkColorSelector
+                                                        current_color={
+                                                            let id_for_color = id;
+                                                            create_memo(move |_| {
+                                                                benchmark_categories()
+                                                                    .iter()
+                                                                    .find(|(cid, _, _, _, _)| *cid == id_for_color)
+                                                                    .map(|(_, _, _, _, color)| color.clone())
+                                                                    .unwrap_or_else(|| "#6b7280".to_string())
+                                                            })
+                                                        }
+                                                        on_color_change={
+                                                            let id_for_callback = id;
+                                                            Callback::new(move |new_color: String| {
+                                                                set_benchmark_categories.update(|cats| {
+                                                                    if let Some(cat) = cats.iter_mut().find(|(cid, _, _, _, _)| *cid == id_for_callback) {
+                                                                        cat.4 = new_color; // Update color (5th element)
+                                                                    }
+                                                                });
+                                                            })
+                                                        }
+                                                    />
+
                                                     <div class="flex-1 grid grid-cols-4 gap-3">
                                                         <input
                                                             type="text"
@@ -1080,7 +1105,7 @@ pub fn TestBuilderContent() -> impl IntoView {
                                                             on:input=move |ev| {
                                                                 let new_label = event_target_value(&ev);
                                                                 set_benchmark_categories.update(|cats| {
-                                                                    if let Some(cat) = cats.iter_mut().find(|(cid, _, _, _)| *cid == id) {
+                                                                    if let Some(cat) = cats.iter_mut().find(|(cid, _, _, _, _)| *cid == id) {
                                                                         cat.3 = new_label;
                                                                     }
                                                                 });
@@ -1099,7 +1124,7 @@ pub fn TestBuilderContent() -> impl IntoView {
                                                                         set_is_single_value.set(checked);
 
                                                                         set_benchmark_categories.update(|cats| {
-                                                                            if let Some(cat) = cats.iter_mut().find(|(cid, _, _, _)| *cid == id) {
+                                                                            if let Some(cat) = cats.iter_mut().find(|(cid, _, _, _, _)| *cid == id) {
                                                                                 if checked {
                                                                                     // Convert to single value - use min as the single value
                                                                                     cat.2 = cat.1; // max = min
@@ -1132,7 +1157,7 @@ pub fn TestBuilderContent() -> impl IntoView {
                                                                             on:input=move |ev| {
                                                                                 if let Ok(new_value) = event_target_value(&ev).parse::<i32>() {
                                                                                     set_benchmark_categories.update(|cats| {
-                                                                                        if let Some(cat) = cats.iter_mut().find(|(cid, _, _, _)| *cid == id) {
+                                                                                        if let Some(cat) = cats.iter_mut().find(|(cid, _, _, _, _)| *cid == id) {
                                                                                             cat.1 = new_value; // min
                                                                                             cat.2 = new_value; // max = min for single value
                                                                                         }
@@ -1155,7 +1180,7 @@ pub fn TestBuilderContent() -> impl IntoView {
                                                                             on:input=move |ev| {
                                                                                 if let Ok(new_min) = event_target_value(&ev).parse::<i32>() {
                                                                                     set_benchmark_categories.update(|cats| {
-                                                                                        if let Some(cat) = cats.iter_mut().find(|(cid, _, _, _)| *cid == id) {
+                                                                                        if let Some(cat) = cats.iter_mut().find(|(cid, _, _, _, _)| *cid == id) {
                                                                                             cat.1 = new_min;
                                                                                             // Ensure max is at least equal to min
                                                                                             if cat.2 < new_min {
@@ -1176,7 +1201,7 @@ pub fn TestBuilderContent() -> impl IntoView {
                                                                             on:input=move |ev| {
                                                                                 if let Ok(new_max) = event_target_value(&ev).parse::<i32>() {
                                                                                     set_benchmark_categories.update(|cats| {
-                                                                                        if let Some(cat) = cats.iter_mut().find(|(cid, _, _, _)| *cid == id) {
+                                                                                        if let Some(cat) = cats.iter_mut().find(|(cid, _, _, _, _)| *cid == id) {
                                                                                             // Ensure max is at least equal to min
                                                                                             cat.2 = if new_max >= cat.1 { new_max } else { cat.1 };
                                                                                         }
@@ -1194,7 +1219,7 @@ pub fn TestBuilderContent() -> impl IntoView {
                                                         class="p-1 text-red-600 hover:bg-red-100 rounded-full focus:outline-none"
                                                         on:click=move |_| {
                                                             set_benchmark_categories.update(|cats| {
-                                                                cats.retain(|(cid, _, _, _)| *cid != id_clone);
+                                                                cats.retain(|(cid, _, _, _, _)| *cid != id_clone);
                                                             });
                                                         }
                                                     >
@@ -1215,8 +1240,8 @@ pub fn TestBuilderContent() -> impl IntoView {
                                             on:click=move |_| {
                                                 set_benchmark_categories.update(|cats| {
                                                     // Generate a unique ID for the new category
-                                                    let new_id = cats.iter().map(|(id, _, _, _)| *id).max().unwrap_or(0) + 1;
-                                                    cats.push((new_id, 0, 10, String::new())); // Default range
+                                                    let new_id = cats.iter().map(|(id, _, _, _, _)| *id).max().unwrap_or(0) + 1;
+                                                    cats.push((new_id, 0, 10, String::new(), "#6b7280".to_string())); // Default range
                                                 });
                                             }
                                         >
@@ -1232,8 +1257,8 @@ pub fn TestBuilderContent() -> impl IntoView {
                                             on:click=move |_| {
                                                 set_benchmark_categories.update(|cats| {
                                                     // Generate a unique ID for the new category
-                                                    let new_id = cats.iter().map(|(id, _, _, _)| *id).max().unwrap_or(0) + 1;
-                                                    cats.push((new_id, 0, 0, String::new())); // Single value (min = max)
+                                                    let new_id = cats.iter().map(|(id, _, _, _, _)| *id).max().unwrap_or(0) + 1;
+                                                    cats.push((new_id, 0, 0, String::new(), "#6b7280".to_string())); // Single value (min = max)
                                                 });
                                             }
                                         >

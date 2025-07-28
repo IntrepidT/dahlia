@@ -1,9 +1,11 @@
+use crate::app::components::dashboard::color_utils::ColorUtils; // Import your new module
 use crate::app::components::enhanced_login_form::{
     use_student_mapping_service, DeAnonymizedStudent, StudentMappingService,
 };
 use crate::app::middleware::global_settings::use_settings;
 use crate::app::models::score::{DeleteScoreRequest, Score};
 use crate::app::models::student::Student;
+use crate::app::models::test::{BenchmarkCategory, Test};
 use crate::app::server_functions::scores::{delete_score, get_scores};
 use crate::app::server_functions::students::get_students;
 use crate::app::server_functions::tests::get_tests;
@@ -15,11 +17,11 @@ use std::rc::Rc;
 pub fn ScoresLedger() -> impl IntoView {
     let navigate = leptos_router::use_navigate();
 
-    //Get global settings for anonymization
+    // Get global settings for anonymization
     let (settings, _) = use_settings();
     let anonymization_enabled = move || settings.get().student_protections;
 
-    //Get the student mapping service
+    // Get the student mapping service
     let (student_mapping_service, _) = use_student_mapping_service();
 
     // Create resource for fetching scores from the database
@@ -92,177 +94,10 @@ pub fn ScoresLedger() -> impl IntoView {
         },
     );
 
-    //helper function to get test name
-    let get_test_name = move |test_id: String| -> String {
-        if let Some(Ok(tests)) = tests_resource.get() {
-            if let Some(test) = tests.iter().find(|t| t.test_id == test_id) {
-                return format!("{}", test.name);
-            }
-        }
-        "Unknown Test".to_string()
-    };
-
-    //helper function to get a max score for test
-    let get_max_score = move |test_id: String| -> i32 {
-        if let Some(Ok(tests)) = tests_resource.get() {
-            if let Some(test) = tests.iter().find(|t| t.test_id == *test_id) {
-                return test.score;
-            }
-        }
-        0
-    };
-
-    //helper function to get student name with de-anonymization support
-    let get_student_name = move |student_id: i32| -> String {
-        let students_data = enhanced_students();
-
-        if let Some((student, de_anon_opt)) = students_data
-            .iter()
-            .find(|(s, _)| s.student_id == student_id)
-        {
-            if let Some(de_anon) = de_anon_opt {
-                // Use de-anonymized display name
-                de_anon.display_name.clone()
-            } else {
-                // Use original student data
-                format!(
-                    "{} {}",
-                    student.firstname.as_ref().unwrap_or(&"Unknown".to_string()),
-                    student.lastname.as_ref().unwrap_or(&"Student".to_string())
-                )
-            }
-        } else {
-            "Unknown Student".to_string()
-        }
-    };
-
-    //helper function to get student ID display with de-anonymization support
-    let get_student_id_display = move |student_id: i32| -> String {
-        let students_data = enhanced_students();
-
-        if let Some((student, de_anon_opt)) = students_data
-            .iter()
-            .find(|(s, _)| s.student_id == student_id)
-        {
-            if let Some(de_anon) = de_anon_opt {
-                // Use de-anonymized display ID
-                de_anon.display_id.clone()
-            } else {
-                // Use original student ID
-                student.student_id.to_string()
-            }
-        } else {
-            student_id.to_string()
-        }
-    };
-
     let (expanded_view, set_expanded_view) = create_signal(false);
 
     let toggle_expanded_view = move |_| {
         set_expanded_view.update(|val| *val = !*val);
-    };
-
-    // Function to format date
-    let format_date =
-        |date: DateTime<chrono::Utc>| -> String { date.format("%b %d, %Y").to_string() };
-
-    // Function to format time
-    let format_time = |date: DateTime<chrono::Utc>| -> String { date.format("%H:%M").to_string() };
-
-    // Function to calculate percentage
-    let calculate_percentage = move |test_scores: &Vec<i32>, test_id: String| -> String {
-        let score: i32 = test_scores.iter().sum();
-        let max_score = get_max_score(test_id.clone());
-
-        if max_score > 0 {
-            format!("{:.1}%", (score as f64 / max_score as f64 * 100.0))
-        } else {
-            "N/A".to_string()
-        }
-    };
-
-    let get_benchmark_label = move |test_scores: &Vec<i32>, test_id: &String| -> String {
-        let score: i32 = test_scores.iter().sum();
-        let max_score = get_max_score(test_id.clone());
-
-        if max_score <= 0 {
-            return "N/A".to_string();
-        }
-
-        let percentage = (score as f64 / max_score as f64) * 100.0;
-
-        if let Some(Ok(tests)) = tests_resource.get() {
-            if let Some(test) = tests.iter().find(|t| t.test_id == *test_id) {
-                if let Some(benchmark_categories) = &test.benchmark_categories {
-                    for category in benchmark_categories {
-                        let min_percent = category.min as f64;
-                        let max_percent = category.max as f64;
-                        if percentage >= min_percent && percentage <= max_percent {
-                            return category.label.clone();
-                        }
-                    }
-                }
-            }
-        }
-
-        if percentage >= 90.0 {
-            "Excellent".to_string()
-        } else if percentage >= 80.0 {
-            "Good".to_string()
-        } else if percentage >= 70.0 {
-            "Satisfactory".to_string()
-        } else {
-            "Needs Improvement".to_string()
-        }
-    };
-
-    // Function to determine badge color based on score percentage
-    let get_badge_color = move |test_scores: &Vec<i32>, test_id: String| -> &'static str {
-        let score: i32 = test_scores.iter().sum();
-        let max_score = get_max_score(test_id.clone());
-
-        if max_score <= 0 {
-            return "bg-gray-100 text-gray-800";
-        }
-
-        let percentage = (score as f64 / max_score as f64) * 100.0;
-
-        if let Some(Ok(tests)) = tests_resource.get() {
-            if let Some(test) = tests.iter().find(|t| t.test_id == *test_id) {
-                if let Some(benchmark_categories) = &test.benchmark_categories {
-                    for category in benchmark_categories {
-                        let min_percent = category.min as f64;
-                        let max_percent = category.max as f64;
-                        if percentage >= min_percent && percentage <= max_percent {
-                            if min_percent >= 85.0 {
-                                return "bg-green-100 text-green-800";
-                            } else if min_percent >= 65.0 {
-                                return "bg-yellow-100 text-yellow-800";
-                            } else {
-                                return "bg-red-100 text-red-800";
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        if percentage >= 90.0 {
-            "bg-green-100 text-green-800"
-        } else if percentage >= 70.0 {
-            "bg-blue-100 text-blue-800"
-        } else if percentage >= 60.0 {
-            "bg-yellow-100 text-yellow-800"
-        } else {
-            "bg-red-100 text-red-800"
-        }
-    };
-
-    // Calculate score value from test_scores
-    let format_score = |test_scores: &Vec<i32>, test_id: String| -> String {
-        let score: i32 = test_scores.iter().sum();
-        let max_score = get_max_score(test_id.clone());
-        format!("{} / {}", score, max_score)
     };
 
     view! {
@@ -316,9 +151,6 @@ pub fn ScoresLedger() -> impl IntoView {
                                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-[#2E3A59] uppercase tracking-wider">
                                     Date
                                 </th>
-                                /*<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Score
-                                </th>*/
                                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-[#2E3A59] uppercase tracking-wider">
                                     Percentage
                                 </th>
@@ -354,45 +186,57 @@ pub fn ScoresLedger() -> impl IntoView {
                                                     let test_variant = score.test_variant;
                                                     let attempt = score.attempt;
 
-                                                    // Create delete request for this score
-                                                    let delete_req = DeleteScoreRequest {
-                                                        student_id,
-                                                        test_id: test_id.clone(),
-                                                        test_variant,
-                                                        attempt,
+                                                    // Get test data for this score
+                                                    let test_data = tests_resource.get()
+                                                        .and_then(|result| result.ok())
+                                                        .and_then(|tests| tests.iter().find(|t| t.test_id == test_id).cloned());
+
+                                                    let max_score = test_data.as_ref().map(|t| t.score).unwrap_or(0);
+                                                    let test_name = test_data.as_ref().map(|t| t.name.clone()).unwrap_or_else(|| "Unknown Test".to_string());
+                                                    let benchmark_categories = test_data.as_ref().and_then(|t| t.benchmark_categories.as_ref());
+
+                                                    // Calculate derived values
+                                                    let total_score: i32 = score.test_scores.iter().sum();
+                                                    let percentage = if max_score > 0 {
+                                                        format!("{:.1}%", (total_score as f64 / max_score as f64 * 100.0))
+                                                    } else {
+                                                        "N/A".to_string()
                                                     };
+
+                                                    let benchmark_label = ScoreUtils::get_benchmark_label(total_score, max_score, benchmark_categories);
+                                                    let badge_classes = ColorUtils::get_badge_classes_for_score(total_score, max_score, benchmark_categories);
+
+                                                    // Get student display info
+                                                    let student_display = ScoreUtils::get_student_display_info(student_id, &enhanced_students());
 
                                                     view! {
                                                         <tr class="hover:bg-gray-50">
                                                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-[#2E3A59]">
-                                                                {get_student_id_display(score.student_id)}
+                                                                {student_display.id}
                                                             </td>
                                                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-[#2E3A59]">
-                                                                {get_student_name(score.student_id)}
+                                                                {student_display.name}
                                                             </td>
                                                             <td class="px-6 py-4 whitespace-nowrap text-sm text-[#2E3A59]">
                                                                 <div class="flex flex-col">
-                                                                    <span>{get_test_name(score.test_id.clone())}</span>
+                                                                    <span>{test_name}</span>
                                                                     <span class="text-xs text-[#2E3A59]">{"Variant: "}{score.test_variant}</span>
                                                                 </div>
                                                             </td>
                                                             <td class="px-6 py-4 whitespace-nowrap text-sm text-[#2E3A59]">
                                                                 <div class="flex flex-col">
-                                                                    <span>{format_date(score.date_administered)}</span>
-                                                                    <span class="text-xs text-[#2E3A59]">{format_time(score.date_administered)}</span>
+                                                                    <span>{score.date_administered.format("%b %d, %Y").to_string()}</span>
+                                                                    <span class="text-xs text-[#2E3A59]">{score.date_administered.format("%H:%M").to_string()}</span>
                                                                 </div>
                                                             </td>
-                                                            /*<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                                {format_score(&score.test_scores)}
-                                                            </td>*/
                                                             <td class="px-6 py-4 whitespace-nowrap">
-                                                                <span class={"px-2 inline-flex text-xs leading-5 font-semibold rounded-full ".to_string() + get_badge_color(&score.test_scores, score.test_id.clone())}>
-                                                                    {calculate_percentage(&score.test_scores, score.test_id.clone())}
+                                                                <span class={format!("px-2 inline-flex text-xs leading-5 font-semibold rounded-full {}", badge_classes)}>
+                                                                    {percentage}
                                                                 </span>
                                                             </td>
                                                             <td class="px-6 py-4 whitespace-nowrap">
-                                                                <span class={"px-2 inline-flex text-xs leading-5 font-semibold rounded-full".to_string() + get_badge_color(&score.test_scores, score.test_id.clone())}>
-                                                                    {get_benchmark_label(&score.test_scores, &score.test_id)}
+                                                                <span class={format!("px-2 inline-flex text-xs leading-5 font-semibold rounded-full {}", badge_classes)}>
+                                                                    {benchmark_label}
                                                                 </span>
                                                             </td>
                                                             <td class="px-6 py-4 whitespace-nowrap text-sm text-[#2E3A59]">
@@ -454,5 +298,81 @@ pub fn ScoresLedger() -> impl IntoView {
                 </div>
             </div>
         </div>
+    }
+}
+
+// Helper struct for student display info
+#[derive(Clone)]
+struct StudentDisplayInfo {
+    pub id: String,
+    pub name: String,
+}
+
+// Additional utility struct for score-related operations
+struct ScoreUtils;
+
+impl ScoreUtils {
+    fn get_student_display_info(
+        student_id: i32,
+        enhanced_students: &[(Student, Option<DeAnonymizedStudent>)],
+    ) -> StudentDisplayInfo {
+        if let Some((student, de_anon_opt)) = enhanced_students
+            .iter()
+            .find(|(s, _)| s.student_id == student_id)
+        {
+            if let Some(de_anon) = de_anon_opt {
+                StudentDisplayInfo {
+                    id: de_anon.display_id.clone(),
+                    name: de_anon.display_name.clone(),
+                }
+            } else {
+                StudentDisplayInfo {
+                    id: student.student_id.to_string(),
+                    name: format!(
+                        "{} {}",
+                        student.firstname.as_ref().unwrap_or(&"Unknown".to_string()),
+                        student.lastname.as_ref().unwrap_or(&"Student".to_string())
+                    ),
+                }
+            }
+        } else {
+            StudentDisplayInfo {
+                id: student_id.to_string(),
+                name: "Unknown Student".to_string(),
+            }
+        }
+    }
+
+    fn get_benchmark_label(
+        score: i32,
+        max_score: i32,
+        benchmark_categories: Option<&Vec<BenchmarkCategory>>,
+    ) -> String {
+        if max_score <= 0 {
+            return "N/A".to_string();
+        }
+
+        let percentage = (score as f64 / max_score as f64) * 100.0;
+
+        if let Some(categories) = benchmark_categories {
+            for category in categories {
+                let min_percent = category.min as f64;
+                let max_percent = category.max as f64;
+                if percentage >= min_percent && percentage <= max_percent {
+                    return category.label.clone();
+                }
+            }
+        }
+
+        // Default labels if no custom categories
+        if percentage >= 90.0 {
+            "Excellent".to_string()
+        } else if percentage >= 80.0 {
+            "Good".to_string()
+        } else if percentage >= 70.0 {
+            "Satisfactory".to_string()
+        } else {
+            "Needs Improvement".to_string()
+        }
     }
 }

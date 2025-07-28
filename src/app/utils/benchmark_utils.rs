@@ -9,26 +9,31 @@ pub struct BenchmarkUtils;
 impl BenchmarkUtils {
     /// Creates benchmark categories from the UI tuple representation (id, min, max, label)
     /// Automatically detects single values when min == max
-    pub fn from_tuples(tuples: Vec<(i32, i32, i32, String)>) -> Vec<BenchmarkCategory> {
+    pub fn from_tuples(tuples: Vec<(i32, i32, i32, String, String)>) -> Vec<BenchmarkCategory> {
         tuples
             .into_iter()
-            .map(|(_, min, max, label)| {
-                if min == max {
+            .map(|(_, min, max, label, color)| {
+                let mut category = if min == max {
                     BenchmarkCategory::new_single(min, label)
                 } else {
                     BenchmarkCategory::new_range(min, max, label)
-                }
+                };
+                category.color = Some(color);
+                category
             })
             .collect()
     }
 
     /// Converts benchmark categories to tuples for UI consumption
     /// Returns (index, min, max, label) tuples
-    pub fn to_tuples(categories: Vec<BenchmarkCategory>) -> Vec<(i32, i32, i32, String)> {
+    pub fn to_tuples(categories: Vec<BenchmarkCategory>) -> Vec<(i32, i32, i32, String, String)> {
         categories
             .into_iter()
             .enumerate()
-            .map(|(idx, cat)| (idx as i32, cat.min, cat.max, cat.label))
+            .map(|(idx, cat)| {
+                let color = cat.get_color();
+                (idx as i32, cat.min, cat.max, cat.label, color)
+            })
             .collect()
     }
 
@@ -44,8 +49,7 @@ impl BenchmarkUtils {
     /// Gets the grade/label for a given score
     /// Returns None if no category matches the score
     pub fn get_grade_for_score(score: i32, categories: &[BenchmarkCategory]) -> Option<String> {
-        Self::find_category_for_score(score, categories)
-            .map(|cat| cat.label.clone())
+        Self::find_category_for_score(score, categories).map(|cat| cat.label.clone())
     }
 
     /// Validates benchmark categories for overlapping ranges
@@ -59,7 +63,7 @@ impl BenchmarkUtils {
             for (j, cat2) in categories.iter().enumerate() {
                 if i != j {
                     let overlap = Self::categories_overlap(cat1, cat2);
-                    
+
                     if overlap {
                         return Err(format!(
                             "Categories '{}' ({}) and '{}' ({}) have overlapping score ranges",
@@ -147,7 +151,9 @@ impl BenchmarkUtils {
     }
 
     /// Groups categories by type (single values vs ranges)
-    pub fn group_by_type(categories: &[BenchmarkCategory]) -> (Vec<&BenchmarkCategory>, Vec<&BenchmarkCategory>) {
+    pub fn group_by_type(
+        categories: &[BenchmarkCategory],
+    ) -> (Vec<&BenchmarkCategory>, Vec<&BenchmarkCategory>) {
         let mut single_values = Vec::new();
         let mut ranges = Vec::new();
 
@@ -199,13 +205,21 @@ impl BenchmarkStats {
         }
 
         let mut parts = vec![format!("{} total", self.total_count)];
-        
+
         if self.single_count > 0 {
-            parts.push(format!("{} single value{}", self.single_count, if self.single_count == 1 { "" } else { "s" }));
+            parts.push(format!(
+                "{} single value{}",
+                self.single_count,
+                if self.single_count == 1 { "" } else { "s" }
+            ));
         }
-        
+
         if self.range_count > 0 {
-            parts.push(format!("{} range{}", self.range_count, if self.range_count == 1 { "" } else { "s" }));
+            parts.push(format!(
+                "{} range{}",
+                self.range_count,
+                if self.range_count == 1 { "" } else { "s" }
+            ));
         }
 
         let type_info = parts.join(", ");
@@ -226,15 +240,17 @@ mod tests {
     #[test]
     fn test_from_tuples() {
         let tuples = vec![
-            (0, 90, 100, "A".to_string()),
-            (1, 85, 85, "Perfect".to_string()),
+            (0, 90, 100, "A".to_string(), "#10b981".to_string()),
+            (1, 85, 85, "Perfect".to_string(), "#ef4444".to_string()),
         ];
 
         let categories = BenchmarkUtils::from_tuples(tuples);
-        
+
         assert_eq!(categories.len(), 2);
         assert!(!categories[0].is_single_value());
         assert!(categories[1].is_single_value());
+        assert_eq!(categories[0].get_color(), "#10b981");
+        assert_eq!(categories[1].get_color(), "#ef4444");
     }
 
     #[test]

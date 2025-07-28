@@ -82,6 +82,9 @@ impl Lobby {
                 "student"
             };
 
+            log::info!("🔑 Assigning role '{}' to user {} based on user_info (is_teacher: {}, is_admin: {})", 
+                      assigned_role, user_id, is_teacher, is_admin);
+
             // Check if this is a teacher reconnecting/taking over
             if assigned_role == "teacher"
                 && msg
@@ -107,6 +110,7 @@ impl Lobby {
                 self.active_tests.remove(&room_id);
             }
 
+            // FIXED: Assign the role based on user info, not room count
             self.room_roles
                 .insert((room_id, user_id), assigned_role.to_string());
 
@@ -118,7 +122,23 @@ impl Lobby {
                 "is_takeover": assigned_role == "teacher" && msg.get("is_reconnecting").and_then(|r| r.as_bool()).unwrap_or(false)
             });
 
+            log::info!(
+                "✅ Sending role assignment: {} to user {}",
+                assigned_role,
+                user_id
+            );
             self.send_message(&role_msg.to_string(), &user_id);
+
+            // Now send participants list since role is assigned
+            self.send_participants_list(&room_id, &user_id);
+
+            // Broadcast user joined event
+            self.broadcast_user_event(&room_id, &user_id, "user_joined", None);
+        } else {
+            log::error!(
+                "❌ Invalid user_info message format for user {}: missing role/is_teacher/is_admin",
+                user_id
+            );
         }
     }
 
@@ -578,38 +598,59 @@ impl Handler<Connect> for Lobby {
             .or_insert_with(HashSet::new)
             .insert(msg.self_id);
 
-        // Improved role assignment logic
+        // FIXED: Only assign role if we don't have one yet AND it's not from user_info
         if !self.room_roles.contains_key(&(msg.lobby_id, msg.self_id)) {
             let is_anonymous_student = self.anonymous_students.contains_key(&msg.self_id);
 
             if is_anonymous_student {
                 self.room_roles
                     .insert((msg.lobby_id, msg.self_id), "student".to_string());
+                log::info!("Assigned 'student' role to anonymous user {}", msg.self_id);
             } else {
-                let room_users_count = self.rooms.get(&msg.lobby_id).map_or(0, |users| users.len());
-                let role = if room_users_count < 1 {
-                    // First user in the room gets teacher role
-                    "teacher"
-                } else {
-                    "student"
-                };
-
-                self.room_roles
-                    .insert((msg.lobby_id, msg.self_id), role.to_string());
+                // FIXED: Don't assign role here - wait for user_info message
                 log::info!(
-                    "Assigned role '{}' to user {} in room {} (room size: {})",
-                    role,
-                    msg.self_id,
-                    msg.lobby_id,
-                    room_users_count
+                    "User {} connected - waiting for user_info to assign role",
+                    msg.self_id
                 );
+
+                // Store the connection but don't assign role yet
+                self.sessions.insert(msg.self_id, msg.addr);
+
+                // Send welcome message but no role assignment yet
+                let welcome_msg = json!({
+                    "type": "welcome",
+                    "user_id": msg.self_id.to_string(),
+                    "room_id": msg.lobby_id.to_string(),
+                    "message": format!("Welcome! Your ID is {}", msg.self_id)
+                });
+                self.send_message(&welcome_msg.to_string(), &msg.self_id);
+
+                // Update database session count
+                let room_id = msg.lobby_id;
+                if let Some(pool) = self.db_pool.clone() {
+                    actix::spawn(async move {
+                        if let Err(e) = websocket_session_database::update_session_user_count(
+                            room_id, true, &pool,
+                        )
+                        .await
+                        {
+                            log::error!("Failed to update session count: {}", e);
+                        }
+                    });
+                }
+
+                log::info!(
+                    "User {} connected - awaiting user_info message",
+                    msg.self_id
+                );
+                return; // Exit early - role will be assigned in handle_user_info_message
             }
         }
 
-        // Store the connection
+        // Store the connection (for anonymous students)
         self.sessions.insert(msg.self_id, msg.addr);
 
-        // Send role assignment immediately with more detailed logging
+        // Send role assignment for anonymous students only
         if let Some(role) = self.room_roles.get(&(msg.lobby_id, msg.self_id)) {
             let role_msg = json!({
                 "type": "role_assigned",
@@ -625,14 +666,12 @@ impl Handler<Connect> for Lobby {
                 role_msg.to_string()
             );
             self.send_message(&role_msg.to_string(), &msg.self_id);
-        } else {
-            log::error!("Failed to assign role to user {}", msg.self_id);
         }
 
         // Broadcast user joined event to other participants
         self.broadcast_user_event(&msg.lobby_id, &msg.self_id, "user_joined", None);
 
-        // Send welcome message with user ID
+        // Send welcome message
         let welcome_msg = json!({
             "type": "welcome",
             "user_id": msg.self_id.to_string(),

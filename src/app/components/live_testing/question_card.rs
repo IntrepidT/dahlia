@@ -23,7 +23,7 @@ pub fn QuestionCard(
             <div class="p-8 flex flex-col justify-start items-center w-full h-full overflow-y-auto">
                 {/* Question Section */}
                 <div class="text-center w-full overflow-auto mb-6">
-                    <p class=move || format!("text-4xl sm:text-3xl font-bold text-gray-800 break-words mb-8 {}", font_settings.get().get_question_classes())>
+                    <p class=move || format!("text-gray-800 break-words mb-8 {}", font_settings.get().get_question_classes())>
                         {question.word_problem.clone()}
                     </p>
                 </div>
@@ -322,7 +322,7 @@ fn AnswerInput(
             view! {
                 <div>
                     <textarea
-                        class="w-full p-3 border border-gray-200 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                        class=move || format!("w-full p-3 border border-gray-200 rounded-lg focus:ring-blue-500 focus:border-blue-500 {}", font_settings.get().get_answer_classes())
                         prop:value=move || answer_value()
                         prop:disabled={should_disable_inputs()}
                         on:input=move |ev| {
