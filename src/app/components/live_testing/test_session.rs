@@ -481,9 +481,12 @@ pub fn RealtimeTestSession() -> impl IntoView {
                             />
                             <div class="text-sm text-gray-500 font-medium hidden sm:block">
                                 {move || match role.get() {
-                                    Role::Teacher => "Teacher",
-                                    Role::Student => "Student",
-                                    Role::Unknown => "Connecting..."
+                                    Role::Teacher => {
+                                        let user_clone = user.get().unwrap();
+                                        format!("Teacher: {} {}", user_clone.first_name.unwrap_or("Unknown".to_string()), user_clone.last_name.unwrap_or("User".to_string()))
+                                    },
+                                    Role::Student => "Student".to_string(),
+                                    Role::Unknown => "Connecting...".to_string(),
                                 }}
                             </div>
                         </div>
