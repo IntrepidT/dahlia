@@ -1,3 +1,4 @@
+use crate::app::models::test::BenchmarkCategory;
 use chrono::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -42,6 +43,15 @@ impl Score {
     }
     pub fn get_total(&self) -> i32 {
         self.test_scores.iter().sum()
+    }
+    pub fn find_benchmark_category(
+        total_score: i32,
+        benchmark_categories: &[BenchmarkCategory],
+    ) -> Option<BenchmarkCategory> {
+        benchmark_categories
+            .iter()
+            .find(|category| category.contains(total_score))
+            .cloned()
     }
 }
 

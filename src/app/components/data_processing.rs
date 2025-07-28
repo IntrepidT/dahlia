@@ -2,6 +2,7 @@
 
 pub mod student_charts;
 pub mod student_results_summary;
+pub mod test_pie_chart;
 
 // Re-export commonly used types and components
 pub use student_results_summary::{
@@ -17,3 +18,5 @@ pub use student_charts::{
     AssessmentProgressChart, AssessmentRadarChart, PerformanceDistributionChart,
     TestAreaPerformanceChart, TestScoresTimelineChart,
 };
+
+pub use test_pie_chart::*;

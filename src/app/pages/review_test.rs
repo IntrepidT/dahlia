@@ -1,3 +1,4 @@
+use crate::app::components::data_processing::test_pie_chart::PieChart;
 use crate::app::components::Header;
 use crate::app::models::question::QuestionType;
 use crate::app::models::score::Score;
@@ -185,79 +186,104 @@ pub fn ReviewTest() -> impl IntoView {
                 </div>
 
                 // Score summary card
-                <div class="bg-white shadow rounded-lg p-6 mb-8">
-                    {move || {
-                        score.get().map(|score_result| {
-                            match score_result {
-                                Ok(score) => {
-                                    // Calculate total correct answers
-                                    let total_correct = create_memo(move |_| {
-                                        if let Some(qs) = questions.get() {
-                                            qs.iter().enumerate().filter(|(i, q)| {
-                                                *i < score.test_scores.len() && score.test_scores[*i] == q.point_value
-                                            }).count() as i32
-                                        } else {
-                                            0
-                                        }
-                                    });
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                    <div class="bg-white shadow rounded-lg p-6">
+                        {move || {
+                            score.get().map(|score_result| {
+                                match score_result {
+                                    Ok(score) => {
+                                        // Calculate total correct answers
+                                        let total_correct = create_memo(move |_| {
+                                            if let Some(qs) = questions.get() {
+                                                qs.iter().enumerate().filter(|(i, q)| {
+                                                    *i < score.test_scores.len() && score.test_scores[*i] == q.point_value
+                                                }).count() as i32
+                                            } else {
+                                                0
+                                            }
+                                        });
 
-                                    let total_possible = move || {
-                                        questions.get().map(|q| q.len()).unwrap_or(0) as i32
-                                    };
+                                        let total_possible = move || {
+                                            questions.get().map(|q| q.len()).unwrap_or(0) as i32
+                                        };
 
-                                    let percentage = move || {
-                                        let total = total_possible();
-                                        if total > 0 {
-                                            (total_correct.get() as f32 / total as f32) * 100.0
-                                        } else {
-                                            0.0
-                                        }
-                                    };
+                                        let percentage = move || {
+                                            let total = total_possible();
+                                            if total > 0 {
+                                                (total_correct.get() as f32 / total as f32) * 100.0
+                                            } else {
+                                                0.0
+                                            }
+                                        };
 
-                                    view! {
-                                        <div class="grid grid-cols-3 gap-6">
-                                            <div class="border-r pr-6">
-                                                <h3 class="text-sm font-medium text-gray-500">Student ID</h3>
-                                                <p class="text-2xl font-semibold">{score.student_id}</p>
+                                        view! {
+                                            <div class="grid grid-cols-3 gap-6">
+                                                <div class="border-r pr-6">
+                                                    <h3 class="text-sm font-medium text-gray-500">Student ID</h3>
+                                                    <p class="text-2xl font-semibold">{score.student_id}</p>
+                                                </div>
+                                                <div class="border-r px-6">
+                                                    <h3 class="text-sm font-medium text-gray-500">Date Administered</h3>
+                                                    <p class="text-2xl font-semibold">{score.date_administered.format("%b %d, %Y").to_string()}</p>
+                                                </div>
+                                                <div class="pl-6">
+                                                    <h3 class="text-sm font-medium text-gray-500">Evaluator</h3>
+                                                    <p class="text-2xl font-semibold">{&score.evaluator}</p>
+                                                </div>
                                             </div>
-                                            <div class="border-r px-6">
-                                                <h3 class="text-sm font-medium text-gray-500">Date Administered</h3>
-                                                <p class="text-2xl font-semibold">{score.date_administered.format("%b %d, %Y").to_string()}</p>
-                                            </div>
-                                            <div class="pl-6">
-                                                <h3 class="text-sm font-medium text-gray-500">Evaluator</h3>
-                                                <p class="text-2xl font-semibold">{&score.evaluator}</p>
-                                            </div>
-                                        </div>
-                                        <div class="mt-6 pt-6 border-t">
-                                            <div class="flex justify-between items-end">
-                                                <div>
-                                                    <h3 class="text-sm font-medium text-gray-500">Total Score</h3>
-                                                    <div class="flex items-baseline">
-                                                        <p class="text-3xl font-bold text-indigo-600">{move || total_correct.get()}</p>
-                                                        <p class="ml-2 text-lg text-gray-500">/ {total_possible}</p>
+                                            <div class="mt-6 pt-6 border-t">
+                                                <div class="flex justify-between items-end">
+                                                    <div>
+                                                        <h3 class="text-sm font-medium text-gray-500">Total Score</h3>
+                                                        <div class="flex items-baseline">
+                                                            <p class="text-3xl font-bold text-indigo-600">{move || total_correct.get()}</p>
+                                                            <p class="ml-2 text-lg text-gray-500">/ {total_possible}</p>
+                                                        </div>
+                                                    </div>
+                                                    <div class="bg-indigo-50 px-4 py-2 rounded-md">
+                                                        <p class="text-indigo-700 text-xl font-semibold">{move || format!("{:.1}%", percentage())}</p>
                                                     </div>
                                                 </div>
-                                                <div class="bg-indigo-50 px-4 py-2 rounded-md">
-                                                    <p class="text-indigo-700 text-xl font-semibold">{move || format!("{:.1}%", percentage())}</p>
+                                                <div class="mt-4 w-full bg-gray-200 rounded-full h-2.5">
+                                                    <div class="bg-indigo-600 h-2.5 rounded-full" style={move || format!("width: {}%", percentage())}></div>
                                                 </div>
                                             </div>
-                                            <div class="mt-4 w-full bg-gray-200 rounded-full h-2.5">
-                                                <div class="bg-indigo-600 h-2.5 rounded-full" style={move || format!("width: {}%", percentage())}></div>
+                                        }.into_view()
+                                    },
+                                    Err(_) => {
+                                        view! {
+                                            <div class="bg-red-50 p-4 rounded-md">
+                                                <p class="text-red-700">Failed to load score information.</p>
                                             </div>
-                                        </div>
+                                        }.into_view()
+                                    }
+                                }
+                            })
+                        }}
+                    </div>
+
+                    <div>
+                        {move || {
+                            match (score.get(), test.get()) {
+                                (Some(Ok(score_data)), Some(Ok(test_data))) => {
+                                    let total_possible = test_data.score;
+                                    view! {
+                                        <PieChart
+                                            score=score_data.clone()
+                                            test=test_data.clone()
+                                        />
                                     }.into_view()
                                 },
-                                Err(_) => {
+                                _ => {
                                     view! {
-                                        <div class="bg-red-50 p-4 rounded-md">
-                                            <p class="text-red-700">Failed to load score information.</p>
+                                        <div class="bg-white shadow rounded-lg p-6 h-64 flex items-center justify-center">
+                                            <p class="text-gray-500">Loading chart...</p>
                                         </div>
                                     }.into_view()
                                 }
                             }
-                        })
-                    }}
+                        }}
+                    </div>
                 </div>
 
                 // Tab selection - Only show Grid tab if all questions are true/false

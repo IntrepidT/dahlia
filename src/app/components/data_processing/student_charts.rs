@@ -3,7 +3,7 @@ use leptos::*;
 
 // Helper function to wait for Chart.js to be available
 #[cfg(feature = "hydrate")]
-fn wait_for_chartjs<F>(callback: F)
+pub fn wait_for_chartjs<F>(callback: F)
 where
     F: Fn() + 'static,
 {
