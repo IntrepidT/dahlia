@@ -3,11 +3,15 @@ use crate::app::components::data_processing::{
     AssessmentProgressChart, AssessmentRadarChart, AssessmentSummary, PerformanceDistributionChart,
     Progress, StudentResultsSummary, TestAreaPerformanceChart, TestDetail, TestScoresTimelineChart,
 };
+use crate::app::components::enhanced_login_form::{
+    use_student_mapping_service, DeAnonymizedStudent, StudentMappingService,
+};
 use crate::app::components::header::Header;
 use crate::app::components::student_report::sequence_progress_bar::{
     CompactStripeProgress, StripeProgressBar,
 };
 use crate::app::components::student_report::sequence_web::SequenceWeb;
+use crate::app::middleware::global_settings::use_settings;
 use crate::app::server_functions::data_wrappers::get_student_results_server;
 use leptos::*;
 use leptos_router::use_params_map;
@@ -16,6 +20,13 @@ use uuid::Uuid;
 
 #[component]
 pub fn TestResultsPage() -> impl IntoView {
+    //Get global settings for anonymization
+    let (settings, _) = use_settings();
+    let anonymization_enabled = move || settings.get().student_protections;
+
+    //Get student mapping service
+    let (student_mapping_service, _) = use_student_mapping_service();
+
     // Get student ID from URL parameters
     let params = use_params_map();
     let student_id = move || {
@@ -39,6 +50,24 @@ pub fn TestResultsPage() -> impl IntoView {
         },
     );
 
+    //Create enhanced student data with de-anonymization
+    let enhanced_student_data = create_memo(move |_| {
+        student_results_resource
+            .get()
+            .unwrap_or(None)
+            .map(|results| {
+                if anonymization_enabled() {
+                    let de_anon = DeAnonymizedStudent::from_student_with_mapping(
+                        &results.student,
+                        student_mapping_service.get().as_ref(),
+                    );
+                    (results, Some(de_anon))
+                } else {
+                    (results, None)
+                }
+            })
+    });
+
     // Signal to track which assessment is expanded
     let (expanded_assessment, set_expanded_assessment) = create_signal::<Option<String>>(None);
     let (filter_test_name, set_filter_test_name) = create_signal::<Option<String>>(None);
@@ -50,32 +79,42 @@ pub fn TestResultsPage() -> impl IntoView {
         <div class="p-6 max-w-7xl mx-auto">
             // Student Information Section
             <Suspense fallback=move || view! { <div class="text-center p-4">"Loading student data..."</div> }>
-                {move || student_results_resource.get().map(|results_opt| {
-                    match results_opt {
-                        Some(results) => view! {
-                            <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-                                <h1 class="text-2xl font-bold mb-4">
-                                    "Test Results for " {results.student.firstname.clone()} " " {results.student.lastname.clone()}
-                                </h1>
-                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    <div class="bg-gray-50 p-4 rounded">
-                                        <h3 class="font-semibold text-gray-700">"Student ID"</h3>
-                                        <p>{results.student.student_id}</p>
-                                    </div>
-                                    <div class="bg-gray-50 p-4 rounded">
-                                        <h3 class="font-semibold text-gray-700">"Grade Level"</h3>
-                                        <p>{results.student.current_grade_level.to_string()}</p>
-                                    </div>
-                                    <div class="bg-gray-50 p-4 rounded">
-                                        <h3 class="font-semibold text-gray-700">"School Year"</h3>
-                                    </div>
+                {move || enhanced_student_data.get().map(|(results, de_anon_opt)| {
+                    let (display_name, display_id) = if let Some(de_anon) = &de_anon_opt {
+                        (de_anon.display_name.clone(), de_anon.display_id.clone())
+                    } else {
+                        let name = format!(
+                            "{} {}",
+                            results.student.firstname.clone().unwrap_or_else(|| "Unknown".to_string()),
+                            results.student.lastname.clone().unwrap_or_else(|| "Student".to_string())
+                        );
+                        (name, results.student.student_id.to_string())
+                    };
+
+                    view! {
+                        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                            <h1 class="text-2xl font-bold mb-4">
+                                "Test Results for " {display_name}
+                            </h1>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div class="bg-gray-50 p-4 rounded">
+                                    <h3 class="font-semibold text-gray-700">"Student ID"</h3>
+                                    <p>{display_id}</p>
+                                </div>
+                                <div class="bg-gray-50 p-4 rounded">
+                                    <h3 class="font-semibold text-gray-700">"Grade Level"</h3>
+                                    <p>{results.student.current_grade_level.to_string()}</p>
+                                </div>
+                                <div class="bg-gray-50 p-4 rounded">
+                                    <h3 class="font-semibold text-gray-700">"School Year"</h3>
                                 </div>
                             </div>
-                        },
-                        None => view! { <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
-                            "Student not found or invalid ID"
-                        </div> }
+                        </div>
                     }
+                }).unwrap_or_else(|| view! {
+                    <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
+                        "Student not found or invalid ID"
+                    </div>
                 })}
             </Suspense>
 
@@ -126,7 +165,7 @@ pub fn TestResultsPage() -> impl IntoView {
             // Visual Overview Section - Charts and visualizations
             <Suspense fallback=move || view! { <div>"Loading chart data..."</div> }>
                 {move || {
-                    let results = student_results_resource.get().unwrap_or(None);
+                    let results = enhanced_student_data.get().map(|(results, _)| results);
                     match results {
                         Some(data) => {
                             let assessments = data.assessment_summaries.clone();
@@ -231,7 +270,7 @@ pub fn TestResultsPage() -> impl IntoView {
             // Progress Overview Section - Using SequenceWeb components
             <Suspense fallback=move || view! { <div>"Loading progress data..."</div> }>
                 {move || {
-                    let results = student_results_resource.get().unwrap_or(None);
+                    let results = enhanced_student_data.get().map(|(results, _)| results);
                     match results {
                         Some(data) => {
                             let assessments = data.assessment_summaries.clone();
@@ -269,7 +308,7 @@ pub fn TestResultsPage() -> impl IntoView {
             // Compact Progress Cards Section - Show in detailed view only
             <Suspense fallback=move || view! { <div>"Loading compact progress..."</div> }>
                 {move || {
-                    let results = student_results_resource.get().unwrap_or(None);
+                    let results = enhanced_student_data.get().map(|(results, _)| results);
                     match results {
                         Some(data) => {
                             let assessments = data.assessment_summaries.clone();
@@ -309,7 +348,7 @@ pub fn TestResultsPage() -> impl IntoView {
                             <h2 class="text-xl font-bold mb-4">"Performance Summary"</h2>
                             <Suspense fallback=move || view! { <div>"Loading summary data..."</div> }>
                                 {move || {
-                                    let results = student_results_resource.get().unwrap_or(None);
+                                    let results = enhanced_student_data.get().map(|(results, _)| results);
                                     match results {
                                         Some(data) => {
                                             let assessments = data.assessment_summaries.clone();
@@ -603,7 +642,7 @@ pub fn TestResultsPage() -> impl IntoView {
 
                 <Suspense fallback=move || view! { <div>"Loading test history data..."</div> }>
                     {move || {
-                        let results = student_results_resource.get().unwrap_or(None);
+                        let results = enhanced_student_data.get().map(|(results, _)| results);
                         match results {
                             Some(data) => {
                                 let test_history = data.test_history.clone();

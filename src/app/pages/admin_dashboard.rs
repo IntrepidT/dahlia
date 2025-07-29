@@ -351,8 +351,8 @@ pub fn AdminDashboardContent() -> impl IntoView {
                 selected_item=selected_view
                 set_selected_item=set_selected_view
             />
-            <div class="flex flex-1 ml-20 mt-20 p-6">
-                <div class="w-full max-w-7xl mx-auto">
+            <div class="flex flex-1 ml-20 mt-20 p-6 max-h-screen overflow-y-auto">
+                <div class="w-full max-w-7xl mx-auto max-h-full">
                     // Tab Navigation
                     <div class="mb-6">
                         <div class="border-b border-gray-200">
@@ -382,228 +382,230 @@ pub fn AdminDashboardContent() -> impl IntoView {
                     </div>
 
                     // Content based on selected tab
-                    {move || match current_tab.get() {
-                        DashboardView::Courses => view! {
-                            <div class="space-y-6">
-                                // Course Management Header
-                                <div class="flex justify-between items-center">
-                                    <h1 class="text-2xl font-bold text-gray-900">"Course Management"</h1>
-                                    <div class="space-x-3">
+                    <div class="overflow-y-auto">
+                        {move || match current_tab.get() {
+                            DashboardView::Courses => view! {
+                                <div class="space-y-6">
+                                    // Course Management Header
+                                    <div class="flex justify-between items-center">
+                                        <h1 class="text-2xl font-bold text-gray-900">"Course Management"</h1>
+                                        <div class="space-x-3">
+                                            <button
+                                                class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors"
+                                                on:click=move |_| {
+                                                    set_enrollment_action.set(EnrollmentAction::QuickEnroll);
+                                                    set_show_enrollment_form.set(true);
+                                                    set_selected_course_for_enrollment.set(None);
+                                                }
+                                            >
+                                                "Quick Enroll Student"
+                                            </button>
+                                            <button
+                                                class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition-colors"
+                                                on:click=move |_| {
+                                                    set_show_course_form.set(true);
+                                                    set_editing_course.set(None);
+                                                }
+                                            >
+                                                "Add New Course"
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    // Search Bar
+                                    <div class="relative">
+                                        <input
+                                            type="text"
+                                            placeholder="Search courses by name, code, or subject..."
+                                            class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                            prop:value=course_search
+                                            on:input=move |ev| set_course_search.set(event_target_value(&ev))
+                                        />
+                                    </div>
+
+                                    // Courses Table
+                                    <div class="bg-white shadow rounded-lg overflow-hidden border border-gray-300">
+                                        <table class="min-w-full divide-y divide-gray-200">
+                                            <thead class="bg-gray-50">
+                                                <tr>
+                                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">"Course Code"</th>
+                                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">"Name"</th>
+                                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">"Subject"</th>
+                                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">"Grade Level"</th>
+                                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">"Academic Year"</th>
+                                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">"Max Students"</th>
+                                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">"Actions"</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="bg-white divide-y divide-gray-200">
+                                                <For
+                                                    each=filtered_courses
+                                                    key=|course| course.id
+                                                    children=move |course| {
+                                                        let course_clone_edit = course.clone();
+                                                        let course_clone_enroll = course.clone();
+                                                        let delete_course_id = course.id;
+
+                                                        view! {
+                                                            <tr>
+                                                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{&course.course_code}</td>
+                                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{&course.name}</td>
+                                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{&course.subject}</td>
+                                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{format!("{:?}", course.course_level)}</td>
+                                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{format!("{}", course.academic_year)}</td>
+                                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{course.max_students}</td>
+                                                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                                                                    <button
+                                                                        class="text-indigo-600 hover:text-indigo-900"
+                                                                        on:click=move |_| {
+                                                                            set_editing_course.set(Some(course_clone_edit.clone()));
+                                                                            set_show_course_form.set(true);
+                                                                        }
+                                                                    >
+                                                                        "Edit"
+                                                                    </button>
+                                                                    <button
+                                                                        class="text-green-600 hover:text-green-900 ml-2"
+                                                                        on:click=move |_| {
+                                                                            set_selected_course_for_enrollment.set(Some(course_clone_enroll.clone()));
+                                                                            set_enrollment_action.set(EnrollmentAction::QuickEnroll);
+                                                                            set_show_enrollment_form.set(true);
+                                                                        }
+                                                                    >
+                                                                        "Enroll"
+                                                                    </button>
+                                                                    <button
+                                                                        class="text-red-600 hover:text-red-900"
+                                                                        on:click=move |_| {
+                                                                            #[cfg(feature = "hydrate")]
+                                                                            {
+                                                                                if window().confirm_with_message("Are you sure you want to delete this course?").unwrap_or(false) {
+                                                                                    delete_course_action.dispatch(delete_course_id);
+                                                                                }
+                                                                            }
+                                                                        }
+                                                                    >
+                                                                        "Delete"
+                                                                    </button>
+                                                                </td>
+                                                            </tr>
+                                                        }
+                                                    }
+                                                />
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            }.into_view(),
+
+                            DashboardView::Enrollments => view! {
+                                <div class="space-y-6">
+                                    // Enrollment Management Header
+                                    <div class="flex justify-between items-center">
+                                        <h1 class="text-2xl font-bold text-gray-900">"Enrollment Management"</h1>
                                         <button
-                                            class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors"
+                                            class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition-colors"
                                             on:click=move |_| {
-                                                set_enrollment_action.set(EnrollmentAction::QuickEnroll);
+                                                set_enrollment_action.set(EnrollmentAction::AddNew);
                                                 set_show_enrollment_form.set(true);
                                                 set_selected_course_for_enrollment.set(None);
                                             }
                                         >
-                                            "Quick Enroll Student"
-                                        </button>
-                                        <button
-                                            class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition-colors"
-                                            on:click=move |_| {
-                                                set_show_course_form.set(true);
-                                                set_editing_course.set(None);
-                                            }
-                                        >
-                                            "Add New Course"
+                                            "Add New Enrollment"
                                         </button>
                                     </div>
-                                </div>
 
-                                // Search Bar
-                                <div class="relative">
-                                    <input
-                                        type="text"
-                                        placeholder="Search courses by name, code, or subject..."
-                                        class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                                        prop:value=course_search
-                                        on:input=move |ev| set_course_search.set(event_target_value(&ev))
-                                    />
-                                </div>
+                                    // Search Bar
+                                    <div class="relative">
+                                        <input
+                                            type="text"
+                                            placeholder="Search by student ID..."
+                                            class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                            prop:value=enrollment_search
+                                            on:input=move |ev| set_enrollment_search.set(event_target_value(&ev))
+                                        />
+                                    </div>
 
-                                // Courses Table
-                                <div class="bg-white shadow rounded-lg overflow-hidden border border-gray-300">
-                                    <table class="min-w-full divide-y divide-gray-200">
-                                        <thead class="bg-gray-50">
-                                            <tr>
-                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">"Course Code"</th>
-                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">"Name"</th>
-                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">"Subject"</th>
-                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">"Grade Level"</th>
-                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">"Academic Year"</th>
-                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">"Max Students"</th>
-                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">"Actions"</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody class="bg-white divide-y divide-gray-200">
-                                            <For
-                                                each=filtered_courses
-                                                key=|course| course.id
-                                                children=move |course| {
-                                                    let course_clone_edit = course.clone();
-                                                    let course_clone_enroll = course.clone();
-                                                    let delete_course_id = course.id;
+                                    // Enrollments Table
+                                    <div class="bg-white shadow rounded-lg overflow-hidden">
+                                        <table class="min-w-full divide-y divide-gray-200">
+                                            <thead class="bg-gray-50">
+                                                <tr>
+                                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">"Student ID"</th>
+                                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">"Academic Year"</th>
+                                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">"Grade Level"</th>
+                                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">"Teacher ID"</th>
+                                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">"Status"</th>
+                                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">"Enrollment Date"</th>
+                                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">"Actions"</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="bg-white divide-y divide-gray-200">
+                                                <For
+                                                    each=filtered_enrollments
+                                                    key=|enrollment| (enrollment.student_id, enrollment.academic_year.clone())
+                                                    children=move |enrollment| {
+                                                        let enrollment_clone_status = enrollment.clone();
+                                                        let enrollment_clone_delete = enrollment.clone();
 
-                                                    view! {
-                                                        <tr>
-                                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{&course.course_code}</td>
-                                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{&course.name}</td>
-                                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{&course.subject}</td>
-                                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{format!("{:?}", course.course_level)}</td>
-                                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{format!("{}", course.academic_year)}</td>
-                                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{course.max_students}</td>
-                                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
-                                                                <button
-                                                                    class="text-indigo-600 hover:text-indigo-900"
-                                                                    on:click=move |_| {
-                                                                        set_editing_course.set(Some(course_clone_edit.clone()));
-                                                                        set_show_course_form.set(true);
-                                                                    }
-                                                                >
-                                                                    "Edit"
-                                                                </button>
-                                                                <button
-                                                                    class="text-green-600 hover:text-green-900 ml-2"
-                                                                    on:click=move |_| {
-                                                                        set_selected_course_for_enrollment.set(Some(course_clone_enroll.clone()));
-                                                                        set_enrollment_action.set(EnrollmentAction::QuickEnroll);
-                                                                        set_show_enrollment_form.set(true);
-                                                                    }
-                                                                >
-                                                                    "Enroll"
-                                                                </button>
-                                                                <button
-                                                                    class="text-red-600 hover:text-red-900"
-                                                                    on:click=move |_| {
-                                                                        #[cfg(feature = "hydrate")]
+                                                        view! {
+                                                            <tr>
+                                                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{enrollment.student_id}</td>
+                                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{format!("{}", enrollment.academic_year)}</td>
+                                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{format!("{:?}", enrollment.grade_level)}</td>
+                                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{enrollment.teacher_id}</td>
+                                                                <td class="px-6 py-4 whitespace-nowrap">
+                                                                    <select
+                                                                        class="text-sm border border-gray-300 rounded px-2 py-1"
+                                                                        on:change=move |ev| {
+                                                                            let status_str = event_target_value(&ev);
+                                                                            if let Some(new_status) = EnrollmentStatus::iter()
+                                                                                .find(|s| s.to_string() == status_str) {
+                                                                                update_enrollment_status_action.dispatch((
+                                                                                    enrollment_clone_status.student_id,
+                                                                                    enrollment_clone_status.academic_year.clone(),
+                                                                                    new_status
+                                                                                ));
+                                                                            }
+                                                                        }
+                                                                    >
                                                                         {
-                                                                            if window().confirm_with_message("Are you sure you want to delete this course?").unwrap_or(false) {
-                                                                                delete_course_action.dispatch(delete_course_id);
+                                                                            EnrollmentStatus::iter().map(|status| {
+                                                                                let is_selected = enrollment.status == status;
+                                                                                view! {
+                                                                                    <option value=status.to_string() selected=is_selected>{status.to_string()}</option>
+                                                                                }
+                                                                            }).collect::<Vec<_>>()
+                                                                        }
+                                                                    </select>
+                                                                </td>
+                                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{enrollment.enrollment_date.format("%Y-%m-%d").to_string()}</td>
+                                                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                                                                    <button
+                                                                        class="text-red-600 hover:text-red-900"
+                                                                        on:click=move |_| {
+                                                                            #[cfg(feature = "hydrate")]
+                                                                            {
+                                                                                if window().confirm_with_message("Are you sure you want to delete this enrollment?").unwrap_or(false) {
+                                                                                    delete_enrollment_action.dispatch((enrollment_clone_delete.student_id, enrollment_clone_delete.academic_year.clone()));
+                                                                                }
                                                                             }
                                                                         }
-                                                                    }
-                                                                >
-                                                                    "Delete"
-                                                                </button>
-                                                            </td>
-                                                        </tr>
+                                                                    >
+                                                                        "Delete"
+                                                                    </button>
+                                                                </td>
+                                                            </tr>
+                                                        }
                                                     }
-                                                }
-                                            />
-                                        </tbody>
-                                    </table>
+                                                />
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 </div>
-                            </div>
-                        }.into_view(),
-
-                        DashboardView::Enrollments => view! {
-                            <div class="space-y-6">
-                                // Enrollment Management Header
-                                <div class="flex justify-between items-center">
-                                    <h1 class="text-2xl font-bold text-gray-900">"Enrollment Management"</h1>
-                                    <button
-                                        class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition-colors"
-                                        on:click=move |_| {
-                                            set_enrollment_action.set(EnrollmentAction::AddNew);
-                                            set_show_enrollment_form.set(true);
-                                            set_selected_course_for_enrollment.set(None);
-                                        }
-                                    >
-                                        "Add New Enrollment"
-                                    </button>
-                                </div>
-
-                                // Search Bar
-                                <div class="relative">
-                                    <input
-                                        type="text"
-                                        placeholder="Search by student ID..."
-                                        class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                                        prop:value=enrollment_search
-                                        on:input=move |ev| set_enrollment_search.set(event_target_value(&ev))
-                                    />
-                                </div>
-
-                                // Enrollments Table
-                                <div class="bg-white shadow rounded-lg overflow-hidden">
-                                    <table class="min-w-full divide-y divide-gray-200">
-                                        <thead class="bg-gray-50">
-                                            <tr>
-                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">"Student ID"</th>
-                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">"Academic Year"</th>
-                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">"Grade Level"</th>
-                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">"Teacher ID"</th>
-                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">"Status"</th>
-                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">"Enrollment Date"</th>
-                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">"Actions"</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody class="bg-white divide-y divide-gray-200">
-                                            <For
-                                                each=filtered_enrollments
-                                                key=|enrollment| (enrollment.student_id, enrollment.academic_year.clone())
-                                                children=move |enrollment| {
-                                                    let enrollment_clone_status = enrollment.clone();
-                                                    let enrollment_clone_delete = enrollment.clone();
-
-                                                    view! {
-                                                        <tr>
-                                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{enrollment.student_id}</td>
-                                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{format!("{}", enrollment.academic_year)}</td>
-                                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{format!("{:?}", enrollment.grade_level)}</td>
-                                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{enrollment.teacher_id}</td>
-                                                            <td class="px-6 py-4 whitespace-nowrap">
-                                                                <select
-                                                                    class="text-sm border border-gray-300 rounded px-2 py-1"
-                                                                    on:change=move |ev| {
-                                                                        let status_str = event_target_value(&ev);
-                                                                        if let Some(new_status) = EnrollmentStatus::iter()
-                                                                            .find(|s| s.to_string() == status_str) {
-                                                                            update_enrollment_status_action.dispatch((
-                                                                                enrollment_clone_status.student_id,
-                                                                                enrollment_clone_status.academic_year.clone(),
-                                                                                new_status
-                                                                            ));
-                                                                        }
-                                                                    }
-                                                                >
-                                                                    {
-                                                                        EnrollmentStatus::iter().map(|status| {
-                                                                            let is_selected = enrollment.status == status;
-                                                                            view! {
-                                                                                <option value=status.to_string() selected=is_selected>{status.to_string()}</option>
-                                                                            }
-                                                                        }).collect::<Vec<_>>()
-                                                                    }
-                                                                </select>
-                                                            </td>
-                                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{enrollment.enrollment_date.format("%Y-%m-%d").to_string()}</td>
-                                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
-                                                                <button
-                                                                    class="text-red-600 hover:text-red-900"
-                                                                    on:click=move |_| {
-                                                                        #[cfg(feature = "hydrate")]
-                                                                        {
-                                                                            if window().confirm_with_message("Are you sure you want to delete this enrollment?").unwrap_or(false) {
-                                                                                delete_enrollment_action.dispatch((enrollment_clone_delete.student_id, enrollment_clone_delete.academic_year.clone()));
-                                                                            }
-                                                                        }
-                                                                    }
-                                                                >
-                                                                    "Delete"
-                                                                </button>
-                                                            </td>
-                                                        </tr>
-                                                    }
-                                                }
-                                            />
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        }.into_view(),
-                    }}
+                            }.into_view(),
+                        }}
+                    </div>
 
                     // Course Form Modal
                     <Show when=show_course_form>
