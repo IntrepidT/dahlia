@@ -7,6 +7,7 @@ use crate::app::components::enhanced_login_form::{
     use_student_mapping_service, DeAnonymizedStudent, StudentMappingService,
 };
 use crate::app::components::header::Header;
+use crate::app::components::student_report::overview::{OverviewTab, SortOption, TimeFrame};
 use crate::app::components::student_report::sequence_progress_bar::{
     CompactStripeProgress, StripeProgressBar,
 };
@@ -162,100 +163,316 @@ pub fn TestResultsPage() -> impl IntoView {
                 </div>
             </div>
 
-            // Visual Overview Section - Charts and visualizations
-            <Suspense fallback=move || view! { <div>"Loading chart data..."</div> }>
+            // Overview Section
+            <Suspense fallback=move || view! {
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 animate-pulse">
+                    <div class="h-6 bg-gray-200 rounded w-1/4 mb-6"></div>
+                    <div class="space-y-3">
+                        <div class="h-4 bg-gray-200 rounded w-full"></div>
+                        <div class="h-4 bg-gray-200 rounded w-3/4"></div>
+                        <div class="h-4 bg-gray-200 rounded w-5/6"></div>
+                    </div>
+                </div>
+            }>
                 {move || {
                     let results = enhanced_student_data.get().map(|(results, _)| results);
                     match results {
                         Some(data) => {
-                            let assessments = data.assessment_summaries.clone();
-                            let test_details = data.test_summaries.clone();
                             let test_history = data.test_history.clone();
 
-                            if view_mode.get() == "overview" && !assessments.is_empty() {
+                            if view_mode.get() == "overview" {
+                                // Create signals for the overview controls
+                                let (search_query, set_search_query) = create_signal(String::new());
+                                let (selected_timeframe, set_selected_timeframe) = create_signal(TimeFrame::AllTime);
+                                let (selected_sort, set_selected_sort) = create_signal(SortOption::DateDesc);
+
+                                // Filter and sort logic
+                                let filtered_and_sorted_tests = create_memo(move |_| {
+                                    let mut tests = test_history.clone();
+                                    let query = search_query.get().to_lowercase();
+                                    let timeframe = selected_timeframe.get();
+                                    let sort = selected_sort.get();
+
+                                    // Filter by search query
+                                    if !query.is_empty() {
+                                        tests = tests.into_iter()
+                                            .filter(|test| {
+                                                test.test_name.to_lowercase().contains(&query) ||
+                                                test.performance_class.to_lowercase().contains(&query) ||
+                                                test.evaluator.to_lowercase().contains(&query)
+                                            })
+                                            .collect();
+                                    }
+
+                                    // Filter by timeframe
+                                    if timeframe != TimeFrame::AllTime {
+                                        let days_back = match timeframe {
+                                            TimeFrame::LastWeek => 7,
+                                            TimeFrame::LastMonth => 30,
+                                            TimeFrame::Last3Months => 90,
+                                            TimeFrame::LastYear => 365,
+                                            TimeFrame::AllTime => unreachable!(),
+                                        };
+
+                                        let cutoff_date = chrono::Utc::now() - chrono::Duration::days(days_back);
+                                        tests = tests.into_iter()
+                                            .filter(|test| test.date_administered >= cutoff_date)
+                                            .collect();
+                                    }
+
+                                    // Sort
+                                    match sort {
+                                        SortOption::DateDesc => tests.sort_by(|a, b| b.date_administered.cmp(&a.date_administered)),
+                                        SortOption::DateAsc => tests.sort_by(|a, b| a.date_administered.cmp(&b.date_administered)),
+                                        SortOption::ScoreDesc => tests.sort_by(|a, b| {
+                                            let a_percent = (a.score as f32 / a.total_possible as f32) * 100.0;
+                                            let b_percent = (b.score as f32 / b.total_possible as f32) * 100.0;
+                                            b_percent.partial_cmp(&a_percent).unwrap_or(std::cmp::Ordering::Equal)
+                                        }),
+                                        SortOption::ScoreAsc => tests.sort_by(|a, b| {
+                                            let a_percent = (a.score as f32 / a.total_possible as f32) * 100.0;
+                                            let b_percent = (b.score as f32 / b.total_possible as f32) * 100.0;
+                                            a_percent.partial_cmp(&b_percent).unwrap_or(std::cmp::Ordering::Equal)
+                                        }),
+                                        SortOption::TestNameAsc => tests.sort_by(|a, b| a.test_name.cmp(&b.test_name)),
+                                        SortOption::TestNameDesc => tests.sort_by(|a, b| b.test_name.cmp(&a.test_name)),
+                                    }
+
+                                    tests
+                                });
+
                                 view! {
-                                    <div class="mb-6 space-y-6">
-                                        <h2 class="text-2xl font-bold text-slate-800 mb-4">"Performance Analytics Dashboard"</h2>
-
-                                        // Main charts grid
-                                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                                            // Assessment Progress Chart
-                                            <AssessmentProgressChart
-                                                assessments={assessments.clone()}
-                                                chart_id="assessment-progress-chart".to_string()
-                                            />
-
-                                            // Assessment Radar Chart
-                                            <AssessmentRadarChart
-                                                assessment_data={assessments.clone()}
-                                                radar_chart_id="assessment-radar-chart".to_string()
-                                            />
+                                    <div class="space-y-6">
+                                        // Header section
+                                        <div class="flex flex-col space-y-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
+                                            <div>
+                                                <h2 class="text-2xl font-semibold text-gray-900">"Recent Tests"</h2>
+                                                <p class="mt-1 text-sm text-gray-600">
+                                                    "Track test performance and progress over time"
+                                                </p>
+                                            </div>
                                         </div>
 
-                                        // Timeline chart (full width)
-                                        {if !test_history.is_empty() {
-                                            view! {
-                                                <TestScoresTimelineChart
-                                                    test_history={test_history.clone()}
-                                                    chart_id="test-timeline-chart".to_string()
-                                                />
-                                            }.into_view()
-                                        } else {
-                                            view! { <div></div> }.into_view()
-                                        }}
-
-                                        // Performance distribution and test area charts
-                                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                            // Test Area Performance
-                                            {if !test_details.is_empty() {
-                                                view! {
-                                                    <TestAreaPerformanceChart
-                                                        test_area_data={test_details.clone()}
-                                                        area_chart_id="test-area-chart".to_string()
+                                        // Controls section
+                                        <div class="flex flex-col space-y-4 sm:flex-row sm:items-center sm:space-y-0 sm:space-x-4">
+                                            <div class="flex-1 max-w-md">
+                                                // Search bar
+                                                <div class="relative">
+                                                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                                        <svg
+                                                            class="h-4 w-4 text-gray-400"
+                                                            fill="none"
+                                                            viewBox="0 0 24 24"
+                                                            stroke="currentColor"
+                                                        >
+                                                            <path
+                                                                stroke-linecap="round"
+                                                                stroke-linejoin="round"
+                                                                stroke-width="2"
+                                                                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                                                            />
+                                                        </svg>
+                                                    </div>
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Search tests, evaluators..."
+                                                        class="block w-full pl-10 pr-3 py-2.5 border border-gray-200 rounded-lg text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-white"
+                                                        prop:value=search_query
+                                                        on:input=move |ev| {
+                                                            set_search_query(event_target_value(&ev));
+                                                        }
                                                     />
-                                                }.into_view()
-                                            } else {
-                                                view! { <div></div> }.into_view()
-                                            }}
-
-                                            // Overall Performance Distribution
-                                            {if !assessments.is_empty() {
-                                                let overall_distribution = calculate_overall_distribution(&assessments);
-                                                view! {
-                                                    <PerformanceDistributionChart
-                                                        distribution_data={overall_distribution}
-                                                        chart_id="overall-distribution-chart".to_string()
-                                                        title="Overall Performance Distribution".to_string()
-                                                    />
-                                                }.into_view()
-                                            } else {
-                                                view! { <div></div> }.into_view()
-                                            }}
+                                                </div>
+                                            </div>
+                                            <div class="flex space-x-3">
+                                                // Time frame selector
+                                                <div class="relative">
+                                                    <select
+                                                        class="appearance-none bg-white border border-gray-200 rounded-lg px-4 py-2.5 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 cursor-pointer"
+                                                        on:change=move |ev| {
+                                                            let value = event_target_value(&ev);
+                                                            let timeframe = match value.as_str() {
+                                                                "7" => TimeFrame::LastWeek,
+                                                                "30" => TimeFrame::LastMonth,
+                                                                "90" => TimeFrame::Last3Months,
+                                                                "365" => TimeFrame::LastYear,
+                                                                _ => TimeFrame::AllTime,
+                                                            };
+                                                            set_selected_timeframe(timeframe);
+                                                        }
+                                                    >
+                                                        <option value="all">"All time"</option>
+                                                        <option value="7">"Last 7 days"</option>
+                                                        <option value="30">"Last 30 days"</option>
+                                                        <option value="90">"Last 90 days"</option>
+                                                        <option value="365">"Last year"</option>
+                                                    </select>
+                                                    <div class="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+                                                        <svg class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                                        </svg>
+                                                    </div>
+                                                </div>
+                                                // Sort selector
+                                                <div class="relative">
+                                                    <select
+                                                        class="appearance-none bg-white border border-gray-200 rounded-lg px-4 py-2.5 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 cursor-pointer"
+                                                        on:change=move |ev| {
+                                                            let value = event_target_value(&ev);
+                                                            let sort = match value.as_str() {
+                                                                "date_asc" => SortOption::DateAsc,
+                                                                "score_desc" => SortOption::ScoreDesc,
+                                                                "score_asc" => SortOption::ScoreAsc,
+                                                                "name_asc" => SortOption::TestNameAsc,
+                                                                "name_desc" => SortOption::TestNameDesc,
+                                                                _ => SortOption::DateDesc,
+                                                            };
+                                                            set_selected_sort(sort);
+                                                        }
+                                                    >
+                                                        <option value="date_desc">"Newest first"</option>
+                                                        <option value="date_asc">"Oldest first"</option>
+                                                        <option value="score_desc">"Highest score"</option>
+                                                        <option value="score_asc">"Lowest score"</option>
+                                                        <option value="name_asc">"Test name A-Z"</option>
+                                                        <option value="name_desc">"Test name Z-A"</option>
+                                                    </select>
+                                                    <div class="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+                                                        <svg class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                                        </svg>
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
 
-                                        // Individual assessment distribution charts
-                                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                            {assessments.iter().map(|assessment| {
-                                                if !assessment.distribution_data.is_empty() {
+                                        // Table section
+                                        <div class="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+                                            {move || {
+                                                let tests = filtered_and_sorted_tests.get();
+                                                if tests.is_empty() {
                                                     view! {
-                                                        <PerformanceDistributionChart
-                                                            distribution_data={assessment.distribution_data.clone()}
-                                                            chart_id={format!("assessment-dist-{}", assessment.assessment_id)}
-                                                            title={assessment.assessment_name.clone()}
-                                                        />
-                                                    }.into_view()
+                                                        <div class="p-12 text-center">
+                                                            <div class="w-12 h-12 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+                                                                <svg class="w-6 h-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                                </svg>
+                                                            </div>
+                                                            <h3 class="text-lg font-medium text-gray-900 mb-1">"No tests found"</h3>
+                                                            <p class="text-gray-500 text-sm">"Try adjusting your search or time frame filters."</p>
+                                                        </div>
+                                                    }
                                                 } else {
-                                                    view! { <div></div> }.into_view()
+                                                    view! {
+                                                        <div class="overflow-x-auto">
+                                                            <table class="min-w-full divide-y divide-gray-200">
+                                                                <thead class="bg-gray-50">
+                                                                    <tr>
+                                                                        <th scope="col" class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                                            "Test"
+                                                                        </th>
+                                                                        <th scope="col" class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                                            "Score"
+                                                                        </th>
+                                                                        <th scope="col" class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                                            "Performance"
+                                                                        </th>
+                                                                        <th scope="col" class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                                            "Evaluator"
+                                                                        </th>
+                                                                        <th scope="col" class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                                            "Date"
+                                                                        </th>
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody class="bg-white divide-y divide-gray-200">
+                                                                    {tests.into_iter().map(|test| {
+                                                                        let score_percentage = (test.score as f32 / test.total_possible as f32) * 100.0;
+                                                                        let performance_class = test.performance_class.clone();
+                                                                        let performance_class_for_badge = performance_class.clone();
+                                                                        // IMPORTANT: Extract evaluator name here
+                                                                        let evaluator_name = test.evaluator.clone();
+
+                                                                        view! {
+                                                                            <tr class="hover:bg-gray-50 transition-colors duration-150">
+                                                                                <td class="px-6 py-4 whitespace-nowrap">
+                                                                                    <div class="text-sm font-medium text-gray-900">
+                                                                                        {test.test_name}
+                                                                                    </div>
+                                                                                </td>
+                                                                                <td class="px-6 py-4 whitespace-nowrap">
+                                                                                    <div class="flex items-center space-x-3">
+                                                                                        <div class="flex-shrink-0">
+                                                                                            <span class=move || {
+                                                                                                if score_percentage >= 80.0 {
+                                                                                                    "text-lg font-semibold text-green-600"
+                                                                                                } else if score_percentage >= 60.0 {
+                                                                                                    "text-lg font-semibold text-amber-600"
+                                                                                                } else {
+                                                                                                    "text-lg font-semibold text-red-600"
+                                                                                                }
+                                                                                            }>
+                                                                                                {test.score}
+                                                                                            </span>
+                                                                                            <span class="text-sm text-gray-400 ml-1">
+                                                                                                "/" {test.total_possible}
+                                                                                            </span>
+                                                                                        </div>
+                                                                                        <div class="flex-1 min-w-0">
+                                                                                            <div class="w-16 bg-gray-200 rounded-full h-1.5">
+                                                                                                <div
+                                                                                                    class=move || {
+                                                                                                        if score_percentage >= 80.0 {
+                                                                                                            "bg-green-500 h-1.5 rounded-full transition-all duration-300"
+                                                                                                        } else if score_percentage >= 60.0 {
+                                                                                                            "bg-amber-500 h-1.5 rounded-full transition-all duration-300"
+                                                                                                        } else {
+                                                                                                            "bg-red-500 h-1.5 rounded-full transition-all duration-300"
+                                                                                                        }
+                                                                                                    }
+                                                                                                    style=format!("width: {}%", score_percentage.min(100.0))
+                                                                                                ></div>
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </td>
+                                                                                <td class="px-6 py-4 whitespace-nowrap">
+                                                                                    <span class=move || {
+                                                                                        if performance_class_for_badge.contains("Above") || performance_class_for_badge.contains("High") {
+                                                                                            "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800"
+                                                                                        } else if performance_class_for_badge.contains("Average") || performance_class_for_badge.contains("On Track") {
+                                                                                            "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                                                                                        } else if performance_class_for_badge.contains("Below") || performance_class_for_badge.contains("Risk") {
+                                                                                            "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800"
+                                                                                        } else {
+                                                                                            "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800"
+                                                                                        }
+                                                                                    }>
+                                                                                        {performance_class}
+                                                                                    </span>
+                                                                                </td>
+                                                                                <td class="px-6 py-4 whitespace-nowrap">
+                                                                                    <div class="text-sm text-gray-900 font-medium">
+                                                                                        {if evaluator_name.is_empty() {
+                                                                                            "Not specified".to_string()
+                                                                                        } else {
+                                                                                            evaluator_name
+                                                                                        }}
+                                                                                    </div>
+                                                                                </td>
+                                                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                                                    {format!("{}", test.date_administered.format("%b %d, %Y"))}
+                                                                                </td>
+                                                                            </tr>
+                                                                        }
+                                                                    }).collect::<Vec<_>>()}
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
+                                                    }
                                                 }
-                                            }).collect::<Vec<_>>()}
+                                            }}
                                         </div>
-                                    </div>
-                                }
-                            } else if view_mode.get() == "overview" {
-                                view! {
-                                    <div class="mb-6 bg-slate-50 rounded-lg p-8 text-center">
-                                        <h2 class="text-xl font-semibold text-slate-600 mb-2">"No Assessment Data Available"</h2>
-                                        <p class="text-slate-500">"Performance charts will appear here once tests are completed."</p>
                                     </div>
                                 }
                             } else {
@@ -624,203 +841,6 @@ pub fn TestResultsPage() -> impl IntoView {
                     view! { <div></div> }
                 }
             }}
-
-            // Test Score Ledger
-            <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-xl font-bold">"Test Score Ledger"</h2>
-                    <button
-                        class="px-3 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 flex items-center"
-                        on:click=move |_| set_show_filters.update(|v| *v = !*v)
-                    >
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-                        </svg>
-                        {move || if show_filters.get() { "Hide Filters" } else { "Show Filters" }}
-                    </button>
-                </div>
-
-                <Suspense fallback=move || view! { <div>"Loading test history data..."</div> }>
-                    {move || {
-                        let results = enhanced_student_data.get().map(|(results, _)| results);
-                        match results {
-                            Some(data) => {
-                                let test_history = data.test_history.clone();
-
-                                if test_history.is_empty() {
-                                    view! { <div class="text-gray-600">"No test history available"</div> }
-                                } else {
-                                    // Extract unique test names for filter dropdown
-                                    let unique_test_names: HashSet<String> = test_history.iter()
-                                        .map(|entry| entry.test_name.clone())
-                                        .collect();
-
-                                    let test_names_vec: Vec<String> = unique_test_names.into_iter().collect();
-                                    let test_names_for_filter = test_names_vec.clone();
-
-                                    // Filter the test history based on selected filters
-                                    let filtered_history = move || {
-                                        let mut filtered = test_history.clone();
-
-                                        // Apply test name filter if selected
-                                        if let Some(name) = filter_test_name.get() {
-                                            filtered = filtered.into_iter()
-                                                .filter(|entry| entry.test_name == name)
-                                                .collect();
-                                        }
-
-                                        // Sort by most recent first
-                                        filtered.sort_by(|a, b| b.date_administered.cmp(&a.date_administered));
-
-                                        filtered
-                                    };
-
-                                    view! {
-                                        <div>
-                                            // Filter controls
-                                            {move || {
-                                                if show_filters.get() {
-                                                    view! {
-                                                        <div class="mb-4 p-4 bg-gray-50 rounded-lg border">
-                                                            <div class="flex flex-wrap gap-4 items-end">
-                                                                <div class="max-w-xs">
-                                                                    <label class="block text-sm font-medium text-gray-700 mb-1" for="test-filter">
-                                                                        "Filter by Test"
-                                                                    </label>
-                                                                    <select
-                                                                        id="test-filter"
-                                                                        class="block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                                                                        on:change=move |ev| {
-                                                                            let value = event_target_value(&ev);
-                                                                            if value.is_empty() {
-                                                                                set_filter_test_name(None);
-                                                                            } else {
-                                                                                set_filter_test_name(Some(value));
-                                                                            }
-                                                                        }
-                                                                    >
-                                                                        <option value="">"All Tests"</option>
-                                                                        {test_names_for_filter.iter().map(|name| {
-                                                                            view! { <option value={name.clone()}>{name.clone()}</option> }
-                                                                        }).collect::<Vec<_>>()}
-                                                                    </select>
-                                                                </div>
-
-                                                                <button
-                                                                    class="px-3 py-2 bg-blue-100 text-blue-800 rounded hover:bg-blue-200"
-                                                                    on:click=move |_| set_filter_test_name(None)
-                                                                >
-                                                                    "Clear Filters"
-                                                                </button>
-                                                            </div>
-                                                        </div>
-                                                    }
-                                                } else {
-                                                    view! { <div></div> }
-                                                }
-                                            }}
-
-                                            // Test history table
-                                            <div class="overflow-x-auto">
-                                                <table class="min-w-full bg-white">
-                                                    <thead class="bg-gray-100">
-                                                        <tr>
-                                                            <th class="py-2 px-4 text-left">"Test Name"</th>
-                                                            <th class="py-2 px-4 text-left">"Taken"</th>
-                                                            <th class="py-2 px-4 text-left">"Score"</th>
-                                                            <th class="py-2 px-4 text-left">"Possible"</th>
-                                                            <th class="py-2 px-4 text-left">"Percentage"</th>
-                                                            <th class="py-2 px-4 text-left">"Performance"</th>
-                                                            <th class="py-2 px-4 text-left">"Evaluator"</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {move || {
-                                                            let entries = filtered_history();
-                                                            if entries.is_empty() {
-                                                                vec![view! {
-                                                                    <tr>
-                                                                        <td colspan="7" class="py-4 px-4 text-center text-gray-500">
-                                                                            "No matching test records found"
-                                                                        </td>
-                                                                    </tr>
-                                                                }]
-                                                            } else {
-                                                                entries.into_iter().map(|entry| {
-                                                                    let score_percentage = (entry.score as f32 / entry.total_possible as f32) * 100.0;
-                                                                    let performance_class = entry.performance_class.clone();
-                                                                    let performance_class_for_style = performance_class.clone();
-
-                                                                    view! {
-                                                                        <tr class="border-t hover:bg-gray-50">
-                                                                            <td class="py-3 px-4">{entry.test_name}</td>
-                                                                            <td class="py-3 px-4">{format!("{}", entry.date_administered.format("%Y-%m-%d"))}</td>
-                                                                            <td class="py-3 px-4">
-                                                                                <span class=move || {
-                                                                                    if score_percentage >= 80.0 {
-                                                                                        "text-green-600 font-semibold"
-                                                                                    } else if score_percentage >= 60.0 {
-                                                                                        "text-yellow-600 font-semibold"
-                                                                                    } else {
-                                                                                        "text-red-600 font-semibold"
-                                                                                    }
-                                                                                }>
-                                                                                    {entry.score}
-                                                                                </span>
-                                                                            </td>
-                                                                            <td class="py-3 px-4">{entry.total_possible}</td>
-                                                                            <td class="py-3 px-4">
-                                                                                <div class="flex items-center">
-                                                                                    <div class="w-24 bg-gray-200 rounded-full h-2 mr-2">
-                                                                                        <div
-                                                                                            class=move || {
-                                                                                                if score_percentage >= 80.0 {
-                                                                                                    "bg-green-600 h-2 rounded-full"
-                                                                                                } else if score_percentage >= 60.0 {
-                                                                                                    "bg-yellow-400 h-2 rounded-full"
-                                                                                                } else {
-                                                                                                    "bg-red-600 h-2 rounded-full"
-                                                                                                }
-                                                                                            }
-                                                                                            style=format!("width: {}%", score_percentage.min(100.0))
-                                                                                        ></div>
-                                                                                    </div>
-                                                                                    <span class="text-sm">{format!("{:.1}%", score_percentage)}</span>
-                                                                                </div>
-                                                                            </td>
-                                                                            <td class="py-3 px-4">
-                                                                                <span class=move || {
-                                                                                    if performance_class_for_style.contains("Above") || performance_class_for_style.contains("High") {
-                                                                                        "px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs"
-                                                                                    } else if performance_class_for_style.contains("Average") || performance_class_for_style.contains("On Track") {
-                                                                                        "px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs"
-                                                                                    } else if performance_class_for_style.contains("Below") || performance_class_for_style.contains("Risk") {
-                                                                                        "px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs"
-                                                                                    } else {
-                                                                                        "px-2 py-1 bg-gray-100 text-gray-800 rounded-full text-xs"
-                                                                                    }
-                                                                                }>
-                                                                                    {&performance_class}
-                                                                                </span>
-                                                                            </td>
-                                                                            <td class="py-3 px-4">{entry.evaluator}</td>
-                                                                        </tr>
-                                                                    }
-                                                                }).collect::<Vec<_>>()
-                                                            }
-                                                        }}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        </div>
-                                    }
-                                }
-                            },
-                            None => view! { <div class="text-gray-600">"No test history available"</div> }
-                        }
-                    }}
-                </Suspense>
-            </div>
         </div>
     }
 }

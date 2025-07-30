@@ -170,7 +170,7 @@ pub fn SequenceNode(
                         <div class="bg-red-100 text-red-700 px-3 py-1 rounded-full text-xs font-bold border border-red-200 mb-3">
                             "ON FAIL ↓"
                         </div>
-                        <VariationStack variations=variations all_tests=all_tests />
+                        <VariationStack variations=variations all_tests=all_tests item_test_id=item_test_id />
                     </div>
                 }.into_view()
             } else {
@@ -213,7 +213,11 @@ pub fn SequenceNode(
 }
 
 #[component]
-fn VariationStack(variations: Vec<VariationLevel>, all_tests: Vec<Test>) -> impl IntoView {
+fn VariationStack(
+    variations: Vec<VariationLevel>,
+    all_tests: Vec<Test>,
+    item_test_id: Uuid,
+) -> impl IntoView {
     view! {
         <div class="flex flex-col items-center space-y-6 w-full">
             {variations.iter().enumerate().map(|(var_index, variation)| {
@@ -221,7 +225,11 @@ fn VariationStack(variations: Vec<VariationLevel>, all_tests: Vec<Test>) -> impl
                     Uuid::parse_str(&t.test_id).unwrap_or_default() == variation.test_id
                 });
                 let var_name = var_test.map(|t| t.name.clone()).unwrap_or_else(|| "Unknown".to_string());
-                let var_short_name = if var_name.len() > 14 {
+                let is_same_test = variation.test_id == item_test_id;
+                let display_icon = if is_same_test { "📋" } else { "🔄" };
+                let var_short_name = if is_same_test {
+                    "Same Test".to_string()
+                } else if var_name.len() > 14 {
                     format!("{}...", &var_name[0..11])
                 } else {
                     var_name.clone()
@@ -252,7 +260,11 @@ fn VariationStack(variations: Vec<VariationLevel>, all_tests: Vec<Test>) -> impl
                                 {var_short_name}
                             </div>
                             <div class="text-xs text-orange-600 bg-orange-100 rounded-full px-2 py-1 mb-1">
-                                {variation.description.clone()}
+                                {if is_same_test {
+                                    format!("{} Retry L{}", display_icon, variation.level)
+                                } else {
+                                    format!("{} {}", display_icon, variation.description.clone())
+                                }}
                             </div>
                             <div class="text-xs text-orange-700 font-medium">
                                 "Level "{variation.level}" • "{variation.max_attempts.unwrap_or(2)}" attempts"

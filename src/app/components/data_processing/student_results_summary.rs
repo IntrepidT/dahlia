@@ -2,12 +2,13 @@ use crate::app::models::assessment::Assessment;
 use crate::app::models::score::Score;
 use crate::app::models::student::Student;
 use crate::app::models::test::Test;
+use crate::app::server_functions::teachers::get_teachers;
 use crate::app::server_functions::{
     assessments::get_assessments, scores::get_student_scores, students::get_student,
     tests::get_tests,
 };
 use chrono::prelude::*;
-use futures::future;
+use futures::join;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt::{self, Debug};
@@ -89,19 +90,20 @@ pub struct TestDetail {
 #[cfg(feature = "ssr")]
 pub async fn get_student_results(student_id: i32) -> Result<StudentResultsSummary, String> {
     // Parallel data fetching instead of sequential - major performance improvement
-    let (tests_result, assessments_result, scores_result, student_result) = future::join4(
+    let (tests_result, assessments_result, scores_result, student_result, teachers_result) = join!(
         get_tests(),
         get_assessments(),
         get_student_scores(student_id),
         get_student(student_id),
-    )
-    .await;
+        get_teachers(),
+    );
 
     // Handle results with proper error propagation
     let tests = tests_result.map_err(|e| e.to_string())?;
     let assessments = assessments_result.map_err(|e| e.to_string())?;
     let scores = scores_result.map_err(|e| e.to_string())?;
     let student = student_result.map_err(|e| e.to_string())?;
+    let teachers = teachers_result.map_err(|e| e.to_string())?;
 
     // Create efficient lookup maps - O(1) access instead of O(n) searches
     let test_lookup: HashMap<String, &Test> = tests
@@ -114,14 +116,37 @@ pub async fn get_student_results(student_id: i32) -> Result<StudentResultsSummar
         .map(|assessment| (assessment.id.to_string(), assessment))
         .collect();
 
+    let teacher_lookup: HashMap<String, String> = teachers
+        .iter()
+        .map(|teacher| {
+            let full_name = format!("{} {}", teacher.firstname, teacher.lastname);
+            // Convert teacher ID to string for lookup
+            let teacher_id = teacher.id.to_string();
+
+            // Debug logging to see what we're creating
+            log::info!("Teacher lookup entry: '{}' -> '{}'", teacher_id, full_name);
+
+            (teacher_id, full_name)
+        })
+        .collect();
+
+    // Log the teacher lookup for debugging
+    log::info!(
+        "Created teacher lookup with {} entries",
+        teacher_lookup.len()
+    );
+    if teacher_lookup.is_empty() {
+        log::warn!("Teacher lookup is empty! No teachers found.");
+    }
+
     // Process test history efficiently without dataframes
-    let test_history = build_test_history(&scores, &test_lookup);
+    let test_history = build_test_history_fixed(&scores, &test_lookup, &teacher_lookup);
 
     // Find highest scores using native collections
     let highest_scores = find_highest_scores(&scores);
 
     // Process test details efficiently
-    let test_details = build_test_details(&highest_scores, &test_lookup);
+    let test_details = build_test_details_fixed(&highest_scores, &test_lookup, &teacher_lookup);
 
     // Group by assessment and create summaries
     let assessment_summaries = build_assessment_summaries(&test_details, &assessment_lookup);
@@ -136,15 +161,20 @@ pub async fn get_student_results(student_id: i32) -> Result<StudentResultsSummar
 
 // Optimized test history builder - no dataframes needed
 #[cfg(feature = "ssr")]
-fn build_test_history(
+fn build_test_history_fixed(
     scores: &[Score],
     test_lookup: &HashMap<String, &Test>,
+    teacher_lookup: &HashMap<String, String>,
 ) -> Vec<TestHistoryEntry> {
     let mut history: Vec<TestHistoryEntry> = scores
         .iter()
         .filter_map(|score| {
             test_lookup.get(&score.test_id).map(|test| {
                 let score_total = score.get_total();
+
+                // FIXED: Better evaluator name resolution
+                let evaluator_name = resolve_evaluator_name(&score.evaluator, teacher_lookup);
+
                 TestHistoryEntry {
                     test_id: score.test_id.clone(),
                     test_name: test.name.clone(),
@@ -152,7 +182,7 @@ fn build_test_history(
                     total_possible: test.score,
                     date_administered: score.date_administered,
                     performance_class: determine_performance_class_fast(test, score_total),
-                    evaluator: score.evaluator.clone(),
+                    evaluator: evaluator_name,
                     attempt: score.attempt,
                 }
             })
@@ -187,15 +217,19 @@ fn find_highest_scores(scores: &[Score]) -> HashMap<String, &Score> {
 
 // Native test details processing - no dataframe overhead
 #[cfg(feature = "ssr")]
-fn build_test_details(
+fn build_test_details_fixed(
     highest_scores: &HashMap<String, &Score>,
     test_lookup: &HashMap<String, &Test>,
+    teacher_lookup: &HashMap<String, String>,
 ) -> Vec<TestDetail> {
     highest_scores
         .iter()
         .filter_map(|(test_id, score)| {
             test_lookup.get(test_id).map(|test| {
                 let score_total = score.get_total();
+
+                let evaluator_name = resolve_evaluator_name(&score.evaluator, teacher_lookup);
+
                 TestDetail {
                     test_id: score.test_id.clone(),
                     test_name: test.name.clone(),
@@ -399,6 +433,40 @@ fn group_tests_by_name_and_attempt(
     }
 
     grouped_tests
+}
+
+#[cfg(feature = "ssr")]
+fn resolve_evaluator_name(evaluator_id: &str, teacher_lookup: &HashMap<String, String>) -> String {
+    if evaluator_id.is_empty() {
+        log::debug!("Evaluator ID is empty, returning 'Unknown'");
+        return "Unknown".to_string();
+    }
+
+    if let Some(teacher_name) = teacher_lookup.get(evaluator_id) {
+        log::debug!("Found teacher: {} -> {}", evaluator_id, teacher_name);
+        return teacher_name.clone();
+    }
+
+    // If direct lookup fails, try parsing as integer and converting back to string
+    if let Ok(id_num) = evaluator_id.trim().parse::<i32>() {
+        let normalized_id = id_num.to_string();
+        if let Some(teacher_name) = teacher_lookup.get(&normalized_id) {
+            log::debug!(
+                "Found teacher after normalization: {} -> {} -> {}",
+                evaluator_id,
+                normalized_id,
+                teacher_name
+            );
+            return teacher_name.clone();
+        }
+    }
+
+    // Return a descriptive fallback
+    if evaluator_id.chars().all(|c| c.is_ascii_digit()) {
+        format!("Teacher #{}", evaluator_id)
+    } else {
+        evaluator_id.to_string()
+    }
 }
 
 // Performance testing module

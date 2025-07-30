@@ -24,7 +24,6 @@ pub fn TestAddPanel(
     let (required_score, set_required_score) = create_signal::<Option<i32>>(None);
     let (show_variations_panel, set_show_variations_panel) = create_signal(false);
 
-    // CRITICAL FIX: Add variations state at panel level to capture them
     let (current_variations, set_current_variations) = create_signal::<Vec<VariationLevel>>(vec![]);
 
     let add_test_to_sequence = move |_| {
@@ -85,16 +84,18 @@ pub fn TestAddPanel(
             .map(|r| r.ok())
             .flatten()
             .unwrap_or_default();
-        let current_seq = current_sequence.get();
+
+        //uncomment these lines to prevent re-using the same test within a sequence
+        /*let current_seq = current_sequence.get();
         let used_test_ids: std::collections::HashSet<Uuid> =
-            current_seq.iter().map(|item| item.test_id).collect();
+            current_seq.iter().map(|item| item.test_id).collect();*/
 
         all_tests
             .into_iter()
-            .filter(|test| {
+            /*.filter(|test| {
                 let test_uuid = Uuid::parse_str(&test.test_id).unwrap_or_default();
                 !used_test_ids.contains(&test_uuid) && !is_variation_test(test)
-            })
+            })*/
             .collect()
     };
 
@@ -201,6 +202,7 @@ pub fn TestAddPanel(
                     current_sequence=current_sequence
                     variations=current_variations
                     set_variations=set_current_variations
+                    main_test_id=selected_test_for_sequence.get()
                 />
             </Show>
 
