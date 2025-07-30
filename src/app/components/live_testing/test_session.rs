@@ -730,14 +730,14 @@ pub fn RealtimeTestSession() -> impl IntoView {
                 </div>
 
                 {/* Session Status */}
-                <div class="flex justify-center items-center mb-3 space-x-8 text-sm">
+                /*<div class="flex justify-center items-center mb-3 space-x-8 text-sm">
                     <Show when=move || !formatted_time().is_empty()>
                         <div class="text-gray-600">
                             <span class="font-medium">"Time: "</span>
                             {move || formatted_time()}
                         </div>
                     </Show>
-                </div>
+                </div>*/
 
                 {/* Teacher Controls */}
                 <div class="mb-4">

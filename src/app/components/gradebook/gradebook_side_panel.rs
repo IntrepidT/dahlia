@@ -1,7 +1,11 @@
 use crate::app::components::data_processing::{
     AssessmentSummary, Progress, StudentResultsSummary, TestDetail,
 };
+use crate::app::components::enhanced_login_form::{
+    use_student_mapping_service, DeAnonymizedStudent, StudentMappingService,
+};
 use crate::app::components::test_item::GenericTestModal;
+use crate::app::middleware::global_settings::use_settings;
 use crate::app::models::student::Student;
 use chrono::prelude::*;
 use icondata::{
@@ -29,6 +33,12 @@ pub fn StudentScorePanel(
     #[prop(into)] test_data: Signal<Option<TestDetail>>,
     #[prop(into)] next_test: Signal<Option<String>>, // Next test ID in sequence
 ) -> impl IntoView {
+    // Get global settings and student mapping service for de-anonymization
+    let (settings, _) = use_settings();
+    let (student_mapping_service, _) = use_student_mapping_service();
+
+    let anonymization_enabled = move || settings.get().student_protections;
+
     // Format date for display
     let format_date = |date: DateTime<Utc>| date.format("%B %d, %Y").to_string();
 
@@ -48,8 +58,17 @@ pub fn StudentScorePanel(
         }
     };
 
-    // Helper function to get student display name safely
+    // Helper function to get student display name with de-anonymization support
     let get_student_display_name = move |student: &Student| -> String {
+        if anonymization_enabled() {
+            if let Some(service) = student_mapping_service.get() {
+                if let Some(mapping) = service.get_original_student_info(student.student_id) {
+                    return format!("{} {}", mapping.firstname, mapping.lastname);
+                }
+            }
+        }
+
+        // Fallback to anonymized or regular display
         let firstname = student.firstname.as_deref().unwrap_or("Student");
         let lastname = student
             .lastname
@@ -57,6 +76,20 @@ pub fn StudentScorePanel(
             .map(|s| s.to_string())
             .unwrap_or_else(|| format!("#{}", student.student_id));
         format!("{} {}", firstname, lastname)
+    };
+
+    // Helper function to get student ID display with de-anonymization support
+    let get_student_display_id = move |student: &Student| -> String {
+        if anonymization_enabled() {
+            if let Some(service) = student_mapping_service.get() {
+                if let Some(mapping) = service.get_original_student_info(student.student_id) {
+                    return mapping.original_student_id.to_string();
+                }
+            }
+        }
+
+        // Fallback to current student ID
+        student.student_id.to_string()
     };
 
     // Close panel function
@@ -92,7 +125,7 @@ pub fn StudentScorePanel(
                     if !show.get() {
                         view! { <div></div> }.into_view()
                     } else {
-                        // Student info section - Fixed the unwrap issue
+                        // Student info section with de-anonymization support
                         let student_info = view! {
                             <div class="mb-6 bg-[#F9F9F8] p-4 rounded-lg shadow-sm">
                                 <div class="flex items-center mb-3">
@@ -109,11 +142,40 @@ pub fn StudentScorePanel(
                                             }}
                                         </h3>
                                         <div class="text-sm text-gray-600">
-                                            <p>{"ID: "} {move || {
-                                                student.get()
-                                                    .map(|s| s.student_id.to_string())
-                                                    .unwrap_or_else(|| "N/A".to_string())
-                                            }}</p>
+                                            <p>
+                                                {move || {
+                                                    if anonymization_enabled() && student_mapping_service.get().is_some() {
+                                                        "Original ID: "
+                                                    } else {
+                                                        "ID: "
+                                                    }
+                                                }}
+                                                {move || {
+                                                    student.get()
+                                                        .map(|s| get_student_display_id(&s))
+                                                        .unwrap_or_else(|| "N/A".to_string())
+                                                }}
+                                            </p>
+                                            // Show anonymization status if enabled
+                                            {move || {
+                                                if anonymization_enabled() {
+                                                    if student_mapping_service.get().is_some() {
+                                                        view! {
+                                                            <p class="text-green-600 text-xs mt-1">
+                                                                "✓ De-anonymized data"
+                                                            </p>
+                                                        }.into_view()
+                                                    } else {
+                                                        view! {
+                                                            <p class="text-yellow-600 text-xs mt-1">
+                                                                "⚠ Anonymized data"
+                                                            </p>
+                                                        }.into_view()
+                                                    }
+                                                } else {
+                                                    view! { <span></span> }.into_view()
+                                                }
+                                            }}
                                         </div>
                                     </div>
                                 </div>
@@ -254,11 +316,11 @@ pub fn StudentScorePanel(
                                             }}
                                         </div>
 
-                                        // Action Buttons
+                                        // Action Buttons - Use de-anonymized student ID for navigation
                                         <div class="flex space-x-2">
                                             <A
                                                 href=format!("/studentview/{}/results",
-                                                    student.get().map(|s| s.student_id.to_string()).unwrap_or_default()
+                                                    student.get().unwrap().student_id
                                                 )
                                                 class="flex-1 bg-indigo-600 text-white px-4 py-2 rounded text-center font-medium hover:bg-indigo-700"
                                             >
@@ -336,11 +398,12 @@ pub fn StudentScorePanel(
                                             </div>
                                         </div>
 
-                                        // Action Buttons
+                                        // Action Buttons - Use appropriate student ID for navigation
                                         <div class="flex flex-col space-y-2">
                                             <A
                                                 href=format!("/reviewtest/{}/{}/{}/{}",
                                                     test.test_id,
+                                                    // Use the actual student ID (not de-anonymized) for internal navigation
                                                     student.get().map(|s| s.student_id.to_string()).unwrap_or_default(),
                                                     test.test_variant,
                                                     test.attempt,
@@ -351,7 +414,8 @@ pub fn StudentScorePanel(
                                             </A>
                                             <A
                                                 href=format!("/studentview/{}/results",
-                                                    student.get().map(|s| s.student_id.to_string()).unwrap_or_default()
+                                                    // Use de-anonymized ID for student view navigation
+                                                    student.get().map(|s| get_student_display_id(&s)).unwrap_or_default()
                                                 )
                                                 class="w-full bg-blue-600 text-white px-4 py-2 rounded text-center font-medium hover:bg-blue-700"
                                             >
@@ -396,7 +460,8 @@ pub fn StudentScorePanel(
                                     <div class="flex space-x-2">
                                         <A
                                             href=format!("/studentview/{}/results",
-                                                student.get().map(|s| s.student_id.to_string()).unwrap_or_default()
+                                                // Use de-anonymized ID for student view navigation
+                                                student.get().map(|s| get_student_display_id(&s)).unwrap_or_default()
                                             )
                                             class="flex-1 bg-indigo-600 text-white px-4 py-2 rounded text-center font-medium hover:bg-indigo-700"
                                         >
