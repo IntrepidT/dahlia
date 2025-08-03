@@ -303,16 +303,16 @@ pub fn ScoresLedger() -> impl IntoView {
 
 // Helper struct for student display info
 #[derive(Clone)]
-struct StudentDisplayInfo {
+pub struct StudentDisplayInfo {
     pub id: String,
     pub name: String,
 }
 
 // Additional utility struct for score-related operations
-struct ScoreUtils;
+pub struct ScoreUtils;
 
 impl ScoreUtils {
-    fn get_student_display_info(
+    pub fn get_student_display_info(
         student_id: i32,
         enhanced_students: &[(Student, Option<DeAnonymizedStudent>)],
     ) -> StudentDisplayInfo {
@@ -343,7 +343,7 @@ impl ScoreUtils {
         }
     }
 
-    fn get_benchmark_label(
+    pub fn get_benchmark_label(
         score: i32,
         max_score: i32,
         benchmark_categories: Option<&Vec<BenchmarkCategory>>,

@@ -365,5 +365,71 @@ cfg_if::cfg_if! {
 
             Ok(assessment)
         }
+
+        pub async fn get_test_sequence(assessment_id: &String, pool: &sqlx::PgPool) -> Result<Vec<(String, String)>, ServerFnError> {
+
+            let uuid = Uuid::parse_str(assessment_id)
+                .map_err(|e| {
+                    log::error!("UUID parsing failed for '{}': {}", assessment_id, e);
+                    ServerFnError::new(format!("Invalid UUID: {}", e))
+                })?;
+
+            let row = sqlx::query("SELECT test_sequence FROM assessments WHERE id = $1")
+                .bind(&uuid)
+                .fetch_one(pool)
+                .await
+                .map_err(|e| {
+                    log::error!("Database query failed for assessment {}: {}", uuid, e);
+                    ServerFnError::new(format!("Database error: {}", e))
+                })?;
+
+            // Parse the test_sequence from the row
+            let test_sequence: Option<Vec<TestSequenceItem>> = match row.try_get::<Option<Json<Vec<TestSequenceItem>>>, _>("test_sequence") {
+                Ok(Some(json)) => {
+                    log::info!("test_sequence JSON parsed successfully, {} items", json.0.len());
+                    Some(json.0)
+                },
+                Ok(None) => {
+                    log::warn!("test_sequence is NULL for assessment {}", uuid);
+                    None
+                },
+                Err(e) => {
+                    log::error!("Failed to parse test_sequence JSON for assessment {}: {}", uuid, e);
+                    return Err(ServerFnError::new(format!("JSON parsing error: {}", e)));
+                }
+            };
+
+            // Convert TestSequenceItem to (String, String) pairs
+            let sequence_items = test_sequence.unwrap_or_default();
+
+            if sequence_items.is_empty() {
+                log::warn!("No test sequence items found for assessment {}", uuid);
+                return Ok(vec![]);
+            }
+
+            // Get test names from the tests table for each test_id in the sequence
+            let mut result = Vec::new();
+
+            for (index, item) in sequence_items.iter().enumerate() {
+                let test_name: Option<String> = sqlx::query_scalar("SELECT name FROM tests WHERE test_id = $1")
+                    .bind(&item.test_id)  // Bind the UUID directly, not as string
+                    .fetch_optional(pool)
+                    .await
+                    .map_err(|e| {
+                        log::error!("Database error fetching test name for test_id {}: {}", item.test_id, e);
+                        ServerFnError::new(format!("Database error fetching test name: {}", e))
+                    })?;
+
+                let name = test_name.unwrap_or_else(|| {
+                    log::warn!("Test name not found for test_id {}, using fallback", item.test_id);
+                    format!("Test {}", item.test_id)
+                });
+
+                // Return the UUID as string in the result tuple
+                result.push((item.test_id.to_string(), name));
+            }
+
+            Ok(result)
+        }
     }
 }

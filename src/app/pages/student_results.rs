@@ -1,4 +1,6 @@
+use crate::app::components::dashboard::color_utils::ColorUtils;
 use crate::app::components::dashboard::dashboard_sidebar::{DashboardSidebar, SidebarSelected};
+use crate::app::components::dashboard::scores_ledger::ScoreUtils;
 use crate::app::components::data_processing::{
     AssessmentProgressChart, AssessmentRadarChart, AssessmentSummary, PerformanceDistributionChart,
     Progress, StudentResultsSummary, TestAreaPerformanceChart, TestDetail, TestScoresTimelineChart,
@@ -7,13 +9,16 @@ use crate::app::components::enhanced_login_form::{
     use_student_mapping_service, DeAnonymizedStudent, StudentMappingService,
 };
 use crate::app::components::header::Header;
+use crate::app::components::student_report::assessments::progress_overview_tab::ProgressOverviewTab;
 use crate::app::components::student_report::overview::{OverviewTab, SortOption, TimeFrame};
 use crate::app::components::student_report::sequence_progress_bar::{
     CompactStripeProgress, StripeProgressBar,
 };
 use crate::app::components::student_report::sequence_web::SequenceWeb;
 use crate::app::middleware::global_settings::use_settings;
+use crate::app::models::test::Test;
 use crate::app::server_functions::data_wrappers::get_student_results_server;
+use crate::app::server_functions::tests::get_tests;
 use leptos::*;
 use leptos_router::use_params_map;
 use std::collections::HashSet;
@@ -51,6 +56,20 @@ pub fn TestResultsPage() -> impl IntoView {
         },
     );
 
+    // Resource to fetch test data for benchmark categories
+    let tests_resource = create_local_resource(
+        || (),
+        |_| async {
+            match get_tests().await {
+                Ok(tests) => Some(tests),
+                Err(e) => {
+                    log::error!("Failed to load tests: {}", e);
+                    None
+                }
+            }
+        },
+    );
+
     //Create enhanced student data with de-anonymization
     let enhanced_student_data = create_memo(move |_| {
         student_results_resource
@@ -77,7 +96,7 @@ pub fn TestResultsPage() -> impl IntoView {
 
     view! {
         <Header />
-        <div class="p-6 max-w-7xl mx-auto">
+        <div class="p-5 max-w-7xl mx-auto">
             // Student Information Section
             <Suspense fallback=move || view! { <div class="text-center p-4">"Loading student data..."</div> }>
                 {move || enhanced_student_data.get().map(|(results, de_anon_opt)| {
@@ -133,7 +152,7 @@ pub fn TestResultsPage() -> impl IntoView {
                             }
                             on:click=move |_| set_view_mode("overview".to_string())
                         >
-                            "Visual Overview"
+                            "Overview"
                         </button>
                         <button
                             class=move || {
@@ -145,7 +164,7 @@ pub fn TestResultsPage() -> impl IntoView {
                             }
                             on:click=move |_| set_view_mode("sequence".to_string())
                         >
-                            "Progress Sequences"
+                            "Assessment Progress"
                         </button>
                         <button
                             class=move || {
@@ -347,128 +366,148 @@ pub fn TestResultsPage() -> impl IntoView {
                                         </div>
 
                                         // Table section
-                                        <div class="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+                                        <div class="bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col" style="height: 400px; min-height: 400px;">
                                             {move || {
                                                 let tests = filtered_and_sorted_tests.get();
+                                                let test_count = tests.len();
+
                                                 if tests.is_empty() {
                                                     view! {
-                                                        <div class="p-12 text-center">
-                                                            <div class="w-12 h-12 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
-                                                                <svg class="w-6 h-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                                                </svg>
+                                                        <>
+                                                            <div class="flex-1 flex items-center justify-center p-12">
+                                                                <div class="text-center">
+                                                                    <div class="w-12 h-12 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+                                                                        <svg class="w-6 h-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                                        </svg>
+                                                                    </div>
+                                                                    <h3 class="text-lg font-medium text-gray-900 mb-1">"No tests found"</h3>
+                                                                    <p class="text-gray-500 text-sm">"Try adjusting your search or time frame filters."</p>
+                                                                </div>
                                                             </div>
-                                                            <h3 class="text-lg font-medium text-gray-900 mb-1">"No tests found"</h3>
-                                                            <p class="text-gray-500 text-sm">"Try adjusting your search or time frame filters."</p>
-                                                        </div>
+                                                        </>
                                                     }
                                                 } else {
                                                     view! {
-                                                        <div class="overflow-x-auto">
-                                                            <table class="min-w-full divide-y divide-gray-200">
-                                                                <thead class="bg-gray-50">
-                                                                    <tr>
-                                                                        <th scope="col" class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                                            "Test"
-                                                                        </th>
-                                                                        <th scope="col" class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                                            "Score"
-                                                                        </th>
-                                                                        <th scope="col" class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                                            "Performance"
-                                                                        </th>
-                                                                        <th scope="col" class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                                            "Evaluator"
-                                                                        </th>
-                                                                        <th scope="col" class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                                            "Date"
-                                                                        </th>
-                                                                    </tr>
-                                                                </thead>
-                                                                <tbody class="bg-white divide-y divide-gray-200">
-                                                                    {tests.into_iter().map(|test| {
-                                                                        let score_percentage = (test.score as f32 / test.total_possible as f32) * 100.0;
-                                                                        let performance_class = test.performance_class.clone();
-                                                                        let performance_class_for_badge = performance_class.clone();
-                                                                        // IMPORTANT: Extract evaluator name here
-                                                                        let evaluator_name = test.evaluator.clone();
+                                                        <>
+                                                            // Header with test count - fixed at top
+                                                            <div class="flex-shrink-0 px-6 py-3 bg-gray-50 border-b border-gray-200 rounded-t-xl">
+                                                                <div class="flex items-center justify-between">
+                                                                    <span class="text-sm font-medium text-gray-700">
+                                                                        {format!("{} test{} found", test_count, if test_count == 1 { "" } else { "s" })}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
 
-                                                                        view! {
-                                                                            <tr class="hover:bg-gray-50 transition-colors duration-150">
-                                                                                <td class="px-6 py-4 whitespace-nowrap">
-                                                                                    <div class="text-sm font-medium text-gray-900">
-                                                                                        {test.test_name}
-                                                                                    </div>
-                                                                                </td>
-                                                                                <td class="px-6 py-4 whitespace-nowrap">
-                                                                                    <div class="flex items-center space-x-3">
-                                                                                        <div class="flex-shrink-0">
-                                                                                            <span class=move || {
-                                                                                                if score_percentage >= 80.0 {
-                                                                                                    "text-lg font-semibold text-green-600"
-                                                                                                } else if score_percentage >= 60.0 {
-                                                                                                    "text-lg font-semibold text-amber-600"
-                                                                                                } else {
-                                                                                                    "text-lg font-semibold text-red-600"
-                                                                                                }
-                                                                                            }>
-                                                                                                {test.score}
-                                                                                            </span>
-                                                                                            <span class="text-sm text-gray-400 ml-1">
-                                                                                                "/" {test.total_possible}
-                                                                                            </span>
-                                                                                        </div>
-                                                                                        <div class="flex-1 min-w-0">
-                                                                                            <div class="w-16 bg-gray-200 rounded-full h-1.5">
-                                                                                                <div
-                                                                                                    class=move || {
-                                                                                                        if score_percentage >= 80.0 {
-                                                                                                            "bg-green-500 h-1.5 rounded-full transition-all duration-300"
-                                                                                                        } else if score_percentage >= 60.0 {
-                                                                                                            "bg-amber-500 h-1.5 rounded-full transition-all duration-300"
-                                                                                                        } else {
-                                                                                                            "bg-red-500 h-1.5 rounded-full transition-all duration-300"
-                                                                                                        }
-                                                                                                    }
-                                                                                                    style=format!("width: {}%", score_percentage.min(100.0))
-                                                                                                ></div>
-                                                                                            </div>
-                                                                                        </div>
-                                                                                    </div>
-                                                                                </td>
-                                                                                <td class="px-6 py-4 whitespace-nowrap">
-                                                                                    <span class=move || {
-                                                                                        if performance_class_for_badge.contains("Above") || performance_class_for_badge.contains("High") {
-                                                                                            "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800"
-                                                                                        } else if performance_class_for_badge.contains("Average") || performance_class_for_badge.contains("On Track") {
-                                                                                            "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
-                                                                                        } else if performance_class_for_badge.contains("Below") || performance_class_for_badge.contains("Risk") {
-                                                                                            "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800"
-                                                                                        } else {
-                                                                                            "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800"
-                                                                                        }
-                                                                                    }>
-                                                                                        {performance_class}
-                                                                                    </span>
-                                                                                </td>
-                                                                                <td class="px-6 py-4 whitespace-nowrap">
-                                                                                    <div class="text-sm text-gray-900 font-medium">
-                                                                                        {if evaluator_name.is_empty() {
-                                                                                            "Not specified".to_string()
-                                                                                        } else {
-                                                                                            evaluator_name
-                                                                                        }}
-                                                                                    </div>
-                                                                                </td>
-                                                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                                                    {format!("{}", test.date_administered.format("%b %d, %Y"))}
-                                                                                </td>
+                                                            // Scrollable table content
+                                                            <div class="flex-1 overflow-auto">
+                                                                <div class="overflow-x-auto h-full">
+                                                                    <table class="min-w-full divide-y divide-gray-200">
+                                                                        <thead class="bg-gray-50 sticky top-0 z-10">
+                                                                            <tr>
+                                                                                <th scope="col" class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                                                    "Test"
+                                                                                </th>
+                                                                                <th scope="col" class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                                                    "Score"
+                                                                                </th>
+                                                                                <th scope="col" class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                                                    "Performance"
+                                                                                </th>
+                                                                                <th scope="col" class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                                                    "Evaluator"
+                                                                                </th>
+                                                                                <th scope="col" class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                                                    "Date"
+                                                                                </th>
                                                                             </tr>
-                                                                        }
-                                                                    }).collect::<Vec<_>>()}
-                                                                </tbody>
-                                                            </table>
-                                                        </div>
+                                                                        </thead>
+                                                                        <tbody class="bg-white divide-y divide-gray-200">
+                                                                            {tests.into_iter().map(|test| {
+                                                                                let score_percentage = (test.score as f32 / test.total_possible as f32) * 100.0;
+                                                                                let evaluator_name = test.evaluator.clone();
+
+                                                                                // Get test data for benchmark categories using test_id for accurate matching
+                                                                                let test_data = tests_resource.get()
+                                                                                    .and_then(|result| result)
+                                                                                    .and_then(|tests| tests.iter().find(|t| t.test_id == test.test_id).cloned());
+
+                                                                                let benchmark_categories = test_data.as_ref().and_then(|t| t.benchmark_categories.as_ref());
+
+                                                                                // Get benchmark-based colors using ColorUtils
+                                                                                let badge_classes = ColorUtils::get_badge_classes_for_score(
+                                                                                    test.score,
+                                                                                    test.total_possible,
+                                                                                    benchmark_categories
+                                                                                );
+                                                                                let benchmark_label = ScoreUtils::get_benchmark_label(
+                                                                                    test.score,
+                                                                                    test.total_possible,
+                                                                                    benchmark_categories
+                                                                                );
+                                                                                let score_text_color = ColorUtils::get_score_text_color_for_score(
+                                                                                    test.score,
+                                                                                    test.total_possible,
+                                                                                    benchmark_categories
+                                                                                );
+                                                                                let progress_bar_color = ColorUtils::get_progress_bar_color_for_score(
+                                                                                    test.score,
+                                                                                    test.total_possible,
+                                                                                    benchmark_categories
+                                                                                );
+
+                                                                                view! {
+                                                                                    <tr class="hover:bg-gray-50 transition-colors duration-150">
+                                                                                        <td class="px-6 py-4 whitespace-nowrap">
+                                                                                            <div class="text-sm font-medium text-gray-900">
+                                                                                                {test.test_name}
+                                                                                            </div>
+                                                                                        </td>
+                                                                                        <td class="px-6 py-4 whitespace-nowrap">
+                                                                                            <div class="flex items-center space-x-3">
+                                                                                                <div class="flex-shrink-0">
+                                                                                                    <span class={score_text_color}>
+                                                                                                        {test.score}
+                                                                                                    </span>
+                                                                                                    <span class="text-sm text-gray-400 ml-1">
+                                                                                                        "/" {test.total_possible}
+                                                                                                    </span>
+                                                                                                </div>
+                                                                                                <div class="flex-1 min-w-0">
+                                                                                                    <div class="w-16 bg-gray-200 rounded-full h-1.5">
+                                                                                                        <div
+                                                                                                            class={progress_bar_color}
+                                                                                                            style=format!("width: {}%", score_percentage.min(100.0))
+                                                                                                        ></div>
+                                                                                                    </div>
+                                                                                                </div>
+                                                                                            </div>
+                                                                                        </td>
+                                                                                        <td class="px-6 py-4 whitespace-nowrap">
+                                                                                            <span class={format!("inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {}", badge_classes)}>
+                                                                                                {benchmark_label}
+                                                                                            </span>
+                                                                                        </td>
+                                                                                        <td class="px-6 py-4 whitespace-nowrap">
+                                                                                            <div class="text-sm text-gray-900 font-medium">
+                                                                                                {if evaluator_name.is_empty() {
+                                                                                                    "Not specified".to_string()
+                                                                                                } else {
+                                                                                                    evaluator_name
+                                                                                                }}
+                                                                                            </div>
+                                                                                        </td>
+                                                                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                                                            {format!("{}", test.date_administered.format("%b %d, %Y"))}
+                                                                                        </td>
+                                                                                    </tr>
+                                                                                }
+                                                                            }).collect::<Vec<_>>()}
+                                                                        </tbody>
+                                                                    </table>
+                                                                </div>
+                                                            </div>
+                                                        </>
                                                     }
                                                 }
                                             }}
@@ -484,40 +523,35 @@ pub fn TestResultsPage() -> impl IntoView {
                 }}
             </Suspense>
 
-            // Progress Overview Section - Using SequenceWeb components
-            <Suspense fallback=move || view! { <div>"Loading progress data..."</div> }>
+            // Progress Overview Section
+            <Suspense fallback=move || view! {
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 animate-pulse">
+                    <div class="h-6 bg-gray-200 rounded w-1/4 mb-6"></div>
+                    <div class="space-y-3">
+                        <div class="h-4 bg-gray-200 rounded w-full"></div>
+                        <div class="h-4 bg-gray-200 rounded w-3/4"></div>
+                        <div class="h-4 bg-gray-200 rounded w-5/6"></div>
+                    </div>
+                </div>
+            }>
                 {move || {
                     let results = enhanced_student_data.get().map(|(results, _)| results);
                     match results {
                         Some(data) => {
-                            let assessments = data.assessment_summaries.clone();
+                            if view_mode.get() == "sequence" {
+                                let assessments = data.assessment_summaries.clone();
 
-                            if view_mode.get() == "sequence" && !assessments.is_empty() {
                                 view! {
-                                    <div class="mb-6 space-y-4">
-                                        <h2 class="text-2xl font-bold text-slate-800 mb-4">"Assessment Progress Sequences"</h2>
-                                        {assessments.iter().map(|assessment| {
-                                            view! {
-                                                <SequenceWeb
-                                                    assessment={assessment.clone()}
-                                                    test_details={assessment.test_details.clone()}
-                                                />
-                                            }
-                                        }).collect::<Vec<_>>()}
-                                    </div>
-                                }
-                            } else if view_mode.get() == "sequence" {
-                                view! {
-                                    <div class="mb-6 bg-slate-50 rounded-lg p-8 text-center">
-                                        <h2 class="text-xl font-semibold text-slate-600 mb-2">"No Assessment Data Available"</h2>
-                                        <p class="text-slate-500">"Assessment progress will appear here once tests are completed."</p>
-                                    </div>
-                                }
+                                    <ProgressOverviewTab
+                                        assessments=assessments
+                                        tests_resource=tests_resource
+                                    />
+                                }.into_view()
                             } else {
-                                view! { <div></div> }
+                                view! { <div></div> }.into_view()
                             }
                         },
-                        None => view! { <div></div> }
+                        None => view! { <div></div> }.into_view()
                     }
                 }}
             </Suspense>
@@ -701,24 +735,30 @@ pub fn TestResultsPage() -> impl IntoView {
                                                                                                     </thead>
                                                                                                     <tbody>
                                                                                                         {test_details_clone.iter().map(|test| {
-                                                                                                            let test_for_class = test.clone();
-                                                                                                            let performance_class = test.performance_class.clone();
-                                                                                                            let performance_class_for_style = performance_class.clone();
+                                                                                                            // Get test data for benchmark categories
+                                                                                                            let test_data = tests_resource.get()
+                                                                                                                .and_then(|result| result)
+                                                                                                                .and_then(|tests| tests.iter().find(|t| t.test_id == test.test_id).cloned());
+
+                                                                                                            let benchmark_categories = test_data.as_ref().and_then(|t| t.benchmark_categories.as_ref());
+
+                                                                                                            // Get benchmark-based colors for the detailed view too
+                                                                                                            let badge_classes = ColorUtils::get_badge_classes_for_score(
+                                                                                                                test.score,
+                                                                                                                test.total_possible,
+                                                                                                                benchmark_categories
+                                                                                                            );
+                                                                                                            let score_text_color = ColorUtils::get_score_text_color_for_score(
+                                                                                                                test.score,
+                                                                                                                test.total_possible,
+                                                                                                                benchmark_categories
+                                                                                                            );
 
                                                                                                             view! {
                                                                                                                 <tr class="border-t">
                                                                                                                     <td class="py-2 px-3 text-sm">{test.test_name.clone()}</td>
                                                                                                                     <td class="py-2 px-3 text-sm">
-                                                                                                                        <span class=move || {
-                                                                                                                            let score_percentage = (test_for_class.score as f32 / test_for_class.total_possible as f32) * 100.0;
-                                                                                                                            if score_percentage >= 80.0 {
-                                                                                                                                "text-green-600 font-semibold"
-                                                                                                                            } else if score_percentage >= 60.0 {
-                                                                                                                                "text-yellow-600 font-semibold"
-                                                                                                                            } else {
-                                                                                                                                "text-red-600 font-semibold"
-                                                                                                                            }
-                                                                                                                        }>
+                                                                                                                        <span class={score_text_color}>
                                                                                                                             {test.score}
                                                                                                                         </span>
                                                                                                                     </td>
@@ -726,18 +766,12 @@ pub fn TestResultsPage() -> impl IntoView {
                                                                                                                     <td class="py-2 px-3 text-sm">{test.test_area.clone()}</td>
                                                                                                                     <td class="py-2 px-3 text-sm">{format!("{}", test.date_administered.format("%Y-%m-%d"))}</td>
                                                                                                                     <td class="py-2 px-3 text-sm">
-                                                                                                                        <span class=move || {
-                                                                                                                            if performance_class_for_style.contains("Above") || performance_class_for_style.contains("High") {
-                                                                                                                                "px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs"
-                                                                                                                            } else if performance_class_for_style.contains("Average") || performance_class_for_style.contains("On Track") {
-                                                                                                                                "px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs"
-                                                                                                                            } else if performance_class_for_style.contains("Below") || performance_class_for_style.contains("Risk") {
-                                                                                                                                "px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs"
-                                                                                                                            } else {
-                                                                                                                                "px-2 py-1 bg-gray-100 text-gray-800 rounded-full text-xs"
-                                                                                                                            }
-                                                                                                                        }>
-                                                                                                                            {&performance_class.clone()}
+                                                                                                                        <span class={format!("px-2 py-1 rounded-full text-xs {}", badge_classes)}>
+                                                                                                                            {ScoreUtils::get_benchmark_label(
+                                                                                                                                test.score,
+                                                                                                                                test.total_possible,
+                                                                                                                                benchmark_categories
+                                                                                                                            )}
                                                                                                                         </span>
                                                                                                                     </td>
                                                                                                                 </tr>

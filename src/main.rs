@@ -37,12 +37,6 @@ async fn main() -> std::io::Result<()> {
     let routes = generate_route_list(App);
     println!("listening on http://{}", &addr);
 
-    // Create a secret key for cookie encryption
-    let secret_key = env::var("SECRET_KEY").unwrap_or_else(|_| {
-        println!("WARNING: Using default secret key. Set the SECRET_KEY environment variable in production.");
-        "this_is_a_default_key_and_should_be_changed_in_production".to_string()
-    });
-
     // Check for SAML configuration
     let base_url = env::var("BASE_URL").unwrap_or_else(|_| format!("http://{}", &addr));
     println!("Base URL for SAML: {}", base_url);
@@ -52,7 +46,6 @@ async fn main() -> std::io::Result<()> {
         let site_root = &leptos_options.site_root;
 
         // We make the pool available to Leptos server functions
-        let pool_clone = pool_one.clone();
         let leptos_options_clone = leptos_options.clone();
         let chat_server_clone = chat_server.clone();
 

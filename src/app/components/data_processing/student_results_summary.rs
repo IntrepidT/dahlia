@@ -64,12 +64,9 @@ pub struct AssessmentSummary {
     pub total_possible: Option<i32>,
     pub current_score: i32,
     pub grade_level: Option<String>,
-    pub test_details: Vec<TestDetail>,
-    pub distribution_data: Vec<(String, i32)>, //these should be overall performance metrics across
-    //all test benchmarks for the specific assessment
-    //(rating, score)
-    pub assessment_rating: String, //this is where the student's overall rating is given according
-    //to the assessment benchmarks
+    pub test_details: Vec<TestDetail>, // Now contains ALL attempts, not just highest
+    pub distribution_data: Vec<(String, i32)>,
+    pub assessment_rating: String,
     pub progress: Progress,
 }
 
@@ -81,8 +78,7 @@ pub struct TestDetail {
     pub total_possible: i32,
     pub test_area: String,
     pub date_administered: DateTime<Utc>,
-    pub performance_class: String, //this would be the categorization of the student according to
-    //the benchmark categories for a specific test
+    pub performance_class: String,
     pub attempt: i32,
     pub test_variant: i32,
 }
@@ -120,17 +116,12 @@ pub async fn get_student_results(student_id: i32) -> Result<StudentResultsSummar
         .iter()
         .map(|teacher| {
             let full_name = format!("{} {}", teacher.firstname, teacher.lastname);
-            // Convert teacher ID to string for lookup
             let teacher_id = teacher.id.to_string();
-
-            // Debug logging to see what we're creating
             log::info!("Teacher lookup entry: '{}' -> '{}'", teacher_id, full_name);
-
             (teacher_id, full_name)
         })
         .collect();
 
-    // Log the teacher lookup for debugging
     log::info!(
         "Created teacher lookup with {} entries",
         teacher_lookup.len()
@@ -142,21 +133,171 @@ pub async fn get_student_results(student_id: i32) -> Result<StudentResultsSummar
     // Process test history efficiently without dataframes
     let test_history = build_test_history_fixed(&scores, &test_lookup, &teacher_lookup);
 
-    // Find highest scores using native collections
+    // MODIFIED: Process ALL scores instead of just highest scores
+    let all_test_details = build_all_test_details(&scores, &test_lookup, &teacher_lookup);
+
+    // Find highest scores for the test_summaries field (backwards compatibility)
     let highest_scores = find_highest_scores(&scores);
+    let highest_test_details =
+        build_test_details_fixed(&highest_scores, &test_lookup, &teacher_lookup);
 
-    // Process test details efficiently
-    let test_details = build_test_details_fixed(&highest_scores, &test_lookup, &teacher_lookup);
-
-    // Group by assessment and create summaries
-    let assessment_summaries = build_assessment_summaries(&test_details, &assessment_lookup);
+    // Group by assessment and create summaries with ALL attempts
+    let assessment_summaries =
+        build_assessment_summaries_with_all_attempts(&all_test_details, &assessment_lookup);
 
     Ok(StudentResultsSummary {
         student,
         assessment_summaries,
-        test_summaries: test_details,
+        test_summaries: highest_test_details, // Keep this as highest scores for backwards compatibility
         test_history,
     })
+}
+
+// NEW: Build test details for ALL scores, not just highest
+#[cfg(feature = "ssr")]
+fn build_all_test_details(
+    scores: &[Score],
+    test_lookup: &HashMap<String, &Test>,
+    teacher_lookup: &HashMap<String, String>,
+) -> Vec<TestDetail> {
+    scores
+        .iter()
+        .filter_map(|score| {
+            test_lookup.get(&score.test_id).map(|test| {
+                let score_total = score.get_total();
+                let evaluator_name = resolve_evaluator_name(&score.evaluator, teacher_lookup);
+
+                TestDetail {
+                    test_id: score.test_id.clone(),
+                    test_name: test.name.clone(),
+                    score: score_total,
+                    total_possible: test.score,
+                    test_area: test.testarea.to_string(),
+                    date_administered: score.date_administered,
+                    performance_class: determine_performance_class_fast(test, score_total),
+                    attempt: score.attempt,
+                    test_variant: score.test_variant,
+                }
+            })
+        })
+        .collect()
+}
+
+// MODIFIED: Assessment summary builder that includes ALL attempts
+#[cfg(feature = "ssr")]
+fn build_assessment_summaries_with_all_attempts(
+    all_test_details: &[TestDetail],
+    assessment_lookup: &HashMap<String, &Assessment>,
+) -> Vec<AssessmentSummary> {
+    // Group ALL test attempts by assessment efficiently
+    let mut assessment_tests: HashMap<String, Vec<TestDetail>> = HashMap::new();
+
+    for test_detail in all_test_details {
+        for (assessment_id, assessment) in assessment_lookup {
+            if assessment
+                .tests
+                .iter()
+                .any(|uuid| uuid.to_string() == test_detail.test_id)
+            {
+                assessment_tests
+                    .entry(assessment_id.clone())
+                    .or_default()
+                    .push(test_detail.clone());
+            }
+        }
+    }
+
+    // Create summaries using iterator patterns - very efficient
+    assessment_tests
+        .into_iter()
+        .filter_map(|(assessment_id, mut test_details)| {
+            assessment_lookup.get(&assessment_id).map(|assessment| {
+                // Sort test details by date (most recent first) and then by attempt
+                test_details.sort_unstable_by(|a, b| {
+                    b.date_administered
+                        .cmp(&a.date_administered)
+                        .then_with(|| b.attempt.cmp(&a.attempt))
+                });
+
+                // For current_score calculation, use the highest score for each unique test
+                let highest_scores_per_test = find_highest_scores_per_test(&test_details);
+                let current_score: i32 = highest_scores_per_test.values().map(|td| td.score).sum();
+                let total_possible = assessment.composite_score;
+
+                AssessmentSummary {
+                    assessment_id: assessment_id.clone(),
+                    assessment_name: assessment.name.clone(),
+                    subject: assessment
+                        .subject
+                        .map_or("Unknown".to_string(), |s| s.to_string()),
+                    total_possible,
+                    current_score,
+                    grade_level: assessment.grade.as_ref().map(|g| g.to_string()),
+                    test_details: test_details.clone(),
+                    distribution_data: calculate_distribution_fast(&test_details),
+                    assessment_rating: determine_assessment_rating_fast(
+                        assessment,
+                        current_score,
+                        total_possible.unwrap_or(0),
+                    ),
+                    progress: calculate_progress_fast_all_attempts(assessment, &test_details),
+                }
+            })
+        })
+        .collect()
+}
+
+// NEW: Helper function to find highest scores per test from a list of test details
+#[cfg(feature = "ssr")]
+fn find_highest_scores_per_test(test_details: &[TestDetail]) -> HashMap<String, &TestDetail> {
+    let mut highest_per_test: HashMap<String, &TestDetail> = HashMap::new();
+
+    for test_detail in test_details {
+        match highest_per_test.get(&test_detail.test_id) {
+            Some(existing) if existing.score >= test_detail.score => {
+                // Keep existing highest score
+            }
+            _ => {
+                // Update with new highest score
+                highest_per_test.insert(test_detail.test_id.clone(), test_detail);
+            }
+        }
+    }
+
+    highest_per_test
+}
+
+// MODIFIED: Progress calculation that works with all attempts
+#[cfg(feature = "ssr")]
+fn calculate_progress_fast_all_attempts(
+    assessment: &Assessment,
+    test_details: &[TestDetail],
+) -> Progress {
+    let assessment_test_ids: std::collections::HashSet<String> = assessment
+        .tests
+        .iter()
+        .map(|uuid| uuid.to_string())
+        .collect();
+
+    // Get unique test IDs that have been attempted
+    let attempted_test_ids: std::collections::HashSet<String> =
+        test_details.iter().map(|td| td.test_id.clone()).collect();
+
+    let attempted_count = attempted_test_ids.len();
+    let total_count = assessment_test_ids.len();
+
+    match attempted_count {
+        0 => Progress::NotStarted,
+        n if n == total_count => {
+            // Verify all required tests have been attempted
+            if assessment_test_ids == attempted_test_ids {
+                Progress::Completed
+            } else {
+                Progress::Ongoing
+            }
+        }
+        _ => Progress::Ongoing,
+    }
 }
 
 // Optimized test history builder - no dataframes needed
@@ -171,8 +312,6 @@ fn build_test_history_fixed(
         .filter_map(|score| {
             test_lookup.get(&score.test_id).map(|test| {
                 let score_total = score.get_total();
-
-                // FIXED: Better evaluator name resolution
                 let evaluator_name = resolve_evaluator_name(&score.evaluator, teacher_lookup);
 
                 TestHistoryEntry {
@@ -227,7 +366,6 @@ fn build_test_details_fixed(
         .filter_map(|(test_id, score)| {
             test_lookup.get(test_id).map(|test| {
                 let score_total = score.get_total();
-
                 let evaluator_name = resolve_evaluator_name(&score.evaluator, teacher_lookup);
 
                 TestDetail {
@@ -246,59 +384,14 @@ fn build_test_details_fixed(
         .collect()
 }
 
-// Efficient assessment summary builder
+// DEPRECATED: Keep for backwards compatibility but rename to indicate it's old
 #[cfg(feature = "ssr")]
 fn build_assessment_summaries(
     test_details: &[TestDetail],
     assessment_lookup: &HashMap<String, &Assessment>,
 ) -> Vec<AssessmentSummary> {
-    // Group tests by assessment efficiently
-    let mut assessment_tests: HashMap<String, Vec<TestDetail>> = HashMap::new();
-
-    for test_detail in test_details {
-        for (assessment_id, assessment) in assessment_lookup {
-            if assessment
-                .tests
-                .iter()
-                .any(|uuid| uuid.to_string() == test_detail.test_id)
-            {
-                assessment_tests
-                    .entry(assessment_id.clone())
-                    .or_default()
-                    .push(test_detail.clone());
-            }
-        }
-    }
-
-    // Create summaries using iterator patterns - very efficient
-    assessment_tests
-        .into_iter()
-        .filter_map(|(assessment_id, test_details)| {
-            assessment_lookup.get(&assessment_id).map(|assessment| {
-                let current_score: i32 = test_details.iter().map(|td| td.score).sum();
-                let total_possible = assessment.composite_score;
-
-                AssessmentSummary {
-                    assessment_id: assessment_id.clone(),
-                    assessment_name: assessment.name.clone(),
-                    subject: assessment
-                        .subject
-                        .map_or("Unknown".to_string(), |s| s.to_string()),
-                    total_possible,
-                    current_score,
-                    grade_level: assessment.grade.as_ref().map(|g| g.to_string()),
-                    test_details: test_details.clone(),
-                    distribution_data: calculate_distribution_fast(&test_details),
-                    assessment_rating: determine_assessment_rating_fast(
-                        assessment,
-                        current_score,
-                        total_possible.unwrap_or(0),
-                    ),
-                    progress: calculate_progress_fast(assessment, &test_details),
-                }
-            })
-        })
-        .collect()
+    // This now just calls the new function for backwards compatibility
+    build_assessment_summaries_with_all_attempts(test_details, assessment_lookup)
 }
 
 // Optimized performance classification - avoid repeated benchmark iteration
@@ -329,35 +422,6 @@ fn calculate_distribution_fast(test_details: &[TestDetail]) -> Vec<(String, i32)
     }
 
     counts.into_iter().collect()
-}
-
-// Fast progress calculation
-#[cfg(feature = "ssr")]
-fn calculate_progress_fast(assessment: &Assessment, test_details: &[TestDetail]) -> Progress {
-    let assessment_test_count = assessment.tests.len();
-    let completed_test_count = test_details.len();
-
-    match completed_test_count {
-        0 => Progress::NotStarted,
-        n if n == assessment_test_count => {
-            // Verify all tests are actually completed
-            let assessment_test_ids: std::collections::HashSet<String> = assessment
-                .tests
-                .iter()
-                .map(|uuid| uuid.to_string())
-                .collect();
-
-            let completed_test_ids: std::collections::HashSet<String> =
-                test_details.iter().map(|td| td.test_id.clone()).collect();
-
-            if assessment_test_ids == completed_test_ids {
-                Progress::Completed
-            } else {
-                Progress::Ongoing
-            }
-        }
-        _ => Progress::Ongoing,
-    }
 }
 
 // Fast assessment rating - avoid repeated benchmark checks

@@ -195,4 +195,56 @@ impl ColorUtils {
 
         Self::hex_to_inline_style(hex_color)
     }
+
+    /// Gets score text color classes based on benchmark categories
+    pub fn get_score_text_color_for_score(
+        score: i32,
+        max_score: i32,
+        benchmark_categories: Option<&Vec<BenchmarkCategory>>,
+    ) -> String {
+        let badge_classes =
+            Self::get_badge_classes_for_score(score, max_score, benchmark_categories);
+
+        if badge_classes.contains("text-green-800") {
+            "text-lg font-semibold text-green-600".to_string()
+        } else if badge_classes.contains("text-cyan-800") {
+            "text-lg font-semibold text-cyan-600".to_string()
+        } else if badge_classes.contains("text-amber-800") {
+            "text-lg font-semibold text-amber-600".to_string()
+        } else if badge_classes.contains("text-rose-800") {
+            "text-lg font-semibold text-rose-600".to_string()
+        } else if badge_classes.contains("text-red-800") {
+            "text-lg font-semibold text-red-600".to_string()
+        } else if badge_classes.contains("text-purple-800") {
+            "text-lg font-semibold text-purple-600".to_string()
+        } else {
+            "text-lg font-semibold text-gray-600".to_string()
+        }
+    }
+
+    /// Gets progress bar color classes based on benchmark categories
+    pub fn get_progress_bar_color_for_score(
+        score: i32,
+        max_score: i32,
+        benchmark_categories: Option<&Vec<BenchmarkCategory>>,
+    ) -> String {
+        let badge_classes =
+            Self::get_badge_classes_for_score(score, max_score, benchmark_categories);
+
+        if badge_classes.contains("text-green-800") {
+            "bg-green-500 h-1.5 rounded-full transition-all duration-300".to_string()
+        } else if badge_classes.contains("text-cyan-800") {
+            "bg-cyan-500 h-1.5 rounded-full transition-all duration-300".to_string()
+        } else if badge_classes.contains("text-amber-800") {
+            "bg-amber-500 h-1.5 rounded-full transition-all duration-300".to_string()
+        } else if badge_classes.contains("text-rose-800") {
+            "bg-rose-500 h-1.5 rounded-full transition-all duration-300".to_string()
+        } else if badge_classes.contains("text-red-800") {
+            "bg-red-500 h-1.5 rounded-full transition-all duration-300".to_string()
+        } else if badge_classes.contains("text-purple-800") {
+            "bg-purple-500 h-1.5 rounded-full transition-all duration-300".to_string()
+        } else {
+            "bg-gray-500 h-1.5 rounded-full transition-all duration-300".to_string()
+        }
+    }
 }

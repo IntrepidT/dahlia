@@ -271,3 +271,35 @@ pub async fn update_assessment(
         ))
     }
 }
+
+#[server(GetTestSequence, "/api")]
+pub async fn get_test_sequence(
+    assessment_id: String,
+) -> Result<Vec<(String, String)>, ServerFnError> {
+    #[cfg(feature = "ssr")]
+    {
+        use actix_web::web;
+        use leptos_actix::extract;
+
+        let pool = extract::<web::Data<PgPool>>()
+            .await
+            .map_err(|e| ServerFnError::new(format!("Failed to extract pool: {}", e)))?;
+
+        log::info!("Attempting to retrieve test sequence for assessment");
+
+        match assessment_database::get_test_sequence(&assessment_id, &pool).await {
+            Ok(test_sequence) => Ok(test_sequence),
+            Err(e) => Err(ServerFnError::new(format!(
+                "Failed to retrieve test sequence: {}",
+                e
+            ))),
+        }
+    }
+
+    #[cfg(not(feature = "ssr"))]
+    {
+        Err(ServerFnError::new(
+            "Server function called in client context",
+        ))
+    }
+}
