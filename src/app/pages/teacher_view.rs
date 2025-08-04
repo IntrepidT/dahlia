@@ -7,7 +7,7 @@ use crate::app::components::teacher_page::{
 };
 use crate::app::models::employee::{AddNewEmployeeRequest, Employee, EmployeeRole};
 use crate::app::models::student::GradeEnum;
-use crate::app::models::user::SessionUser;
+use crate::app::models::user::{SessionUser, UserRole};
 use crate::app::models::StatusEnum;
 use crate::app::server_functions::employees::{add_employee, get_employees};
 use crate::app::server_functions::teachers::get_teachers;
@@ -77,7 +77,7 @@ pub fn TeachersContent() -> impl IntoView {
         },
     );
 
-    let teachers = create_resource(
+    let teachers = create_local_resource(
         move || refresh_trigger(),
         |_| async move {
             match get_teachers().await {
@@ -90,7 +90,7 @@ pub fn TeachersContent() -> impl IntoView {
         },
     );
 
-    let users = create_resource(
+    let users = create_local_resource(
         move || refresh_trigger(),
         |_| async move {
             match get_users().await {
@@ -227,6 +227,13 @@ pub fn TeachersContent() -> impl IntoView {
                         users=users
                         search_term=search_term
                         is_panel_expanded=Signal::derive(move || panel_expanded())
+                        current_user_role=Signal::derive(move || {
+                            user.get().map_or(UserRole::User, |u| u.role)
+                        })
+                        current_user_id=Signal::derive(move || {
+                            user.get().map(|u| u.id).unwrap_or(0)
+                        })
+                        set_refresh_trigger=set_refresh_trigger
                     />
                 </Show>
 

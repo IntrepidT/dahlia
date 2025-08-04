@@ -1,6 +1,6 @@
-use crate::app::models::user::User;
+use crate::app::components::teacher_page::role_selector::RoleSelector;
+use crate::app::models::user::{User, UserRole};
 use leptos::*;
-use std::rc::Rc;
 
 const TABLE_CONTAINER_STYLE: &str =
     "bg-[#F9F9F8] rounded-lg shadow-sm border border-[#DADADA] overflow-hidden";
@@ -11,14 +11,15 @@ const TABLE_STYLE: &str = "min-w-full divide-y divide-[#DADADA]";
 const HEADER_CELL_STYLE: &str =
     "px-6 py-3 text-left text-sm font-medium text-[#2E3A59] uppercase tracking-wider";
 const CELL_STYLE: &str = "px-6 py-4 whitespace-nowrap text-sm bg-[#F9F9F8]";
-const SELECTED_ROW_STYLE: &str =
-    "bg-[#DADADA] border-l-4 border-r-2 border-t-2 border-b-2 border-[#2E3A59]";
 
 #[component]
 pub fn UserTable(
     #[prop(into)] users: Resource<i32, Option<Vec<User>>>,
     #[prop(into)] search_term: Signal<String>,
     #[prop(into)] is_panel_expanded: Signal<bool>,
+    #[prop(into)] current_user_role: Signal<UserRole>, // Add this prop
+    #[prop(into)] current_user_id: Signal<i64>,
+    set_refresh_trigger: WriteSignal<i32>,
 ) -> impl IntoView {
     let filtered_users = create_memo(move |_| {
         let search = search_term().trim().to_lowercase();
@@ -107,14 +108,13 @@ pub fn UserTable(
                                     }.into_view()
                                 } else {
                                     users.into_iter().map(|user| {
-                                        // Clone all the necessary fields to avoid lifetime issues
                                         let username = user.username.clone();
                                         let first_name = user.first_name.clone().unwrap_or_default();
                                         let last_name = user.last_name.clone().unwrap_or_default();
                                         let email = user.email.clone();
                                         let phone = user.phone_number.clone().unwrap_or_default();
                                         let status = user.account_status.to_string();
-                                        let role = user.role.clone();
+                                        let user_for_role_selector = user.clone();
 
                                         view! {
                                             <tr class="hover:bg-[#DADADA] hover:bg-opacity-70 cursor-pointer border-b border-[#DADADA]">
@@ -124,7 +124,17 @@ pub fn UserTable(
                                                 <td class=format!("{} {}", CELL_STYLE, "font-medium text-[#2E3A59]")>{email}</td>
                                                 <td class=format!("{} {}", CELL_STYLE, "font-medium text-[#2E3A59]")>{phone}</td>
                                                 <td class=format!("{} {}", CELL_STYLE, "font-medium text-[#2E3A59]")>{status}</td>
-                                                <td class=format!("{} {}", CELL_STYLE, "font-medium text-[#2E3A59]")>{role.to_string()}</td>
+                                                <td class=format!("{} {}", CELL_STYLE, "font-medium text-[#2E3A59]")>
+                                                    <RoleSelector
+                                                        user=user_for_role_selector
+                                                        current_user_role=current_user_role()
+                                                        current_user_id=current_user_id().into()
+                                                        on_role_updated=Callback::new(move |_: ()| {
+                                                            log::info!("Role updated, refreshing users");
+                                                            set_refresh_trigger.update(|n| *n += 1);
+                                                        })
+                                                    />
+                                                </td>
                                             </tr>
                                         }
                                     }).collect_view()
