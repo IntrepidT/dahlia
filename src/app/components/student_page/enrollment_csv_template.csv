@@ -1,0 +1,4 @@
+student_id,academic_year,grade_level,teacher_id,status,enrollment_date,status_change,notes
+12345,2024-2025,5th Grade,101,active,08/04/24,,Enrolled in regular curriculum
+12346,2024-2025,4th Grade,102,active,08/04/24,,Student with special needs accomodations
+12347,2024-2025,3rd Grade,103,active,08/04/24,,Transfer student from another district
