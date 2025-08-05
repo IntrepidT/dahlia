@@ -150,11 +150,6 @@ pub async fn toggle_student_protection(
                 .await
                 .map_err(|e| ServerFnError::new(format!("Failed to extract pool: {}", e)))?;
 
-            // Get DATABASE_URL from environment
-            let database_url = env::var("DATABASE_URL").map_err(|_| {
-                ServerFnError::new("DATABASE_URL environment variable not set".to_string())
-            })?;
-
             if enable {
                 // Check if script file exists
                 let script_paths = vec![
@@ -196,9 +191,11 @@ pub async fn toggle_student_protection(
                     ));
                 }
 
-                // Execute the remove PII script - FIXED: Use DATABASE_URL instead of hardcoded localhost
+                // Execute the remove PII script
                 let output = Command::new("psql")
-                    .arg(&database_url)  // Use the actual DATABASE_URL
+                    .arg(&env::var("DATABASE_URL").map_err(|_| {
+                        ServerFnError::new("DATABASE_URL environment variable not set".to_string())
+                    })?)
                     .arg("-f")
                     .arg(script_path)
                     .output()
@@ -239,9 +236,9 @@ pub async fn toggle_student_protection(
                 }
 
                 if !csv_created {
-                    // Manually create CSV using psql - FIXED: Use DATABASE_URL
+                    // Manually create CSV using psql
                     let csv_creation = Command::new("psql")
-                        .arg(&database_url)  // Use the actual DATABASE_URL
+                        .arg(&env::var("DATABASE_URL").unwrap())
                         .arg("-c")
                         .arg("COPY (SELECT new_student_id as app_id, old_student_id as student_id, created_at FROM student_id_mapping ORDER BY new_student_id) TO '/tmp/student_id_mapping.csv' WITH CSV HEADER;")
                         .output()
@@ -297,9 +294,9 @@ pub async fn toggle_student_protection(
                     .arg("/tmp/student_id_mapping.csv")
                     .output();
 
-                // Execute restore script - FIXED: Use DATABASE_URL
+                // Execute restore script
                 let output = Command::new("psql")
-                    .arg(&database_url)  // Use the actual DATABASE_URL instead of hardcoded localhost
+                    .arg(&env::var("DATABASE_URL").unwrap())
                     .arg("-f")
                     .arg(restore_script_path)
                     .output()
@@ -370,11 +367,6 @@ pub async fn restore_student_ids_from_file(file_content: String) -> Result<Strin
                 .await
                 .map_err(|e| ServerFnError::new(format!("Failed to extract pool: {}", e)))?;
 
-            // Get DATABASE_URL from environment - FIXED: Use actual Cloud SQL connection
-            let database_url = env::var("DATABASE_URL").map_err(|_| {
-                ServerFnError::new("DATABASE_URL environment variable not set".to_string())
-            })?;
-
             // Try multiple file paths that are more likely to work
             let possible_paths = vec![
                 "./student_id_mapping.csv",    // Current working directory
@@ -406,9 +398,9 @@ pub async fn restore_student_ids_from_file(file_content: String) -> Result<Strin
                 ))
             })?;
 
-            // Execute the restore PII script - FIXED: Use DATABASE_URL instead of hardcoded localhost
+            // Execute the restore PII script
             let output = Command::new("psql")
-                .arg(&database_url)  // Use the actual DATABASE_URL from environment
+                .arg("postgresql://postgres:IntrepidTh13n32!@localhost/dahlia")
                 .arg("-f")
                 .arg("./scripts/restore_pii_data.sql")
                 .output()
@@ -447,11 +439,8 @@ pub async fn restore_student_ids_from_file(file_content: String) -> Result<Strin
 
             // Return success message with some output for debugging
             Ok(format!(
-                "Student IDs successfully restored from uploaded mapping file!\n\nUsed file path: {}\n\nDatabase URL: {}\n\nProcess output:\n{}",
-                final_path, 
-                // Mask the password in the URL for security in logs
-                database_url.replace(&database_url.split('@').nth(0).unwrap_or(""), "***:***"),
-                stdout
+                "Student IDs successfully restored from uploaded mapping file!\n\nUsed file path: {}\n\nProcess output:\n{}",
+                final_path, stdout
             ))
         } else {
             Err(ServerFnError::new(
