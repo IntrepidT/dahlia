@@ -3,8 +3,9 @@ use crate::app::components::test_components::balloon_celebration::BalloonCelebra
 use crate::app::components::test_components::font_controls::{use_font_settings, FontControls};
 use crate::app::models::question::{Question, QuestionType};
 use crate::app::server_functions::{questions::get_questions, tests::get_tests};
-use leptos::*;
-use leptos_router::*;
+use leptos::prelude::*;
+use leptos_router::components::*;
+use leptos_router::hooks::*;
 use log;
 use std::collections::HashMap;
 use uuid::Uuid;
@@ -19,38 +20,45 @@ use {
 #[component]
 pub fn AnonymousStudentTest() -> impl IntoView {
     let params = use_params_map();
-    let test_id = move || params.with(|params| params.get("test_id").cloned().unwrap_or_default());
-    let session_id_str =
-        move || params.with(|params| params.get("session_id").cloned().unwrap_or_default());
+    let test_id =
+        move || params.with(|params| params.get("test_id").unwrap_or("".to_string()).to_string());
+    let session_id_str = move || {
+        params.with(|params| {
+            params
+                .get("session_id")
+                .unwrap_or("".to_string())
+                .to_string()
+        })
+    };
 
-    let (student_name, set_student_name) = create_signal(String::new());
-    let (student_id_input, set_student_id_input) = create_signal(String::new());
-    let (has_joined, set_has_joined) = create_signal(false);
-    let (error_message, set_error_message) = create_signal(None::<String>);
-    let (connection_status, set_connection_status) = create_signal(ConnectionStatus::Disconnected);
-    let (is_test_active, set_is_test_active) = create_signal(false);
-    let (current_card_index, set_current_card_index) = create_signal(0);
-    let (responses, set_responses) = create_signal(HashMap::<i32, QuestionResponse>::new());
-    let (remaining_time, set_remaining_time) = create_signal::<Option<i32>>(None);
-    let (user_role, set_user_role) = create_signal(Role::Student);
+    let (student_name, set_student_name) = signal(String::new());
+    let (student_id_input, set_student_id_input) = signal(String::new());
+    let (has_joined, set_has_joined) = signal(false);
+    let (error_message, set_error_message) = signal(None::<String>);
+    let (connection_status, set_connection_status) = signal(ConnectionStatus::Disconnected);
+    let (is_test_active, set_is_test_active) = signal(false);
+    let (current_card_index, set_current_card_index) = signal(0);
+    let (responses, set_responses) = signal(HashMap::<i32, QuestionResponse>::new());
+    let (remaining_time, set_remaining_time) = signal::<Option<i32>>(None);
+    let (user_role, set_user_role) = signal(Role::Student);
 
     let (font_settings, set_font_settings) = use_font_settings();
-    let (show_celebration, set_show_celebration) = create_signal(false);
+    let (show_celebration, set_show_celebration) = signal(false);
 
     //Read-only mode control signal
-    let (is_read_only, set_is_read_only) = create_signal(true);
+    let (is_read_only, set_is_read_only) = signal(true);
 
     let should_disable_inputs =
-        create_memo(move |_| matches!(user_role.get(), Role::Student | Role::Unknown));
+        Memo::new(move |_| matches!(user_role.get(), Role::Student | Role::Unknown));
 
     #[cfg(feature = "hydrate")]
-    let (ws, set_ws) = create_signal::<Option<WebSocket>>(None);
+    let (ws, set_ws) = signal_local::<Option<WebSocket>>(None);
 
     // Get session ID as UUID
-    let session_id = create_memo(move |_| Uuid::parse_str(&session_id_str()).ok());
+    let session_id = Memo::new(move |_| Uuid::parse_str(&session_id_str()).ok());
 
     // Fetch test details and questions
-    let test_details = create_resource(test_id.clone(), move |tid| async move {
+    let test_details = Resource::new(test_id.clone(), move |tid| async move {
         if tid.is_empty() {
             return None;
         }
@@ -63,7 +71,7 @@ pub fn AnonymousStudentTest() -> impl IntoView {
         }
     });
 
-    let questions = create_resource(test_id, move |tid| async move {
+    let questions = Resource::new(test_id, move |tid| async move {
         if tid.is_empty() {
             return Vec::new();
         }
@@ -101,7 +109,7 @@ pub fn AnonymousStudentTest() -> impl IntoView {
 
     // WebSocket connection for anonymous students
     #[cfg(feature = "hydrate")]
-    let connect_to_session = create_action(move |session_uuid: &Uuid| {
+    let connect_to_session = Action::new(move |session_uuid: &Uuid| {
         let session_uuid = *session_uuid;
         let student_name_val = student_name.get();
         let student_id_val = student_id_input.get();
@@ -279,7 +287,7 @@ pub fn AnonymousStudentTest() -> impl IntoView {
     });
 
     // Connect when student joins
-    create_effect(move |_| {
+    Effect::new(move |_| {
         if has_joined.get() {
             if let Some(session_uuid) = session_id.get() {
                 #[cfg(feature = "hydrate")]
@@ -467,27 +475,37 @@ pub fn AnonymousStudentTest() -> impl IntoView {
 
                     {/* Connection Status */}
                     <div class="flex justify-center mb-4">
-                        <div class="flex items-center space-x-2 px-3 py-1 rounded-full text-sm"
-                             class:bg-green-100={move || matches!(connection_status.get(), ConnectionStatus::Connected)}
-                             class:text-green-800={move || matches!(connection_status.get(), ConnectionStatus::Connected)}
-                             class:bg-yellow-100={move || matches!(connection_status.get(), ConnectionStatus::Connecting)}
-                             class:text-yellow-800={move || matches!(connection_status.get(), ConnectionStatus::Connecting)}
-                             class:bg-red-100={move || matches!(connection_status.get(), ConnectionStatus::Error)}
-                             class:text-red-800={move || matches!(connection_status.get(), ConnectionStatus::Error)}
-                             class:bg-gray-100={move || matches!(connection_status.get(), ConnectionStatus::Disconnected)}
-                             class:text-gray-800={move || matches!(connection_status.get(), ConnectionStatus::Disconnected)}>
-                            <div class="w-2 h-2 rounded-full"
-                                 class:bg-green-500={move || matches!(connection_status.get(), ConnectionStatus::Connected)}
-                                 class:bg-yellow-500={move || matches!(connection_status.get(), ConnectionStatus::Connecting)}
-                                 class:bg-red-500={move || matches!(connection_status.get(), ConnectionStatus::Error)}
-                                 class:bg-gray-500={move || matches!(connection_status.get(), ConnectionStatus::Disconnected)}></div>
-                            <span>{move || match connection_status.get() {
-                                ConnectionStatus::Connected => "Connected",
-                                ConnectionStatus::Connecting => "Connecting...",
-                                ConnectionStatus::Error => "Connection Error",
-                                ConnectionStatus::Disconnected => "Disconnected"
-                            }}</span>
-                        </div>
+                        {
+                            let connection_status_class = move || {
+                                let base_classes = "flex items-center space-x-2 px-3 py-1 rounded-full text-sm";
+                                match connection_status.get() {
+                                    ConnectionStatus::Connected => format!("{} bg-green-100 text-green-800", base_classes),
+                                    ConnectionStatus::Connecting => format!("{} bg-yellow-100 text-yellow-800", base_classes),
+                                    ConnectionStatus::Error => format!("{} bg-red-100 text-red-800", base_classes),
+                                    ConnectionStatus::Disconnected => format!("{} bg-gray-100 text-gray-800", base_classes),
+                                }
+                            };
+
+                            view! {
+                                <div class=connection_status_class>
+                                    <div class={move || {
+                                        let base = "w-2 h-2 rounded-full";
+                                        match connection_status.get() {
+                                            ConnectionStatus::Connected => format!("{} bg-green-500", base),
+                                            ConnectionStatus::Connecting => format!("{} bg-yellow-500", base),
+                                            ConnectionStatus::Error => format!("{} bg-red-500", base),
+                                            ConnectionStatus::Disconnected => format!("{} bg-gray-500", base),
+                                        }
+                                    }}></div>
+                                    <span>{move || match connection_status.get() {
+                                        ConnectionStatus::Connected => "Connected",
+                                        ConnectionStatus::Connecting => "Connecting...",
+                                        ConnectionStatus::Error => "Connection Error",
+                                        ConnectionStatus::Disconnected => "Disconnected"
+                                    }}</span>
+                                </div>
+                            }
+                        }
                     </div>
 
                     {/* Status and Timer */}
@@ -514,15 +532,15 @@ pub fn AnonymousStudentTest() -> impl IntoView {
                             </div>
                         }>
                             {move || match questions.get() {
-                                None => view! {<div class="text-center py-8">"Loading..."</div>}.into_view(),
+                                None => view! {<div class="text-center py-8">"Loading..."</div>}.into_any(),
                                 Some(questions_vec) if questions_vec.is_empty() => {
-                                    view! {<div class="text-center py-8 text-red-500">"No questions found."</div>}.into_view()
+                                    view! {<div class="text-center py-8 text-red-500">"No questions found."</div>}.into_any()
                                 },
                                 Some(questions_vec) => {
                                     let questions_len = questions_vec.len();
                                     let questions_clone = questions_vec.clone();
 
-                                    let current_question = create_memo(move |_| {
+                                    let current_question = Memo::new(move |_| {
                                         questions_clone.get(current_card_index.get()).cloned().unwrap_or_else(|| {
                                             questions_clone.first().cloned().unwrap()
                                         })
@@ -567,7 +585,7 @@ pub fn AnonymousStudentTest() -> impl IntoView {
                                                                                 let option_value = option.clone();
                                                                                 let option_value_clone = option_value.clone();
                                                                                 let qnumber = q.qnumber;
-                                                                                let is_checked = create_memo(move |_| {
+                                                                                let is_checked = Memo::new(move |_| {
                                                                                     responses.with(|r| {
                                                                                         r.get(&qnumber)
                                                                                          .map(|resp| resp.answer == option_value_clone.clone())
@@ -599,7 +617,7 @@ pub fn AnonymousStudentTest() -> impl IntoView {
                                                                             }
                                                                         />
                                                                     </div>
-                                                                }.into_view(),
+                                                                }.into_any(),
                                                                 QuestionType::WeightedMultipleChoice => {
                                                                     let qnumber = q.qnumber;
                                                                     let weighted_options = q.get_weighted_options();
@@ -619,7 +637,7 @@ pub fn AnonymousStudentTest() -> impl IntoView {
                                                                                     let option_text_for_change = option_text.clone();
                                                                                     let choice_number = index + 1;
 
-                                                                                    let is_selected = create_memo(move |_| {
+                                                                                    let is_selected = Memo::new(move |_| {
                                                                                         responses.with(|r| {
                                                                                             r.get(&qnumber)
                                                                                                 .and_then(|resp| resp.selected_options.as_ref())
@@ -676,11 +694,11 @@ pub fn AnonymousStudentTest() -> impl IntoView {
                                                                                                                     </svg>
                                                                                                                 </Show>
                                                                                                             </div>
-                                                                                                        }.into_view()
+                                                                                                        }.into_any()
                                                                                                     } else {
                                                                                                         view! {
                                                                                                             <div class="w-5 h-5 rounded border-2 border-gray-300 bg-gray-100"></div>
-                                                                                                        }.into_view()
+                                                                                                        }.into_any()
                                                                                                     }}
                                                                                                 </div>
                                                                                                 <div class="flex items-start gap-3">
@@ -708,9 +726,9 @@ pub fn AnonymousStudentTest() -> impl IntoView {
                                                                                                 {if !option_clone.is_selectable {
                                                                                                     view! {
                                                                                                         <span class="text-xs text-gray-400 italic">"(info only)"</span>
-                                                                                                    }.into_view()
+                                                                                                    }.into_any()
                                                                                                 } else {
-                                                                                                    view! { <span></span> }.into_view()
+                                                                                                    view! { <span></span> }.into_any()
                                                                                                 }}
                                                                                             </div>
                                                                                         </div>
@@ -736,18 +754,18 @@ pub fn AnonymousStudentTest() -> impl IntoView {
                                                                                 </div>
                                                                             </div>
                                                                         </div>
-                                                                    }.into_view()
+                                                                    }.into_any()
                                                                 },
                                                                 QuestionType::TrueFalse => {
                                                                     let qnumber = q.qnumber;
-                                                                    let is_true = create_memo(move |_| {
+                                                                    let is_true = Memo::new(move |_| {
                                                                         responses.with(|r| {
                                                                             r.get(&qnumber)
                                                                              .map(|resp| resp.answer == "true")
                                                                              .unwrap_or(false)
                                                                         })
                                                                     });
-                                                                    let is_false = create_memo(move |_| {
+                                                                    let is_false = Memo::new(move |_| {
                                                                         responses.with(|r| {
                                                                             r.get(&qnumber)
                                                                              .map(|resp| resp.answer == "false")
@@ -756,56 +774,66 @@ pub fn AnonymousStudentTest() -> impl IntoView {
                                                                     });
 
                                                                     view! {
-                                                                        <div class="w-full flex flex-col sm:flex-row gap-4 items-center justify-center">
-                                                                            <button
-                                                                                type="button"
-                                                                                class="px-6 py-3 w-full rounded-lg font-medium text-center transition-colors"
-                                                                                class:bg-white={move || !is_true()}
-                                                                                class:text-gray-800={move || !is_true()}
-                                                                                class:border-gray-200={move || !is_true()}
-                                                                                class:border={move || !is_true()}
-                                                                                class:bg-green-500={move || is_true()}
-                                                                                class:text-white={move || is_true()}
-                                                                                class:border-transparent={move || is_true()}
-                                                                                on:click=move |_| {
-                                                                                    #[cfg(feature = "hydrate")]{
-                                                                                        if !is_read_only.get() {
-                                                                                            handle_answer_change(qnumber, "true".to_string());
+                                                                        {
+                                                                            let true_button_class = move || {
+                                                                                let base = "px-6 py-3 w-full rounded-lg font-medium text-center transition-colors";
+                                                                                if is_true() {
+                                                                                    format!("{} bg-green-500 text-white border-transparent", base)
+                                                                                } else {
+                                                                                    format!("{} bg-white text-gray-800 border-gray-200 border", base)
+                                                                                }
+                                                                            };
+
+                                                                            let false_button_class = move || {
+                                                                                let base = "px-6 py-3 w-full rounded-lg font-medium text-center transition-colors";
+                                                                                if is_false() {
+                                                                                    format!("{} bg-red-500 text-white border-transparent", base)
+                                                                                } else {
+                                                                                    format!("{} bg-white text-gray-800 border-gray-200 border", base)
+                                                                                }
+                                                                            };
+
+                                                                            view! {
+                                                                                <div class="w-full flex flex-col sm:flex-row gap-4 items-center justify-center">
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        class=true_button_class
+                                                                                        on:click=move |_| {
+                                                                                            #[cfg(feature = "hydrate")]{
+                                                                                                if !is_read_only.get() {
+                                                                                                    handle_answer_change(qnumber, "true".to_string());
+                                                                                                }
+                                                                                            }
                                                                                         }
-                                                                                    }
-                                                                                }
-                                                                            >
-                                                                                <span class=move || font_settings.get().get_answer_classes()>
-                                                                                    "Yes" //manually
-                                                                                </span>
-                                                                                //equivalent to
-                                                                                //"True"
-                                                                            </button>
-                                                                            <button
-                                                                                type="button"
-                                                                                class="px-6 py-3 w-full rounded-lg font-medium text-center transition-colors"
-                                                                                class:bg-white={move || !is_false()}
-                                                                                class:text-gray-800={move || !is_false()}
-                                                                                class:border-gray-200={move || !is_false()}
-                                                                                class:border={move || !is_false()}
-                                                                                class:bg-red-500={move || is_false()}
-                                                                                class:text-white={move || is_false()}
-                                                                                class:border-transparent={move || is_false()}
-                                                                                on:click=move |_| {
-                                                                                    #[cfg(feature = "hydrate")]
-                                                                                    handle_answer_change(qnumber, "false".to_string());
-                                                                                }
-                                                                            >
-                                                                                <span class=move || font_settings.get().get_answer_classes()>
-                                                                                    "No" //manually
-                                                                                </span>
-                                                                            </button>
-                                                                        </div>
-                                                                    }.into_view()
+                                                                                    >
+                                                                                        <span class=move || font_settings.get().get_answer_classes()>
+                                                                                            "Yes" //manually
+                                                                                        </span>
+                                                                                        //equivalent to
+                                                                                        //"True"
+                                                                                    </button>
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        class=false_button_class
+                                                                                        on:click=move |_| {
+                                                                                            #[cfg(feature = "hydrate")]
+                                                                                            if !is_read_only.get() {
+                                                                                                handle_answer_change(qnumber, "false".to_string());
+                                                                                            }
+                                                                                        }
+                                                                                    >
+                                                                                        <span class=move || font_settings.get().get_answer_classes()>
+                                                                                            "No" //manually
+                                                                                        </span>
+                                                                                    </button>
+                                                                                </div>
+                                                                            }
+                                                                        }
+                                                                    }.into_any()
                                                                 },
                                                                 _ => {
                                                                     let qnumber = q.qnumber;
-                                                                    let answer_value = create_memo(move |_| {
+                                                                    let answer_value = Memo::new(move |_| {
                                                                         responses.with(|r| {
                                                                             r.get(&qnumber)
                                                                              .map(|resp| resp.answer.clone())
@@ -831,7 +859,7 @@ pub fn AnonymousStudentTest() -> impl IntoView {
                                                                                 rows="4"
                                                                             ></textarea>
                                                                         </div>
-                                                                    }.into_view()
+                                                                    }.into_any()
                                                                 }
                                                             }
                                                         }}
@@ -839,7 +867,7 @@ pub fn AnonymousStudentTest() -> impl IntoView {
                                                 </div>
                                             </div>
                                         </div>
-                                    }.into_view()
+                                    }.into_any()
                                 }
                             }}
                         </Suspense>

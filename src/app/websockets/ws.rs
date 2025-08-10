@@ -1,3 +1,4 @@
+use leptos::prelude::*;
 #[cfg(feature = "ssr")]
 use {
     crate::app::websockets::lobby::{AnonymousStudentJoinMessage, Lobby},

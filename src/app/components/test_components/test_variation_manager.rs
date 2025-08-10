@@ -5,9 +5,12 @@ use crate::app::models::student::GradeEnum;
 use crate::app::models::test::{CreateNewTestRequest, Test, TestType};
 use crate::app::server_functions::questions::duplicate_and_randomize_questions;
 use crate::app::server_functions::tests::{add_test, get_tests};
+use leptos::ev;
 use leptos::prelude::*;
-use leptos::*;
-use leptos_router::*;
+use leptos::task::spawn_local;
+use leptos_router::components::*;
+use leptos_router::hooks::*;
+use leptos_router::path;
 use std::str::FromStr;
 use strum::IntoEnumIterator;
 
@@ -178,7 +181,7 @@ fn get_base_test_name(test_name: &str) -> String {
     }
 }
 
-async fn get_next_variant_number(base_test_name: &str) -> Result<i32, leptos::ServerFnError> {
+async fn get_next_variant_number(base_test_name: &str) -> Result<i32, ServerFnError> {
     let all_tests = get_tests().await?;
 
     // Find all tests with the same base name (including the base test itself)
@@ -266,16 +269,16 @@ pub fn TestVariationManager() -> impl IntoView {
 
 #[component]
 pub fn TestVariationManagerContent() -> impl IntoView {
-    let (search_term, set_search_term) = create_signal(String::new());
+    let (search_term, set_search_term) = signal(String::new());
     let (selected_base_test, set_selected_base_test) = create_signal::<Option<Test>>(None);
-    let (show_create_modal, set_show_create_modal) = create_signal(false);
+    let (show_create_modal, set_show_create_modal) = signal(false);
     let (selected_variation_type, set_selected_variation_type) =
         create_signal::<Option<VariationType>>(None);
-    let (is_creating, set_is_creating) = create_signal(false);
-    let (show_info_panel, set_show_info_panel) = create_signal(false);
+    let (is_creating, set_is_creating) = signal(false);
+    let (show_info_panel, set_show_info_panel) = signal(false);
 
     // Load all tests
-    let tests_resource = create_resource(
+    let tests_resource = Resource::new(
         || (),
         |_| async move {
             match get_tests().await {
@@ -289,13 +292,13 @@ pub fn TestVariationManagerContent() -> impl IntoView {
     );
 
     // Group tests into variation families
-    let test_groups = create_memo(move |_| {
+    let test_groups = Memo::new(move |_| {
         let tests = tests_resource.get().unwrap_or_default();
         group_tests_by_base(tests)
     });
 
     // Filter groups based on search
-    let filtered_groups = create_memo(move |_| {
+    let filtered_groups = Memo::new(move |_| {
         let groups = test_groups.get();
         let search = search_term.get().to_lowercase();
 
@@ -394,7 +397,7 @@ pub fn TestVariationManagerContent() -> impl IntoView {
                                     set_selected_variation_type(None);
                                     set_selected_base_test(None);
 
-                                    let navigate = leptos_router::use_navigate();
+                                    let navigate = use_navigate();
                                     navigate(
                                         &format!("/testbuilder/{}", new_test.test_id),
                                         Default::default(),
@@ -443,7 +446,7 @@ pub fn TestVariationManagerContent() -> impl IntoView {
                                 <VariationTypeInfo var_type=VariationType::Practice />
                             </div>
                         </div>
-                    }.into_view()
+                    }.into_any()
                 } else {
                     view! {
                         <div class="mb-6">
@@ -454,7 +457,7 @@ pub fn TestVariationManagerContent() -> impl IntoView {
                                 "Show Variation Types Info"
                             </button>
                         </div>
-                    }.into_view()
+                    }.into_any()
                 }
             }}
 
@@ -472,7 +475,7 @@ pub fn TestVariationManagerContent() -> impl IntoView {
                 <button
                     class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     on:click=move |_| {
-                        let navigate = leptos_router::use_navigate();
+                        let navigate = use_navigate();
                         navigate("/testbuilder", Default::default());
                     }
                 >
@@ -523,9 +526,9 @@ pub fn TestVariationManagerContent() -> impl IntoView {
                                 set_selected_base_test(None);
                             }
                         />
-                    }.into_view()
+                    }.into_any()
                 } else {
-                    view! { <div></div> }.into_view()
+                    view! { <div></div> }.into_any()
                 }
             }}
         </main>
@@ -604,7 +607,7 @@ fn TestVariationCard(
                             class="px-3 py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700"
                             on:click=move |_| {
                                 let test_id = base_test_for_edit.test_id.clone();
-                                let navigate = leptos_router::use_navigate();
+                                let navigate = use_navigate();
                                 navigate(&format!("/testbuilder/{}", test_id), Default::default());
                             }
                         >
@@ -650,7 +653,7 @@ fn VariationTypeSection(
             {if variations.is_empty() {
                 view! {
                     <p class="text-sm text-gray-500 italic">No {title.to_lowercase()} variations yet</p>
-                }.into_view()
+                }.into_any()
             } else {
                 view! {
                     <div class="space-y-3">
@@ -664,7 +667,7 @@ fn VariationTypeSection(
                             }
                         />
                     </div>
-                }.into_view()
+                }.into_any()
             }}
         </div>
     }
@@ -692,7 +695,7 @@ fn VariationCard(variation: Test, var_type: VariationType) -> impl IntoView {
                     class="flex-1 px-2 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
                     on:click=move |_| {
                         let test_id = variation_clone.test_id.clone();
-                        let navigate = leptos_router::use_navigate();
+                        let navigate = use_navigate();
                         navigate(&format!("/testbuilder/{}", test_id), Default::default());
                     }
                 >
@@ -702,7 +705,7 @@ fn VariationCard(variation: Test, var_type: VariationType) -> impl IntoView {
                     class="flex-1 px-2 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700"
                     on:click=move |_| {
                         let test_id = variation.test_id.clone();
-                        let navigate = leptos_router::use_navigate();
+                        let navigate = use_navigate();
                         navigate(&format!("/test-session/{}", test_id), Default::default());
                     }
                 >
@@ -793,7 +796,7 @@ fn VariationTypeSelector(
     selected: ReadSignal<Option<VariationType>>,
     set_selected: WriteSignal<Option<VariationType>>,
 ) -> impl IntoView {
-    let is_selected = create_memo(move |_| selected.get() == Some(var_type));
+    let is_selected = Memo::new(move |_| selected.get() == Some(var_type));
 
     view! {
         <div

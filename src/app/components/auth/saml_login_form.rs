@@ -4,39 +4,40 @@ use crate::app::server_functions::auth::{get_current_user, login};
 use crate::app::server_functions::saml_auth::{
     get_saml_institutions, initiate_saml_login, SamlInstitution,
 };
-use leptos::*;
-use leptos_router::use_navigate;
+use leptos::prelude::*;
+use leptos::task::spawn_local;
+use leptos_router::hooks::use_navigate;
 
 #[component]
 pub fn SamlLoginForm() -> impl IntoView {
-    let (username, set_username) = create_signal("".to_string());
-    let (password, set_password) = create_signal("".to_string());
+    let (username, set_username) = signal("".to_string());
+    let (password, set_password) = signal("".to_string());
     let (error, set_error) = create_signal::<Option<String>>(None);
-    let (login_mode, set_login_mode) = create_signal("local"); // "local" or "saml"
+    let (login_mode, set_login_mode) = signal("local"); // "local" or "saml"
     let (selected_institution, set_selected_institution) = create_signal::<Option<String>>(None);
     let (saml_institutions, set_saml_institutions) =
         create_signal::<Vec<SamlInstitution>>(Vec::new());
-    let (loading, set_loading) = create_signal(false);
+    let (loading, set_loading) = signal(false);
 
-    let set_current_user = use_context::<WriteSignal<Option<SessionUser>>>().unwrap();
+    let set_current_user = expect_context::<WriteSignal<Option<SessionUser>>>();
     let navigate = use_navigate();
 
     // Load SAML institutions on component mount
-    create_effect(move |_| {
+    Effect::new(move |_| {
         spawn_local(async move {
             match get_saml_institutions().await {
                 Ok(institutions) => {
                     set_saml_institutions.set(institutions);
                 }
                 Err(e) => {
-                    logging::log!("Failed to load SAML institutions: {:?}", e);
+                    log::info!("Failed to load SAML institutions: {:?}", e);
                 }
             }
         });
     });
 
     // Handle local login
-    let handle_local_login = create_action(move |_: &()| {
+    let handle_local_login = Action::new(move |_: &()| {
         let username = username.get();
         let password = password.get();
 
@@ -175,16 +176,16 @@ pub fn SamlLoginForm() -> impl IntoView {
                                                 </svg>
                                                 "Signing in..."
                                             </div>
-                                        }.into_view()
+                                        }.into_any()
                                     } else {
                                         view! {
                                             "Sign In"
-                                        }.into_view()
+                                        }.into_any()
                                     }
                                 }}
                             </button>
                         </form>
-                    }.into_view()
+                    }.into_any()
                 } else {
                     // SAML Institution Login - Using button with JavaScript navigation
                     view! {
@@ -198,7 +199,7 @@ pub fn SamlLoginForm() -> impl IntoView {
                                                 "No institutions configured for SAML login."
                                             </p>
                                         </div>
-                                    }.into_view()
+                                    }.into_any()
                                 } else {
                                     view! {
                                         <div>
@@ -245,7 +246,7 @@ pub fn SamlLoginForm() -> impl IntoView {
                                                                 "Login with Institution"
                                                             </div>
                                                         </a>
-                                                    }.into_view()
+                                                    }.into_any()
                                                 } else {
                                                     view! {
                                                         <button
@@ -254,7 +255,7 @@ pub fn SamlLoginForm() -> impl IntoView {
                                                         >
                                                             "Select an institution first"
                                                         </button>
-                                                    }.into_view()
+                                                    }.into_any()
                                                 }
                                             }}
 
@@ -265,11 +266,11 @@ pub fn SamlLoginForm() -> impl IntoView {
                                                 </p>
                                             </div>
                                         </div>
-                                    }.into_view()
+                                    }.into_any()
                                 }
                             }}
                         </div>
-                    }.into_view()
+                    }.into_any()
                 }
             }}
 

@@ -2,7 +2,7 @@ use crate::app::models::assessment::RangeCategory;
 use crate::app::models::assessment::ScopeEnum;
 use crate::app::models::assessment_sequences::{SequenceBehavior, TestSequenceItem};
 use crate::app::models::student::GradeEnum;
-use leptos::ServerFnError;
+use leptos::prelude::*;
 use uuid::Uuid;
 cfg_if::cfg_if! {
 
@@ -10,7 +10,7 @@ cfg_if::cfg_if! {
         use crate::app::models::assessment::{Assessment, SubjectEnum, RangeCategoriesWrapper};
         use sqlx::PgPool;
         use sqlx::types::Json;
-        use leptos::*;
+        use leptos::prelude::*;
         use sqlx::prelude::*;
 
         pub async fn get_all_assessments(pool: &sqlx::PgPool) -> Result<Vec<Assessment>, ServerFnError> {

@@ -3,7 +3,7 @@ use crate::app::models::assessment::SubjectEnum;
 use crate::app::models::assessment::{
     Assessment, CreateNewAssessmentRequest, DeleteAssessmentRequest, UpdateAssessmentRequest,
 };
-use leptos::*;
+use leptos::prelude::*;
 #[cfg(feature = "ssr")]
 use {
     crate::app::db::assessment_database, crate::app::db::database, actix_web::web, chrono::Local,
@@ -14,7 +14,7 @@ use {
 //lowercase functions denote functions that are server side while upper/camel case functions
 //indicate Client side Objects/functions
 
-#[server(GetAssessments, "/api")]
+#[server]
 pub async fn get_assessments() -> Result<Vec<Assessment>, ServerFnError> {
     #[cfg(feature = "ssr")]
     {
@@ -46,7 +46,7 @@ pub async fn get_assessments() -> Result<Vec<Assessment>, ServerFnError> {
     }
 }
 
-#[server(GetAssessment, "/api")]
+#[server]
 pub async fn get_assessment(id: String) -> Result<Assessment, ServerFnError> {
     #[cfg(feature = "ssr")]
     {
@@ -78,7 +78,7 @@ pub async fn get_assessment(id: String) -> Result<Assessment, ServerFnError> {
     }
 }
 
-#[server(AddAssessment, "/api")]
+#[server]
 pub async fn add_assessment(
     add_assessment_request: CreateNewAssessmentRequest,
 ) -> Result<Assessment, ServerFnError> {
@@ -144,7 +144,7 @@ pub async fn add_assessment(
     }
 }
 
-#[server(DeleteAssessment, "/api")]
+#[server]
 pub async fn delete_assessment(
     delete_assessment_request: DeleteAssessmentRequest,
 ) -> Result<Assessment, ServerFnError> {
@@ -180,7 +180,7 @@ pub async fn delete_assessment(
     }
 }
 
-#[server(UpdateAssessmentScore, "/api")]
+#[server]
 pub async fn update_assessment_score(test_id: String) -> Result<(), ServerFnError> {
     #[cfg(feature = "ssr")]
     {
@@ -208,7 +208,7 @@ pub async fn update_assessment_score(test_id: String) -> Result<(), ServerFnErro
     }
 }
 
-#[server(EditAssessment, "/api")]
+#[server]
 pub async fn update_assessment(
     update_assessment_request: UpdateAssessmentRequest,
 ) -> Result<Assessment, ServerFnError> {
@@ -272,7 +272,7 @@ pub async fn update_assessment(
     }
 }
 
-#[server(GetTestSequence, "/api")]
+#[server]
 pub async fn get_test_sequence(
     assessment_id: String,
 ) -> Result<Vec<(String, String)>, ServerFnError> {

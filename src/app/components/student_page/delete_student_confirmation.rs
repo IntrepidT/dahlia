@@ -1,17 +1,18 @@
 use crate::app::models::student::{DeleteStudentRequest, Student};
 use crate::app::server_functions::students::delete_student;
 use leptos::ev::SubmitEvent;
-use leptos::*;
-use std::rc::Rc;
+use leptos::prelude::*;
+use leptos::task::spawn_local;
+use std::sync::Arc;
 
 #[component]
 pub fn DeleteStudentConfirmation(
-    #[prop(into)] student: Signal<Option<Rc<Student>>>,
+    #[prop(into)] student: Signal<Option<Arc<Student>>>,
     #[prop(into)] show: Signal<bool>,
     #[prop(into)] set_show: Callback<bool>,
     #[prop(into)] on_delete_success: Callback<()>,
 ) -> impl IntoView {
-    let (confirm_id, set_confirm_id) = create_signal(String::new());
+    let (confirm_id, set_confirm_id) = signal(String::new());
 
     let handle_delete_student = move |ev: SubmitEvent| {
         ev.prevent_default();
@@ -33,17 +34,17 @@ pub fn DeleteStudentConfirmation(
 
                     match delete_result {
                         Ok(_deleted_student) => {
-                            set_show.call(false);
-                            on_delete_success.call(());
+                            set_show.run(false);
+                            on_delete_success.run(());
                         }
                         Err(e) => {
                             println!("Error deleting = {:?}", e);
-                            set_show.call(false);
+                            set_show.run(false);
                         }
                     };
                 });
             } else {
-                set_show.call(false);
+                set_show.run(false);
                 log::info!("Delete was cancelled");
             }
         }
@@ -70,7 +71,7 @@ pub fn DeleteStudentConfirmation(
                             <button
                                 type="button"
                                 class="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
-                                on:click=move |_| set_show.call(false)
+                                on:click=move |_| set_show.run(false)
                             >
                                 "Cancel"
                             </button>

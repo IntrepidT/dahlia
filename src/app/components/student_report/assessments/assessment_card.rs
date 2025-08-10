@@ -2,12 +2,13 @@ use crate::app::components::dashboard::color_utils::ColorUtils;
 use crate::app::components::data_processing::{AssessmentSummary, Progress, TestHistoryEntry};
 use crate::app::components::student_report::assessments::compact_assessment_dot_chart::CompactProgressChart; // Fixed import path
 use crate::app::models::test::Test;
-use leptos::*;
+use leptos::prelude::*;
+use leptos::prelude::*;
 
 #[component]
 pub fn AssessmentCard(
     assessment: AssessmentSummary,
-    tests_resource: Resource<(), Option<Vec<Test>>>,
+    tests_resource: Resource<Option<Vec<Test>>>,
     on_expand: Callback<String>,
     #[prop(default = false)] is_expanded: bool,
     #[prop(optional)] test_history: Option<Vec<TestHistoryEntry>>,
@@ -80,7 +81,7 @@ pub fn AssessmentCard(
                         </span>
                         <button
                             class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
-                            on:click=move |_| on_expand.call(assessment_id.clone())
+                            on:click=move |_| on_expand.run(assessment_id.clone())
                         >
                             <svg
                                 class={format!("w-5 h-5 transition-transform duration-200 {}", if is_expanded { "rotate-180" } else { "" })}
@@ -104,9 +105,9 @@ pub fn AssessmentCard(
                             tests_resource={tests_resource}
                         />
                     </div>
-                }
+                }.into_any()
             } else {
-                view! { <div></div> }
+                view! { <div></div> }.into_any()
             }}
 
             // Content Section
@@ -162,7 +163,7 @@ pub fn AssessmentCard(
                                             </svg>
                                             <span class="text-sm">Above Average</span>
                                         </div>
-                                    }
+                                    }.into_any()
                                 } else if assessment_rating.contains("Below") || assessment_rating.contains("Risk") {
                                     view! {
                                         <div class="flex items-center gap-1 text-red-600">
@@ -171,7 +172,7 @@ pub fn AssessmentCard(
                                             </svg>
                                             <span class="text-sm">Needs Support</span>
                                         </div>
-                                    }
+                                    }.into_any()
                                 } else {
                                     view! {
                                         <div class="flex items-center gap-1 text-blue-600">
@@ -180,7 +181,7 @@ pub fn AssessmentCard(
                                             </svg>
                                             <span class="text-sm">On Track</span>
                                         </div>
-                                    }
+                                    }.into_any()
                                 }
                             }
                         </div>
@@ -262,13 +263,13 @@ pub fn AssessmentCard(
                                                 </div>
                                             </div>
                                         </div>
-                                    }
+                                    }.into_any()
                                 }).collect::<Vec<_>>()}
                             </div>
                         </div>
-                    }
+                    }.into_any()
                 } else {
-                    view! { <div></div> }
+                    view! { <div></div> }.into_any()
                 }}
             </div>
         </div>

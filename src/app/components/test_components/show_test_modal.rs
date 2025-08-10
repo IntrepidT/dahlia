@@ -1,7 +1,8 @@
 use crate::app::components::{Toast, ToastMessage, ToastMessageType};
 use crate::app::models::{DeleteTestRequest, Test};
 use crate::app::server_functions::tests::delete_test;
-use leptos::*;
+use leptos::prelude::*;
+use leptos::task::spawn_local;
 use std::rc::Rc;
 
 const INFO_STYLE: &str = "w-full h-12 pr-4 py-4 mt-6 flex flex-col outline-none focus:outline-none focus:pl-7 transition-all duration-1000 ease-in-out";
@@ -20,7 +21,7 @@ pub fn ShowTestModal(
     test: Rc<Test>,
     set_if_show_modal: WriteSignal<bool>,
     set_if_show_deleted: WriteSignal<bool>,
-    test_resource: Resource<(), Result<Vec<Test>, ServerFnError>>,
+    test_resource: Resource<Result<Vec<Test>, ServerFnError>>,
     set_toast_message: WriteSignal<ToastMessage>,
 ) -> impl IntoView {
     let mimic_test = test.clone();
@@ -58,7 +59,7 @@ pub fn ShowTestModal(
                 <div class=MODAL_STYLE>
 
                     <p class="text-white pt-2 text-4xl mt-2">
-                        {&test.name}
+                        {test.name.clone()}
                     </p>
 
                     <div class=INFO_STYLE>
@@ -68,17 +69,17 @@ pub fn ShowTestModal(
 
                     <div class=INFO_STYLE>
                         <div class=INFO_TITLE_STYLE>"Comments"</div>
-                        <div class=INFO_VALUE_STYLE>{&test.comments}</div>
+                        <div class=INFO_VALUE_STYLE>{test.comments.clone()}</div>
                     </div>
 
                     <div class=INFO_STYLE>
                         <div class=INFO_TITLE_STYLE>"Test Identifier"</div>
-                        <div class=INFO_VALUE_STYLE>{format!("#{:?}", &test.test_id)}</div>
+                        <div class=INFO_VALUE_STYLE>{format!("#{:?}", test.test_id.clone())}</div>
                     </div>
 
                     <div class=INFO_STYLE>
                         <div class=INFO_TITLE_STYLE>"Test Type"</div>
-                        <div class=INFO_VALUE_STYLE>{format!("{:?}", &test.testarea)}</div>
+                        <div class=INFO_VALUE_STYLE>{format!("{:?}", test.testarea.clone())}</div>
                     </div>
 
                     <div class="flex flex-row w-full items-right justify-right mt-1">

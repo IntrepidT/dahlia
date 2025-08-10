@@ -1,5 +1,7 @@
 use crate::app::components::data_processing::{AssessmentSummary, TestDetail, TestHistoryEntry};
-use leptos::*;
+use leptos::html;
+use leptos::prelude::*;
+use leptos::prelude::*;
 
 // Helper function to wait for Chart.js to be available
 #[cfg(feature = "hydrate")]
@@ -37,7 +39,7 @@ pub fn AssessmentProgressChart(
     let chart_ref = create_node_ref::<html::Canvas>();
 
     #[cfg(feature = "hydrate")]
-    create_effect(move |_| {
+    Effect::new(move |_| {
         if let Some(canvas) = chart_ref.get() {
             let assessments = assessments.clone();
 
@@ -140,7 +142,7 @@ pub fn PerformanceDistributionChart(
     let chart_ref = create_node_ref::<html::Canvas>();
 
     #[cfg(feature = "hydrate")]
-    create_effect(move |_| {
+    Effect::new(move |_| {
         if let Some(canvas) = chart_ref.get() {
             let distribution_data = distribution_data.clone();
             let title = title.clone();
@@ -244,7 +246,7 @@ pub fn TestScoresTimelineChart(
     let chart_ref = create_node_ref::<html::Canvas>();
 
     #[cfg(feature = "hydrate")]
-    create_effect(move |_| {
+    Effect::new(move |_| {
         if let Some(canvas) = chart_ref.get() {
             let test_history = test_history.clone();
 
@@ -345,7 +347,7 @@ pub fn AssessmentRadarChart(
     let chart_ref = create_node_ref::<html::Canvas>();
 
     #[cfg(feature = "hydrate")]
-    create_effect(move |_| {
+    Effect::new(move |_| {
         if let Some(canvas) = chart_ref.get() {
             let assessment_data = assessment_data.clone();
 
@@ -441,7 +443,7 @@ pub fn TestAreaPerformanceChart(
     let chart_ref = create_node_ref::<html::Canvas>();
 
     #[cfg(feature = "hydrate")]
-    create_effect(move |_| {
+    Effect::new(move |_| {
         if let Some(canvas) = chart_ref.get() {
             let test_area_data = test_area_data.clone();
 

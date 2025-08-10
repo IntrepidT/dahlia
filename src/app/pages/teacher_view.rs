@@ -13,9 +13,10 @@ use crate::app::server_functions::employees::{add_employee, get_employees};
 use crate::app::server_functions::teachers::get_teachers;
 use crate::app::server_functions::users::get_users;
 use leptos::ev::SubmitEvent;
-use leptos::*;
-use std::rc::Rc;
+use leptos::prelude::*;
+use leptos_router::path;
 use std::str::FromStr;
+use std::sync::Arc;
 use strum::IntoEnumIterator;
 use validator::Validate;
 
@@ -60,13 +61,13 @@ const BUTTON_CONTAINER_STYLE: &str =
 pub fn TeachersContent() -> impl IntoView {
     let user = use_context::<ReadSignal<Option<SessionUser>>>().expect("AuthProvider not found");
     // Create resource for refreshing data
-    let (refresh_trigger, set_refresh_trigger) = create_signal(0);
-    let (selected_view, set_selected_view) = create_signal(SidebarSelected::TeacherView);
+    let (refresh_trigger, set_refresh_trigger) = signal(0);
+    let (selected_view, set_selected_view) = signal(SidebarSelected::TeacherView);
 
     // Create resources for employees and teachers
-    let employees = create_local_resource(
-        move || refresh_trigger(),
-        |_| async move {
+    let employees = Resource::new(
+        || (),
+        |_| async {
             match get_employees().await {
                 Ok(employees) => Some(employees),
                 Err(e) => {
@@ -77,9 +78,9 @@ pub fn TeachersContent() -> impl IntoView {
         },
     );
 
-    let teachers = create_local_resource(
-        move || refresh_trigger(),
-        |_| async move {
+    let teachers = Resource::new(
+        || (),
+        |_| async {
             match get_teachers().await {
                 Ok(teachers) => Some(teachers),
                 Err(e) => {
@@ -90,9 +91,9 @@ pub fn TeachersContent() -> impl IntoView {
         },
     );
 
-    let users = create_local_resource(
-        move || refresh_trigger(),
-        |_| async move {
+    let users = Resource::new(
+        || (),
+        |_| async {
             match get_users().await {
                 Ok(users) => Some(users),
                 Err(e) => {
@@ -104,24 +105,24 @@ pub fn TeachersContent() -> impl IntoView {
     );
 
     // Main UI state signals
-    let (active_view, set_active_view) = create_signal(String::from("employees"));
-    let (selected_employee, set_selected_employee) = create_signal(None::<Rc<Employee>>);
-    let (search_term, set_search_term) = create_signal(String::new());
-    let (role_filter, set_role_filter) = create_signal(String::new());
-    let (adding_employee, set_adding_employee) = create_signal(false);
-    let (confirm_delete, set_confirm_delete) = create_signal(false);
+    let (active_view, set_active_view) = signal(String::from("employees"));
+    let (selected_employee, set_selected_employee) = signal(None::<Arc<Employee>>);
+    let (search_term, set_search_term) = signal(String::new());
+    let (role_filter, set_role_filter) = signal(String::new());
+    let (adding_employee, set_adding_employee) = signal(false);
+    let (confirm_delete, set_confirm_delete) = signal(false);
 
     // Panel visibility control
-    let (show_side_panel, set_show_side_panel) = create_signal(false);
+    let (show_side_panel, set_show_side_panel) = signal(false);
 
     // Panel toggle for desktop view
-    let (panel_expanded, set_panel_expanded) = create_signal(false);
+    let (panel_expanded, set_panel_expanded) = signal(false);
 
     // Watch for selected employee changes to show panel on mobile
-    create_effect(move |_| {
+    Effect::new(move |_| {
         if selected_employee().is_some() || adding_employee() {
             set_show_side_panel(true);
-            set_panel_expanded(true);
+            set_panel_expanded.set(true);
         }
     });
 
@@ -131,7 +132,7 @@ pub fn TeachersContent() -> impl IntoView {
     let select_users_view = move |_| set_active_view(String::from("users"));
 
     // Clear filters function
-    let clear_filters = move |_| {
+    let clear_filters = move || {
         set_search_term(String::new());
         set_role_filter(String::new());
     };
@@ -149,7 +150,7 @@ pub fn TeachersContent() -> impl IntoView {
                     selected_employee=selected_employee
                     on_cancel=Callback::new(move |_| set_confirm_delete(false))
                     on_delete=Callback::new(move |_| {
-                        set_selected_employee(None::<Rc::<Employee>>);
+                        set_selected_employee(None::<Arc::<Employee>>);
                         set_refresh_trigger.update(|count| *count += 1);
                         set_confirm_delete(false);
                     })
@@ -239,25 +240,36 @@ pub fn TeachersContent() -> impl IntoView {
 
                 // Action Buttons
                 <div class="mt-4 pt-2 flex flex-wrap gap-2 justify-end sticky bottom-0 bg-[#F9F9F8]">
-                    <button
-                        class=DELETE_BUTTON_STYLE
-                        class:opacity-50=move || selected_employee().is_none()
-                        class:cursor-not-allowed=move || selected_employee().is_none()
-                        on:click=move |_| {
-                            if selected_employee().is_some() {
-                                set_confirm_delete(true)
+                    {
+                        let delete_button_class = move || {
+                            let base = DELETE_BUTTON_STYLE;
+                            if selected_employee().is_none() {
+                                format!("{} opacity-50 cursor-not-allowed", base)
+                            } else {
+                                base.to_string()
                             }
+                        };
+
+                        view! {
+                            <button
+                                class=delete_button_class
+                                on:click=move |_| {
+                                    if selected_employee().is_some() {
+                                        set_confirm_delete(true)
+                                    }
+                                }
+                            >
+                                "Delete"
+                            </button>
                         }
-                    >
-                        "Delete"
-                    </button>
+                    }
                     <button
                         class=ADD_BUTTON_STYLE
                         on:click=move |_| {
                             set_adding_employee(true);
                             set_selected_employee(None);
                             set_show_side_panel(true); // Show panel on mobile when adding
-                            set_panel_expanded(true); // Ensure panel is expanded
+                            set_panel_expanded.set(true); // Ensure panel is expanded
                         }
                     >
                         "Add Employee"
@@ -293,7 +305,7 @@ pub fn TeachersContent() -> impl IntoView {
                         <button
                             class="hidden lg:block text-[#2E3A59] p-1 rounded hover:bg-[#DADADA] transition-colors"
                             on:click=move |_| {
-                                set_panel_expanded(false);
+                                set_panel_expanded.set(false);
                             }
                             title="Collapse panel"
                         >
@@ -327,39 +339,39 @@ pub fn TeachersContent() -> impl IntoView {
                             view! {
                                 <div class="h-full">
                                     <AddEmployeeForm
-                                        on_cancel=move |_| {
+                                        on_cancel=move || {
                                             set_adding_employee(false);
                                             set_show_side_panel(false); // Close panel on mobile
                                         }
-                                        on_save=move |_| {
+                                        on_save=move || {
                                             set_adding_employee(false);
                                             set_refresh_trigger.update(|count| *count += 1);
                                             set_show_side_panel(false); // Close panel on mobile
                                         }
                                     />
                                 </div>
-                            }
+                            }.into_any()
                         } else if let Some(employee) = selected_employee() {
                             view! {
                                 <div class="h-full">
                                     <EmployeeDetails
                                         employee=employee
-                                        on_close=move |_| {
+                                        on_close=move || {
                                             set_selected_employee(None);
                                             set_show_side_panel(false); // Close panel on mobile
                                         }
-                                        call_refresh=move |_| {
+                                        call_refresh=move || {
                                             set_selected_employee(None);
                                             set_refresh_trigger.update(|count| *count +=1);
                                             set_show_side_panel(false); // Close panel on mobile
                                         }
                                     />
                                 </div>
-                            }
+                            }.into_any()
                         } else {
                             view! {
                                 <div>"An error has occurred"</div>
-                            }
+                            }.into_any()
                         }
                     }}
                 </Show>
@@ -370,7 +382,7 @@ pub fn TeachersContent() -> impl IntoView {
                 <button
                     class="fixed right-4 top-16 lg:right-8 lg:top-20 bg-[#2E3A59] text-white p-2 rounded-full shadow-lg z-20"
                     on:click=move |_| {
-                        set_panel_expanded(true);
+                        set_panel_expanded.set(true);
                         if selected_employee().is_some() || adding_employee() {
                             set_show_side_panel(true);
                         }

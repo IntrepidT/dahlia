@@ -1,6 +1,7 @@
+use leptos::prelude::*;
 use crate::app::server_functions::auth::{get_current_user, login, logout, register};
-use leptos::*;
-use leptos_router::use_navigate;
+use leptos::prelude::*;
+use leptos_router::hooks::use_navigate;
 use log::{debug, error, log};
 use serde::Serialize;
 #[cfg(feature = "ssr")]
@@ -80,7 +81,7 @@ pub async fn send_reset_email(email: &str, reset_token: &str) -> Result<(), Stri
         .json(&payload)
         .send()
         .await
-        .map_err(|e| format!("Failed to send request to SendGrid: {}", e))?;
+        .map_err(|e| format!("Failed to send request to SendGrid= {}", e))?;
 
     // Check the response
     if res.status().is_success() {

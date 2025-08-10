@@ -1,7 +1,7 @@
 use crate::app::db::saml_database;
 use crate::app::models::auth::{AuthProvider, SamlConfig, SamlResponse};
 use crate::app::models::user::{SessionUser, UserRole};
-use leptos::*;
+use leptos::prelude::*;
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "ssr")]
@@ -38,7 +38,7 @@ impl SamlInstitution {
 }
 
 // Get list of available SAML institutions
-#[server(GetSamlInstitutions, "/api")]
+#[server]
 pub async fn get_saml_institutions() -> Result<Vec<SamlInstitution>, ServerFnError> {
     #[cfg(feature = "ssr")]
     {
@@ -86,7 +86,7 @@ pub async fn get_saml_institutions() -> Result<Vec<SamlInstitution>, ServerFnErr
 }
 
 // Initiate SAML login
-#[server(InitiateSamlLogin, "/api")]
+#[server]
 pub async fn initiate_saml_login(
     institution_id: String,
     relay_state: Option<String>,
@@ -149,7 +149,7 @@ pub async fn initiate_saml_login(
 }
 
 // Handle SAML response (ACS endpoint)
-#[server(HandleSamlResponse, "/api")]
+#[server]
 pub async fn handle_saml_response(
     saml_response: String,
     relay_state: Option<String>,
@@ -269,7 +269,7 @@ pub async fn handle_saml_response(
 }
 
 // Initiate SAML logout
-#[server(InitiateSamlLogout, "/api")]
+#[server]
 pub async fn initiate_saml_logout() -> Result<SamlAuthResponse, ServerFnError> {
     #[cfg(feature = "ssr")]
     {
@@ -400,7 +400,7 @@ pub async fn initiate_saml_logout() -> Result<SamlAuthResponse, ServerFnError> {
 }
 
 // Admin function to create SAML config
-#[server(CreateSamlConfig, "/api")]
+#[server]
 pub async fn create_saml_config(
     institution_name: String,
     entity_id: String,
@@ -464,7 +464,7 @@ pub async fn create_saml_config(
 }
 
 // Update existing SAML config
-#[server(UpdateSamlConfig, "/api")]
+#[server]
 pub async fn update_saml_config(
     config_id: String,
     institution_name: String,
@@ -525,7 +525,7 @@ pub async fn update_saml_config(
 }
 
 // Delete SAML config
-#[server(DeleteSamlConfig, "/api")]
+#[server]
 pub async fn delete_saml_config(config_id: String) -> Result<SamlAuthResponse, ServerFnError> {
     #[cfg(feature = "ssr")]
     {
@@ -566,7 +566,7 @@ pub async fn delete_saml_config(config_id: String) -> Result<SamlAuthResponse, S
 }
 
 // Toggle SAML config active status
-#[server(ToggleSamlConfig, "/api")]
+#[server]
 pub async fn toggle_saml_config(config_id: String) -> Result<SamlAuthResponse, ServerFnError> {
     #[cfg(feature = "ssr")]
     {
@@ -612,7 +612,7 @@ pub async fn toggle_saml_config(config_id: String) -> Result<SamlAuthResponse, S
 }
 
 // Get detailed SAML config (for editing)
-#[server(GetSamlConfigDetails, "/api")]
+#[server]
 pub async fn get_saml_config_details(config_id: String) -> Result<SamlConfig, ServerFnError> {
     #[cfg(feature = "ssr")]
     {
@@ -650,7 +650,7 @@ pub async fn get_saml_config_details(config_id: String) -> Result<SamlConfig, Se
 }
 
 // Test SAML configuration
-#[server(TestSamlConfig, "/api")]
+#[server]
 pub async fn test_saml_config(config_id: String) -> Result<SamlAuthResponse, ServerFnError> {
     #[cfg(feature = "ssr")]
     {
@@ -722,7 +722,7 @@ pub async fn test_saml_config(config_id: String) -> Result<SamlAuthResponse, Ser
 }
 
 // Get SAML statistics
-#[server(GetSamlStats, "/api")]
+#[server]
 pub async fn get_saml_stats() -> Result<SamlStats, ServerFnError> {
     #[cfg(feature = "ssr")]
     {
@@ -761,7 +761,7 @@ pub struct SamlStats {
 }
 
 // Import metadata from URL
-#[server(ImportSamlMetadata, "/api")]
+#[server]
 pub async fn import_saml_metadata(
     metadata_url: String,
     institution_name: String,
@@ -819,7 +819,7 @@ pub struct SamlMetadataResponse {
     pub x509_cert: String,
 }
 
-#[server(GetDetailedSamlInstitutions, "/api")]
+#[server]
 pub async fn get_detailed_saml_institutions() -> Result<Vec<SamlInstitutionDetail>, ServerFnError> {
     #[cfg(feature = "ssr")]
     {
@@ -877,7 +877,7 @@ pub struct SamlInstitutionDetail {
 }
 
 // Add a bulk operations function for admin convenience
-#[server(BulkToggleSamlConfigs, "/api")]
+#[server]
 pub async fn bulk_toggle_saml_configs(
     config_ids: Vec<String>,
     enable: bool,
@@ -946,7 +946,7 @@ pub async fn bulk_toggle_saml_configs(
 }
 
 // Add validation function for SAML configurations
-#[server(ValidateSamlConfig, "/api")]
+#[server]
 pub async fn validate_saml_config(
     entity_id: String,
     sso_url: String,

@@ -2,7 +2,7 @@ use crate::app::models::websocket_session::{
     CreateSessionRequest, Session, SessionStatus, SessionSummary, SessionType,
 };
 use chrono::{DateTime, Utc};
-use leptos::*;
+use leptos::prelude::*;
 use uuid::Uuid;
 
 #[cfg(feature = "ssr")]
@@ -11,7 +11,7 @@ use {
     sqlx::PgPool, std::error::Error,
 };
 
-#[server(ListActiveSessions, "/api")]
+#[server]
 pub async fn list_active_sessions() -> Result<Vec<SessionSummary>, ServerFnError> {
     #[cfg(feature = "ssr")]
     {
@@ -36,7 +36,7 @@ pub async fn list_active_sessions() -> Result<Vec<SessionSummary>, ServerFnError
     }
 }
 
-#[server(GetActiveTestSessions, "/api")]
+#[server]
 pub async fn get_active_test_sessions() -> Result<Vec<SessionSummary>, ServerFnError> {
     #[cfg(feature = "ssr")]
     {
@@ -54,7 +54,7 @@ pub async fn get_active_test_sessions() -> Result<Vec<SessionSummary>, ServerFnE
     }
 }
 
-#[server(GetSession, "/api")]
+#[server]
 pub async fn get_session(session_id: String) -> Result<Option<SessionSummary>, ServerFnError> {
     #[cfg(feature = "ssr")]
     {
@@ -73,7 +73,7 @@ pub async fn get_session(session_id: String) -> Result<Option<SessionSummary>, S
     }
 }
 
-#[server(GetTestSessionsByTestId, "/api")]
+#[server]
 pub async fn get_test_sessions_by_test_id(
     test_id: String,
 ) -> Result<Vec<SessionSummary>, ServerFnError> {
@@ -93,7 +93,7 @@ pub async fn get_test_sessions_by_test_id(
     }
 }
 
-#[server(CreateSession, "/api")]
+#[server]
 pub async fn create_session(
     request: CreateSessionRequest,
 ) -> Result<SessionSummary, ServerFnError> {
@@ -157,7 +157,7 @@ pub async fn create_session(
     }
 }
 
-#[server(StartTestSession, "/api")]
+#[server]
 pub async fn start_test_session(
     session_id: String,
     scheduled_end_time: Option<DateTime<Utc>>,
@@ -199,7 +199,7 @@ pub async fn start_test_session(
     }
 }
 
-#[server(JoinSession, "/api")]
+#[server]
 pub async fn join_session(
     session_id: String,
     password: Option<String>,
@@ -248,7 +248,7 @@ pub async fn join_session(
     }
 }
 
-#[server(LeaveSession, "/api")]
+#[server]
 pub async fn leave_session(session_id: String) -> Result<(), ServerFnError> {
     #[cfg(feature = "ssr")]
     {
@@ -267,7 +267,7 @@ pub async fn leave_session(session_id: String) -> Result<(), ServerFnError> {
     }
 }
 
-#[server(EndTestSession, "/api")]
+#[server]
 pub async fn end_test_session(session_id: String) -> Result<SessionSummary, ServerFnError> {
     #[cfg(feature = "ssr")]
     {
@@ -276,7 +276,7 @@ pub async fn end_test_session(session_id: String) -> Result<SessionSummary, Serv
             .map_err(|e| ServerFnError::new(format!("Failed to extract pool: {}", e)))?;
 
         let uuid = Uuid::parse_str(&session_id)
-            .map_err(|e| ServerFnError::new(format!("Invalid Uuid: {}", e)))?;
+            .map_err(|e| ServerFnError::new(format!("Invalid Uuid {}", e)))?;
 
         log::info!("Ending test session: {}", uuid);
 
@@ -307,7 +307,7 @@ pub async fn end_test_session(session_id: String) -> Result<SessionSummary, Serv
     }
 }
 
-#[server(CloseSession, "/api")]
+#[server]
 pub async fn close_session(session_id: String) -> Result<(), ServerFnError> {
     #[cfg(feature = "ssr")]
     {
@@ -327,7 +327,7 @@ pub async fn close_session(session_id: String) -> Result<(), ServerFnError> {
     }
 }
 
-#[server(CheckTeacherAccess, "/api")]
+#[server]
 pub async fn check_teacher_access(test_id: String, teacher_id: i32) -> Result<bool, ServerFnError> {
     #[cfg(feature = "ssr")]
     {
@@ -378,7 +378,7 @@ pub async fn check_teacher_access(test_id: String, teacher_id: i32) -> Result<bo
     }
 }
 
-#[server(AssignTeacherToSession, "/api")]
+#[server]
 pub async fn assign_teacher_to_session(
     session_id: String,
     teacher_id: i32,
@@ -406,7 +406,7 @@ pub async fn assign_teacher_to_session(
     }
 }
 
-#[server(GetTeacherActiveSession, "/api")]
+#[server]
 pub async fn get_teacher_active_session(
     teacher_id: i32,
 ) -> Result<Option<SessionSummary>, ServerFnError> {
@@ -430,7 +430,7 @@ pub async fn get_teacher_active_session(
     }
 }
 
-#[server(ReleaseTeacherFromSession, "/api")]
+#[server]
 pub async fn release_teacher_from_session(session_id: String) -> Result<(), ServerFnError> {
     #[cfg(feature = "ssr")]
     {
@@ -454,7 +454,7 @@ pub async fn release_teacher_from_session(session_id: String) -> Result<(), Serv
     }
 }
 
-#[server(CleanupTeacherSession, "/api")]
+#[server]
 pub async fn cleanup_teacher_session_endpoint(teacher_id: i32) -> Result<(), ServerFnError> {
     #[cfg(feature = "ssr")]
     {
@@ -479,7 +479,7 @@ pub async fn cleanup_teacher_session_endpoint(teacher_id: i32) -> Result<(), Ser
     }
 }
 
-#[server(CreateOrJoinSession, "/api")]
+#[server]
 pub async fn create_or_join_session(
     request: CreateSessionRequest,
 ) -> Result<SessionSummary, ServerFnError> {

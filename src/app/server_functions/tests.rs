@@ -1,7 +1,7 @@
 use crate::app::models::test::BenchmarkCategory;
 use crate::app::models::TestType;
 use crate::app::models::{test::Test, CreateNewTestRequest, DeleteTestRequest, UpdateTestRequest};
-use leptos::*;
+use leptos::prelude::*;
 use uuid::Uuid;
 #[cfg(feature = "ssr")]
 use {
@@ -12,7 +12,7 @@ use {
 //lowercase functions denot functions that are server side while upper/camel case functions
 //indicate Client side Objects/functions
 //
-#[server(GetTests, "/api")]
+#[server]
 pub async fn get_tests() -> Result<Vec<Test>, ServerFnError> {
     #[cfg(feature = "ssr")]
     {
@@ -37,7 +37,7 @@ pub async fn get_tests() -> Result<Vec<Test>, ServerFnError> {
     }
 }
 
-#[server(GetTestsBatch, "/api")]
+#[server]
 pub async fn get_tests_batch(test_ids: Vec<Uuid>) -> Result<Vec<Test>, ServerFnError> {
     #[cfg(feature = "ssr")]
     {
@@ -63,7 +63,7 @@ pub async fn get_tests_batch(test_ids: Vec<Uuid>) -> Result<Vec<Test>, ServerFnE
     }
 }
 
-#[server(GetTest, "/api")]
+#[server]
 pub async fn get_test(test_id: String) -> Result<Test, ServerFnError> {
     #[cfg(feature = "ssr")]
     {
@@ -88,7 +88,7 @@ pub async fn get_test(test_id: String) -> Result<Test, ServerFnError> {
     }
 }
 
-#[server(AddTest, "/api")]
+#[server]
 pub async fn add_test(add_test_request: CreateNewTestRequest) -> Result<Test, ServerFnError> {
     #[cfg(feature = "ssr")]
     {
@@ -125,7 +125,7 @@ pub async fn add_test(add_test_request: CreateNewTestRequest) -> Result<Test, Se
     }
 }
 
-#[server(DeleteTest, "/api")]
+#[server]
 pub async fn delete_test(delete_test_request: DeleteTestRequest) -> Result<Test, ServerFnError> {
     #[cfg(feature = "ssr")]
     {
@@ -144,7 +144,7 @@ pub async fn delete_test(delete_test_request: DeleteTestRequest) -> Result<Test,
     }
 }
 
-#[server(EditTest, "/api")]
+#[server]
 pub async fn update_test(update_test_request: UpdateTestRequest) -> Result<Test, ServerFnError> {
     #[cfg(feature = "ssr")]
     {
@@ -182,7 +182,7 @@ pub async fn update_test(update_test_request: UpdateTestRequest) -> Result<Test,
     }
 }
 
-#[server(ScoreOverride, "/api")]
+#[server]
 pub async fn score_overrider(test_id: String, score: i32) -> Result<Test, ServerFnError> {
     #[cfg(feature = "ssr")]
     {

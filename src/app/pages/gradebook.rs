@@ -18,9 +18,12 @@ use crate::app::server_functions::students::get_students;
 use crate::app::server_functions::tests::get_tests_batch;
 use chrono::Utc;
 use icondata::{BiCheckboxCheckedRegular, BiCheckboxRegular, HiUserCircleOutlineLg};
-use leptos::*;
+use leptos::prelude::*;
+use leptos::prelude::*;
 use leptos_icons::Icon;
-use leptos_router::*;
+use leptos_router::components::*;
+use leptos_router::hooks::*;
+use leptos_router::path;
 use std::collections::HashMap;
 
 #[component]
@@ -34,24 +37,23 @@ pub fn Gradebook() -> impl IntoView {
 
 #[component]
 pub fn GradebookContent() -> impl IntoView {
-    let (refresh_trigger, set_refresh_trigger) = create_signal(0);
-    let (selected_view, set_selected_view) = create_signal(SidebarSelected::Dashboard);
-    let (search_term, set_search_term) = create_signal(String::new());
+    let (refresh_trigger, set_refresh_trigger) = signal(0);
+    let (selected_view, set_selected_view) = signal(SidebarSelected::Dashboard);
+    let (search_term, set_search_term) = signal(String::new());
 
     // Store assessment ID instead of the whole assessment
-    let (selected_assessment_id, set_selected_assessment_id) =
-        create_signal(Option::<String>::None);
+    let (selected_assessment_id, set_selected_assessment_id) = signal(Option::<String>::None);
 
     // Side panel state
-    let (show_side_panel, set_show_side_panel) = create_signal(false);
-    let (panel_type, set_panel_type) = create_signal(ScorePanelType::None);
-    let (selected_student, set_selected_student) = create_signal(Option::<Student>::None);
+    let (show_side_panel, set_show_side_panel) = signal(false);
+    let (panel_type, set_panel_type) = signal(ScorePanelType::None);
+    let (selected_student, set_selected_student) = signal(Option::<Student>::None);
 
     // Current assessment/test data for the side panel
     let (current_assessment_data, set_current_assessment_data) =
-        create_signal(Option::<AssessmentSummary>::None);
-    let (current_test_data, set_current_test_data) = create_signal(Option::<TestDetail>::None);
-    let (next_test_id, set_next_test_id) = create_signal(Option::<String>::None);
+        signal(Option::<AssessmentSummary>::None);
+    let (current_test_data, set_current_test_data) = signal(Option::<TestDetail>::None);
+    let (next_test_id, set_next_test_id) = signal(Option::<String>::None);
 
     // Get global settings for anonymization
     let (settings, _) = use_settings();
@@ -60,10 +62,11 @@ pub fn GradebookContent() -> impl IntoView {
     // Get the student mapping service
     let (student_mapping_service, _) = use_student_mapping_service();
 
-    // OPTIMIZATION 1: Combine all initial data fetching into a single resource with better error handling
-    let initial_data = create_local_resource(
-        move || refresh_trigger(),
-        |_| async move {
+    // Updated LocalResource syntax - single fetcher function
+    let initial_data = LocalResource::new(move || {
+        // Create the async block here that tracks refresh_trigger
+        let trigger = refresh_trigger.get();
+        async move {
             log::info!("Starting gradebook data fetch...");
 
             // Fetch students and assessments concurrently
@@ -113,33 +116,31 @@ pub fn GradebookContent() -> impl IntoView {
                     None
                 }
             }
-        },
-    );
+        }
+    });
 
-    // OPTIMIZATION 2: Create derived signals from the combined data
-    let students = create_memo(move |_| {
+    let students = Memo::new(move |_| {
         initial_data
             .get()
             .and_then(|data| data.as_ref().map(|(students, _, _)| students.clone()))
             .unwrap_or_default()
     });
 
-    let assessment_list = create_memo(move |_| {
+    let assessment_list = Memo::new(move |_| {
         initial_data
             .get()
             .and_then(|data| data.as_ref().map(|(_, assessments, _)| assessments.clone()))
             .unwrap_or_default()
     });
 
-    let all_student_results = create_memo(move |_| {
+    let all_student_results = Memo::new(move |_| {
         initial_data
             .get()
             .and_then(|data| data.as_ref().map(|(_, _, results)| results.clone()))
             .unwrap_or_default()
     });
 
-    // OPTIMIZATION 3: Lazy load tests and scores only when assessment is selected
-    let selected_assessment = create_memo(move |_| {
+    let selected_assessment = Memo::new(move |_| {
         if let Some(assessment_id) = selected_assessment_id.get() {
             if assessment_id.is_empty() {
                 return None;
@@ -155,11 +156,12 @@ pub fn GradebookContent() -> impl IntoView {
         }
     });
 
-    // Only load tests when an assessment is selected
-    let tests = create_local_resource(
-        move || (selected_assessment.get(), refresh_trigger()),
-        |(selected_assessment_opt, _)| async move {
-            if let Some(assessment) = selected_assessment_opt {
+    // Updated tests resource - single fetcher function that tracks dependencies
+    let tests = LocalResource::new(move || {
+        let selected_assessment = selected_assessment.get();
+        let trigger = refresh_trigger.get();
+        async move {
+            if let Some(assessment) = selected_assessment {
                 match get_tests_batch(assessment.tests).await {
                     Ok(tests) => Some(tests),
                     Err(e) => {
@@ -170,14 +172,15 @@ pub fn GradebookContent() -> impl IntoView {
             } else {
                 None
             }
-        },
-    );
+        }
+    });
 
-    // Only load scores when an assessment is selected
-    let scores = create_local_resource(
-        move || (selected_assessment.get(), refresh_trigger()),
-        |(selected_assessment_opt, _)| async move {
-            if let Some(assessment) = selected_assessment_opt {
+    // Updated scores resource - single fetcher function that tracks dependencies
+    let scores = LocalResource::new(move || {
+        let selected_assessment = selected_assessment.get();
+        let trigger = refresh_trigger.get();
+        async move {
+            if let Some(assessment) = selected_assessment {
                 match get_scores_by_test(assessment.tests).await {
                     Ok(scores) => Some(scores),
                     Err(e) => {
@@ -188,8 +191,8 @@ pub fn GradebookContent() -> impl IntoView {
             } else {
                 None
             }
-        },
-    );
+        }
+    });
 
     // Helper function to get display name and ID
     let get_student_display = move |student: &Student| -> (String, String) {
@@ -219,7 +222,7 @@ pub fn GradebookContent() -> impl IntoView {
     };
 
     // OPTIMIZATION 4: Memoized filtered students with debouncing
-    let filtered_students = create_memo(move |_| {
+    let filtered_students = Memo::new(move |_| {
         let search = search_term().trim().to_lowercase();
         let students_list = students.get();
 
@@ -338,16 +341,16 @@ pub fn GradebookContent() -> impl IntoView {
                                         <span class="ml-2 px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
                                             "De-anonymized"
                                         </span>
-                                    }.into_view()
+                                    }.into_any()
                                 } else {
                                     view! {
                                         <span class="ml-2 px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full">
                                             "Anonymized"
                                         </span>
-                                    }.into_view()
+                                    }.into_any()
                                 }
                             } else {
-                                view! { <span></span> }.into_view()
+                                view! { <span></span> }.into_any()
                             }
                         }}
                     </h1>
@@ -405,12 +408,12 @@ pub fn GradebookContent() -> impl IntoView {
                                         <p class="text-gray-600">"Loading gradebook data..."</p>
                                     </div>
                                 </div>
-                            }.into_view(),
+                            }.into_any(),
                             Some(None) => view! {
                                 <div class="flex-1 flex items-center justify-center">
                                     <p class="text-red-600">"Failed to load gradebook data"</p>
                                 </div>
-                            }.into_view(),
+                            }.into_any(),
                             Some(Some(_)) => view! {
                                 <div class="flex-1 flex flex-col overflow-hidden rounded-md">
                                     <div class="h-full overflow-auto">
@@ -434,9 +437,9 @@ pub fn GradebookContent() -> impl IntoView {
                                                                 let assessments = assessment_list.get();
                                                                 assessments.into_iter().map(|assessment| {
                                                                     view! {
-                                                                        <th class="px-2 py-4 border text-center font-medium text-[#2E3A59] text-md whitespace-normal uppercase tracking-wider">{&assessment.name}</th>
+                                                                        <th class="px-2 py-4 border text-center font-medium text-[#2E3A59] text-md whitespace-normal uppercase tracking-wider">{assessment.name.clone()}</th>
                                                                     }
-                                                                }).collect_view()
+                                                                }).collect_view().into_any()
                                                             } else {
                                                                 // Show selected assessment's tests as columns
                                                                 match tests.get() {
@@ -449,16 +452,16 @@ pub fn GradebookContent() -> impl IntoView {
                                                                                     {format!("(Out of {})", &test.score)}
                                                                                 </th>
                                                                             }
-                                                                        }).collect_view()
+                                                                        }).collect_view().into_any()
                                                                     },
-                                                                    _ => view! {}.into_view()
+                                                                    _ => view! {}.into_any()
                                                                 }
                                                             }
                                                         }
                                                     }
                                                 </tr>
                                             </thead>
-                                            <                                            tbody class="text-md">
+                                            <tbody class="text-md">
                                                 {move || {
                                                     let students_list = filtered_students();
                                                     if students_list.is_empty() {
@@ -468,7 +471,7 @@ pub fn GradebookContent() -> impl IntoView {
                                                                     "No students match your search criteria."
                                                                 </td>
                                                             </tr>
-                                                        }.into_view()
+                                                        }.into_any()
                                                     } else {
                                                         // Clone the results map to avoid move issues
                                                         let results_map = all_student_results.get();
@@ -485,7 +488,7 @@ pub fn GradebookContent() -> impl IntoView {
                                                                         <a href=format!("/studentview/{}/results", &student.student_id)>
                                                                             <Icon
                                                                                 icon=HiUserCircleOutlineLg
-                                                                                class="w-4 h-4 text-[#2E3A59] inline-block mr-2"
+                                                                                attr:class="w-4 h-4 text-[#2E3A59] inline-block mr-2"
                                                                             />
                                                                             {display_name}
                                                                         </a>
@@ -518,22 +521,22 @@ pub fn GradebookContent() -> impl IntoView {
                                                                                             >
                                                                                                 {format!("{} / {}", score, total)}
                                                                                             </td>
-                                                                                        }.into_view()
+                                                                                        }.into_any()
                                                                                     } else {
                                                                                         view! {
                                                                                             <td class="px-2 py-2 border whitespace-nowrap bg-blue-100 text-center">
                                                                                                 "Not started"
                                                                                             </td>
-                                                                                        }.into_view()
+                                                                                        }.into_any()
                                                                                     }
                                                                                 } else {
                                                                                     view! {
                                                                                         <td class="px-2 py-2 border whitespace-nowrap text-center">
                                                                                             "-"
                                                                                         </td>
-                                                                                    }.into_view()
+                                                                                    }.into_any()
                                                                                 }
-                                                                            }).collect_view()
+                                                                            }).collect_view().into_any()
                                                                         } else {
                                                                             // Show selected assessment's test scores
                                                                             match tests.get() {
@@ -561,28 +564,28 @@ pub fn GradebookContent() -> impl IntoView {
                                                                                                             <span class="cursor-pointer hover:text-indigo-600" on:click=move |_| open_test(test_id.clone(), student_id, attempt_clone)>
                                                                                                                 {s.get_total().to_string()}
                                                                                                             </span>
-                                                                                                        }.into_view(),
-                                                                                                        None => view!{"-"}.into_view(),
+                                                                                                        }.into_any(),
+                                                                                                        None => view!{"-"}.into_any(),
                                                                                                     }
                                                                                                 }
                                                                                             </td>
-                                                                                        }
-                                                                                    }).collect_view()
+                                                                                        }.into_any()
+                                                                                    }).collect_view().into_any()
                                                                                 },
-                                                                                _ => view! {}.into_view()
+                                                                                _ => view! {}.into_any()
                                                                             }
                                                                         }
                                                                     }
                                                                 </tr>
-                                                            }
-                                                        }).collect_view()
+                                                            }.into_any()
+                                                        }).collect_view().into_any()
                                                     }
                                                 }}
                                             </tbody>
                                         </table>
                                     </div>
                                 </div>
-                            }.into_view()
+                            }.into_any()
                         }
                     }}
                 </main>
@@ -590,7 +593,7 @@ pub fn GradebookContent() -> impl IntoView {
                 <StudentScorePanel
                     show=show_side_panel
                     panel_type=panel_type
-                    set_show=set_show_side_panel
+                    set_show=Callback::new(move |value: bool| set_show_side_panel.set(value))
                     student=selected_student
                     assessment_data=current_assessment_data
                     test_data=current_test_data

@@ -1,4 +1,4 @@
-use leptos::ServerFnError;
+use leptos::prelude::*;
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "ssr")]{
@@ -6,7 +6,6 @@ cfg_if::cfg_if! {
         use crate::app::models::student::GradeEnum;
         use log::{debug, error, info, warn};
         use chrono::NaiveDate;
-        use leptos::*;
         use sqlx::PgPool;
         use sqlx::prelude::*;
 

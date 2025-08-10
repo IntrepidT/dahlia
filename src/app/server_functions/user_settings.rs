@@ -1,15 +1,15 @@
 use crate::app::db::user_database;
 use crate::app::models::setting_data::{UserSettings, UserSettingsUpdate};
-use leptos::*;
+use leptos::prelude::*;
 
-#[server(GetUserSettings, "/api")]
+#[server]
 pub async fn get_user_settings(user_id: i64) -> Result<UserSettings, ServerFnError> {
     #[cfg(feature = "ssr")]
     {
         use actix_web::web;
         use leptos_actix::extract;
         use sqlx::PgPool;
-        
+
         let pool = extract::<web::Data<PgPool>>()
             .await
             .map_err(|e| ServerFnError::new(format!("Failed to extract pool: {}", e)))?;
@@ -18,7 +18,10 @@ pub async fn get_user_settings(user_id: i64) -> Result<UserSettings, ServerFnErr
 
         match user_database::get_user_settings(&pool, user_id).await {
             Ok(settings) => {
-                log::info!("Successfully retrieved user settings for user ID {}", user_id);
+                log::info!(
+                    "Successfully retrieved user settings for user ID {}",
+                    user_id
+                );
                 Ok(settings)
             }
             Err(e) => {
@@ -29,7 +32,7 @@ pub async fn get_user_settings(user_id: i64) -> Result<UserSettings, ServerFnErr
     }
 }
 
-#[server(UpdateUserSettings, "/api")]
+#[server]
 pub async fn update_user_settings(
     user_id: i64,
     settings_update: UserSettingsUpdate,
@@ -39,7 +42,7 @@ pub async fn update_user_settings(
         use actix_web::web;
         use leptos_actix::extract;
         use sqlx::PgPool;
-        
+
         let pool = extract::<web::Data<PgPool>>()
             .await
             .map_err(|e| ServerFnError::new(format!("Failed to extract pool: {}", e)))?;
@@ -59,14 +62,14 @@ pub async fn update_user_settings(
     }
 }
 
-#[server(ResetUserSettings, "/api")]
+#[server]
 pub async fn reset_user_settings(user_id: i64) -> Result<UserSettings, ServerFnError> {
     #[cfg(feature = "ssr")]
     {
         use actix_web::web;
         use leptos_actix::extract;
         use sqlx::PgPool;
-        
+
         let pool = extract::<web::Data<PgPool>>()
             .await
             .map_err(|e| ServerFnError::new(format!("Failed to extract pool: {}", e)))?;
@@ -87,26 +90,32 @@ pub async fn reset_user_settings(user_id: i64) -> Result<UserSettings, ServerFnE
 }
 
 // Convenience functions for updating specific settings
-#[server(UpdateDarkMode, "/api")]
-pub async fn update_dark_mode(user_id: i64, dark_mode: bool) -> Result<UserSettings, ServerFnError> {
+#[server]
+pub async fn update_dark_mode(
+    user_id: i64,
+    dark_mode: bool,
+) -> Result<UserSettings, ServerFnError> {
     let settings_update = UserSettingsUpdate {
         ui: Some(crate::app::models::setting_data::UiSettingsUpdate {
             dark_mode: Some(dark_mode),
             pinned_sidebar: None,
         }),
     };
-    
+
     update_user_settings(user_id, settings_update).await
 }
 
-#[server(UpdatePinnedSidebar, "/api")]
-pub async fn update_pinned_sidebar(user_id: i64, pinned_sidebar: bool) -> Result<UserSettings, ServerFnError> {
+#[server]
+pub async fn update_pinned_sidebar(
+    user_id: i64,
+    pinned_sidebar: bool,
+) -> Result<UserSettings, ServerFnError> {
     let settings_update = UserSettingsUpdate {
         ui: Some(crate::app::models::setting_data::UiSettingsUpdate {
             dark_mode: None,
             pinned_sidebar: Some(pinned_sidebar),
         }),
     };
-    
+
     update_user_settings(user_id, settings_update).await
 }

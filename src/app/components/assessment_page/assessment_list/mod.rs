@@ -1,3 +1,4 @@
+use leptos::prelude::*;
 pub mod assessment_card;
 pub mod assessment_list;
 pub mod sequence_visualization;

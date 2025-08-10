@@ -19,8 +19,8 @@ use crate::app::middleware::global_settings::use_settings;
 use crate::app::models::test::Test;
 use crate::app::server_functions::data_wrappers::get_student_results_server;
 use crate::app::server_functions::tests::get_tests;
-use leptos::*;
-use leptos_router::use_params_map;
+use leptos::prelude::*;
+use leptos_router::hooks::use_params_map;
 use std::collections::HashSet;
 use uuid::Uuid;
 
@@ -45,7 +45,7 @@ pub fn TestResultsPage() -> impl IntoView {
     };
 
     // Resource to fetch consolidated student results data
-    let student_results_resource = create_resource(
+    let student_results_resource = Resource::new(
         move || student_id(),
         |id| async move {
             if id > 0 {
@@ -56,22 +56,19 @@ pub fn TestResultsPage() -> impl IntoView {
         },
     );
 
-    // Resource to fetch test data for benchmark categories
-    let tests_resource = create_local_resource(
-        || (),
-        |_| async {
-            match get_tests().await {
-                Ok(tests) => Some(tests),
-                Err(e) => {
-                    log::error!("Failed to load tests: {}", e);
-                    None
-                }
+    // Resource to fetch test data for benchmark categories - FIXED
+    let tests_resource = LocalResource::new(|| async {
+        match get_tests().await {
+            Ok(tests) => Some(tests),
+            Err(e) => {
+                log::error!("Failed to load tests: {}", e);
+                None
             }
-        },
-    );
+        }
+    });
 
     //Create enhanced student data with de-anonymization
-    let enhanced_student_data = create_memo(move |_| {
+    let enhanced_student_data = Memo::new(move |_| {
         student_results_resource
             .get()
             .unwrap_or(None)
@@ -130,12 +127,12 @@ pub fn TestResultsPage() -> impl IntoView {
                                 </div>
                             </div>
                         </div>
-                    }
+                    }.into_any()
                 }).unwrap_or_else(|| view! {
                     <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
                         "Student not found or invalid ID"
                     </div>
-                })}
+                }.into_any())}
             </Suspense>
 
             //View mode toggle
@@ -201,12 +198,12 @@ pub fn TestResultsPage() -> impl IntoView {
 
                             if view_mode.get() == "overview" {
                                 // Create signals for the overview controls
-                                let (search_query, set_search_query) = create_signal(String::new());
-                                let (selected_timeframe, set_selected_timeframe) = create_signal(TimeFrame::AllTime);
-                                let (selected_sort, set_selected_sort) = create_signal(SortOption::DateDesc);
+                                let (search_query, set_search_query) = signal(String::new());
+                                let (selected_timeframe, set_selected_timeframe) = signal(TimeFrame::AllTime);
+                                let (selected_sort, set_selected_sort) = signal(SortOption::DateDesc);
 
                                 // Filter and sort logic
-                                let filtered_and_sorted_tests = create_memo(move |_| {
+                                let filtered_and_sorted_tests = Memo::new(move |_| {
                                     let mut tests = test_history.clone();
                                     let query = search_query.get().to_lowercase();
                                     let timeframe = selected_timeframe.get();
@@ -386,7 +383,7 @@ pub fn TestResultsPage() -> impl IntoView {
                                                                 </div>
                                                             </div>
                                                         </>
-                                                    }
+                                                    }.into_any()
                                                 } else {
                                                     view! {
                                                         <>
@@ -508,50 +505,17 @@ pub fn TestResultsPage() -> impl IntoView {
                                                                 </div>
                                                             </div>
                                                         </>
-                                                    }
+                                                    }.into_any()
                                                 }
                                             }}
                                         </div>
                                     </div>
-                                }
+                                }.into_any()
                             } else {
-                                view! { <div></div> }
+                                view! { <div></div> }.into_any()
                             }
                         },
-                        None => view! { <div></div> }
-                    }
-                }}
-            </Suspense>
-
-            // Progress Overview Section
-            <Suspense fallback=move || view! {
-                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 animate-pulse">
-                    <div class="h-6 bg-gray-200 rounded w-1/4 mb-6"></div>
-                    <div class="space-y-3">
-                        <div class="h-4 bg-gray-200 rounded w-full"></div>
-                        <div class="h-4 bg-gray-200 rounded w-3/4"></div>
-                        <div class="h-4 bg-gray-200 rounded w-5/6"></div>
-                    </div>
-                </div>
-            }>
-                {move || {
-                    let results = enhanced_student_data.get().map(|(results, _)| results);
-                    match results {
-                        Some(data) => {
-                            if view_mode.get() == "sequence" {
-                                let assessments = data.assessment_summaries.clone();
-
-                                view! {
-                                    <ProgressOverviewTab
-                                        assessments=assessments
-                                        tests_resource=tests_resource
-                                    />
-                                }.into_view()
-                            } else {
-                                view! { <div></div> }.into_view()
-                            }
-                        },
-                        None => view! { <div></div> }.into_view()
+                        None => view! { <div></div> }.into_any()
                     }
                 }}
             </Suspense>
@@ -581,12 +545,12 @@ pub fn TestResultsPage() -> impl IntoView {
                                             }).collect::<Vec<_>>()}
                                         </div>
                                     </div>
-                                }
+                                }.into_any()
                             } else {
-                                view! { <div></div> }
+                                view! { <div></div> }.into_any()
                             }
                         },
-                        None => view! { <div></div> }
+                        None => view! { <div></div> }.into_any()
                     }
                 }}
             </Suspense>
@@ -605,7 +569,7 @@ pub fn TestResultsPage() -> impl IntoView {
                                             let assessments = data.assessment_summaries.clone();
                                             let assessments_clone = assessments.clone();
                                             if assessments.is_empty() {
-                                                view! { <div class="text-gray-600">"No assessment data available"</div> }
+                                                view! { <div class="text-gray-600">"No assessment data available"</div> }.into_any()
                                             } else {
                                                 view! {
                                                     <div class="overflow-x-auto">
@@ -712,13 +676,13 @@ pub fn TestResultsPage() -> impl IntoView {
                                                                         view! {
                                                                             <div class="mt-4 mb-8 bg-gray-50 border rounded-lg p-4 shadow">
                                                                                 <h3 class="font-semibold text-lg mb-2 text-blue-600">
-                                                                                    {format!("{} Details", assessment_name)}
+                                                                                    {format!("{} Details", assessment_name.clone())}
                                                                                 </h3>
 
                                                                                 <div class="mb-4">
                                                                                     <h4 class="font-semibold mb-2">{"Subtests Performance"}</h4>
                                                                                     {if test_details_clone.is_empty() {
-                                                                                        view! { <div><p class="text-gray-500">"No test data available for this assessment"</p></div> }
+                                                                                        view! { <div><p class="text-gray-500">"No test data available for this assessment"</p></div> }.into_any()
                                                                                     } else {
                                                                                         view! {
                                                                                             <div class="overflow-x-auto">
@@ -780,7 +744,7 @@ pub fn TestResultsPage() -> impl IntoView {
                                                                                                     </tbody>
                                                                                                 </table>
                                                                                             </div>
-                                                                                        }
+                                                                                        }.into_any()
                                                                                     }}
                                                                                 </div>
 
@@ -811,7 +775,7 @@ pub fn TestResultsPage() -> impl IntoView {
                                                                                                 };
                                                                                                 color_class
                                                                                             }>
-                                                                                                {&assessment_rating_clone}
+                                                                                                {assessment_rating_clone}
                                                                                             </div>
                                                                                             <div class="mt-2 text-sm text-gray-600">
                                                                                                 "Based on " {test_details_len} " completed tests"
@@ -854,25 +818,25 @@ pub fn TestResultsPage() -> impl IntoView {
                                                                                     </div>
                                                                                 </div>
                                                                             </div>
-                                                                        }
+                                                                        }.into_any()
                                                                     } else {
-                                                                        view! { <div></div> }
+                                                                        view! { <div></div> }.into_any()
                                                                     }
                                                                 }}
                                                             }
                                                         }).collect::<Vec<_>>()}
                                                     </div>
-                                                }
+                                                }.into_any()
                                             }
                                         },
-                                        None => view! { <div class="text-gray-600">"No assessment data available"</div> }
+                                        None => view! { <div class="text-gray-600">"No assessment data available"</div> }.into_any()
                                     }
                                 }}
                             </Suspense>
                         </div>
-                    }
+                    }.into_any()
                 } else {
-                    view! { <div></div> }
+                    view! { <div></div> }.into_any()
                 }
             }}
         </div>

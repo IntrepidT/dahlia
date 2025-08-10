@@ -5,7 +5,7 @@ use crate::app::models::assessment_sequences::{
     SequenceBehavior, TestSequenceItem, VariationLevel,
 };
 use crate::app::models::test::Test;
-use leptos::*;
+use leptos::prelude::*;
 use uuid::Uuid;
 
 #[component]
@@ -41,7 +41,7 @@ pub fn SequenceNode(
     };
 
     let dragging_item = sequence_builder.state.with(|s| s.dragging_item);
-    let (show_details, set_show_details) = create_signal(false);
+    let (show_details, set_show_details) = signal(false);
 
     let handle_drag_start = move |ev: leptos::ev::DragEvent| {
         ev.stop_propagation();
@@ -62,7 +62,7 @@ pub fn SequenceNode(
             if let Ok(data) = dt.get_data("text/plain") {
                 if let Ok(source_index) = data.parse::<usize>() {
                     if source_index != index {
-                        let new_sequence = sequence_builder.reorder_sequence.call((
+                        let new_sequence = sequence_builder.reorder_sequence.run((
                             source_index,
                             index,
                             current_sequence.get(),
@@ -80,60 +80,72 @@ pub fn SequenceNode(
     let remove_test = move |_| {
         let new_sequence = sequence_builder
             .remove_from_sequence
-            .call((item_test_id, current_sequence.get()));
+            .run((item_test_id, current_sequence.get()));
         on_sequence_change(new_sequence);
     };
 
     view! {
         <div class="flex flex-col items-center w-48 min-h-96">
             // Main Test Node
-            <div
-                class="sequence-node relative group cursor-move transition-all duration-200 hover:scale-105 z-10"
-                class:opacity-50={move || dragging_item == Some(index)}
-                draggable="true"
-                on:dragstart=handle_drag_start
-                on:dragover=move |ev: leptos::ev::DragEvent| {
-                    ev.prevent_default();
-                    ev.stop_propagation();
-                }
-                on:drop=handle_drop
-                on:dragend=move |_| {
-                    sequence_builder.set_state.update(|s| s.dragging_item = None);
-                }
-            >
-                <div
-                    class="w-20 h-20 rounded-full flex flex-col items-center justify-center text-white font-bold shadow-xl hover:shadow-2xl transition-shadow duration-200 relative"
-                    style=format!("background: linear-gradient(135deg, {}, {}); border: 3px solid {}", node_color, node_color, border_color)
-                >
-                    <div class="text-lg mb-1">{icon}</div>
-                    <div class="text-xs font-bold bg-black bg-opacity-20 rounded-full w-5 h-5 flex items-center justify-center">
-                        {seq_item.sequence_order}
-                    </div>
-                </div>
+            {
+                let sequence_node_class = move || {
+                    let base = "sequence-node relative group cursor-move transition-all duration-200 hover:scale-105 z-10";
+                    if dragging_item == Some(index) {
+                        format!("{} opacity-50", base)
+                    } else {
+                        base.to_string()
+                    }
+                };
 
-                // Action buttons
-                <div class="absolute -top-2 -right-2 opacity-0 group-hover:opacity-100 transition-opacity flex space-x-1 z-20">
-                    <button
-                        type="button"
-                        class="w-6 h-6 bg-blue-500 text-white rounded-full text-xs hover:bg-blue-600 transition-colors shadow-md"
-                        on:click=move |ev| {
+                view! {
+                    <div
+                        class=sequence_node_class
+                        draggable="true"
+                        on:dragstart=handle_drag_start
+                        on:dragover=move |ev: leptos::ev::DragEvent| {
+                            ev.prevent_default();
                             ev.stop_propagation();
-                            set_show_details.update(|val| *val = !*val);
                         }
-                        title="View details"
+                        on:drop=handle_drop
+                        on:dragend=move |_| {
+                            sequence_builder.set_state.update(|s| s.dragging_item = None);
+                        }
                     >
-                        "ⓘ"
-                    </button>
-                    <button
-                        type="button"
-                        class="w-6 h-6 bg-red-500 text-white rounded-full text-xs hover:bg-red-600 transition-colors shadow-md"
-                        on:click=remove_test
-                        title="Remove test"
-                    >
-                        "×"
-                    </button>
-                </div>
-            </div>
+                        <div
+                            class="w-20 h-20 rounded-full flex flex-col items-center justify-center text-white font-bold shadow-xl hover:shadow-2xl transition-shadow duration-200 relative"
+                            style=format!("background: linear-gradient(135deg, {}, {}); border: 3px solid {}", node_color, node_color, border_color)
+                        >
+                            <div class="text-lg mb-1">{icon}</div>
+                            <div class="text-xs font-bold bg-black bg-opacity-20 rounded-full w-5 h-5 flex items-center justify-center">
+                                {seq_item.sequence_order}
+                            </div>
+                        </div>
+
+                        // Action buttons
+                        <div class="absolute -top-2 -right-2 opacity-0 group-hover:opacity-100 transition-opacity flex space-x-1 z-20">
+                            <button
+                                type="button"
+                                class="w-6 h-6 bg-blue-500 text-white rounded-full text-xs hover:bg-blue-600 transition-colors shadow-md"
+                                on:click=move |ev| {
+                                    ev.stop_propagation();
+                                    set_show_details.update(|val| *val = !*val);
+                                }
+                                title="View details"
+                            >
+                                "ⓘ"
+                            </button>
+                            <button
+                                type="button"
+                                class="w-6 h-6 bg-red-500 text-white rounded-full text-xs hover:bg-red-600 transition-colors shadow-md"
+                                on:click=remove_test
+                                title="Remove test"
+                            >
+                                "×"
+                            </button>
+                        </div>
+                    </div>
+                }
+            }
 
             // Node Info
             <div class="mt-4 text-center w-full px-2">
@@ -148,18 +160,18 @@ pub fn SequenceNode(
                         <div class="text-xs text-green-700 font-medium bg-green-100 rounded-full px-2 py-1 mb-1">
                             "Requires "{seq_item.required_score.unwrap_or(70)}"%"
                         </div>
-                    }.into_view()
+                    }.into_any()
                 } else {
-                    view! {}.into_view()
+                    view! {}.into_any()
                 }}
                 {if has_variations {
                     view! {
                         <div class="text-xs text-orange-600 font-bold bg-orange-100 rounded-full px-2 py-1">
                             {format!("{} Variation{}", variations.len(), if variations.len() == 1 { "" } else { "s" })}
                         </div>
-                    }.into_view()
+                    }.into_any()
                 } else {
-                    view! {}.into_view()
+                    view! {}.into_any()
                 }}
             </div>
 
@@ -172,9 +184,9 @@ pub fn SequenceNode(
                         </div>
                         <VariationStack variations=variations all_tests=all_tests item_test_id=item_test_id />
                     </div>
-                }.into_view()
+                }.into_any()
             } else {
-                view! { <div class="h-12"></div> }.into_view()
+                view! { <div class="h-12"></div> }.into_any()
             }}
 
             // Details Panel
@@ -278,9 +290,9 @@ fn VariationStack(
                                         "STILL FAIL ↓"
                                     </div>
                                 </div>
-                            }.into_view()
+                            }.into_any()
                         } else {
-                            view! {}.into_view()
+                            view! {}.into_any()
                         }}
                     </div>
                 }

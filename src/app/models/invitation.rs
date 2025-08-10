@@ -1,12 +1,13 @@
+use leptos::prelude::*;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Invitation {
-    pub id: i64,
+    pub id= i64,
     pub code: String,
     pub school_name: String,
-    pub invited_by_user_id: Option<i64>,
+    pub invited_by_user_id= Option<i64>,
     pub role: String,
     pub max_uses: i32,
     pub current_uses: i32,
@@ -33,8 +34,8 @@ pub struct InvitationInfo {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VerificationCode {
-    pub id: i64,
-    pub user_id: i64,
+    pub id= i64,
+    pub user_id= i64,
     pub code: String,
     pub verification_type: VerificationType,
     pub expires_at: DateTime<Utc>,
@@ -174,10 +175,10 @@ mod tests {
     #[test]
     fn test_invitation_validity() {
         let mut invitation = Invitation {
-            id: 1,
+            id= 1,
             code: "TEST123".to_string(),
             school_name: "Test School".to_string(),
-            invited_by_user_id: Some(1),
+            invited_by_user_id= Some(1),
             role: "user".to_string(),
             max_uses: 5,
             current_uses: 2,

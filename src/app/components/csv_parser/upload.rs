@@ -1,3 +1,4 @@
+use leptos::prelude::*;
 let handle_csv_upload = move |file: File| {
     let reader = FileReader::new().unwrap();
     let reader_clone = reader.clone();

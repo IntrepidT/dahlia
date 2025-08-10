@@ -1,6 +1,7 @@
 use crate::app::models::user::UserRole;
 #[cfg(feature = "ssr")]
 use actix::prelude::{Message, Recipient};
+use leptos::prelude::*;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 

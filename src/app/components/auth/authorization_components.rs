@@ -1,21 +1,20 @@
 use crate::app::models::user::SessionUser;
 use crate::app::server_functions::auth::get_current_user;
-use leptos::*;
-use leptos_router::{use_location, use_navigate};
+use leptos::prelude::*;
+use leptos_router::hooks::{use_location, use_navigate};
 use log::debug;
 
 #[component]
-pub fn AuthProvider(children: Children) -> impl IntoView {
-    let (current_user, set_current_user) = create_signal::<Option<SessionUser>>(None);
-    let (loading, set_loading) = create_signal(true);
-    let (initialized, set_initialized) = create_signal(false);
-    let (redirect_after_auth, set_redirect_after_auth) = create_signal::<Option<String>>(None);
+pub fn AuthProvider(children: ChildrenFn) -> impl IntoView {
+    let (current_user, set_current_user) = signal::<Option<SessionUser>>(None);
+    let (loading, set_loading) = signal(true);
+    let (initialized, set_initialized) = signal(false);
+    let (redirect_after_auth, set_redirect_after_auth) = signal::<Option<String>>(None);
 
-    // Use create_local_resource to avoid hydration issues
-    let user_resource = create_local_resource(
+    let user_resource = Resource::new(
         move || initialized.get(),
-        move |_| async move {
-            if initialized.get() {
+        move |is_initialized| async move {
+            if is_initialized {
                 debug!("AuthProvider: Loading user");
                 get_current_user().await
             } else {
@@ -25,11 +24,11 @@ pub fn AuthProvider(children: Children) -> impl IntoView {
     );
 
     // Initialize auth on client side only
-    create_effect(move |_| {
+    Effect::new(move |_| {
         if !initialized.get_untracked() {
             set_initialized.set(true);
 
-            // Store current path for post-login redirect
+            // Store current path for post-login redirect - use get_untracked to avoid tracking
             let location = use_location();
             let current_path = location.pathname.get_untracked();
             if !is_auth_page(&current_path) {
@@ -39,7 +38,7 @@ pub fn AuthProvider(children: Children) -> impl IntoView {
     });
 
     // Track resource state
-    create_effect(move |_| {
+    Effect::new(move |_| {
         match user_resource.get() {
             Some(Ok(user)) => {
                 debug!("AuthProvider: User loaded: {:?}", user.is_some());
@@ -71,19 +70,16 @@ pub fn AuthProvider(children: Children) -> impl IntoView {
 }
 
 #[component]
-pub fn RequireAuth(children: Children) -> impl IntoView {
-    let current_user =
-        use_context::<ReadSignal<Option<SessionUser>>>().expect("AuthProvider context not found");
-    let loading = use_context::<ReadSignal<bool>>().expect("AuthProvider context not found");
-    let set_redirect_after_auth =
-        use_context::<WriteSignal<Option<String>>>().expect("AuthProvider context not found");
+pub fn RequireAuth(children: ChildrenFn) -> impl IntoView {
+    let current_user = expect_context::<ReadSignal<Option<SessionUser>>>();
+    let loading = expect_context::<ReadSignal<bool>>();
+    let set_redirect_after_auth = expect_context::<WriteSignal<Option<String>>>();
 
     let navigate = use_navigate();
     let location = use_location();
-    let rendered_children = store_value(children());
 
-    // Handle redirect when not authenticated - use create_effect with proper tracking
-    create_effect(move |_| {
+    // Handle redirect when not authenticated
+    Effect::new(move |_| {
         let is_loading = loading.get();
         let user = current_user.get();
 
@@ -94,6 +90,7 @@ pub fn RequireAuth(children: Children) -> impl IntoView {
         );
 
         if !is_loading && user.is_none() {
+            // Use get_untracked to avoid creating unnecessary reactive dependencies
             let current_path = location.pathname.get_untracked();
             if !is_auth_page(&current_path) {
                 set_redirect_after_auth.set(Some(current_path));
@@ -103,65 +100,60 @@ pub fn RequireAuth(children: Children) -> impl IntoView {
         }
     });
 
-    // Use Suspense to handle loading states properly
+    // Use Show component with proper reactive tracking
     view! {
-        <Suspense fallback=move || loading_view()>
-            {move || {
-                let is_loading = loading.get();
-                let user = current_user.get();
-
-                if is_loading {
-                    debug!("RequireAuth: Showing loading view");
-                    loading_view().into_view()
-                } else if user.is_some() {
-                    debug!("RequireAuth: User authenticated, showing content");
-                    rendered_children.get_value().into_view()
+        <Show
+            when=move || !loading.get() && current_user.get().is_some()
+            fallback=move || {
+                if loading.get() {
+                    loading_view().into_any()
                 } else {
-                    debug!("RequireAuth: No user, showing redirect view");
-                    redirect_view().into_view()
+                    redirect_view().into_any()
                 }
-            }}
-        </Suspense>
+            }
+        >
+            {children()}
+        </Show>
     }
 }
 
 #[component]
 pub fn RequireRole(
     #[prop(default = "user".to_string())] role: String,
-    children: Children,
+    children: ChildrenFn,
 ) -> impl IntoView {
-    let current_user =
-        use_context::<ReadSignal<Option<SessionUser>>>().expect("AuthProvider context not found");
-    let loading = use_context::<ReadSignal<bool>>().expect("AuthProvider context not found");
-    let set_redirect_after_auth =
-        use_context::<WriteSignal<Option<String>>>().expect("AuthProvider context not found");
+    let current_user = expect_context::<ReadSignal<Option<SessionUser>>>();
+    let loading = expect_context::<ReadSignal<bool>>();
+    let set_redirect_after_auth = expect_context::<WriteSignal<Option<String>>>();
 
     let navigate = use_navigate();
     let location = use_location();
-    let rendered_children = store_value(children());
-    let role_stored = store_value(role);
 
-    create_effect(move |_| {
+    // Clone role for use in both closures
+    let role_for_effect = role.clone();
+    let role_for_when = role.clone();
+
+    Effect::new(move |_| {
         let is_loading = loading.get();
         let user = current_user.get();
-        let role = role_stored.get_value();
 
         debug!(
             "RequireRole: loading={}, user={:?}, required_role={}",
             is_loading,
             user.is_some(),
-            role
+            role_for_effect
         );
 
         if !is_loading {
             match user {
                 Some(user) => {
-                    if !user_has_role(&user, &role) {
-                        debug!("RequireRole: User lacks required role: {}", role);
+                    if !user_has_role(&user, &role_for_effect) {
+                        debug!("RequireRole: User lacks required role: {}", role_for_effect);
                         navigate("/", Default::default());
                     }
                 }
                 None => {
+                    // Use get_untracked to avoid creating unnecessary reactive dependencies
                     let current_path = location.pathname.get_untracked();
                     if !is_auth_page(&current_path) {
                         set_redirect_after_auth.set(Some(current_path));
@@ -173,60 +165,63 @@ pub fn RequireRole(
         }
     });
 
+    // Use Show component with proper reactive tracking
     view! {
-        <Suspense fallback=move || loading_view()>
-            {move || {
-                let is_loading = loading.get();
-                let user = current_user.get();
-                let role = role_stored.get_value();
-
-                if is_loading {
-                    debug!("RequireRole: Showing loading view");
-                    loading_view().into_view()
-                } else if let Some(user) = user {
-                    if user_has_role(&user, &role) {
-                        debug!("RequireRole: User has required role, showing content");
-                        rendered_children.get_value().into_view()
-                    } else {
-                        debug!("RequireRole: User lacks required role, showing unauthorized view");
-                        unauthorized_view().into_view()
-                    }
+        <Show
+            when=move || {
+                if loading.get() {
+                    false
+                } else if let Some(user) = current_user.get() {
+                    user_has_role(&user, &role_for_when)
                 } else {
-                    debug!("RequireRole: No user, showing redirect view");
-                    redirect_view().into_view()
+                    false
                 }
-            }}
-        </Suspense>
+            }
+            fallback=move || {
+                if loading.get() {
+                    loading_view().into_any()
+                } else if current_user.get().is_some() {
+                    unauthorized_view().into_any()
+                } else {
+                    redirect_view().into_any()
+                }
+            }
+        >
+            {children()}
+        </Show>
     }
 }
 
 #[component]
-pub fn RequireAnyRole(roles: Vec<String>, children: Children) -> impl IntoView {
-    let current_user =
-        use_context::<ReadSignal<Option<SessionUser>>>().expect("AuthProvider context not found");
-    let loading = use_context::<ReadSignal<bool>>().expect("AuthProvider context not found");
-    let set_redirect_after_auth =
-        use_context::<WriteSignal<Option<String>>>().expect("AuthProvider context not found");
+pub fn RequireAnyRole(roles: Vec<String>, children: ChildrenFn) -> impl IntoView {
+    let current_user = expect_context::<ReadSignal<Option<SessionUser>>>();
+    let loading = expect_context::<ReadSignal<bool>>();
+    let set_redirect_after_auth = expect_context::<WriteSignal<Option<String>>>();
 
     let navigate = use_navigate();
     let location = use_location();
-    let rendered_children = store_value(children());
-    let roles_stored = store_value(roles);
 
-    create_effect(move |_| {
+    // Clone roles for use in both closures
+    let roles_for_effect = roles.clone();
+    let roles_for_when = roles.clone();
+
+    Effect::new(move |_| {
         let is_loading = loading.get();
         let user = current_user.get();
-        let roles = roles_stored.get_value();
 
         if !is_loading {
             match user {
                 Some(user) => {
-                    if !user_has_any_role(&user, &roles) {
-                        debug!("RequireAnyRole: User lacks required roles: {:?}", roles);
+                    if !user_has_any_role(&user, &roles_for_effect) {
+                        debug!(
+                            "RequireAnyRole: User lacks required roles: {:?}",
+                            roles_for_effect
+                        );
                         navigate("/", Default::default());
                     }
                 }
                 None => {
+                    // Use get_untracked to avoid creating unnecessary reactive dependencies
                     let current_path = location.pathname.get_untracked();
                     if !is_auth_page(&current_path) {
                         set_redirect_after_auth.set(Some(current_path));
@@ -238,31 +233,35 @@ pub fn RequireAnyRole(roles: Vec<String>, children: Children) -> impl IntoView {
         }
     });
 
+    // Use Show component with proper reactive tracking
     view! {
-        <Suspense fallback=move || loading_view()>
-            {move || {
-                let is_loading = loading.get();
-                let user = current_user.get();
-                let roles = roles_stored.get_value();
-
-                if is_loading {
-                    loading_view().into_view()
-                } else if let Some(user) = user {
-                    if user_has_any_role(&user, &roles) {
-                        rendered_children.get_value().into_view()
-                    } else {
-                        unauthorized_view().into_view()
-                    }
+        <Show
+            when=move || {
+                if loading.get() {
+                    false
+                } else if let Some(user) = current_user.get() {
+                    user_has_any_role(&user, &roles_for_when)
                 } else {
-                    redirect_view().into_view()
+                    false
                 }
-            }}
-        </Suspense>
+            }
+            fallback=move || {
+                if loading.get() {
+                    loading_view().into_any()
+                } else if current_user.get().is_some() {
+                    unauthorized_view().into_any()
+                } else {
+                    redirect_view().into_any()
+                }
+            }
+        >
+            {children()}
+        </Show>
     }
 }
 
 #[component]
-pub fn RequireAdminOrTeacher(children: Children) -> impl IntoView {
+pub fn RequireAdminOrTeacher(children: ChildrenFn) -> impl IntoView {
     view! {
         <RequireAnyRole roles=vec!["admin".to_string(), "teacher".to_string()]>
             {children()}
@@ -328,12 +327,11 @@ fn unauthorized_view() -> impl IntoView {
 
 // Post-login redirect function
 pub fn perform_post_login_redirect() {
-    let redirect_after_auth =
-        use_context::<ReadSignal<Option<String>>>().expect("AuthProvider context not found");
-    let set_redirect_after_auth =
-        use_context::<WriteSignal<Option<String>>>().expect("AuthProvider context not found");
+    let redirect_after_auth = expect_context::<ReadSignal<Option<String>>>();
+    let set_redirect_after_auth = expect_context::<WriteSignal<Option<String>>>();
     let navigate = use_navigate();
 
+    // Use get_untracked for one-time read that doesn't need tracking
     if let Some(redirect_path) = redirect_after_auth.get_untracked() {
         set_redirect_after_auth.set(None);
         navigate(&redirect_path, Default::default());
@@ -344,13 +342,13 @@ pub fn perform_post_login_redirect() {
 
 // Auth hooks for components that need user data
 pub fn use_current_user() -> ReadSignal<Option<SessionUser>> {
-    use_context::<ReadSignal<Option<SessionUser>>>().expect("AuthProvider context not found")
+    expect_context::<ReadSignal<Option<SessionUser>>>()
 }
 
 pub fn use_auth_loading() -> ReadSignal<bool> {
-    use_context::<ReadSignal<bool>>().expect("AuthProvider context not found")
+    expect_context::<ReadSignal<bool>>()
 }
 
 pub fn use_set_current_user() -> WriteSignal<Option<SessionUser>> {
-    use_context::<WriteSignal<Option<SessionUser>>>().expect("AuthProvider context not found")
+    expect_context::<WriteSignal<Option<SessionUser>>>()
 }

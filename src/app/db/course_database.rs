@@ -1,10 +1,10 @@
+use leptos::prelude::*;
 cfg_if::cfg_if! {
     if #[cfg(feature = "ssr")] {
         use crate::app::models::course::{Course, CreateCourseRequest, UpdateCourseRequest};
         use crate::app::models::student::GradeEnum;
         use crate::app::models::enrollment::AcademicYear;
         use chrono::{DateTime, Utc};
-        use leptos::*;
         use log::{debug, error, info, warn};
         use sqlx::prelude::*;
         use sqlx::PgPool;

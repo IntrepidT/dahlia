@@ -1,10 +1,10 @@
 use crate::app::models::course::{Course, CreateCourseRequest, UpdateCourseRequest};
-use leptos::*;
+use leptos::prelude::*;
 
 #[cfg(feature = "ssr")]
 use {crate::app::db::course_database, actix_web::web, sqlx::PgPool, std::error::Error};
 
-#[server(GetCourses, "/api")]
+#[server]
 pub async fn get_courses() -> Result<Vec<Course>, ServerFnError> {
     #[cfg(feature = "ssr")]
     {
@@ -31,7 +31,7 @@ pub async fn get_courses() -> Result<Vec<Course>, ServerFnError> {
     }
 }
 
-#[server(GetCourse, "/api")]
+#[server]
 pub async fn get_course(course_id: i32) -> Result<Course, ServerFnError> {
     #[cfg(feature = "ssr")]
     {
@@ -58,7 +58,7 @@ pub async fn get_course(course_id: i32) -> Result<Course, ServerFnError> {
     }
 }
 
-#[server(GetCourseByCode, "/api")]
+#[server]
 pub async fn get_course_by_code(course_code: String) -> Result<Course, ServerFnError> {
     #[cfg(feature = "ssr")]
     {
@@ -85,7 +85,7 @@ pub async fn get_course_by_code(course_code: String) -> Result<Course, ServerFnE
     }
 }
 
-#[server(AddCourse, "/api")]
+#[server]
 pub async fn add_course(add_course_request: CreateCourseRequest) -> Result<Course, ServerFnError> {
     #[cfg(feature = "ssr")]
     {
@@ -116,7 +116,7 @@ pub async fn add_course(add_course_request: CreateCourseRequest) -> Result<Cours
     }
 }
 
-#[server(UpdateCourse, "/api")]
+#[server]
 pub async fn update_course(
     course_id: i32,
     update_course_request: UpdateCourseRequest,
@@ -144,7 +144,7 @@ pub async fn update_course(
     }
 }
 
-#[server(DeleteCourse, "/api")]
+#[server]
 pub async fn delete_course(course_id: i32) -> Result<(), ServerFnError> {
     #[cfg(feature = "ssr")]
     {

@@ -2,7 +2,9 @@ use crate::app::models::employee::{AddNewEmployeeRequest, EmployeeRole, StatusEn
 use crate::app::models::student::GradeEnum;
 use crate::app::server_functions::employees::add_employee;
 use leptos::ev::SubmitEvent;
-use leptos::*;
+use leptos::prelude::*;
+use leptos::prelude::*;
+use leptos::task::spawn_local;
 use std::str::FromStr;
 use strum::IntoEnumIterator;
 use validator::Validate;
@@ -25,14 +27,14 @@ pub fn AddEmployeeForm(
     #[prop(into)] on_cancel: Callback<()>,
     #[prop(into)] on_save: Callback<()>,
 ) -> impl IntoView {
-    let (new_firstname, set_new_firstname) = create_signal(String::new());
-    let (new_lastname, set_new_lastname) = create_signal(String::new());
-    let (new_status, set_new_status) = create_signal(String::from("Not Applicable"));
-    let (new_role, set_new_role) = create_signal(String::new());
-    let (yes_no_grade, set_yes_no_grade) = create_signal(false);
-    let (new_grade, set_new_grade) = create_signal(String::from("None"));
-    let (error_message, set_error_message) = create_signal(String::new());
-    let (if_error, set_if_error) = create_signal(false);
+    let (new_firstname, set_new_firstname) = signal(String::new());
+    let (new_lastname, set_new_lastname) = signal(String::new());
+    let (new_status, set_new_status) = signal(String::from("Not Applicable"));
+    let (new_role, set_new_role) = signal(String::new());
+    let (yes_no_grade, set_yes_no_grade) = signal(false);
+    let (new_grade, set_new_grade) = signal(String::from("None"));
+    let (error_message, set_error_message) = signal(String::new());
+    let (if_error, set_if_error) = signal(false);
 
     let handle_submit_new_employee = move |ev: SubmitEvent| {
         ev.prevent_default();
@@ -76,7 +78,7 @@ pub fn AddEmployeeForm(
 
         spawn_local(async move {
             match add_employee(add_employee_request).await {
-                Ok(_) => on_save(()),
+                Ok(_) => on_save.run(()),
                 Err(e) => {
                     set_if_error(true);
                     set_error_message(format!("Error adding employee: {:?}", e));
@@ -163,7 +165,7 @@ pub fn AddEmployeeForm(
                     <button
                         type="button"
                         class=BUTTON_SECONDARY_STYLE
-                        on:click=move |_| on_cancel(())
+                        on:click=move |_| on_cancel.run(())
                     >
                         "Cancel"
                     </button>

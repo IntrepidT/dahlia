@@ -1,7 +1,8 @@
 use crate::app::components::teacher_page::update_employee_form::UpdateEmployeeForm;
 use crate::app::models::employee::{Employee, EmployeeRole};
-use leptos::*;
-use std::rc::Rc;
+use leptos::prelude::*;
+use leptos::prelude::*;
+use std::sync::Arc;
 
 // Updated consistent color scheme and styling
 const THEME_PRIMARY: &str = "#003366";
@@ -26,14 +27,14 @@ const BUTTON_ACCENT: &str = "px-4 py-2 bg-[#F9F9F8] rounded-md font-medium text-
 
 #[component]
 pub fn EmployeeDetails(
-    #[prop()] employee: Rc<Employee>,
+    #[prop()] employee: Arc<Employee>,
     #[prop(into)] on_close: Callback<()>,
     #[prop(into)] call_refresh: Callback<()>,
 ) -> impl IntoView {
-    let (updating_employee, set_updating_employee) = create_signal(false);
+    let (updating_employee, set_updating_employee) = signal(false);
 
     // Create a memo for the employee to ensure stable references
-    let employee_memo = create_memo(move |_| employee.clone());
+    let employee_memo = Memo::new(move |_| employee.clone());
 
     // Create explicit callbacks for the UpdateEmployeeForm
     let on_cancel = Callback::new(move |()| {
@@ -42,13 +43,13 @@ pub fn EmployeeDetails(
 
     let on_save = Callback::new(move |()| {
         set_updating_employee(false);
-        call_refresh.call(());
+        call_refresh.run(());
     });
 
     view! {
         <Show when=move || updating_employee()>
             <UpdateEmployeeForm
-                employee=employee_memo()
+                employee=employee_memo.get()
                 on_cancel=on_cancel
                 on_save=on_save
             />
@@ -57,10 +58,10 @@ pub fn EmployeeDetails(
             <div class=CARD_CONTAINER>
                 <div class="flex items-center justify-between mb-6">
                     <h2 class="text-xl font-bold text-[#2E3A59]">
-                        {move || format!("{} {}", employee_memo().firstname, employee_memo().lastname)}
+                        {move || format!("{} {}", employee_memo.get().firstname, employee_memo.get().lastname)}
                     </h2>
                     <div class="px-3 py-1 rounded-full bg-[#2E3A59] text-white text-xs font-medium">
-                        {move || employee_memo().status.to_string()}
+                        {move || employee_memo.get().status.to_string()}
                     </div>
                 </div>
 
@@ -72,14 +73,14 @@ pub fn EmployeeDetails(
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div class=INFO_GROUP>
                                     <div class=INFO_TITLE>"Employee ID"</div>
-                                    <div class=INFO_VALUE>{move || format!("#{}", employee_memo().id)}</div>
+                                    <div class=INFO_VALUE>{move || format!("#{}", employee_memo.get().id)}</div>
                                 </div>
                                 <div class=INFO_GROUP>
                                     <div class=INFO_TITLE>"Role"</div>
-                                    <div class=INFO_VALUE>{move || employee_memo().role.to_string()}</div>
+                                    <div class=INFO_VALUE>{move || employee_memo.get().role.to_string()}</div>
                                 </div>
                                 {move || {
-                                    let employee = employee_memo();
+                                    let employee = employee_memo.get();
                                     match &employee.role {
                                         EmployeeRole::Teacher { grade } => {
                                             view! {
@@ -87,14 +88,14 @@ pub fn EmployeeDetails(
                                                     <div class=INFO_TITLE>"Assigned Grade"</div>
                                                     <div class=INFO_VALUE>
                                                         {grade.as_ref().map_or(
-                                                            view! { <span class="text-gray-400">"Not Assigned"</span> },
-                                                            |g| view! { <span class="font-medium">{g.to_string()}</span> }
+                                                            view! { <span class="text-gray-400">"Not Assigned"</span> }.into_any(),
+                                                            |g| view! { <span class="font-medium">{g.to_string()}</span> }.into_any()
                                                         )}
                                                     </div>
                                                 </div>
-                                            }.into_view()
+                                            }.into_any()
                                         }
-                                        _ => view! {}.into_view()
+                                        _ => view! {}.into_any()
                                     }
                                 }}
                             </div>
@@ -105,7 +106,7 @@ pub fn EmployeeDetails(
                     <button
                         type="button"
                         class=BUTTON_SECONDARY
-                        on:click=move |_| on_close.call(())
+                        on:click=move |_| on_close.run(())
                     >
                         "Close"
                     </button>

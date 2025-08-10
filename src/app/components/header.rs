@@ -1,5 +1,5 @@
-use leptos::*;
-use leptos_router::*;
+use leptos::prelude::*;
+use leptos_router::components::*;
 
 #[component]
 pub fn Header() -> impl IntoView {
@@ -7,27 +7,30 @@ pub fn Header() -> impl IntoView {
         <header class="sticky top-0 z-50 w-full bg-[#F9F9F8] backdrop-blur bg-opacity-90">
             <div class="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
                 <div class="flex justify-between items-center h-20">
-                    {/* Logo and brand name */}
+                    // Logo and brand name
                     <div class="flex items-center transform hover:scale-105 transition-transform duration-200">
-                        <A href="/dashboard" class="flex items-center">
-                            <div class="rounded-lg ">
+                        <a
+                            href="/dashboard"
+                            class="flex items-center"
+                        >
+                            <div class="rounded-lg">
                                 <img
                                     src="/assets/teapot2.png"
                                     alt="Teapot Testing"
-                                    class="h-24 w-auto "
+                                    class="h-24 w-auto"
                                 />
                             </div>
                             <div class="hidden sm:block">
                                 <div class="font-montserrat text-4xl font-bold text-[#2E3A59] leading-tight">
-                                    "teapot"
+                                    "teapot v2"
                                 </div>
                             </div>
-                        </A>
+                        </a>
                     </div>
 
-                    {/* User Account */}
+                    // User Account
                     <div class="flex items-center transform hover:scale-105 transition-transform duration-200">
-                        <A
+                        <a
                             href="/myaccount"
                             class="flex items-center space-x-2 bg-[#2E3A59] hover:bg-opacity-80 text-[#F9F9F8] px-4 py-2 rounded-lg transition-colors duration-200 text-sm font-medium"
                         >
@@ -35,10 +38,10 @@ pub fn Header() -> impl IntoView {
                                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                                 <circle cx="12" cy="7" r="4"></circle>
                             </svg>
-                        </A>
+                        </a>
                     </div>
 
-                    {/* Mobile menu button - hidden on desktop */}
+                    // Mobile menu button - hidden on desktop
                     <div class="md:hidden flex items-center">
                         <button class="text-[#DADADA] hover:text-[#2E3A59] focus:outline-none transition-colors duration-200">
                             <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -47,7 +50,8 @@ pub fn Header() -> impl IntoView {
                                     stroke-linejoin="round"
                                     stroke-width="2"
                                     d="M4 6h16M4 12h16m-7 6h7"
-                                ></path>
+                                >
+                                </path>
                             </svg>
                         </button>
                     </div>

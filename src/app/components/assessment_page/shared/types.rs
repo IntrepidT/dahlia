@@ -4,7 +4,8 @@ use crate::app::models::assessment_sequences::{
 };
 use crate::app::models::student::GradeEnum;
 use crate::app::models::test::Test;
-use leptos::*;
+use leptos::prelude::*;
+use leptos::prelude::*;
 use uuid::Uuid;
 
 #[derive(Clone, Debug)]

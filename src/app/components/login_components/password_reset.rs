@@ -1,18 +1,20 @@
 use crate::app::server_functions::auth::{
     request_password_reset, reset_password, validate_reset_token,
 };
-use leptos::*;
-use leptos_router::{use_params, Params};
+use leptos::prelude::*;
+use leptos::task::spawn_local;
+use leptos_router::hooks::{use_navigate, use_params};
+use leptos_router::params::Params;
 use log::info;
 use std::time::Duration;
 
 #[component]
 pub fn RequestPasswordResetForm() -> impl IntoView {
-    let (email, set_email) = create_signal("".to_string());
-    let (message, set_message) = create_signal::<Option<(String, bool)>>(None);
+    let (email, set_email) = signal("".to_string());
+    let (message, set_message) = signal::<Option<(String, bool)>>(None);
 
     // Create an action to handle the form submission
-    let request_reset = create_action(move |_: &()| {
+    let request_reset = Action::new(move |_: &()| {
         let email = email.get();
 
         async move {
@@ -87,23 +89,23 @@ pub fn RequestPasswordResetForm() -> impl IntoView {
 
 #[component]
 pub fn ResetPasswordForm() -> impl IntoView {
-    // Get the token from the URL
+    // Get the token from the URL - FIX: Change String to Option<String>
     #[derive(Params, PartialEq, Clone, Debug)]
     struct ResetParams {
-        token: String,
+        token: Option<String>,
     }
 
     let params = use_params::<ResetParams>();
-    let token = move || params.get().map(|p| p.token).unwrap_or_default();
+    let token = move || params.get().ok().and_then(|p| p.token).unwrap_or_default();
 
-    let (password, set_password) = create_signal("".to_string());
-    let (confirm_password, set_confirm_password) = create_signal("".to_string());
-    let (message, set_message) = create_signal::<Option<(String, bool)>>(None);
-    let (token_valid, set_token_valid) = create_signal(false);
-    let (token_checked, set_token_checked) = create_signal(false);
+    let (password, set_password) = signal("".to_string());
+    let (confirm_password, set_confirm_password) = signal("".to_string());
+    let (message, set_message) = signal::<Option<(String, bool)>>(None);
+    let (token_valid, set_token_valid) = signal(false);
+    let (token_checked, set_token_checked) = signal(false);
 
     // Validate the token when the component mounts
-    create_effect(move |_| {
+    Effect::new(move |_| {
         let token_value = token();
         if !token_value.is_empty() {
             spawn_local(async move {
@@ -125,7 +127,7 @@ pub fn ResetPasswordForm() -> impl IntoView {
     });
 
     // Create an action to handle the form submission
-    let perform_reset = create_action(move |_: &()| {
+    let perform_reset = Action::new(move |_: &()| {
         let password_value = password.get();
         let confirm_value = confirm_password.get();
         let token_value = token();
@@ -159,7 +161,7 @@ pub fn ResetPasswordForm() -> impl IntoView {
                             true,
                         )));
                         // Redirect to login page after 3 seconds
-                        let navigate = leptos_router::use_navigate();
+                        let navigate = use_navigate();
                         set_timeout(
                             move || {
                                 navigate("/login", Default::default());
@@ -192,7 +194,7 @@ pub fn ResetPasswordForm() -> impl IntoView {
 
             {move || {
                 if !token_checked.get() {
-                    view! { <div class="text-center py-4">"Validating reset token..."</div> }.into_view()
+                    view! { <div class="text-center py-4">"Validating reset token..."</div> }.into_any()
                 } else if token_valid.get() {
                     view! {
                         <form on:submit=move |ev| {
@@ -242,14 +244,14 @@ pub fn ResetPasswordForm() -> impl IntoView {
                                 }}
                             </button>
                         </form>
-                    }.into_view()
+                    }.into_any()
                 } else {
                     view! {
                         <div class="text-center">
                             <p class="mb-4">"This password reset link is invalid or has expired."</p>
                             <a href="/forgot-password" class="text-blue-500 hover:underline">"Request a new reset link"</a>
                         </div>
-                    }.into_view()
+                    }.into_any()
                 }
             }}
 

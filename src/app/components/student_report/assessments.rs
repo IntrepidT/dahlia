@@ -1,3 +1,4 @@
+use leptos::prelude::*;
 pub mod assessment_card;
 pub mod compact_assessment_dot_chart;
 pub mod expanded_test_list;

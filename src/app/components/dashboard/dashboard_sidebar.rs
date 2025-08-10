@@ -4,6 +4,8 @@ use icondata::{
     AiApiOutlined, BsClipboardCheck, BsGraphUpArrow, ChNotesTick, FaChildrenSolid,
     LuLayoutDashboard, RiAdminUserFacesLine,
 };
+use leptos::prelude::*;
+use leptos_router::path;
 // Add new imports for additional icons, including pin/unpin icons
 use crate::app::components::ShowAdministerTestModal;
 use crate::app::models::{setting_data::UserSettings, user::SessionUser};
@@ -20,9 +22,10 @@ use icondata::{
     IoSettingsOutline,
 };
 use leptos::ev::MouseEvent;
-use leptos::*;
+use leptos::prelude::*;
 use leptos_icons::Icon;
-use leptos_router::*;
+use leptos_router::components::*;
+use leptos_router::hooks::*;
 use std::time::Duration;
 
 #[derive(Clone, PartialEq, Debug)]
@@ -50,10 +53,9 @@ pub fn DashboardSidebar(
     selected_item: ReadSignal<SidebarSelected>,
     set_selected_item: WriteSignal<SidebarSelected>,
 ) -> impl IntoView {
-    // Get the current user ID from use_context
-    let current_user =
-        use_context::<ReadSignal<Option<SessionUser>>>().expect("AuthProvider not Found");
-    let user_settings_resource = create_resource(
+    // Get the current user ID from expect_context
+    let current_user = expect_context::<ReadSignal<Option<SessionUser>>>();
+    let user_settings_resource = Resource::new(
         move || current_user.get().map(|user| user.id),
         move |id| async move {
             match id {
@@ -72,20 +74,17 @@ pub fn DashboardSidebar(
     let user_id = current_user.get().map(|user| user.id).unwrap_or_default();
 
     // Handle current route for active styling
-    let (current_path, set_current_path) = create_signal(String::new());
+    let (current_path, set_current_path) = signal(String::new());
 
-    // Effect to track current route
-    create_effect(move |_| {
-        if let Some(route_context) = use_context::<RouterContext>() {
-            set_current_path(route_context.pathname().get());
-        } else {
-            set_current_path(String::from("/"));
-        }
+    // Effect to track current route using use_location instead of Router context
+    Effect::new(move |_| {
+        let location = use_location();
+        set_current_path(location.pathname.get());
     });
 
-    let (is_expanded, set_is_expanded) = create_signal(false);
-    let (is_navigating, set_is_navigating) = create_signal(false);
-    create_effect(move |_| {
+    let (is_expanded, set_is_expanded) = signal(false);
+    let (is_navigating, set_is_navigating) = signal(false);
+    Effect::new(move |_| {
         let _current_path = current_path();
         set_is_navigating.set(true);
         set_timeout(
@@ -95,19 +94,19 @@ pub fn DashboardSidebar(
             Duration::from_millis(500),
         );
     });
-    let (show_administer_modal, set_show_administer_modal) = create_signal(false);
-    let (show_settings, set_show_settings) = create_signal(false);
+    let (show_administer_modal, set_show_administer_modal) = signal(false);
+    let (show_settings, set_show_settings) = signal(false);
 
     // New signal for pinned state
-    let (is_pinned_closed, set_is_pinned_closed) = create_signal(false);
-    create_effect(move |_| {
+    let (is_pinned_closed, set_is_pinned_closed) = signal(false);
+    Effect::new(move |_| {
         if let Some(Some(settings)) = user_settings_resource.get() {
             set_is_pinned_closed.set(settings.ui.pinned_sidebar);
         }
     });
 
     // Handle window size for responsive behavior
-    let (is_small_screen, set_is_small_screen) = create_signal(false);
+    let (is_small_screen, set_is_small_screen) = signal(false);
 
     // Computed position for dropdown modal based on screen size
     let modal_position = move || {
@@ -155,14 +154,31 @@ pub fn DashboardSidebar(
         }
     };
 
+    // Combined class computation for the main sidebar div
+    let sidebar_class = move || {
+        let base_classes = "fixed left-0 top-20 h-[calc(100vh-4rem)] bg-[#F9F9F8] shadow-lg transition-all duration-300 ease-in-out z-40";
+
+        let width_class = if is_expanded() {
+            if is_small_screen() {
+                "w-48"
+            } else {
+                "w-64"
+            }
+        } else {
+            if is_small_screen() {
+                "w-16"
+            } else {
+                "w-20"
+            }
+        };
+
+        format!("{} {}", base_classes, width_class)
+    };
+
     view! {
         <div class="relative">
             <div
-                class="fixed left-0 top-20 h-[calc(100vh-4rem)] bg-[#F9F9F8] shadow-lg transition-all duration-300 ease-in-out z-40"
-                class:w-16={move || !is_expanded() && is_small_screen()}
-                class:w-20={move || !is_expanded() && !is_small_screen()}
-                class:w-48={move || is_expanded() && is_small_screen()}
-                class:w-64={move || is_expanded() && !is_small_screen()}
+                class=sidebar_class
                 on:mouseenter=handle_mouseenter
                 on:mouseleave=handle_mouseleave
             >
@@ -242,7 +258,7 @@ pub fn DashboardSidebar(
                         >
                             <Icon
                                 icon={if is_pinned_closed() { IoPinSharp } else { IoPinOutline }}
-                                class="w-5 h-5 text-[#2E3A59] flex-shrink-0"
+                                attr:class="w-5 h-5 text-[#2E3A59] flex-shrink-0"
                             />
                             <Show
                                 when=move || is_expanded()
@@ -260,7 +276,7 @@ pub fn DashboardSidebar(
                         >
                             <Icon
                                 icon=IoSettingsOutline
-                                class="w-6 h-6 text[#2E3A59] flex-shrink-0"
+                                attr:class="w-6 h-6 text[#2E3A59] flex-shrink-0"
                             />
                             <div class="overflow-hidden whitespace-nowrap">
                                 <Show
@@ -304,7 +320,9 @@ pub fn DashboardSidebar(
             <Show when=move || show_settings()>
                 <SettingsModal
                     show=show_settings
-                    on_close=move |_| set_show_settings.set(false)
+                    on_close=move || {
+                        let _ = set_show_settings.set(false);
+                    }
                     user_id=user_id
                 />
             </Show>
@@ -322,15 +340,35 @@ fn SidebarItem(
     is_small_screen: Signal<bool>,
     on_click: impl Fn(MouseEvent) + 'static,
 ) -> impl IntoView {
+    // Combined class computation for the item div
+    let item_class = move || {
+        let base_classes =
+            "flex items-center cursor-pointer hover:bg-[#DADADA] p-2 rounded-md transition-colors";
+        if is_selected() {
+            format!("{} bg-blue-100", base_classes)
+        } else {
+            base_classes.to_string()
+        }
+    };
+
+    // Combined class computation for the span
+    let span_class = move || {
+        let base_class = "font-semibold text-sm sm:text-base";
+        if is_selected.get() {
+            format!("{} {}", base_class, BLUE_COLOR)
+        } else {
+            format!("{} {}", base_class, GRAY_COLOR)
+        }
+    };
+
     view! {
         <div
-            class="flex items-center cursor-pointer hover:bg-[#DADADA] p-2 rounded-md transition-colors"
-            class:bg-blue-100=move || is_selected()
+            class=item_class
             on:click=on_click
         >
             <Icon
                 icon=icon
-                class="w-6 h-6 text-[#2E3A59] flex-shrink-0"
+                attr:class="w-6 h-6 text-[#2E3A59] flex-shrink-0"
             />
             <div class="overflow-hidden whitespace-nowrap">
                 <Show
@@ -338,11 +376,7 @@ fn SidebarItem(
                     fallback=|| view! { <></> }
                 >
                     <div class="flex flex-col ml-2">
-                        <span
-                            class="font-semibold text-sm sm:text-base"
-                            class:GRAY_COLOR=move || !is_selected.get()
-                            class:BLUE_COLOR=move || is_selected.get()
-                        >
+                        <span class=span_class>
                             {label}
                         </span>
                         <Show
@@ -367,29 +401,42 @@ fn SidebarNavLink(
     is_active: Signal<bool>,
     is_small_screen: Signal<bool>,
 ) -> impl IntoView {
+    // Combined class computation for the nav div
+    let nav_class = move || {
+        let base_class = "rounded-lg";
+        if is_active() {
+            format!("{} bg-blue-100", base_class)
+        } else {
+            base_class.to_string()
+        }
+    };
+
+    // Combined class computation for the span
+    let span_class = move || {
+        let base_class = "ml-2 font-semibold text-sm sm:text-base";
+        if is_active.get() {
+            format!("{} {}", base_class, BLUE_COLOR)
+        } else {
+            format!("{} {}", base_class, GRAY_COLOR)
+        }
+    };
+
     view! {
-        <div
-            class="rounded-lg"
-            class:bg-blue-100=move || is_active()
-        >
+        <div class=nav_class>
             <A
                 href={path}
-                class="flex items-center cursor-pointer hover:bg-[#DADADA] p-2 rounded-md transition-colors"
+                attr:class="flex items-center cursor-pointer hover:bg-[#DADADA] p-2 rounded-md transition-colors"
             >
                 <Icon
                     icon=icon
-                    class="w-6 h-6 text-[#2E3A59] flex-shrink-0"
+                    attr:class="w-6 h-6 text-[#2E3A59] flex-shrink-0"
                 />
                 <div class="overflow-hidden whitespace-nowrap">
                     <Show
                         when=move || is_expanded()
                         fallback=|| view! { <></> }
                     >
-                        <span
-                            class="ml-2 font-semibold text-sm sm:text-base"
-                            class:GRAY_COLOR=move || !is_active.get()
-                            class:BLUE_COLOR=move || is_active.get()
-                        >
+                        <span class=span_class>
                             {label}
                         </span>
                     </Show>

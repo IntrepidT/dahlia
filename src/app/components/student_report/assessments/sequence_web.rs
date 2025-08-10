@@ -1,5 +1,6 @@
 use crate::app::components::data_processing::{AssessmentSummary, Progress, TestDetail};
-use leptos::*;
+use leptos::prelude::*;
+use leptos::prelude::*;
 use std::collections::HashMap;
 
 #[component]
@@ -10,7 +11,7 @@ pub fn AssessmentProgressChart(
     #[prop(default = false)] show_legend: bool,
 ) -> impl IntoView {
     // Group tests by test name to handle multiple attempts
-    let test_groups = create_memo(move |_| {
+    let test_groups = Memo::new(move |_| {
         let mut groups: HashMap<String, Vec<TestDetail>> = HashMap::new();
 
         for test in test_details.iter() {
@@ -38,7 +39,7 @@ pub fn AssessmentProgressChart(
     });
 
     // Calculate chart data points
-    let chart_data = create_memo(move |_| {
+    let chart_data = Memo::new(move |_| {
         let groups = test_groups.get();
         let mut data_points = Vec::new();
         let mut cumulative_score = 0;
@@ -84,7 +85,7 @@ pub fn AssessmentProgressChart(
     });
 
     // Calculate chart dimensions and scales
-    let chart_bounds = create_memo(move |_| {
+    let chart_bounds = Memo::new(move |_| {
         let data = chart_data.get();
         let max_x = data.len().max(1);
         let max_y = 100.0; // Always 0-100%
@@ -119,9 +120,9 @@ pub fn AssessmentProgressChart(
                             </div>
                         </div>
                     </div>
-                }
+                }.into_any()
             } else {
-                view! { <div></div> }
+                view! { <div></div> }.into_any()
             }}
 
             <div class="relative">
@@ -190,7 +191,7 @@ pub fn AssessmentProgressChart(
                         let bounds = chart_bounds.get();
 
                         if data.len() < 2 {
-                            return view! { <g></g> };
+                            return view! { <g></g> }.into_any();
                         }
 
                         let path_data = data.iter().enumerate().map(|(i, point)| {
@@ -214,7 +215,7 @@ pub fn AssessmentProgressChart(
                                     class="transition-all duration-300"
                                 />
                             </g>
-                        }
+                        }.into_any()
                     }}
 
                     // Data points

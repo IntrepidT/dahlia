@@ -1,37 +1,35 @@
 use crate::app::components::data_processing::{AssessmentSummary, TestDetail};
 use crate::app::models::test::Test;
 use crate::app::server_functions::assessments::get_test_sequence;
-use leptos::*;
+use leptos::prelude::*;
+use leptos::prelude::*;
 use std::collections::HashMap;
 
 #[component]
 pub fn CompactProgressChart(
     assessment: AssessmentSummary,
     test_details: Vec<TestDetail>,
-    tests_resource: Resource<(), Option<Vec<Test>>>,
+    tests_resource: Resource<Option<Vec<Test>>>,
 ) -> impl IntoView {
     // Get the complete test sequence for this assessment
-    let test_sequence_resource = create_resource(
-        move || assessment.assessment_id.clone(),
-        |assessment_id| async move {
+    let test_sequence_resource = Resource::new(
+        move || assessment.assessment_id.clone(), // Source: returns assessment_id
+        move |assessment_id| async move {
+            // Fetcher: takes assessment_id, returns Future
             match get_test_sequence(assessment_id).await {
                 Ok(sequence) => {
-                    log::info!(
-                        "Successfully loaded test sequence with {} tests",
-                        sequence.len()
-                    );
+                    log::info!("Loaded test sequence with {} items", sequence.len());
                     Some(sequence)
                 }
                 Err(e) => {
-                    log::error!("Failed to get test sequence: {}", e);
+                    log::error!("Failed to load test sequence: {}", e);
                     None
                 }
             }
         },
     );
-
     // Group test details by test_id and sort by attempt
-    let grouped_tests = create_memo(move |_| {
+    let grouped_tests = Memo::new(move |_| {
         let mut groups: HashMap<String, Vec<TestDetail>> = HashMap::new();
 
         for test in test_details.clone() {
@@ -47,10 +45,10 @@ pub fn CompactProgressChart(
     });
 
     // Create the ordered test sequence including untaken tests
-    let chart_data = create_memo(move |_| {
+    let chart_data = Memo::new(move |_| {
         let groups = grouped_tests.get();
-        let test_sequence = test_sequence_resource.get().unwrap_or(None);
-        let all_tests = tests_resource.get().unwrap_or(None);
+        let test_sequence = test_sequence_resource.get().flatten();
+        let all_tests = tests_resource.get().flatten();
 
         log::info!(
             "Building chart data - test_sequence loaded: {}, attempted tests: {}",
@@ -120,7 +118,7 @@ pub fn CompactProgressChart(
         // Get benchmark categories from tests_resource
         let benchmark_categories = tests_resource
             .get()
-            .unwrap_or(None)
+            .flatten()
             .and_then(|tests| tests.iter().find(|t| t.test_id == test.test_id).cloned())
             .and_then(|t| t.benchmark_categories);
 
@@ -205,7 +203,7 @@ pub fn CompactProgressChart(
                                     <div class="text-sm font-medium text-gray-600 mb-1">"No Test Sequence"</div>
                                     <div class="text-xs text-gray-500">"No tests found for this assessment"</div>
                                 </div>
-                            }.into_view();
+                            }.into_any();
                         }
 
                         // Responsive sizing based on number of tests - ensure no overlap
@@ -243,9 +241,9 @@ pub fn CompactProgressChart(
                                                     }).collect::<Vec<_>>()}
                                                 </div>
                                             </div>
-                                        }.into_view()
+                                        }.into_any()
                                     } else {
-                                        view! { <div class="w-0"></div> }.into_view()
+                                        view! { <div class="w-0"></div> }.into_any()
                                     }}
 
                                     // Chart dots container
@@ -261,7 +259,7 @@ pub fn CompactProgressChart(
                                                     .or_else(|| {
                                                         // Try to get test name from tests_resource as final fallback
                                                         tests_resource.get()
-                                                            .unwrap_or(None)
+                                                            .flatten()
                                                             .and_then(|tests| {
                                                                 tests.iter()
                                                                     .find(|t| &t.test_id == test_id)
@@ -311,7 +309,7 @@ pub fn CompactProgressChart(
                                                                         style=format!("width: {}px; height: {}px", dot_size, dot_size)
                                                                         title=tooltip
                                                                     ></div>
-                                                                },
+                                                                }.into_any(),
                                                                 None => {
                                                                     // Show different styles based on whether test has been attempted
                                                                     if !has_attempts && attempt == 1 {
@@ -322,7 +320,7 @@ pub fn CompactProgressChart(
                                                                                 style=format!("width: {}px; height: {}px", dot_size, dot_size)
                                                                                 title=format!("{}\nNext in sequence - Not yet attempted", test_name)
                                                                             ></div>
-                                                                        }
+                                                                        }.into_any()
                                                                     } else if has_attempts && attempt > test_attempts.len() {
                                                                         // Additional attempt slots for attempted tests - light gray
                                                                         view! {
@@ -331,14 +329,14 @@ pub fn CompactProgressChart(
                                                                                 style=format!("width: {}px; height: {}px", dot_size, dot_size)
                                                                                 title=format!("{}\nAttempt {} - Available", test_name, attempt_i32)
                                                                             ></div>
-                                                                        }
+                                                                        }.into_any()
                                                                     } else {
                                                                         // Empty space for higher attempts of untaken tests
                                                                         view! {
                                                                             <div
                                                                                 style=format!("width: {}px; height: {}px", dot_size, dot_size)
                                                                             ></div>
-                                                                        }
+                                                                        }.into_any()
                                                                     }
                                                                 }
                                                             }
@@ -395,7 +393,7 @@ pub fn CompactProgressChart(
                                     </div>
                                 </div>
                             </div>
-                        }.into_view()
+                        }.into_any()
                     }}
                 </Suspense>
             </div>

@@ -1,3 +1,4 @@
+use leptos::prelude::*;
 pub mod student;
 pub use student::AddStudentRequest;
 pub use student::DeleteStudentRequest;

@@ -1,13 +1,13 @@
 use crate::app::models::enrollment::{
     AcademicYear, CreateEnrollmentRequest, Enrollment, EnrollmentStatus, UpdateEnrollmentRequest,
 };
-use leptos::*;
+use leptos::prelude::*;
 use uuid::Uuid;
 
 #[cfg(feature = "ssr")]
 use {crate::app::db::enrollment_database, actix_web::web, sqlx::PgPool, std::error::Error};
 
-#[server(GetEnrollments, "/api")]
+#[server]
 pub async fn get_enrollments() -> Result<Vec<Enrollment>, ServerFnError> {
     #[cfg(feature = "ssr")]
     {
@@ -32,7 +32,7 @@ pub async fn get_enrollments() -> Result<Vec<Enrollment>, ServerFnError> {
     }
 }
 
-#[server(GetEnrollment, "/api")]
+#[server]
 pub async fn get_enrollment(
     student_id: i32,
     academic_year: AcademicYear,
@@ -70,7 +70,7 @@ pub async fn get_enrollment(
     }
 }
 
-#[server(GetEnrollmentsByStudent, "/api")]
+#[server]
 pub async fn get_enrollments_by_student(student_id: i32) -> Result<Vec<Enrollment>, ServerFnError> {
     #[cfg(feature = "ssr")]
     {
@@ -101,7 +101,7 @@ pub async fn get_enrollments_by_student(student_id: i32) -> Result<Vec<Enrollmen
     }
 }
 
-#[server(GetEnrollmentByYear, "/api")]
+#[server]
 pub async fn get_enrollments_by_year(
     academic_year: AcademicYear,
 ) -> Result<Vec<Enrollment>, ServerFnError> {
@@ -134,7 +134,7 @@ pub async fn get_enrollments_by_year(
     }
 }
 
-#[server(GetEnrollmentsByTeacher, "/api")]
+#[server]
 pub async fn get_enrollments_by_teacher(teacher_id: i32) -> Result<Vec<Enrollment>, ServerFnError> {
     #[cfg(feature = "ssr")]
     {
@@ -165,7 +165,7 @@ pub async fn get_enrollments_by_teacher(teacher_id: i32) -> Result<Vec<Enrollmen
     }
 }
 
-#[server(CreateEnrollment, "/api")]
+#[server]
 pub async fn create_enrollment(
     new_enrollment_request: CreateEnrollmentRequest,
 ) -> Result<Enrollment, ServerFnError> {
@@ -208,7 +208,7 @@ pub async fn create_enrollment(
     }
 }
 
-#[server(ModifyEnrollment, "/api")]
+#[server]
 pub async fn modify_enrollment(
     update_enrollment_request: UpdateEnrollmentRequest,
 ) -> Result<Enrollment, ServerFnError> {
@@ -252,7 +252,7 @@ pub async fn modify_enrollment(
     }
 }
 
-#[server(UpdateEnrollmentStatus, "/api")]
+#[server]
 pub async fn update_enrollment_status(
     student_id: i32,
     academic_year: AcademicYear,
@@ -295,7 +295,7 @@ pub async fn update_enrollment_status(
     }
 }
 
-#[server(DeleteEnrollment, "/api")]
+#[server]
 pub async fn delete_enrollment(
     student_id: i32,
     academic_year: AcademicYear,

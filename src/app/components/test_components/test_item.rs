@@ -1,10 +1,11 @@
 use crate::app::models::test::Test;
-use leptos::*;
+use leptos::prelude::*;
+use leptos_router::hooks::use_navigate;
 use std::rc::Rc;
 
 #[component]
 pub fn GenericTestModal(test_id: String, test_name: String, children: Children) -> impl IntoView {
-    let (show_options_modal, set_show_options_modal) = create_signal(false);
+    let (show_options_modal, set_show_options_modal) = signal(false);
     let name_clone = test_name.clone();
 
     // Handle wrapper click to show the modal
@@ -15,7 +16,7 @@ pub fn GenericTestModal(test_id: String, test_name: String, children: Children) 
     // Navigation functions for different test modes
     let test_id_clone = test_id.clone();
     let on_realtime_click = move |_| {
-        let navigate = leptos_router::use_navigate();
+        let navigate = use_navigate();
         navigate(
             &format!("/test-session/{}", test_id_clone),
             Default::default(),
@@ -25,7 +26,7 @@ pub fn GenericTestModal(test_id: String, test_name: String, children: Children) 
 
     let test_id_clone = test_id.clone();
     let on_individual_click = move |_| {
-        let navigate = leptos_router::use_navigate();
+        let navigate = use_navigate();
         navigate(
             &format!("/flashcardset/{}", test_id_clone),
             Default::default(),
@@ -35,7 +36,7 @@ pub fn GenericTestModal(test_id: String, test_name: String, children: Children) 
 
     let test_id_clone = test_id.clone();
     let on_grid_test_click = move |_| {
-        let navigate = leptos_router::use_navigate();
+        let navigate = use_navigate();
         navigate(&format!("/gridtest/{}", test_id_clone), Default::default());
         set_show_options_modal.set(false);
     };
@@ -103,9 +104,9 @@ pub fn GenericTestModal(test_id: String, test_name: String, children: Children) 
                                 </div>
                             </div>
                         </div>
-                    }
+                    }.into_any()
                 } else {
-                    view! { <div></div> }
+                    view! { <div></div> }.into_any()
                 }
             }}
         </div>
@@ -114,7 +115,7 @@ pub fn GenericTestModal(test_id: String, test_name: String, children: Children) 
 
 #[component]
 pub fn TestItem(test: Test, test_id: String, test_name: String) -> impl IntoView {
-    let (show_options_modal, set_show_options_modal) = create_signal(false);
+    let (show_options_modal, set_show_options_modal) = signal(false);
     let name_clone = test_name.clone();
 
     // Handle test click to show the modal
@@ -125,7 +126,7 @@ pub fn TestItem(test: Test, test_id: String, test_name: String) -> impl IntoView
     // Navigation functions for different test modes
     let test_id_clone = test_id.clone();
     let on_realtime_click = move |_| {
-        let navigate = leptos_router::use_navigate();
+        let navigate = use_navigate();
         navigate(
             &format!("/test-session/{}", test_id_clone),
             Default::default(),
@@ -135,7 +136,7 @@ pub fn TestItem(test: Test, test_id: String, test_name: String) -> impl IntoView
 
     let test_id_clone = test_id.clone();
     let on_individual_click = move |_| {
-        let navigate = leptos_router::use_navigate();
+        let navigate = use_navigate();
         navigate(
             &format!("/flashcardset/{}", test_id_clone),
             Default::default(),
@@ -145,7 +146,7 @@ pub fn TestItem(test: Test, test_id: String, test_name: String) -> impl IntoView
 
     let test_id_clone = test_id.clone();
     let on_grid_test_click = move |_| {
-        let navigate = leptos_router::use_navigate();
+        let navigate = use_navigate();
         navigate(&format!("/gridtest/{}", test_id_clone), Default::default());
         set_show_options_modal.set(false);
     };
@@ -214,9 +215,9 @@ pub fn TestItem(test: Test, test_id: String, test_name: String) -> impl IntoView
                                 </div>
                             </div>
                         </div>
-                    }
+                    }.into_any()
                 } else {
-                    view! { <div></div> }
+                    view! { <div></div> }.into_any()
                 }
             }}
         </div>

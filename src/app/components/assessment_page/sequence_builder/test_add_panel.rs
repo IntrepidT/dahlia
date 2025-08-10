@@ -7,22 +7,22 @@ use crate::app::models::assessment_sequences::{
     SequenceBehavior, TestSequenceItem, VariationLevel,
 };
 use crate::app::models::test::Test;
-use leptos::*;
+use leptos::prelude::*;
 use strum::IntoEnumIterator;
 use uuid::Uuid;
 
 #[component]
 pub fn TestAddPanel(
-    tests_resource: Resource<(), Result<Vec<Test>, ServerFnError>>,
+    tests_resource: Resource<Result<Vec<Test>, ServerFnError>>,
     sequence_builder: UseSequenceBuilder,
     current_sequence: Signal<Vec<TestSequenceItem>>,
     on_sequence_change: impl Fn(Vec<TestSequenceItem>) + 'static + Copy,
 ) -> impl IntoView {
     let (selected_test_for_sequence, set_selected_test_for_sequence) =
         create_signal::<Option<Uuid>>(None);
-    let (sequence_behavior, set_sequence_behavior) = create_signal(SequenceBehavior::Node);
+    let (sequence_behavior, set_sequence_behavior) = signal(SequenceBehavior::Node);
     let (required_score, set_required_score) = create_signal::<Option<i32>>(None);
-    let (show_variations_panel, set_show_variations_panel) = create_signal(false);
+    let (show_variations_panel, set_show_variations_panel) = signal(false);
 
     let (current_variations, set_current_variations) = create_signal::<Vec<VariationLevel>>(vec![]);
 

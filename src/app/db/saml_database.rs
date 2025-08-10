@@ -1,7 +1,7 @@
+use leptos::prelude::*;
 cfg_if::cfg_if! {
     if #[cfg(feature = "ssr")] {
         use sqlx::{Pool, Postgres, Row};
-        use leptos::ServerFnError;
         use crate::app::models::auth::{SamlConfig, SamlResponse, AuthProvider};
         use crate::app::models::user::{SessionUser, UserRole, AccountStatus};
         use crate::app::db::user_database;
@@ -31,7 +31,7 @@ cfg_if::cfg_if! {
             <samlp:AuthnRequest 
                 xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"
                 xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"
-                ID="{}"
+                ID:"{}"
                 Version="2.0"
                 IssueInstant="{}"
                 Destination=""
@@ -180,7 +180,7 @@ cfg_if::cfg_if! {
     <samlp:LogoutRequest 
         xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"
         xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"
-        ID="{}"
+        ID:"{}"
         Version="2.0"
         IssueInstant="{}"
         Destination="">
@@ -623,7 +623,7 @@ cfg_if::cfg_if! {
             user_id: i64,
             institution_id: &str
         ) -> Result<String, ServerFnError> {
-            use rand::{distributions::Alphanumeric, Rng};
+            use rand::{distr::Alphanumeric, Rng};
 
             let token: String = rand::thread_rng()
                 .sample_iter(&Alphanumeric)
@@ -650,7 +650,7 @@ cfg_if::cfg_if! {
             auth_provider: &str,
             institution_id: Option<&str>
         ) -> Result<String, sqlx::Error> {
-            use rand::{distributions::Alphanumeric, Rng};
+            use rand::{distr::Alphanumeric, Rng};
 
             let token: String = rand::thread_rng()
                 .sample_iter(&Alphanumeric)

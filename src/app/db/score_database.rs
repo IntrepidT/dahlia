@@ -1,10 +1,10 @@
+use leptos::prelude::*;
 cfg_if::cfg_if! {
 
     if #[cfg(feature = "ssr")] {
 
         use crate::app::models::{Score, CreateScoreRequest};
         use chrono::{Local, DateTime, Utc, NaiveDateTime};
-        use leptos::*;
         use uuid::Uuid;
         use log::{debug, error, info, warn};
         use sqlx::prelude::*;

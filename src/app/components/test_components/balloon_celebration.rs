@@ -1,4 +1,4 @@
-use leptos::*;
+use leptos::prelude::*;
 #[cfg(feature = "hydrate")]
 use wasm_bindgen::prelude::*;
 
@@ -8,11 +8,11 @@ pub fn BalloonCelebration(
     #[prop(default = "🎉 Test Complete! Great job! 🎉")] message: &'static str,
     #[prop(default = 5000)] duration: u32, // Duration in milliseconds
 ) -> impl IntoView {
-    let (is_visible, set_is_visible) = create_signal(false);
-    let (animate_out, set_animate_out) = create_signal(false);
+    let (is_visible, set_is_visible) = signal(false);
+    let (animate_out, set_animate_out) = signal(false);
 
     // Handle show/hide animation
-    create_effect(move |_| {
+    Effect::new(move |_| {
         if show.get() {
             set_is_visible.set(true);
             set_animate_out.set(false);
@@ -48,10 +48,10 @@ pub fn BalloonCelebration(
             #[cfg(not(feature = "hydrate"))]
             {
                 // For server-side rendering, just set a simple timeout using leptos
-                leptos::set_timeout(
+                set_timeout(
                     move || {
                         set_animate_out.set(true);
-                        leptos::set_timeout(
+                        set_timeout(
                             move || {
                                 set_is_visible.set(false);
                             },

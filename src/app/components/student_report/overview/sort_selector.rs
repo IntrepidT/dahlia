@@ -1,4 +1,5 @@
-use leptos::*;
+use leptos::prelude::*;
+use leptos::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, Copy)]
 pub enum SortOption {

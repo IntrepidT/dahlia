@@ -1,10 +1,10 @@
+use leptos::prelude::*;
 cfg_if::cfg_if! {
 
     if #[cfg(feature = "ssr")] {
 
         use crate::app::models::{Student, Test, TestType, QuestionType, Question, Score, CreateScoreRequest};
         use crate::app::errors::{ErrorMessage, StudentError, TestError, ErrorMessageTest, QuestionError, ErrorMessageQuestion};
-        use leptos::*;
         use sqlx::PgPool;
         use uuid::{Uuid, uuid};
         use log::{debug, error, info, warn};

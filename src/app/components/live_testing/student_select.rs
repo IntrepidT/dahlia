@@ -3,7 +3,8 @@ use crate::app::components::auth::enhanced_login_form::{
 };
 use crate::app::middleware::global_settings::use_settings;
 use crate::app::server_functions::students::get_students;
-use leptos::*;
+use leptos::prelude::*;
+use leptos::prelude::*;
 use log;
 
 #[component]
@@ -12,7 +13,7 @@ pub fn StudentSelect(set_selected_student_id: WriteSignal<Option<i32>>) -> impl 
     let anonymization_enabled = move || settings.get().student_protections;
     let (student_mapping_service, _) = use_student_mapping_service();
 
-    let get_students_action = create_action(|_: &()| async move {
+    let get_students_action = Action::new(|_: &()| async move {
         match get_students().await {
             Ok(fetched_students) => fetched_students,
             Err(e) => {
@@ -22,7 +23,7 @@ pub fn StudentSelect(set_selected_student_id: WriteSignal<Option<i32>>) -> impl 
         }
     });
 
-    let enhanced_students = create_memo(move |_| {
+    let enhanced_students = Memo::new(move |_| {
         let students_data = get_students_action
             .value()
             .get()
@@ -50,7 +51,7 @@ pub fn StudentSelect(set_selected_student_id: WriteSignal<Option<i32>>) -> impl 
         }
     });
 
-    create_effect(move |_| {
+    Effect::new(move |_| {
         get_students_action.dispatch(());
     });
 

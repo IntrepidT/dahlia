@@ -8,8 +8,11 @@ use crate::app::models::{
 };
 use crate::app::server_functions::{courses::*, enrollments::*};
 use chrono::{Local, NaiveDate};
-use leptos::*;
-use leptos_router::*;
+use leptos::prelude::*;
+use leptos::prelude::*;
+use leptos_router::components::*;
+use leptos_router::hooks::*;
+use leptos_router::path;
 use rust_decimal::Decimal;
 use std::str::FromStr;
 use strum::IntoEnumIterator;
@@ -101,25 +104,25 @@ pub fn AdminDashboard() -> impl IntoView {
 
 #[component]
 pub fn AdminDashboardContent() -> impl IntoView {
-    let (selected_view, set_selected_view) = create_signal(SidebarSelected::AdminDashboard);
-    let (current_tab, set_current_tab) = create_signal(DashboardView::Courses);
+    let (selected_view, set_selected_view) = signal(SidebarSelected::AdminDashboard);
+    let (current_tab, set_current_tab) = signal(DashboardView::Courses);
 
     // Course management state
     let (courses, set_courses) = create_signal::<Vec<Course>>(vec![]);
-    let (course_search, set_course_search) = create_signal(String::new());
-    let (show_course_form, set_show_course_form) = create_signal(false);
+    let (course_search, set_course_search) = signal(String::new());
+    let (show_course_form, set_show_course_form) = signal(false);
     let (editing_course, set_editing_course) = create_signal::<Option<Course>>(None);
 
     // Enrollment management state
     let (enrollments, set_enrollments) = create_signal::<Vec<Enrollment>>(vec![]);
-    let (enrollment_search, set_enrollment_search) = create_signal(String::new());
-    let (show_enrollment_form, set_show_enrollment_form) = create_signal(false);
-    let (enrollment_action, set_enrollment_action) = create_signal(EnrollmentAction::AddNew);
+    let (enrollment_search, set_enrollment_search) = signal(String::new());
+    let (show_enrollment_form, set_show_enrollment_form) = signal(false);
+    let (enrollment_action, set_enrollment_action) = signal(EnrollmentAction::AddNew);
     let (selected_course_for_enrollment, set_selected_course_for_enrollment) =
         create_signal::<Option<Course>>(None);
 
     // Load courses
-    let load_courses = create_action(|_: &()| async move {
+    let load_courses = Action::new(|_: &()| async move {
         match get_courses().await {
             Ok(courses) => courses,
             Err(_) => vec![],
@@ -127,7 +130,7 @@ pub fn AdminDashboardContent() -> impl IntoView {
     });
 
     // Load enrollments
-    let load_enrollments = create_action(|_: &()| async move {
+    let load_enrollments = Action::new(|_: &()| async move {
         match get_enrollments().await {
             Ok(enrollments) => enrollments,
             Err(_) => vec![],
@@ -135,7 +138,7 @@ pub fn AdminDashboardContent() -> impl IntoView {
     });
 
     // Delete course action
-    let delete_course_action = create_action(|course_id: &i32| {
+    let delete_course_action = Action::new(|course_id: &i32| {
         let course_id = *course_id;
         async move {
             match delete_course(course_id).await {
@@ -147,7 +150,7 @@ pub fn AdminDashboardContent() -> impl IntoView {
 
     // Create/Update course action
     let save_course_action =
-        create_action(|(form_data, editing_id): &(CourseFormData, Option<i32>)| {
+        Action::new(|(form_data, editing_id): &(CourseFormData, Option<i32>)| {
             let form_data = form_data.clone();
             let editing_id = *editing_id;
             async move {
@@ -197,7 +200,7 @@ pub fn AdminDashboardContent() -> impl IntoView {
         });
 
     // Update enrollment status action
-    let update_enrollment_status_action = create_action(
+    let update_enrollment_status_action = Action::new(
         |(student_id, academic_year, status): &(i32, AcademicYear, EnrollmentStatus)| {
             let student_id = *student_id;
             let academic_year = academic_year.clone();
@@ -211,7 +214,7 @@ pub fn AdminDashboardContent() -> impl IntoView {
     );
 
     // Create enrollment action
-    let create_enrollment_action = create_action(|form_data: &EnrollmentFormData| {
+    let create_enrollment_action = Action::new(|form_data: &EnrollmentFormData| {
         let form_data = form_data.clone();
         async move {
             let student_id = form_data.student_id.parse::<i32>().unwrap_or(0);
@@ -239,7 +242,7 @@ pub fn AdminDashboardContent() -> impl IntoView {
 
     // Delete enrollment action
     let delete_enrollment_action =
-        create_action(|(student_id, academic_year): &(i32, AcademicYear)| {
+        Action::new(|(student_id, academic_year): &(i32, AcademicYear)| {
             let student_id = *student_id;
             let academic_year = academic_year.clone(); // Clone here
             async move {
@@ -252,7 +255,7 @@ pub fn AdminDashboardContent() -> impl IntoView {
         });
 
     // Effects to reload data when actions complete
-    create_effect(move |_| {
+    Effect::new(move |_| {
         if load_courses.value().get().is_some() {
             if let Some(loaded_courses) = load_courses.value().get() {
                 set_courses.set(loaded_courses);
@@ -260,7 +263,7 @@ pub fn AdminDashboardContent() -> impl IntoView {
         }
     });
 
-    create_effect(move |_| {
+    Effect::new(move |_| {
         if load_enrollments.value().get().is_some() {
             if let Some(loaded_enrollments) = load_enrollments.value().get() {
                 set_enrollments.set(loaded_enrollments);
@@ -268,13 +271,13 @@ pub fn AdminDashboardContent() -> impl IntoView {
         }
     });
 
-    create_effect(move |_| {
+    Effect::new(move |_| {
         if let Some(Some(_)) = delete_course_action.value().get() {
             load_courses.dispatch(());
         }
     });
 
-    create_effect(move |_| {
+    Effect::new(move |_| {
         if save_course_action.value().get() == Some(true) {
             set_show_course_form.set(false);
             set_editing_course.set(None);
@@ -282,19 +285,19 @@ pub fn AdminDashboardContent() -> impl IntoView {
         }
     });
 
-    create_effect(move |_| {
+    Effect::new(move |_| {
         if update_enrollment_status_action.value().get() == Some(true) {
             load_enrollments.dispatch(());
         }
     });
 
     // Initial data load
-    create_effect(move |_| {
+    Effect::new(move |_| {
         load_courses.dispatch(());
         load_enrollments.dispatch(());
     });
 
-    create_effect(move |_| {
+    Effect::new(move |_| {
         if create_enrollment_action.value().get() == Some(true) {
             set_show_enrollment_form.set(false);
             set_selected_course_for_enrollment.set(None);
@@ -302,14 +305,14 @@ pub fn AdminDashboardContent() -> impl IntoView {
         }
     });
 
-    create_effect(move |_| {
+    Effect::new(move |_| {
         if let Some(Some(_)) = delete_enrollment_action.value().get() {
             load_enrollments.dispatch(());
         }
     });
 
     // Filtered courses based on search
-    let filtered_courses = create_memo(move |_| {
+    let filtered_courses = Memo::new(move |_| {
         let search = course_search.get().to_lowercase();
         if search.is_empty() {
             courses.get()
@@ -327,7 +330,7 @@ pub fn AdminDashboardContent() -> impl IntoView {
     });
 
     // Filtered enrollments based on search
-    let filtered_enrollments = create_memo(move |_| {
+    let filtered_enrollments = Memo::new(move |_| {
         let search = enrollment_search.get();
         if search.is_empty() {
             enrollments.get()
@@ -448,9 +451,9 @@ pub fn AdminDashboardContent() -> impl IntoView {
 
                                                         view! {
                                                             <tr>
-                                                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{&course.course_code}</td>
-                                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{&course.name}</td>
-                                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{&course.subject}</td>
+                                                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{course.course_code.clone()}</td>
+                                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{course.name.clone()}</td>
+                                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{course.subject.clone()}</td>
                                                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{format!("{:?}", course.course_level)}</td>
                                                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{format!("{}", course.academic_year)}</td>
                                                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{course.max_students}</td>
@@ -496,7 +499,7 @@ pub fn AdminDashboardContent() -> impl IntoView {
                                         </table>
                                     </div>
                                 </div>
-                            }.into_view(),
+                            }.into_any(),
 
                             DashboardView::Enrollments => view! {
                                 <div class="space-y-6">
@@ -603,7 +606,7 @@ pub fn AdminDashboardContent() -> impl IntoView {
                                         </table>
                                     </div>
                                 </div>
-                            }.into_view(),
+                            }.into_any(),
                         }}
                     </div>
 

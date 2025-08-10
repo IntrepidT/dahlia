@@ -2,7 +2,7 @@ use crate::app::components::assessment_page::assessment_list::sequence_visualiza
 use crate::app::components::test_item::TestItem;
 use crate::app::models::assessment::Assessment;
 use crate::app::models::test::Test;
-use leptos::*;
+use leptos::prelude::*;
 use uuid::Uuid;
 
 #[component]
@@ -14,13 +14,20 @@ pub fn AssessmentCard(
 ) -> impl IntoView {
     let assessment_clone = assessment.clone();
     let assessment_id = assessment.id;
-    let assessment_name = assessment.name.clone(); // FIXED: Clone early
-    let assessment_subject = assessment.subject.clone(); // FIXED: Clone early
-    let assessment_grade = assessment.grade.clone(); // FIXED: Clone early
-    let (expanded, set_expanded) = create_signal(false);
+    let assessment_name = assessment.name.clone();
+    let assessment_subject = assessment.subject.clone();
+    let assessment_grade = assessment.grade.clone();
+    let (expanded, set_expanded) = signal(false);
 
     let uses_sequences = assessment.test_sequence.is_some()
         && !assessment.test_sequence.as_ref().unwrap().is_empty();
+
+    // Combined style computation
+    let expandable_style = move || {
+        let max_height = if expanded.get() { "800px" } else { "0" };
+        let opacity = if expanded.get() { "1" } else { "0" };
+        format!("max-height: {}; opacity: {}", max_height, opacity)
+    };
 
     view! {
         <div class="bg-white rounded-lg shadow-sm border border-gray-100 hover:shadow-md transition-shadow overflow-hidden">
@@ -34,15 +41,15 @@ pub fn AssessmentCard(
                         <div class="flex items-center space-x-2 text-sm text-gray-500">
                             <span>"("{assessment_subject.as_ref().map(|s| s.to_string()).unwrap_or_else(|| "No Subject".to_string())}")"</span>
                             {if uses_sequences {
-                                view! { <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">"Sequenced"</span> }
+                                view! { <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">"Sequenced"</span> }.into_any()
                             } else {
-                                view! { <span class="bg-gray-100 text-gray-600 px-2 py-1 rounded text-xs">"Legacy"</span> }
+                                view! { <span class="bg-gray-100 text-gray-600 px-2 py-1 rounded text-xs">"Legacy"</span> }.into_any()
                             }}
                         </div>
                     </div>
                     <div class="flex items-center space-x-2">
                         <div class="text-sm text-gray-500">
-                            {assessment_grade.map(|g| format!("{:?}", g)).unwrap_or_else(|| "Any".to_string())}  // FIXED: Use cloned value
+                            {assessment_grade.map(|g| format!("{:?}", g)).unwrap_or_else(|| "Any".to_string())}
                         </div>
                         <button
                             class="text-xs px-3 py-1 bg-blue-100 rounded-full text-blue-600 hover:bg-blue-200 transition-colors"
@@ -66,11 +73,10 @@ pub fn AssessmentCard(
                 </div>
             </button>
 
-            // Expandable details section
+            // Expandable details section - FIXED: Combined styles
             <div
                 class="border-t border-gray-100 overflow-hidden transition-all duration-300 ease-in-out"
-                style:max-height={move || if expanded.get() { "800px" } else { "0" }}
-                style:opacity={move || if expanded.get() { "1" } else { "0" }}
+                style=expandable_style
             >
                 <div class="p-4">
                     <AssessmentDetails
@@ -100,7 +106,7 @@ fn AssessmentDetails(
                 />
             </div>
         }
-        .into_view()
+        .into_any()
     } else {
         view! {
             <div>
@@ -116,14 +122,14 @@ fn AssessmentDetails(
                                     test_id=test.test_id.clone()
                                     test_name=test.name.clone()
                                 />
-                            }.into_view()
+                            }.into_any()
                         } else {
-                            view! { <div>"Unknown Test"</div> }.into_view()
+                            view! { <div>"Unknown Test"</div> }.into_any()
                         }
                     }).collect_view()}
                 </div>
             </div>
         }
-        .into_view()
+        .into_any()
     }
 }

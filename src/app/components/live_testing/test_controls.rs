@@ -1,5 +1,6 @@
 use super::types::{ConnectionStatus, Role};
-use leptos::*;
+use leptos::attr::value;
+use leptos::prelude::*;
 use uuid::Uuid;
 
 #[cfg(feature = "hydrate")]
@@ -17,12 +18,12 @@ pub fn TestControls(
     #[prop(into)] start_test: Callback<()>,
     #[prop(into)] end_test: Callback<()>,
 ) -> impl IntoView {
-    let (show_link_modal, set_show_link_modal) = create_signal(false);
-    let (copied_link, set_copied_link) = create_signal(false);
-    let (show_qr, set_show_qr) = create_signal(false);
+    let (show_link_modal, set_show_link_modal) = signal(false);
+    let (copied_link, set_copied_link) = signal(false);
+    let (show_qr, set_show_qr) = signal(false);
 
     // Generate student link
-    let student_link = create_memo(move |_| {
+    let student_link = Memo::new(move |_| {
         if let (Some(room), tid) = (room_id.get(), test_id.get()) {
             if !tid.is_empty() {
                 #[cfg(feature = "hydrate")]
@@ -42,7 +43,7 @@ pub fn TestControls(
     });
 
     // Generate QR code URL (using qr-server.com API)
-    let qr_code_url = create_memo(move |_| {
+    let qr_code_url = Memo::new(move |_| {
         let link = student_link.get();
         if !link.is_empty() {
             format!(
@@ -80,7 +81,7 @@ pub fn TestControls(
     // Quick start for anonymous mode - FIXED: removed the argument expectation
     /*let quick_start_test = move |_| {
         // Start test without requiring student selection for anonymous mode
-        start_test.call(());
+        start_test.run(());
     };*/
 
     view! {
@@ -113,7 +114,7 @@ pub fn TestControls(
                             // Traditional Start
                             <button
                                 class="px-5 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                                on:click=move |_| start_test.call(())
+                                on:click=move |_| start_test.run(())
                                 disabled=move || selected_student_id.get().is_none() || !matches!(connection_status.get(), ConnectionStatus::Connected)
                             >
                                 <span>"🎯"</span>
@@ -140,7 +141,7 @@ pub fn TestControls(
                     <div class="flex flex-col items-center space-y-4">
                         <button
                             class="px-5 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2"
-                            on:click=move |_| end_test.call(())
+                            on:click=move |_| end_test.run(())
                         >
                             <span>"🛑"</span>
                             "End Test Session"
@@ -179,21 +180,17 @@ pub fn TestControls(
                             // Tab navigation
                             <div class="flex border-b">
                                 <button
-                                    class="px-4 py-2 font-medium transition-colors"
-                                    class:border-b-2={move || !show_qr.get()}
-                                    class:border-blue-500={move || !show_qr.get()}
-                                    class:text-blue-600={move || !show_qr.get()}
-                                    class:text-gray-500={move || show_qr.get()}
+                                    class=("px-4 py-2 font-medium transition-colors")
+                                    class=(["border-blue-500", "border-b-2", "text-blue-600"], move || !show_qr.get())
+                                    class=("text-gray-500", move || show_qr.get())
                                     on:click=move |_| set_show_qr.set(false)
                                 >
                                     "📋 Share Link"
                                 </button>
                                 <button
-                                    class="px-4 py-2 font-medium transition-colors"
-                                    class:border-b-2={move || show_qr.get()}
-                                    class:border-blue-500={move || show_qr.get()}
-                                    class:text-blue-600={move || show_qr.get()}
-                                    class:text-gray-500={move || !show_qr.get()}
+                                    class=("px-4 py-2 font-medium transition-colors")
+                                    class=(["border-b-2", "border-blue-500", "text-blue-600"], move || show_qr.get())
+                                    class=("text-gray-500", move || !show_qr.get())
                                     on:click=move |_| set_show_qr.set(true)
                                 >
                                     "📱 QR Code"
@@ -217,9 +214,9 @@ pub fn TestControls(
                                             on:click=copy_link
                                         >
                                             {move || if copied_link.get() {
-                                                view! { <><span>"✓"</span> "Copied!"</> }
+                                                view! { <><span>"✓"</span> "Copied!"</> }.into_any()
                                             } else {
-                                                view! { <><span>"📋"</span> "Copy Link"</> }
+                                                view! { <><span>"📋"</span> "Copy Link"</> }.into_any()
                                             }}
                                         </button>
 

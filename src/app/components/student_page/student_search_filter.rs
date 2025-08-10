@@ -1,4 +1,5 @@
-use leptos::*;
+use leptos::html;
+use leptos::prelude::*;
 
 // More responsive container style with padding adjustments for small screens
 const SEARCH_CONTAINER_STYLE: &str =
@@ -46,15 +47,15 @@ pub fn SearchFilter(
     #[prop(into)] on_clear_filters: Callback<()>,
     #[prop(into)] is_panel_expanded: Signal<bool>,
 ) -> impl IntoView {
-    let iep_checkbox_ref = create_node_ref::<html::Input>();
-    let esl_checkbox_ref = create_node_ref::<html::Input>();
-    let student_504_checkbox_ref = create_node_ref::<html::Input>();
-    let readplan_checkbox_ref = create_node_ref::<html::Input>();
-    let gt_checkbox_ref = create_node_ref::<html::Input>();
-    let bip_checkbox_ref = create_node_ref::<html::Input>();
-    let intervention_filter_ref = create_node_ref::<html::Select>();
-    let grade_filter_ref = create_node_ref::<html::Select>();
-    let teacher_filter_ref = create_node_ref::<html::Select>();
+    let iep_checkbox_ref = NodeRef::<html::Input>::new();
+    let esl_checkbox_ref = NodeRef::<html::Input>::new();
+    let student_504_checkbox_ref = NodeRef::<html::Input>::new();
+    let readplan_checkbox_ref = NodeRef::<html::Input>::new();
+    let gt_checkbox_ref = NodeRef::<html::Input>::new();
+    let bip_checkbox_ref = NodeRef::<html::Input>::new();
+    let intervention_filter_ref = NodeRef::<html::Select>::new();
+    let grade_filter_ref = NodeRef::<html::Select>::new();
+    let teacher_filter_ref = NodeRef::<html::Select>::new();
 
     view! {
         <div class=SEARCH_CONTAINER_STYLE>
@@ -76,7 +77,7 @@ pub fn SearchFilter(
                         class="focus:ring-indigo-500 focus:border-indigo-500 block w-full pl-10 pr-10 text-xs sm:text-sm border-gray-300 rounded-md h-8 sm:h-10 border"
                         placeholder="Search students..."
                         prop:value={move || search_term.get()}
-                        on:input=move |ev| set_search_term(event_target_value(&ev))
+                        on:input=move |ev| set_search_term.run(event_target_value(&ev))
                     />
                 </div>
             </div>
@@ -87,7 +88,7 @@ pub fn SearchFilter(
                 <select
                     id="grade-filter"
                     class=SELECT_STYLE
-                    on:change=move |ev| set_grade_filter(event_target_value(&ev))
+                    on:change=move |ev| set_grade_filter.run(event_target_value(&ev))
                     node_ref=grade_filter_ref
                 >
                     <option value="all">"All Grades"</option>
@@ -113,7 +114,7 @@ pub fn SearchFilter(
                 <select
                     id="teacher-filter"
                     class=SELECT_STYLE
-                    on:change=move |ev| set_teacher_filter(event_target_value(&ev))
+                    on:change=move |ev| set_teacher_filter.run(event_target_value(&ev))
                     node_ref=teacher_filter_ref
                 >
                     <option value="all">"All Teachers"</option>
@@ -123,7 +124,7 @@ pub fn SearchFilter(
 
                         teacher_list.into_iter().map(|teacher| {
                             view! {
-                                <option value={teacher.clone()}>{teacher}</option>
+                                <option value=teacher.clone()>{teacher.clone()}</option>
                             }
                         }).collect_view()
                     }}
@@ -136,7 +137,7 @@ pub fn SearchFilter(
                 <select
                     id="intervention-filter"
                     class=SELECT_STYLE
-                    on:change=move |ev| set_intervention_filter(event_target_value(&ev))
+                    on:change=move |ev| set_intervention_filter.run(event_target_value(&ev))
                     node_ref=intervention_filter_ref
                 >
                     <option value="all">""</option>
@@ -155,7 +156,7 @@ pub fn SearchFilter(
                         type="checkbox"
                         id="iep-filter"
                         class=CHECKBOX_STYLE
-                        on:change=move |ev| set_iep_filter(event_target_checked(&ev))
+                        on:change=move |ev| set_iep_filter.run(event_target_checked(&ev))
                         node_ref=iep_checkbox_ref
                     />
                     <label for="iep-filter" class="text-xs sm:text-sm text-gray-700">"IEP"</label>
@@ -167,7 +168,7 @@ pub fn SearchFilter(
                         type="checkbox"
                         id="esl-filter"
                         class=CHECKBOX_STYLE
-                        on:change=move |ev| set_esl_filter(event_target_checked(&ev))
+                        on:change=move |ev| set_esl_filter.run(event_target_checked(&ev))
                         node_ref=esl_checkbox_ref
                     />
                     <label for="esl-filter" class="text-xs sm:text-sm text-gray-700">"ESL"</label>
@@ -179,7 +180,7 @@ pub fn SearchFilter(
                         type="checkbox"
                         id="504-filter"
                         class=CHECKBOX_STYLE
-                        on:change=move |ev| set_student_504_filter(event_target_checked(&ev))
+                        on:change=move |ev| set_student_504_filter.run(event_target_checked(&ev))
                         node_ref=student_504_checkbox_ref
                     />
                     <label for="504-filter" class="text-xs sm:text-sm text-gray-700">"504"</label>
@@ -197,7 +198,7 @@ pub fn SearchFilter(
                         type="checkbox"
                         id="readplan-filter"
                         class=CHECKBOX_STYLE
-                        on:change=move |ev| set_readplan_filter(event_target_checked(&ev))
+                        on:change=move |ev| set_readplan_filter.run(event_target_checked(&ev))
                         node_ref=readplan_checkbox_ref
                     />
                     <label for="readplan-filter" class="text-xs sm:text-sm text-gray-700">"Read Plan"</label>
@@ -214,7 +215,7 @@ pub fn SearchFilter(
                         type="checkbox"
                         id="gt-filter"
                         class=CHECKBOX_STYLE
-                        on:change=move |ev| set_gt_filter(event_target_checked(&ev))
+                        on:change=move |ev| set_gt_filter.run(event_target_checked(&ev))
                         node_ref=gt_checkbox_ref
                     />
                     <label for="gt-filter" class="text-xs sm:text-sm text-gray-700">"GT"</label>
@@ -231,7 +232,7 @@ pub fn SearchFilter(
                         type="checkbox"
                         id="bip-filter"
                         class=CHECKBOX_STYLE
-                        on:change=move |ev| set_bip_filter(event_target_checked(&ev))
+                        on:change=move |ev| set_bip_filter.run(event_target_checked(&ev))
                         node_ref=bip_checkbox_ref
                     />
                     <label for="bip-filter" class="text-xs sm:text-sm text-gray-700">"BEH"</label>
@@ -273,7 +274,7 @@ pub fn SearchFilter(
                             input.set_checked(false);
                         }
 
-                        on_clear_filters.call(());
+                        on_clear_filters.run(());
                     }
                 >
                     "Clear Filters"

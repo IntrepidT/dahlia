@@ -10,7 +10,8 @@ use crate::app::models::test::Test;
 use crate::app::server_functions::assessments::{delete_assessment, get_assessments};
 use crate::app::server_functions::courses::get_courses;
 use crate::app::server_functions::tests::get_tests;
-use leptos::*;
+use leptos::prelude::*;
+use leptos_router::path;
 use uuid::Uuid;
 
 #[component]
@@ -24,20 +25,22 @@ pub fn AssessmentPage() -> impl IntoView {
 
 #[component]
 pub fn AssessmentPageContent() -> impl IntoView {
-    let (selected_view, set_selected_view) = create_signal(SidebarSelected::Assessments);
-    let (show_modal, set_show_modal) = create_signal(false);
+    let (selected_view, set_selected_view) = signal(SidebarSelected::Assessments);
+    let (show_modal, set_show_modal) = signal(false);
 
-    // Resources
-    let assessments_resource =
-        create_local_resource(|| (), |_| async move { get_assessments().await });
-    let tests_resource = create_local_resource(|| (), |_| async move { get_tests().await });
-    let courses_resource = create_local_resource(|| (), |_| async move { get_courses().await });
+    // Resources - Using Resource instead of LocalResource for SSR compatibility
+    let assessments_resource = Resource::new(
+        || (), // source signal - empty tuple means "run once"
+        |_| async move { get_assessments().await },
+    );
+    let tests_resource = Resource::new(|| (), |_| async move { get_tests().await });
+    let courses_resource = Resource::new(|| (), |_| async move { get_courses().await });
 
     // Form state management
     let form_hook = use_assessment_form();
 
     // Delete action
-    let delete_action = create_action(|id: &Uuid| {
+    let delete_action = Action::new(|id: &Uuid| {
         let id = *id;
         async move {
             let request = DeleteAssessmentRequest::new(1, id);
@@ -52,7 +55,7 @@ pub fn AssessmentPageContent() -> impl IntoView {
 
     // Handle edit assessment
     let handle_edit_assessment = move |assessment: Assessment| {
-        form_hook.load_assessment.call(assessment); // FIXED: Added .call()
+        form_hook.load_assessment.run(assessment);
         set_show_modal.set(true);
     };
 
@@ -63,12 +66,12 @@ pub fn AssessmentPageContent() -> impl IntoView {
 
     // Handle new assessment
     let handle_new_assessment = move || {
-        form_hook.reset_form.call(()); // FIXED: Added .call(())
+        form_hook.reset_form.run(());
         set_show_modal.set(true);
     };
 
     // Effect to refetch assessments after successful deletion
-    create_effect(move |_| {
+    Effect::new(move |_| {
         if let Some(Ok(_)) = delete_action.value().get() {
             assessments_resource.refetch();
         }
@@ -105,7 +108,7 @@ pub fn AssessmentPageContent() -> impl IntoView {
 }
 
 #[component]
-fn AssessmentPageHeader(on_new_assessment: impl Fn() + 'static + Copy) -> impl IntoView {
+fn AssessmentPageHeader(on_new_assessment: impl Fn() + 'static + Copy + Send) -> impl IntoView {
     view! {
         <div class="flex justify-between">
             <h1 class="text-3xl font-medium mb-8 text-[#2E3A59]">"Assessments"</h1>
@@ -123,10 +126,10 @@ fn AssessmentPageHeader(on_new_assessment: impl Fn() + 'static + Copy) -> impl I
 
 #[component]
 fn AssessmentListSection(
-    assessments_resource: Resource<(), Result<Vec<Assessment>, ServerFnError>>,
-    tests_resource: Resource<(), Result<Vec<Test>, ServerFnError>>,
-    on_edit: impl Fn(Assessment) + 'static + Copy,
-    on_delete: impl Fn(Uuid) + 'static + Copy,
+    assessments_resource: Resource<Result<Vec<Assessment>, ServerFnError>>,
+    tests_resource: Resource<Result<Vec<Test>, ServerFnError>>,
+    on_edit: impl Fn(Assessment) + 'static + Copy + Send,
+    on_delete: impl Fn(Uuid) + 'static + Copy + Send,
 ) -> impl IntoView {
     view! {
         {move || {
@@ -139,7 +142,7 @@ fn AssessmentListSection(
                             on_edit=on_edit
                             on_delete=on_delete
                         />
-                    }.into_view()
+                    }.into_any()
                 },
                 (Some(Err(e)), _) | (_, Some(Err(e))) => {
                     view! {
@@ -150,7 +153,7 @@ fn AssessmentListSection(
                                 </div>
                             </div>
                         </div>
-                    }.into_view()
+                    }.into_any()
                 },
                 _ => {
                     view! {
@@ -167,7 +170,7 @@ fn AssessmentListSection(
                                 </div>
                             </div>
                         </div>
-                    }.into_view()
+                    }.into_any()
                 }
             }
         }}

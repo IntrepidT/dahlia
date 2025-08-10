@@ -3,14 +3,14 @@ use crate::app::models::enrollment::{AcademicYear, Enrollment, EnrollmentStatus}
 use crate::app::models::student::GradeEnum;
 use chrono::{NaiveDate, Utc};
 use csv::ReaderBuilder;
-use leptos::*;
+use leptos::prelude::*;
 use std::str::FromStr;
 use validator::Validate;
 
 #[cfg(feature = "ssr")]
 use {crate::app::db::enrollment_database, sqlx::PgPool};
 
-#[server(UploadBulkEnrollment, "/api")]
+#[server]
 pub async fn upload_bulk_enrollment(file_contents: String) -> Result<usize, ServerFnError> {
     #[cfg(feature = "ssr")]
     {
@@ -203,7 +203,7 @@ pub async fn validate_teacher_exists(
 }
 
 // Enhanced version with teacher validation
-#[server(UploadBulkEnrollmentWithValidation, "/api")]
+#[server]
 pub async fn upload_bulk_enrollment_with_validation(
     file_contents: String,
 ) -> Result<usize, ServerFnError> {

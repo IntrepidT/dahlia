@@ -1,3 +1,4 @@
+use leptos::prelude::*;
 use crate::app::models::question::{Question, QuestionType, WeightedOption};
 use crate::app::models::score::{QuestionResponse, CreateScoreRequest};
 use std::collections::HashMap;
@@ -123,8 +124,8 @@ impl ScoringEngine {
     pub fn score_test(
         questions: &[Question],
         student_responses: &HashMap<i32, (String, String)>, // qnumber -> (answer, comment)
-        student_id: i32,
-        test_id: String,
+        student_id= i32,
+        test_id= String,
         test_variant: i32,
         evaluator: String,
     ) -> Result<CreateScoreRequest, String> {

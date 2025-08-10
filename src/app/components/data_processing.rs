@@ -1,3 +1,4 @@
+use leptos::prelude::*;
 pub mod student_charts;
 pub mod student_results_summary;
 pub mod test_pie_chart;

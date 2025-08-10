@@ -2,20 +2,21 @@ use crate::app::models::employee::Employee;
 use crate::app::models::teacher::DeleteTeacherRequest;
 use crate::app::server_functions::employees::delete_employee;
 use leptos::ev::SubmitEvent;
-use leptos::*;
+use leptos::prelude::*;
+use leptos::task::spawn_local;
 use log::{error, info, warn};
-use std::rc::Rc;
+use std::sync::Arc;
 
 #[component]
 pub fn DeleteConfirmation(
-    #[prop(into)] selected_employee: Signal<Option<Rc<Employee>>>,
+    #[prop(into)] selected_employee: Signal<Option<Arc<Employee>>>,
     #[prop(into)] on_cancel: Callback<()>,
     #[prop(into)] on_delete: Callback<()>,
 ) -> impl IntoView {
     log::info!("DeleteConfirmation component initialized");
 
     // Input field state
-    let (confirm_id, set_confirm_id) = create_signal(String::new());
+    let (confirm_id, set_confirm_id) = signal(String::new());
 
     let handle_delete_employee = move |ev: SubmitEvent| {
         ev.prevent_default();
@@ -33,15 +34,15 @@ pub fn DeleteConfirmation(
                     let delete_result = delete_employee(delete_teacher_request).await;
 
                     match delete_result {
-                        Ok(_deleted_employee) => on_delete.call(()),
+                        Ok(_deleted_employee) => on_delete.run(()),
                         Err(e) => {
                             println!("Error deleting = {:?}", e);
-                            on_cancel.call(());
+                            on_cancel.run(());
                         }
                     };
                 });
             } else {
-                on_cancel.call(());
+                on_cancel.run(());
                 log::info!("Delete was cancelled");
             }
         }
@@ -89,7 +90,7 @@ pub fn DeleteConfirmation(
                             <button
                                 type="button"
                                 class="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
-                                on:click=move |_| on_cancel.call(())
+                                on:click=move |_| on_cancel.run(())
                             >
                                 "Cancel"
                             </button>

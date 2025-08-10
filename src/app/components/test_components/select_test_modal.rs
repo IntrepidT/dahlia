@@ -1,10 +1,12 @@
 use crate::app::models::test::Test;
-use leptos::*;
-use std::rc::Rc;
+use leptos::prelude::*;
+use leptos::prelude::*;
+use leptos_router::hooks::use_navigate;
+use std::sync::Arc;
 
 #[component]
 pub fn SelectTestModal(
-    test: Rc<Test>,
+    test: Arc<Test>,
     show_modal: ReadSignal<bool>,
     set_show_modal: WriteSignal<bool>,
 ) -> impl IntoView {
@@ -16,21 +18,21 @@ pub fn SelectTestModal(
     // Event handlers for each type of test navigation
     let on_realtime_click = move |_| {
         let test_id = realtime_test.test_id.clone();
-        let navigate = leptos_router::use_navigate();
+        let navigate = use_navigate();
         navigate(&format!("/test-session/{}", test_id), Default::default());
         set_show_modal.set(false);
     };
 
     let on_individual_click = move |_| {
         let test_id = individual_test.test_id.clone();
-        let navigate = leptos_router::use_navigate();
+        let navigate = use_navigate();
         navigate(&format!("/flashcardset/{}", test_id), Default::default());
         set_show_modal.set(false);
     };
 
     let on_grid_test_click = move |_| {
         let test_id = grid_test.test_id.clone();
-        let navigate = leptos_router::use_navigate();
+        let navigate = use_navigate();
         navigate(&format!("/gridtest/{}", test_id), Default::default());
         set_show_modal.set(false);
     };
@@ -75,9 +77,9 @@ pub fn SelectTestModal(
                                     "Using " <strong>{variation_type.clone()}</strong> " version of " <strong>{base_name.clone()}</strong>
                                 </p>
                             </div>
-                        }
+                        }.into_any()
                     } else {
-                        view! { <div></div> }
+                        view! { <div></div> }.into_any()
                     }}
 
                     <div class="space-y-4">

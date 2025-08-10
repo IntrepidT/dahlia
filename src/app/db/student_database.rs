@@ -1,6 +1,5 @@
-use leptos::ServerFnError;
-
 use crate::app::models::student;
+use leptos::prelude::*;
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "ssr")]{
@@ -9,7 +8,6 @@ cfg_if::cfg_if! {
         use crate::app::models::student::{GradeEnum, ESLEnum, GenderEnum, InterventionEnum};
         use log::{debug, error, info, warn};
         use chrono::NaiveDate;
-        use leptos::*;
         use sqlx::PgPool;
         use sqlx::prelude::*;
 
@@ -180,7 +178,7 @@ cfg_if::cfg_if! {
 
         pub async fn update_student(firstname: String, lastname: String, preferred: String, gender: GenderEnum, date_of_birth: NaiveDate, student_id: i32, esl: ESLEnum, current_grade_level: GradeEnum, teacher: String, iep: bool, bip: bool, student_504: bool, readplan: bool, gt: bool, intervention: Option<InterventionEnum>, eye_glasses: bool, notes: String, pin: i32, pool: &PgPool) -> Result<Option<Student>, ServerFnError> {
 
-            let row = sqlx::query("UPDATE students SET firstname =$1, lastname =$2, preferred =$3, gender =$4::gender_enum, date_of_birth=$5::DATE, student_id=$6, esl =$7::esl_enum, current_grade_level =$8::grade_enum, teacher =$9, iep =$10, bip =$11, student_504 =$12, readplan =$13, gt =$14, intervention =$15::intervention_enum, eye_glasses =$16, notes =$17, pin =$18 WHERE student_id = $6 RETURNING firstname, lastname, preferred, gender, date_of_birth, student_id, esl, current_grade_level, teacher, iep, bip, student_504, readplan, gt, intervention, eye_glasses, notes, pin")
+            let row = sqlx::query("UPDATE students SET firstname =$1, lastname =$2, preferred =$3, gender =$4::gender_enum, date_of_birth=$5::DATE, student_id:$6, esl =$7::esl_enum, current_grade_level =$8::grade_enum, teacher =$9, iep =$10, bip =$11, student_504 =$12, readplan =$13, gt =$14, intervention =$15::intervention_enum, eye_glasses =$16, notes =$17, pin =$18 WHERE student_id = $6 RETURNING firstname, lastname, preferred, gender, date_of_birth, student_id, esl, current_grade_level, teacher, iep, bip, student_504, readplan, gt, intervention, eye_glasses, notes, pin")
                 .bind(firstname)
                 .bind(lastname)
                 .bind(preferred)

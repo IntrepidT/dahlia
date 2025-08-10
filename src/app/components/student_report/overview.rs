@@ -1,3 +1,4 @@
+use leptos::prelude::*;
 pub mod search_bar;
 pub mod time_frame_selector;
 pub mod sort_selector;

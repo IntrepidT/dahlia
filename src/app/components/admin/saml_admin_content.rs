@@ -4,37 +4,38 @@ use crate::app::server_functions::saml_auth::{
     create_saml_config, delete_saml_config, get_saml_config_details, get_saml_institutions,
     toggle_saml_config, update_saml_config, SamlInstitution,
 };
-use leptos::*;
+use leptos::prelude::*;
+use leptos::prelude::*;
 
 #[component]
 pub fn SamlAdminContent(user_id: i64) -> impl IntoView {
     let (institutions, set_institutions) = create_signal::<Vec<SamlInstitution>>(Vec::new());
-    let (show_add_form, set_show_add_form) = create_signal(false);
-    let (show_edit_form, set_show_edit_form) = create_signal(false);
+    let (show_add_form, set_show_add_form) = signal(false);
+    let (show_edit_form, set_show_edit_form) = signal(false);
     let (editing_config, set_editing_config) = create_signal::<Option<SamlConfig>>(None);
-    let (loading, set_loading) = create_signal(false);
+    let (loading, set_loading) = signal(false);
     let (message, set_message) = create_signal::<Option<(String, bool)>>(None);
-    let (show_delete_confirm, set_show_delete_confirm) = create_signal(false);
+    let (show_delete_confirm, set_show_delete_confirm) = signal(false);
     let (delete_target, set_delete_target) = create_signal::<Option<(String, String)>>(None);
 
     // Form fields for adding/editing SAML config
-    let (institution_name, set_institution_name) = create_signal("".to_string());
-    let (entity_id, set_entity_id) = create_signal("".to_string());
-    let (sso_url, set_sso_url) = create_signal("".to_string());
-    let (slo_url, set_slo_url) = create_signal("".to_string());
-    let (x509_cert, set_x509_cert) = create_signal("".to_string());
-    let (metadata_url, set_metadata_url) = create_signal("".to_string());
-    let (config_active, set_config_active) = create_signal(true);
+    let (institution_name, set_institution_name) = signal("".to_string());
+    let (entity_id, set_entity_id) = signal("".to_string());
+    let (sso_url, set_sso_url) = signal("".to_string());
+    let (slo_url, set_slo_url) = signal("".to_string());
+    let (x509_cert, set_x509_cert) = signal("".to_string());
+    let (metadata_url, set_metadata_url) = signal("".to_string());
+    let (config_active, set_config_active) = signal(true);
 
     // Load institutions on component mount
-    let load_institutions = create_action(move |_: &()| async move {
+    let load_institutions = Action::new(move |_: &()| async move {
         match get_saml_institutions().await {
             Ok(institutions_list) => {
                 set_institutions.set(institutions_list);
                 Ok(())
             }
             Err(e) => {
-                logging::log!("Failed to load SAML institutions: {:?}", e);
+                log::info!("Failed to load SAML institutions: {:?}", e);
                 set_message.set(Some((format!("Failed to load institutions: {}", e), false)));
                 Err(e)
             }
@@ -42,8 +43,8 @@ pub fn SamlAdminContent(user_id: i64) -> impl IntoView {
     });
 
     // Load institutions on mount
-    create_effect(move |_| {
-        load_institutions.dispatch(());
+    Effect::new(move |_| {
+        let _ = load_institutions.dispatch(());
     });
 
     // Clear form helper
@@ -59,7 +60,7 @@ pub fn SamlAdminContent(user_id: i64) -> impl IntoView {
     };
 
     // Add configuration action
-    let handle_add_config = create_action(move |_: &()| {
+    let handle_add_config = Action::new(move |_: &()| {
         let institution_name = institution_name.get();
         let entity_id = entity_id.get();
         let sso_url = sso_url.get();
@@ -157,7 +158,7 @@ pub fn SamlAdminContent(user_id: i64) -> impl IntoView {
     });
 
     // Edit configuration action
-    let handle_edit_config = create_action(move |config_id: &String| {
+    let handle_edit_config = Action::new(move |config_id: &String| {
         let config_id = config_id.clone();
         async move {
             set_loading.set(true);
@@ -185,7 +186,7 @@ pub fn SamlAdminContent(user_id: i64) -> impl IntoView {
     });
 
     // Update configuration action
-    let handle_update_config = create_action(move |_: &()| {
+    let handle_update_config = Action::new(move |_: &()| {
         let config = editing_config.get();
         let institution_name = institution_name.get();
         let entity_id = entity_id.get();
@@ -261,7 +262,7 @@ pub fn SamlAdminContent(user_id: i64) -> impl IntoView {
     });
 
     // Delete configuration action
-    let handle_delete_config = create_action(move |config_id: &String| {
+    let handle_delete_config = Action::new(move |config_id: &String| {
         let config_id = config_id.clone();
         async move {
             set_loading.set(true);
@@ -286,7 +287,7 @@ pub fn SamlAdminContent(user_id: i64) -> impl IntoView {
     });
 
     // Toggle configuration status action
-    let handle_toggle_config = create_action(move |config_id: &String| {
+    let handle_toggle_config = Action::new(move |config_id: &String| {
         let config_id = config_id.clone();
         async move {
             set_loading.set(true);
@@ -371,15 +372,15 @@ pub fn SamlAdminContent(user_id: i64) -> impl IntoView {
                             set_metadata_url=set_metadata_url
                             config_active=config_active
                             set_config_active=set_config_active
-                            on_submit=Callback::new(move |_| handle_add_config.dispatch(()))
+                            on_submit=Callback::new(move |_| { let _ = handle_add_config.dispatch(()); })
                             on_cancel=Callback::new(move |_| {
                                 set_show_add_form.set(false);
                                 clear_form();
                             })
                         />
-                    }.into_view()
+                    }.into_any()
                 } else {
-                    view! { <div></div> }.into_view()
+                    view! { <div></div> }.into_any()
                 }
             }}
 
@@ -405,15 +406,15 @@ pub fn SamlAdminContent(user_id: i64) -> impl IntoView {
                             set_metadata_url=set_metadata_url
                             config_active=config_active
                             set_config_active=set_config_active
-                            on_submit=Callback::new(move |_| handle_update_config.dispatch(()))
+                            on_submit=Callback::new(move |_| { let _ = handle_update_config.dispatch(()); })
                             on_cancel=Callback::new(move |_| {
                                 set_show_edit_form.set(false);
                                 clear_form();
                             })
                         />
-                    }.into_view()
+                    }.into_any()
                 } else {
-                    view! { <div></div> }.into_view()
+                    view! { <div></div> }.into_any()
                 }
             }}
 
@@ -427,7 +428,7 @@ pub fn SamlAdminContent(user_id: i64) -> impl IntoView {
                                 <p>"No SAML institutions configured yet."</p>
                                 <p class="text-sm mt-1">"Click 'Add Institution' to get started."</p>
                             </div>
-                        }.into_view()
+                        }.into_any()
                     } else {
                         view! {
                             <div class="space-y-2">
@@ -455,24 +456,28 @@ pub fn SamlAdminContent(user_id: i64) -> impl IntoView {
                                                             <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-900 text-green-200">
                                                                 "Active"
                                                             </span>
-                                                        }.into_view()
+                                                        }.into_any()
                                                     } else {
                                                         view! {
                                                             <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-900 text-red-200">
                                                                 "Inactive"
                                                             </span>
-                                                        }.into_view()
+                                                        }.into_any()
                                                     }}
                                                     <button
                                                         class="text-blue-400 hover:text-blue-300 text-sm disabled:text-gray-500"
-                                                        on:click=move |_| handle_edit_config.dispatch(institution_id_for_edit.clone())
+                                                        on:click=move |_| {
+                                                            let _ = handle_edit_config.dispatch(institution_id_for_edit.clone());
+                                                        }
                                                         prop:disabled=move || loading.get()
                                                     >
                                                         "Edit"
                                                     </button>
                                                     <button
                                                         class="text-yellow-400 hover:text-yellow-300 text-sm disabled:text-gray-500"
-                                                        on:click=move |_| handle_toggle_config.dispatch(institution_id_for_toggle.clone())
+                                                        on:click=move |_| {
+                                                            let _ = handle_toggle_config.dispatch(institution_id_for_toggle.clone());
+                                                        }
                                                         prop:disabled=move || loading.get()
                                                     >
                                                         {if institution_active { "Disable" } else { "Enable" }}
@@ -493,7 +498,7 @@ pub fn SamlAdminContent(user_id: i64) -> impl IntoView {
                                     }
                                 }).collect::<Vec<_>>()}
                             </div>
-                        }.into_view()
+                        }.into_any()
                     }
                 }}
             </div>
@@ -558,12 +563,12 @@ pub fn SamlAdminContent(user_id: i64) -> impl IntoView {
                                     </div>
                                 </div>
                             </div>
-                        }.into_view()
+                        }.into_any()
                     } else {
-                        view! { <div></div> }.into_view()
+                        view! { <div></div> }.into_any()
                     }
                 } else {
-                    view! { <div></div> }.into_view()
+                    view! { <div></div> }.into_any()
                 }
             }}
         </div>
@@ -598,7 +603,7 @@ fn SamlConfigForm(
             <form on:submit=move |ev| {
                 ev.prevent_default();
                 if !loading.get() {
-                    on_submit.call(());
+                    on_submit.run(());
                 }
             }>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -706,7 +711,7 @@ MIIEbzCCA1egAwIBAgIJAIYhQeZPzfH3MA0GCSqGSIb3DQEBCwUAMIGBMQswCQYD...
                     <button
                         type="button"
                         class="px-3 py-2 bg-gray-600 text-gray-200 rounded hover:bg-gray-500 text-sm disabled:bg-gray-500"
-                        on:click=move |_| on_cancel.call(())
+                        on:click=move |_| on_cancel.run(())
                         prop:disabled=move || loading.get()
                     >
                         "Cancel"

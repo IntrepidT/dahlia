@@ -1,3 +1,4 @@
+use leptos::prelude::*;
 use thiserror::Error;
 
 #[derive(Error, Debug)]

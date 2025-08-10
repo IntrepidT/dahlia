@@ -2,12 +2,13 @@ use crate::app::components::auth::login_form::{LoginForm, RegisterForm};
 use crate::app::components::auth::saml_login_form::SamlLoginForm;
 use crate::app::middleware::global_settings::use_settings;
 use crate::app::models::user::SessionUser;
-use leptos::*;
-use leptos_router::*;
+use leptos::prelude::*;
+use leptos_router::components::*;
+use leptos_router::hooks::*;
 
 #[component]
 pub fn LoginPage() -> impl IntoView {
-    let (show_register, set_show_register) = create_signal(false);
+    let (show_register, set_show_register) = signal(false);
     let current_user = use_context::<ReadSignal<Option<SessionUser>>>().unwrap();
     let navigate = use_navigate();
 
@@ -16,7 +17,8 @@ pub fn LoginPage() -> impl IntoView {
     let student_protections_enabled = move || settings.get().student_protections;
 
     // If already logged in, redirect to home
-    create_effect(move |_| {
+    #[cfg(feature = "hydrate")]
+    Effect::new(move |_| {
         if current_user.get().is_some() {
             navigate("/", Default::default());
         }
@@ -24,23 +26,9 @@ pub fn LoginPage() -> impl IntoView {
 
     view! {
         <div class="max-w-md mx-auto mt-10 bg-[#f9f9f8]">
-            {move || {
-                if show_register.get() {
+            <Show when=move || show_register.get()
+                fallback=move || {
                     view! {
-                        <RegisterForm />
-                        <div class="mt-4 text-center">
-                            <span>"Already have an account? "</span>
-                            <button
-                                class="text-blue-500 hover:underline"
-                                on:click=move |_| set_show_register.set(false)
-                            >
-                                "Login"
-                            </button>
-                        </div>
-                    }.into_view()
-                } else {
-                    view! {
-                        // Conditionally render the appropriate login form
                         <SamlLoginForm />
 
                         <div class="mt-4 text-center">
@@ -60,9 +48,20 @@ pub fn LoginPage() -> impl IntoView {
                                 </a>
                             </div>
                         </div>
-                    }.into_view()
+                    }
                 }
-            }}
+            >
+                <RegisterForm />
+                <div class="mt-4 text-center">
+                    <span>"Already have an account? "</span>
+                    <button
+                        class="text-blue-500 hover:underline"
+                        on:click=move |_| set_show_register.set(false)
+                    >
+                        "Login"
+                    </button>
+                </div>
+            </Show>
         </div>
     }
 }

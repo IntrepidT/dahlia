@@ -1,3 +1,4 @@
+use leptos::prelude::*;
 #[cfg(feature = "ssr")]
 mod server {
     use actix_web::{

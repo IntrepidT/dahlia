@@ -1,3 +1,4 @@
+use leptos::prelude::*;
 pub mod benchmark_utils;
 pub use benchmark_utils::*;
 

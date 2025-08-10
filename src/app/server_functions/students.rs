@@ -2,7 +2,7 @@ use crate::app::errors::ErrorMessage;
 use crate::app::models::{
     student::Student, AddStudentRequest, DeleteStudentRequest, UpdateStudentRequest,
 };
-use leptos::*;
+use leptos::prelude::*;
 
 #[cfg(feature = "ssr")]
 use {
@@ -10,7 +10,7 @@ use {
     actix_web::web, chrono::Local, sqlx::PgPool, std::error::Error, uuid::Uuid,
 };
 
-#[server(GetStudents, "/api")]
+#[server]
 pub async fn get_students() -> Result<Vec<Student>, ServerFnError> {
     #[cfg(feature = "ssr")]
     {
@@ -35,7 +35,7 @@ pub async fn get_students() -> Result<Vec<Student>, ServerFnError> {
     }
 }
 
-#[server(GetStudent, "/api")]
+#[server]
 pub async fn get_student(student_id: i32) -> Result<Student, ServerFnError> {
     #[cfg(feature = "ssr")]
     {
@@ -60,7 +60,7 @@ pub async fn get_student(student_id: i32) -> Result<Student, ServerFnError> {
     }
 }
 
-#[server(GetStudentsSmart, "/api")]
+#[server]
 pub async fn get_students_smart(fragment: String) -> Result<Vec<Student>, ServerFnError> {
     #[cfg(feature = "ssr")]
     {
@@ -85,7 +85,7 @@ pub async fn get_students_smart(fragment: String) -> Result<Vec<Student>, Server
     }
 }
 
-#[server(AddStudent, "/api")]
+#[server]
 pub async fn add_student(add_student_request: AddStudentRequest) -> Result<Student, ServerFnError> {
     #[cfg(feature = "ssr")]
     {
@@ -135,7 +135,7 @@ pub async fn add_student(add_student_request: AddStudentRequest) -> Result<Stude
     }
 }
 
-#[server(DeleteStudent, "/api")]
+#[server]
 pub async fn delete_student(
     delete_student_request: DeleteStudentRequest,
 ) -> Result<Student, ServerFnError> {
@@ -165,7 +165,7 @@ pub async fn delete_student(
     }
 }
 
-#[server(EditStudent, "/api")]
+#[server]
 pub async fn edit_student(
     edit_student_request: UpdateStudentRequest,
 ) -> Result<Student, ServerFnError> {

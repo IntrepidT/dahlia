@@ -4,7 +4,7 @@ use crate::app::models::teacher::{
     AddNewTeacherRequest, DeleteTeacherRequest, UpdateTeacherRequest,
 };
 use crate::app::models::StatusEnum;
-use leptos::*;
+use leptos::prelude::*;
 
 #[cfg(feature = "ssr")]
 use {
@@ -12,7 +12,7 @@ use {
     uuid::Uuid,
 };
 
-#[server(GetEmployees, "/api")]
+#[server]
 pub async fn get_employees() -> Result<Vec<Employee>, ServerFnError> {
     #[cfg(feature = "ssr")]
     {
@@ -37,7 +37,7 @@ pub async fn get_employees() -> Result<Vec<Employee>, ServerFnError> {
     }
 }
 
-#[server(GetTeachers, "/api")]
+#[server]
 pub async fn get_teachers() -> Result<Vec<Employee>, ServerFnError> {
     #[cfg(feature = "ssr")]
     {
@@ -62,7 +62,7 @@ pub async fn get_teachers() -> Result<Vec<Employee>, ServerFnError> {
     }
 }
 
-#[server(AddTeacher, "/api")]
+#[server]
 pub async fn add_teacher(
     add_teacher_request: AddNewTeacherRequest,
 ) -> Result<Employee, ServerFnError> {
@@ -103,7 +103,7 @@ pub async fn add_teacher(
     }
 }
 /*
-#[server(DeleteTeacher, "/api")]
+#[server]
 pub async fn delete_teacher(
     delete_teacher_request: DeleteTeacherRequest,
 ) -> Result<Employee, ServerFnError> {
@@ -126,7 +126,7 @@ pub async fn delete_teacher(
     }
 }*/
 
-#[server(EditTeacher, "/api")]
+#[server]
 pub async fn edit_teacher(
     edit_teacher_request: UpdateTeacherRequest,
 ) -> Result<Employee, ServerFnError> {

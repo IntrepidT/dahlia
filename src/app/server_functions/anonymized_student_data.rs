@@ -1,4 +1,5 @@
-use leptos::*;
+use leptos::prelude::*;
+use leptos::prelude::*;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "ssr")]
 use sqlx::PgPool;
@@ -16,10 +17,10 @@ pub struct StudentValidationResponse {
     pub message: String,
 }
 
-#[server(ValidateStudentIds, "/api")]
+#[server]
 pub async fn validate_student_ids(
     request: StudentValidationRequest,
-) -> Result<StudentValidationResponse, ServerFnError> {
+) -> Result<StudentValidationResponse, leptos::ServerFnError> {
     #[cfg(feature = "ssr")]
     {
         use crate::app::server_functions::auth::get_current_user;
@@ -31,7 +32,7 @@ pub async fn validate_student_ids(
 
         let pool = extract::<web::Data<PgPool>>()
             .await
-            .map_err(|e| ServerFnError::new(format!("Database connection error: {}", e)))?;
+            .map_err(|e| leptos::ServerFnError::new(format!("Database connection error: {}", e)))?;
 
         // Check which app_ids exist in the database and belong to this user/session
         let mut valid_app_ids = Vec::new();
@@ -80,10 +81,10 @@ pub async fn validate_student_ids(
 }
 
 // Helper function to get student data with de-anonymization
-#[server(GetStudentData, "/api")]
+#[server]
 pub async fn get_student_data(
     app_ids: Vec<i32>, // Changed from u32 to i32 for consistency
-) -> Result<Vec<StudentRecord>, ServerFnError> {
+) -> Result<Vec<StudentRecord>, leptos::ServerFnError> {
     #[cfg(feature = "ssr")]
     {
         use crate::app::server_functions::auth::get_current_user;
@@ -93,7 +94,7 @@ pub async fn get_student_data(
         let user = get_current_user().await?;
         let pool = extract::<web::Data<PgPool>>()
             .await
-            .map_err(|e| ServerFnError::new(format!("Database connection error: {}", e)))?;
+            .map_err(|e| leptos::ServerFnError::new(format!("Database connection error: {}", e)))?;
 
         // Fetch anonymized student records
         let records = sqlx::query_as!(
@@ -118,5 +119,5 @@ pub async fn get_student_data(
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct StudentRecord {
-    pub app_id: i32, // Changed from u32 to i32 for consistency
+    pub app_id= i32, // Changed from u32 to i32 for consistency
 }

@@ -1,6 +1,8 @@
 use crate::app::models::user::{SessionUser, User};
 use crate::app::server_functions::users::{get_user, update_user};
-use leptos::*;
+use leptos::ev;
+use leptos::prelude::*;
+use leptos::task::spawn_local;
 
 #[component]
 pub fn UpdateProfileModal(
@@ -13,20 +15,20 @@ pub fn UpdateProfileModal(
         .expect("AuthProvider should provide current_user");
 
     // Create a derived signal for user_id to avoid unnecessary refetching
-    let user_id = create_memo(move |_| current_user.get().map(|user| user.id));
+    let user_id = Memo::new(move |_| current_user.get().map(|user| user.id));
 
     // State for form inputs
-    let (first_name, set_first_name) = create_signal(String::new());
-    let (last_name, set_last_name) = create_signal(String::new());
-    let (phone_number, set_phone_number) = create_signal(String::new());
+    let (first_name, set_first_name) = signal(String::new());
+    let (last_name, set_last_name) = signal(String::new());
+    let (phone_number, set_phone_number) = signal(String::new());
 
     // State for feedback messages
-    let (success_message, set_success_message) = create_signal(None::<String>);
-    let (error_message, set_error_message) = create_signal(None::<String>);
-    let (is_submitting, set_is_submitting) = create_signal(false);
+    let (success_message, set_success_message) = signal(None::<String>);
+    let (error_message, set_error_message) = signal(None::<String>);
+    let (is_submitting, set_is_submitting) = signal(false);
 
     // Fetch current user data to pre-populate form
-    let user_resource = create_resource(
+    let user_resource = Resource::new(
         move || (user_id.get(), show.get()), // Refetch when modal is shown
         move |(id, _)| async move {
             match id {
@@ -37,7 +39,7 @@ pub fn UpdateProfileModal(
     );
 
     // Pre-populate form when user data is fetched
-    create_effect(move |_| {
+    Effect::new(move |_| {
         if let Some(Some(user)) = user_resource.get() {
             if let Some(first) = user.first_name.clone() {
                 set_first_name(first);
@@ -52,7 +54,7 @@ pub fn UpdateProfileModal(
     });
 
     // Reset form state when modal is closed
-    create_effect(move |_| {
+    Effect::new(move |_| {
         if !show.get() {
             set_success_message(None);
             set_error_message(None);
@@ -91,11 +93,11 @@ pub fn UpdateProfileModal(
                                     "Profile updated successfully!".to_string(),
                                 ));
                                 // Notify parent component of success
-                                on_success_callback.call(());
+                                on_success_callback.run(());
                                 // Wait briefly to show success message before closing
                                 set_timeout(
                                     move || {
-                                        on_close.call(());
+                                        on_close.run(());
                                     },
                                     std::time::Duration::from_millis(1500),
                                 );
@@ -118,7 +120,7 @@ pub fn UpdateProfileModal(
     };
 
     let close_modal = move |_| {
-        on_close.call(());
+        on_close.run(());
     };
 
     // Only render modal content when shown
@@ -223,9 +225,9 @@ pub fn UpdateProfileModal(
                         </form>
                     </div>
                 </div>
-            }
+            }.into_any()
         } else {
-            view! { <div> </div> }
+            view! { <div> </div> }.into_any()
         }}
     }
 }

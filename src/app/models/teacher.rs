@@ -1,5 +1,6 @@
 use crate::app::models::employee::{Employee, EmployeeRole, StatusEnum};
 use crate::app::models::student::GradeEnum;
+use leptos::prelude::*;
 use serde::{Deserialize, Serialize};
 
 impl Employee {
@@ -42,9 +43,7 @@ pub struct DeleteTeacherRequest {
 
 impl DeleteTeacherRequest {
     pub fn new(id: i32) -> DeleteTeacherRequest {
-        DeleteTeacherRequest {
-            id
-        }
+        DeleteTeacherRequest { id }
     }
 }
 

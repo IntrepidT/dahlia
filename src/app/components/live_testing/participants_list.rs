@@ -1,5 +1,6 @@
+use leptos::prelude::*;
 use super::types::{ConnectedStudent, Role};
-use leptos::*;
+use leptos::prelude::*;
 
 #[component]
 pub fn ParticipantsList(

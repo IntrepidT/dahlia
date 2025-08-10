@@ -1,0 +1,12 @@
+[target.x86_64-unknown-linux-gnu]
+linker = "clang"
+rustflags = ["-C", "link-arg=-fuse-ld=lld", "--cfg", "erase_components"]
+
+[build]
+# Enable incremental compilation
+incremental = true
+jobs = 8
+
+[env]
+CARGO_TARGET_DIR = "target"
+

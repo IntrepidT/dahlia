@@ -11,7 +11,7 @@ use crate::app::models::assessment::{
 };
 use crate::app::models::test::Test;
 use crate::app::server_functions::assessments::{add_assessment, update_assessment};
-use leptos::*;
+use leptos::prelude::*;
 use uuid::Uuid;
 
 #[component]
@@ -19,12 +19,13 @@ pub fn AssessmentForm(
     show_modal: ReadSignal<bool>,
     set_show_modal: WriteSignal<bool>,
     form_hook: UseAssessmentForm,
-    tests_resource: Resource<(), Result<Vec<Test>, ServerFnError>>,
-    courses_resource: Resource<(), Result<Vec<crate::app::models::course::Course>, ServerFnError>>,
+    // Fix: Updated Resource type signatures to match Leptos 0.8
+    tests_resource: Resource<Result<Vec<Test>, ServerFnError>>,
+    courses_resource: Resource<Result<Vec<crate::app::models::course::Course>, ServerFnError>>,
     on_success: impl Fn() + 'static + Copy,
 ) -> impl IntoView {
     // Form submission logic
-    let submit_form = create_action(move |_: &()| {
+    let submit_form = Action::new(move |_: &()| {
         let state = form_hook.state.get();
         let editing = form_hook.editing.get();
         let selected_id = form_hook.selected_assessment_id.get();
@@ -103,9 +104,9 @@ pub fn AssessmentForm(
     });
 
     // Handle form submission success
-    create_effect(move |_| {
+    Effect::new(move |_| {
         if let Some(Ok(_)) = submit_form.value().get() {
-            form_hook.reset_form.call(()); // FIXED: Added ()
+            form_hook.reset_form.run(()); // Fixed: Added ()
             set_show_modal.set(false);
             on_success();
         }
@@ -119,7 +120,7 @@ pub fn AssessmentForm(
                         editing=form_hook.editing
                         on_close=move || {
                             set_show_modal.set(false);
-                            form_hook.reset_form.call(());  // FIXED: Added ()
+                            form_hook.reset_form.run(());  // Fixed: Added ()
                         }
                     />
 
@@ -155,9 +156,11 @@ pub fn AssessmentForm(
                         editing=form_hook.editing
                         on_cancel=move || {
                             set_show_modal.set(false);
-                            form_hook.reset_form.call(());  // FIXED: Added ()
+                            form_hook.reset_form.run(());  // Fixed: Added ()
                         }
-                        on_submit=move || submit_form.dispatch(())
+                        on_submit=move || {
+                            let _ = submit_form.dispatch(());
+                        }
                     />
                 </div>
             </div>
@@ -186,7 +189,8 @@ fn FormHeader(editing: ReadSignal<bool>, on_close: impl Fn() + 'static + Copy) -
 fn TestManagementSection(
     state: ReadSignal<AssessmentFormState>,
     set_state: WriteSignal<AssessmentFormState>,
-    tests_resource: Resource<(), Result<Vec<Test>, ServerFnError>>,
+    // Fix: Updated Resource type signature
+    tests_resource: Resource<Result<Vec<Test>, ServerFnError>>,
 ) -> impl IntoView {
     view! {
         <div class="border-t border-gray-200 pt-6 bg-white">
@@ -310,9 +314,10 @@ fn FormFooter(
     }
 }
 
+// Fix: Updated function signature and resource access pattern for Leptos 0.8
 async fn calculate_composite_score(
     state: &AssessmentFormState,
-    tests_resource: &Resource<(), Result<Vec<Test>, ServerFnError>>,
+    tests_resource: &Resource<Result<Vec<Test>, ServerFnError>>,
 ) -> Option<i32> {
     let tests_to_sum = if state.use_sequences {
         if state.test_sequence.is_empty() {
@@ -330,6 +335,7 @@ async fn calculate_composite_score(
         state.selected_tests.clone()
     };
 
+    // Fix: Updated resource access pattern for Leptos 0.8
     tests_resource
         .get()
         .and_then(|result| result.ok())

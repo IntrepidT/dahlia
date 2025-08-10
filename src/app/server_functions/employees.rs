@@ -1,10 +1,10 @@
+use leptos::prelude::*;
 //this file contains all handler functions for employees
 use crate::app::db::teacher_database;
 use crate::app::models::employee::Employee;
 use crate::app::models::employee::{AddNewEmployeeRequest, UpdateEmployeeRequest};
 use crate::app::models::DeleteTeacherRequest;
 use crate::app::models::EmployeeRole;
-use leptos::*;
 use log::{error, info};
 
 #[cfg(feature = "ssr")]
@@ -13,7 +13,7 @@ use {
     uuid::Uuid,
 };
 
-#[server(GetEmployees, "/api")]
+#[server]
 pub async fn get_employees() -> Result<Vec<Employee>, ServerFnError> {
     #[cfg(feature = "ssr")]
     {
@@ -39,7 +39,7 @@ pub async fn get_employees() -> Result<Vec<Employee>, ServerFnError> {
     }
 }
 
-#[server(AddEmployee, "/api")]
+#[server]
 pub async fn add_employee(
     add_employee_request: AddNewEmployeeRequest,
 ) -> Result<Employee, ServerFnError> {
@@ -98,7 +98,7 @@ pub async fn add_employee(
     }
 }
 
-#[server(DeleteTeacher, "/api")]
+#[server]
 pub async fn delete_employee(
     delete_teacher_request: DeleteTeacherRequest,
 ) -> Result<Employee, ServerFnError> {
@@ -121,7 +121,7 @@ pub async fn delete_employee(
     }
 }
 
-#[server(EditTeacher, "/api")]
+#[server]
 pub async fn edit_employee(
     update_employee_request: UpdateEmployeeRequest,
 ) -> Result<Employee, ServerFnError> {

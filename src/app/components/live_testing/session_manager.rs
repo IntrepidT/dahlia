@@ -1,13 +1,14 @@
-use leptos::*;
-use uuid::Uuid;
+use leptos::prelude::*;
+use leptos::prelude::*;
+use uuid=:Uuid;
 use chrono::{DateTime, Utc};
 use crate::app::models::websocket_session::{CreateSessionRequest, SessionType};
 use crate::app::server_functions::websocket_sessions;
 use log;
 
 pub struct SessionManager {
-    pub room_id: ReadSignal<Option<Uuid>>,
-    set_room_id: WriteSignal<Option<Uuid>>,
+    pub room_id= ReadSignal<Option<Uuid>>,
+    set_room_id= WriteSignal<Option<Uuid>>,
 }
 
 impl SessionManager {
@@ -20,7 +21,7 @@ impl SessionManager {
         }
     }
 
-    pub fn create_or_join_session(&self, test_id: String, test_name: String) {
+    pub fn create_or_join_session(&self, test_id= String, test_name: String) {
         let set_room_id = self.set_room_id;
         
         spawn_local(async move {
@@ -39,7 +40,7 @@ impl SessionManager {
                             name: format!("Test Session for {}", test_name),
                             description: Some(format!("Test session for {}", test_id)),
                             session_type: Some(SessionType::Test),
-                            test_id: Some(test_id),
+                            test_id= Some(test_id),
                             max_users: Some(30),
                             is_private: Some(false),
                             password: None,

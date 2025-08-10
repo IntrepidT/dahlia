@@ -5,22 +5,22 @@ use crate::app::models::user::SessionUser;
 use crate::app::models::user::User;
 use crate::app::server_functions::auth::{get_current_user, Logout};
 use crate::app::server_functions::users::get_user;
-use leptos::*;
+use leptos::prelude::*;
 
 #[component]
 pub fn MyAccount() -> impl IntoView {
     // State to control the visibility of the update profile modal
-    let (show_update_modal, set_show_update_modal) = create_signal(false);
+    let (show_update_modal, set_show_update_modal) = signal(false);
 
     // Get the current user from context (provided by AuthProvider)
     let current_user = use_context::<ReadSignal<Option<SessionUser>>>()
         .expect("AuthProvider should provide current_user");
 
     // Create a derived signal for user_id to avoid unnecessary refetching
-    let user_id = create_memo(move |_| current_user.get().map(|user| user.id));
+    let user_id = Memo::new(move |_| current_user.get().map(|user| user.id));
 
     // Fetch full user data when authenticated
-    let user_resource = create_resource(
+    let user_resource = Resource::new(
         move || user_id.get(),
         move |id| async move {
             match id {
@@ -56,7 +56,7 @@ pub fn MyAccount() -> impl IntoView {
 
                 {move || {
                     if loading.get() {
-                        view! { <div class="text-center p-8">"Loading..."</div> }
+                        view! { <div class="text-center p-8">"Loading..."</div> }.into_any()
                     } else if let Some(user) = current_user.get() {
                         // Define reusable function to display user data safely
                         let display_user_field = |field_value: Option<String>| {
@@ -168,7 +168,7 @@ pub fn MyAccount() -> impl IntoView {
                                     on_success=Callback::new(on_profile_updated)
                                 />
                             </div>
-                        }
+                        }.into_any()
                     } else {
                         view! {
                             <div class="bg-[#F9F9F8] text-[#2E3A59] p-8 rounded-md shadow-md text-center">
@@ -177,7 +177,7 @@ pub fn MyAccount() -> impl IntoView {
                                     "Log In"
                                 </a>
                             </div>
-                        }
+                        }.into_any()
                     }
                 }}
             </div>

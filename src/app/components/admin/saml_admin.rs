@@ -2,23 +2,24 @@ use crate::app::models::user::{SessionUser, UserRole};
 use crate::app::server_functions::saml_auth::{
     create_saml_config, get_saml_institutions, SamlInstitution,
 };
-use leptos::*;
+use leptos::prelude::*;
+use leptos::task::spawn_local;
 
 #[component]
 pub fn SamlAdminPanel() -> impl IntoView {
     let current_user = use_context::<ReadSignal<Option<SessionUser>>>().unwrap();
     let (institutions, set_institutions) = create_signal::<Vec<SamlInstitution>>(Vec::new());
-    let (show_add_form, set_show_add_form) = create_signal(false);
-    let (loading, set_loading) = create_signal(false);
+    let (show_add_form, set_show_add_form) = signal(false);
+    let (loading, set_loading) = signal(false);
     let (message, set_message) = create_signal::<Option<(String, bool)>>(None);
 
     // Form fields for adding new SAML config
-    let (institution_name, set_institution_name) = create_signal("".to_string());
-    let (entity_id, set_entity_id) = create_signal("".to_string());
-    let (sso_url, set_sso_url) = create_signal("".to_string());
-    let (slo_url, set_slo_url) = create_signal("".to_string());
-    let (x509_cert, set_x509_cert) = create_signal("".to_string());
-    let (metadata_url, set_metadata_url) = create_signal("".to_string());
+    let (institution_name, set_institution_name) = signal("".to_string());
+    let (entity_id, set_entity_id) = signal("".to_string());
+    let (sso_url, set_sso_url) = signal("".to_string());
+    let (slo_url, set_slo_url) = signal("".to_string());
+    let (x509_cert, set_x509_cert) = signal("".to_string());
+    let (metadata_url, set_metadata_url) = signal("".to_string());
 
     // Check if user has admin privileges
     let is_admin = move || {
@@ -29,7 +30,7 @@ pub fn SamlAdminPanel() -> impl IntoView {
     };
 
     // Load institutions on component mount
-    create_effect(move |_| {
+    Effect::new(move |_| {
         if is_admin() {
             spawn_local(async move {
                 match get_saml_institutions().await {
@@ -37,7 +38,7 @@ pub fn SamlAdminPanel() -> impl IntoView {
                         set_institutions.set(institutions_list);
                     }
                     Err(e) => {
-                        logging::log!("Failed to load SAML institutions: {:?}", e);
+                        log::info!("Failed to load SAML institutions: {:?}", e);
                         set_message
                             .set(Some((format!("Failed to load institutions: {}", e), false)));
                     }
@@ -46,7 +47,7 @@ pub fn SamlAdminPanel() -> impl IntoView {
         }
     });
 
-    let handle_add_config = create_action(move |_: &()| {
+    let handle_add_config = Action::new(move |_: &()| {
         let institution_name = institution_name.get();
         let entity_id = entity_id.get();
         let sso_url = sso_url.get();
@@ -169,7 +170,7 @@ pub fn SamlAdminPanel() -> impl IntoView {
                         <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
                             "Access denied. Administrator privileges required."
                         </div>
-                    }.into_view()
+                    }.into_any()
                 } else {
                     view! {
                         <div class="space-y-6">
@@ -309,9 +310,9 @@ MIIEbzCCA1egAwIBAgIJAIYhQeZPzfH3MA0GCSqGSIb3DQEBCwUAMIGBMQswCQYD...
                                                 </div>
                                             </form>
                                         </div>
-                                    }.into_view()
+                                    }.into_any()
                                 } else {
-                                    view! { <div></div> }.into_view()
+                                    view! { <div></div> }.into_any()
                                 }
                             }}
 
@@ -332,7 +333,7 @@ MIIEbzCCA1egAwIBAgIJAIYhQeZPzfH3MA0GCSqGSIb3DQEBCwUAMIGBMQswCQYD...
                                                     <p class="mt-2">"No SAML institutions configured yet."</p>
                                                     <p class="text-sm">"Click 'Add Institution' to get started."</p>
                                                 </div>
-                                            }.into_view()
+                                            }.into_any()
                                         } else {
                                             view! {
                                                 <div class="divide-y divide-gray-200">
@@ -361,13 +362,13 @@ MIIEbzCCA1egAwIBAgIJAIYhQeZPzfH3MA0GCSqGSIb3DQEBCwUAMIGBMQswCQYD...
                                                                                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                                                                                     "Active"
                                                                                 </span>
-                                                                            }.into_view()
+                                                                            }.into_any()
                                                                         } else {
                                                                             view! {
                                                                                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
                                                                                     "Inactive"
                                                                                 </span>
-                                                                            }.into_view()
+                                                                            }.into_any()
                                                                         }}
                                                                         <button class="text-indigo-600 hover:text-indigo-900 text-sm font-medium">
                                                                             "Edit"
@@ -381,7 +382,7 @@ MIIEbzCCA1egAwIBAgIJAIYhQeZPzfH3MA0GCSqGSIb3DQEBCwUAMIGBMQswCQYD...
                                                         }
                                                     }).collect::<Vec<_>>()}
                                                 </div>
-                                            }.into_view()
+                                            }.into_any()
                                         }
                                     }}
                                 </div>
@@ -418,7 +419,7 @@ MIIEbzCCA1egAwIBAgIJAIYhQeZPzfH3MA0GCSqGSIb3DQEBCwUAMIGBMQswCQYD...
                                 </p>
                             </div>
                         </div>
-                    }.into_view()
+                    }.into_any()
                 }
             }}
         </div>

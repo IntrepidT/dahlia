@@ -1,3 +1,4 @@
+use leptos::prelude::*;
 use crate::app::models::test::BenchmarkCategory;
 
 //This file contains utilities for working with benchmark categories (primarily used in

@@ -1,7 +1,7 @@
+use leptos::prelude::*;
 use super::types::{QuestionResponse, Role};
 use crate::app::components::test_components::font_controls::FontSettings;
 use crate::app::models::question::{Question, QuestionType};
-use leptos::*;
 use std::collections::HashMap;
 
 #[component]
@@ -83,7 +83,7 @@ fn AnswerInput(
                     children=move |option| {
                         let option_value = option.clone();
                         let option_value_clone = option_value.clone();
-                        let is_checked = create_memo(move |_| {
+                        let is_checked = Memo::new(move |_| {
                             responses.with(|r| {
                                 r.get(&qnumber)
                                  .map(|resp| resp.answer == option_value_clone.clone())
@@ -103,7 +103,7 @@ fn AnswerInput(
                                     on:change=move |ev| {
                                         if !should_disable_inputs.get() {
                                             let value = event_target_value(&ev);
-                                            on_answer_change.call((qnumber, value));
+                                            on_answer_change.run((qnumber, value));
                                         }
                                     }
                                 />
@@ -113,7 +113,7 @@ fn AnswerInput(
                     }
                 />
             </div>
-        }.into_view(),
+        }.into_any(),
         QuestionType::WeightedMultipleChoice => {
             let weighted_options = question.get_weighted_options();
             let q_clone_for_calc = question.clone();
@@ -132,7 +132,7 @@ fn AnswerInput(
                             let option_text_for_change = option_text.clone();
                             let choice_number = index + 1;
 
-                            let is_selected = create_memo(move |_| {
+                            let is_selected = Memo::new(move |_| {
                                 responses.with(|r| {
                                     r.get(&qnumber)
                                         .and_then(|resp| resp.selected_options.as_ref())
@@ -166,7 +166,7 @@ fn AnswerInput(
                                             new_selected.push(option_text_for_change.clone());
                                         }
 
-                                        on_weighted_selection.call((qnumber, new_selected));
+                                        on_weighted_selection.run((qnumber, new_selected));
                                     }
                                 }>
                                     <div class="flex items-center gap-3">
@@ -186,11 +186,11 @@ fn AnswerInput(
                                                             </svg>
                                                         </Show>
                                                     </div>
-                                                }.into_view()
+                                                }.into_any()
                                             } else {
                                                 view! {
                                                     <div class="w-5 h-5 rounded border-2 border-gray-300 bg-gray-100"></div>
-                                                }.into_view()
+                                                }.into_any()
                                             }}
                                         </div>
                                         <div class="flex items-start gap-3">
@@ -217,9 +217,9 @@ fn AnswerInput(
                                         {if !option_clone.is_selectable {
                                             view! {
                                                 <span class="text-xs text-gray-400 italic">"(info only)"</span>
-                                            }.into_view()
+                                            }.into_any()
                                         } else {
-                                            view! { <span></span> }.into_view()
+                                            view! { <span></span> }.into_any()
                                         }}
                                     </div>
                                 </div>
@@ -245,17 +245,17 @@ fn AnswerInput(
                         </div>
                     </div>
                 </div>
-            }.into_view()
+            }.into_any()
         },
         QuestionType::TrueFalse => {
-            let is_true = create_memo(move |_| {
+            let is_true = Memo::new(move |_| {
                 responses.with(|r| {
                     r.get(&qnumber)
                      .map(|resp| resp.answer == "true")
                      .unwrap_or(false)
                 })
             });
-            let is_false = create_memo(move |_| {
+            let is_false = Memo::new(move |_| {
                 responses.with(|r| {
                     r.get(&qnumber)
                      .map(|resp| resp.answer == "false")
@@ -263,22 +263,38 @@ fn AnswerInput(
                 })
             });
 
+            // Combined class computation for True button
+            let true_button_class = move || {
+                let base = "px-6 py-3 w-full rounded-lg font-medium text-center transition-colors";
+                let disabled_cursor = if should_disable_inputs() { " cursor-not-allowed" } else { "" };
+                
+                if is_true() {
+                    format!("{} bg-green-500 text-white border-transparent{}", base, disabled_cursor)
+                } else {
+                    format!("{} bg-white text-gray-800 border-gray-200 border{}", base, disabled_cursor)
+                }
+            };
+
+            // Combined class computation for False button
+            let false_button_class = move || {
+                let base = "px-6 py-3 w-full rounded-lg font-medium text-center transition-colors";
+                let disabled_cursor = if should_disable_inputs() { " cursor-not-allowed" } else { "" };
+                
+                if is_false() {
+                    format!("{} bg-red-500 text-white border-transparent{}", base, disabled_cursor)
+                } else {
+                    format!("{} bg-white text-gray-800 border-gray-200 border{}", base, disabled_cursor)
+                }
+            };
+
             view! {
                 <div class="w-full flex flex-col sm:flex-row gap-4 items-center justify-center">
                     <button
                         type="button"
-                        class="px-6 py-3 w-full rounded-lg font-medium text-center transition-colors"
-                        class:bg-white={move || !is_true()}
-                        class:text-gray-800={move || !is_true()}
-                        class:border-gray-200={move || !is_true()}
-                        class:border={move || !is_true()}
-                        class:bg-green-500={move || is_true()}
-                        class:text-white={move || is_true()}
-                        class:border-transparent={move || is_true()}
-                        class:cursor-not-allowed={should_disable_inputs()}
+                        class=true_button_class
                         on:click=move |_| {
                             if !should_disable_inputs.get() {
-                                on_answer_change.call((qnumber, "true".to_string()));
+                                on_answer_change.run((qnumber, "true".to_string()));
                             }
                         }
                     >
@@ -288,18 +304,10 @@ fn AnswerInput(
                     </button>
                     <button
                         type="button"
-                        class="px-6 py-3 w-full rounded-lg font-medium text-center transition-colors"
-                        class:bg-white={move || !is_false()}
-                        class:text-gray-800={move || !is_false()}
-                        class:border-gray-200={move || !is_false()}
-                        class:border={move || !is_false()}
-                        class:bg-red-500={move || is_false()}
-                        class:text-white={move || is_false()}
-                        class:border-transparent={move || is_false()}
-                        class:cursor-not-allowed={should_disable_inputs()}
+                        class=false_button_class
                         on:click=move |_| {
                             if !should_disable_inputs.get() {
-                                on_answer_change.call((qnumber, "false".to_string()));
+                                on_answer_change.run((qnumber, "false".to_string()));
                             }
                         }
                     >
@@ -308,10 +316,10 @@ fn AnswerInput(
                         </span>
                     </button>
                 </div>
-            }.into_view()
+            }.into_any()
         },
         _ => {
-            let answer_value = create_memo(move |_| {
+            let answer_value = Memo::new(move |_| {
                 responses.with(|r| {
                     r.get(&qnumber)
                      .map(|resp| resp.answer.clone())
@@ -328,14 +336,14 @@ fn AnswerInput(
                         on:input=move |ev| {
                             if !should_disable_inputs.get() {
                                 let value = event_target_value(&ev);
-                                on_answer_change.call((qnumber, value));
+                                on_answer_change.run((qnumber, value));
                             }
                         }
                         placeholder="Enter your answer here..."
                         rows="3"
                     ></textarea>
                 </div>
-            }.into_view()
+            }.into_any()
         }
     }
 }
@@ -347,7 +355,7 @@ fn CommentInput(
     #[prop(into)] on_comment_change: Callback<(i32, String)>,
 ) -> impl IntoView {
     let qnumber = question.qnumber;
-    let comment_value = create_memo(move |_| {
+    let comment_value = Memo::new(move |_| {
         responses.with(|r| {
             r.get(&qnumber)
                 .map(|resp| resp.comment.clone())
@@ -362,7 +370,7 @@ fn CommentInput(
                 prop:value=move || comment_value()
                 on:input=move |ev| {
                     let value = event_target_value(&ev);
-                    on_comment_change.call((qnumber, value));
+                    on_comment_change.run((qnumber, value));
                 }
                 placeholder="Add teacher comments or notes here..."
                 rows="2"

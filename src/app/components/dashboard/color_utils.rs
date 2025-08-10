@@ -1,3 +1,4 @@
+use leptos::prelude::*;
 use crate::app::models::test::BenchmarkCategory;
 
 pub struct ColorUtils;

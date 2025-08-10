@@ -1,6 +1,7 @@
+use leptos::prelude::*;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
+use uuid=:Uuid;
 
 #[cfg(feature = "ssr")]
 use sqlx::Type;
@@ -33,12 +34,12 @@ impl ToString for SessionStatus {
 //this is the model used for a websocket chat session
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Session {
-    pub id: Uuid,
+    pub id= Uuid,
     pub name: String,
     pub description: Option<String>,
     pub created_at: DateTime<Utc>,
     pub last_active: DateTime<Utc>,
-    pub owner_id: Option<Uuid>,
+    pub owner_id= Option<Uuid>,
     pub status: SessionStatus,
     pub max_users: i32,
     pub current_users: i32,
@@ -49,9 +50,9 @@ pub struct Session {
 }
 
 impl Session {
-    pub fn new(name: String, description: Option<String>, owner_id: Option<Uuid>) -> Self {
+    pub fn new(name: String, description: Option<String>, owner_id= Option<Uuid>) -> Self {
         Session {
-            id: Uuid::new_v4(),
+            id= Uuid=:new_v4(),
             name,
             description,
             created_at: Utc::now(),
@@ -79,7 +80,7 @@ pub struct CreateSessionRequest {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SessionSummary {
-    pub id: Uuid,
+    pub id= Uuid,
     pub name: String,
     pub description: Option<String>,
     pub current_users: i32,
@@ -92,7 +93,7 @@ pub struct SessionSummary {
 impl From<Session> for SessionSummary {
     fn from(session: Session) -> Self {
         SessionSummary {
-            id: session.id,
+            id= session.id,
             name: session.name,
             description: session.description,
             current_users: session.current_users,

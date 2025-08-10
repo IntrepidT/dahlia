@@ -1,3 +1,4 @@
+use leptos::prelude::*;
 cfg_if::cfg_if! {
     if #[cfg(feature = "ssr")] {
 
@@ -6,7 +7,6 @@ cfg_if::cfg_if! {
             Argon2,
         };
         use sqlx::{Pool, Postgres};
-        use leptos::ServerFnError;
         use crate::app::models::user::{SessionUser, User, UserRole};
         use sqlx::Row;
         use chrono::{DateTime, Utc};

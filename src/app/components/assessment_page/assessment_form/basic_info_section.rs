@@ -1,7 +1,8 @@
 use crate::app::components::assessment_page::shared::types::AssessmentFormState;
 use crate::app::models::assessment::{ScopeEnum, SubjectEnum};
 use crate::app::models::student::GradeEnum;
-use leptos::*;
+use leptos::html;
+use leptos::prelude::*;
 use strum::IntoEnumIterator;
 #[cfg(feature = "hydrate")]
 use wasm_bindgen::JsCast;
@@ -10,25 +11,25 @@ use wasm_bindgen::JsCast;
 pub fn BasicInfoSection(
     state: ReadSignal<AssessmentFormState>,
     set_state: WriteSignal<AssessmentFormState>,
-    courses_resource: Resource<(), Result<Vec<crate::app::models::course::Course>, ServerFnError>>,
+    courses_resource: Resource<Result<Vec<crate::app::models::course::Course>, ServerFnError>>,
 ) -> impl IntoView {
     // Create node refs for the select elements
-    let subject_ref = create_node_ref::<html::Select>();
-    let grade_ref = create_node_ref::<html::Select>();
-    let scope_ref = create_node_ref::<html::Select>();
+    let subject_ref = NodeRef::<html::Select>::new();
+    let grade_ref = NodeRef::<html::Select>::new();
+    let scope_ref = NodeRef::<html::Select>::new();
 
     // Effect to update subject select when state changes
-    create_effect(move |_| {
+    Effect::new(move |_| {
         let current_state = state.get();
         if let Some(subject_element) = subject_ref.get() {
             match current_state.subject {
                 Some(subject) => {
                     let formatted = format!("{}", subject);
-                    logging::log!("Setting subject select to: {}", formatted);
+                    log::info!("Setting subject select to: {}", formatted);
                     subject_element.set_value(&formatted);
                 }
                 None => {
-                    logging::log!("Setting subject select to empty");
+                    log::info!("Setting subject select to empty");
                     subject_element.set_value("");
                 }
             }
@@ -36,17 +37,17 @@ pub fn BasicInfoSection(
     });
 
     // Effect to update grade select when state changes
-    create_effect(move |_| {
+    Effect::new(move |_| {
         let current_state = state.get();
         if let Some(grade_element) = grade_ref.get() {
             match current_state.grade {
                 Some(grade) => {
                     let formatted = format!("{}", grade);
-                    logging::log!("Setting grade select to: {}", formatted);
+                    log::info!("Setting grade select to: {}", formatted);
                     grade_element.set_value(&formatted);
                 }
                 None => {
-                    logging::log!("Setting grade select to empty");
+                    log::info!("Setting grade select to empty");
                     grade_element.set_value("");
                 }
             }
@@ -54,17 +55,17 @@ pub fn BasicInfoSection(
     });
 
     // Effect to update scope select when state changes
-    create_effect(move |_| {
+    Effect::new(move |_| {
         let current_state = state.get();
         if let Some(scope_element) = scope_ref.get() {
             match current_state.scope {
                 Some(scope) => {
                     let formatted = format!("{}", scope);
-                    logging::log!("Setting scope select to: {}", formatted);
+                    log::info!("Setting scope select to: {}", formatted);
                     scope_element.set_value(&formatted);
                 }
                 None => {
-                    logging::log!("Setting scope select to empty");
+                    log::info!("Setting scope select to empty");
                     scope_element.set_value("");
                 }
             }
@@ -93,13 +94,13 @@ pub fn BasicInfoSection(
                     class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2E3A59] focus:border-[#2E3A59] bg-white text-gray-900"
                     on:change=move |ev| {
                         let value = event_target_value(&ev);
-                        logging::log!("Subject select changed to: {}", value);
+                        log::info!("Subject select changed to: {}", value);
                         if value.is_empty() {
                             set_state.update(|s| s.subject = None);
                         } else {
                             match value.parse::<SubjectEnum>() {
                                 Ok(subject_enum) => set_state.update(|s| s.subject = Some(subject_enum)),
-                                Err(_) => logging::log!("Failed to parse subject: {}", value)
+                                Err(_) => log::info!("Failed to parse subject: {}", value)
                             }
                         }
                     }
@@ -109,7 +110,7 @@ pub fn BasicInfoSection(
                         let option_value = format!("{}", option);
                         view! {
                             <option value=option_value.clone() class="text-gray-900 bg-white">
-                                {option_value}
+                                {option_value.clone()}
                             </option>
                         }
                     }).collect::<Vec<_>>()}
@@ -124,13 +125,13 @@ pub fn BasicInfoSection(
                     class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2E3A59] focus:border-[#2E3A59] bg-white text-gray-900"
                     on:change=move |ev| {
                         let value = event_target_value(&ev);
-                        logging::log!("Grade select changed to: {}", value);
+                        log::info!("Grade select changed to: {}", value);
                         if value.is_empty() {
                             set_state.update(|s| s.grade = None);
                         } else {
                             match value.parse::<GradeEnum>() {
                                 Ok(grade_enum) => set_state.update(|s| s.grade = Some(grade_enum)),
-                                Err(_) => logging::log!("Failed to parse grade: {}", value)
+                                Err(_) => log::info!("Failed to parse grade: {}", value)
                             }
                         }
                     }
@@ -140,7 +141,7 @@ pub fn BasicInfoSection(
                         let option_value = format!("{}", grade);
                         view! {
                             <option value=option_value.clone() class="text-gray-900 bg-white">
-                                {option_value}
+                                {option_value.clone()}
                             </option>
                         }
                     }).collect::<Vec<_>>()}
@@ -192,13 +193,13 @@ pub fn BasicInfoSection(
                     class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2E3A59] focus:border-[#2E3A59] bg-white text-gray-900"
                     on:change=move |ev| {
                         let value = event_target_value(&ev);
-                        logging::log!("Scope select changed to: {}", value);
+                        log::info!("Scope select changed to: {}", value);
                         if value.is_empty() {
                             set_state.update(|s| s.scope = None);
                         } else {
                             match value.parse::<ScopeEnum>() {
                                 Ok(scope_enum) => set_state.update(|s| s.scope = Some(scope_enum)),
-                                Err(_) => logging::log!("Failed to parse scope: {}", value)
+                                Err(_) => log::info!("Failed to parse scope: {}", value)
                             }
                         }
                     }
@@ -208,7 +209,7 @@ pub fn BasicInfoSection(
                         let option_value = format!("{}", option);
                         view! {
                             <option value=option_value.clone() class="text-gray-900 bg-white">
-                                {option_value}
+                                {option_value.clone()}
                             </option>
                         }
                     }).collect::<Vec<_>>()}
@@ -243,11 +244,11 @@ pub fn BasicInfoSection(
                                                     {course.name}
                                                 </option>
                                             }
-                                        }).collect_view()
+                                        }).collect_view().into_any()
                                     },
-                                    Err(_) => view! {}.into_view()
+                                    Err(_) => view! {}.into_any()
                                 }
-                            }).unwrap_or_default()
+                            }).unwrap_or_else(|| view! {}.into_any())
                         }}
                     </select>
                 </div>

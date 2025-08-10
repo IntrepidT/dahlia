@@ -1,8 +1,8 @@
 use crate::app::db::user_database;
 use crate::app::models::user::{User, UserRole};
-use leptos::*;
+use leptos::prelude::*;
 
-#[server(GetUsers, "/api")]
+#[server]
 pub async fn get_users() -> Result<Vec<User>, ServerFnError> {
     #[cfg(feature = "ssr")]
     {
@@ -28,7 +28,7 @@ pub async fn get_users() -> Result<Vec<User>, ServerFnError> {
     }
 }
 
-#[server(GetUser, "/api")]
+#[server]
 pub async fn get_user(id: i64) -> Result<User, ServerFnError> {
     #[cfg(feature = "ssr")]
     {
@@ -57,7 +57,7 @@ pub async fn get_user(id: i64) -> Result<User, ServerFnError> {
     }
 }
 
-#[server(UpdateUserPermissions, "/api")]
+#[server]
 pub async fn update_user_permissions(user_id: i64, role: UserRole) -> Result<(), ServerFnError> {
     #[cfg(feature = "ssr")]
     {
@@ -83,7 +83,7 @@ pub async fn update_user_permissions(user_id: i64, role: UserRole) -> Result<(),
     }
 }
 
-#[server(UpdateUser, "/api")]
+#[server]
 pub async fn update_user(new_user_data: User) -> Result<User, ServerFnError> {
     #[cfg(feature = "ssr")]
     {

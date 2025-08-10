@@ -1,4 +1,5 @@
-use leptos::*;
+use leptos::prelude::*;
+use leptos::prelude::*;
 use std::time::Duration;
 
 const TOAST_PARENT_STYLE: &str = "flex flex-row top-0 h-16 w-full max-w-[61rem] mx-auto items-center justify-center align-center fixed -mt-36 transition-all duration-1000 ease-in-out";     
@@ -45,7 +46,7 @@ pub fn Toast(
         set_if_appear(false);
     };
 
-    create_effect(move |_| {
+    Effect::new(move |_| {
         if if_appear() {
                 set_timeout(hide, Duration::from_secs(4));
         }

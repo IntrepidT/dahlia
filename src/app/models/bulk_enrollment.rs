@@ -1,4 +1,5 @@
 use crate::app::models::enrollment::Enrollment;
+use leptos::prelude::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -14,10 +15,10 @@ pub struct EnrollmentCsvRow {
     pub teacher_id: i32,
     #[serde(default)]
     pub status: String, //ignored - set to "Active" always for bulk update
-    #[serde(default)]    
-    pub enrollment_date: String, //ignored - set in database as NOW() 
-    #[serde(default)]    
+    #[serde(default)]
+    pub enrollment_date: String, //ignored - set in database as NOW()
+    #[serde(default)]
     pub status_change_date: String, //ignored - set in database as NOW()
-    #[serde(default)]    
+    #[serde(default)]
     pub notes: String,
 }

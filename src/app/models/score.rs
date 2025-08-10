@@ -1,5 +1,6 @@
 use crate::app::models::test::BenchmarkCategory;
 use chrono::prelude::*;
+use leptos::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt::Debug;

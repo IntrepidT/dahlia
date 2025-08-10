@@ -1,11 +1,12 @@
 #[cfg(feature = "hydrate")]
 use crate::app::components::data_processing::student_charts::wait_for_chartjs;
-
 use crate::app::models::{
     score::Score,
     test::{BenchmarkCategory, Test},
 };
-use leptos::*;
+use leptos::html;
+use leptos::prelude::*;
+use leptos::prelude::*;
 use std::rc::Rc;
 
 #[component]
@@ -28,7 +29,7 @@ pub fn PieChart(
     let title_for_effect = Rc::clone(&title_rc);
 
     #[cfg(feature = "hydrate")]
-    create_effect(move |_| {
+    Effect::new(move |_| {
         if let Some(canvas) = chart_ref.get() {
             let current_score = Rc::clone(&score_for_effect);
             let current_test = Rc::clone(&test_for_effect);
@@ -155,7 +156,7 @@ pub fn PieChart(
                 if let Some(benchmark_categories) = &test_for_view.benchmark_categories {
                     if !benchmark_categories.is_empty() {
                         let current_benchmark = Score::find_benchmark_category(total_score, benchmark_categories);
-                        let (is_open, set_is_open) = create_signal(false);
+                        let (is_open, set_is_open) = signal(false);
 
                         view! {
                             <div class="mb-4">
@@ -180,7 +181,7 @@ pub fn PieChart(
                                                             "Score: " {total_score} " / " {test_for_view.score} " (" {current_benchmark.range_display()} " range)"
                                                         </div>
                                                     </div>
-                                                }.into_view()
+                                                }.into_any()
                                             } else {
                                                 view! {
                                                     <div class="text-left">
@@ -189,7 +190,7 @@ pub fn PieChart(
                                                             "Score: " {total_score} " / " {test_for_view.score}
                                                         </div>
                                                     </div>
-                                                }.into_view()
+                                                }.into_any()
                                             }
                                         }
                                     </div>
@@ -248,9 +249,9 @@ pub fn PieChart(
                                                                     <span class="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">
                                                                         Current
                                                                     </span>
-                                                                }.into_view()
+                                                                }.into_any()
                                                             } else {
-                                                                view! { <div></div> }.into_view()
+                                                                view! { <div></div> }.into_any()
                                                             }
                                                         }
                                                     </div>
@@ -260,12 +261,12 @@ pub fn PieChart(
                                     </div>
                                 </div>
                             </div>
-                        }.into_view()
+                        }.into_any()
                     } else {
-                        view! { <div></div> }.into_view()
+                        view! { <div></div> }.into_any()
                     }
                 } else {
-                    view! { <div></div> }.into_view()
+                    view! { <div></div> }.into_any()
                 }
             }
 

@@ -2,7 +2,7 @@ use crate::app::components::auth::authorization_components::perform_post_login_r
 use crate::app::middleware::global_settings::use_settings;
 use crate::app::models::user::SessionUser;
 use crate::app::server_functions::auth::login;
-use leptos::*;
+use leptos::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -96,19 +96,18 @@ pub fn provide_student_mapping_service() -> (
     ReadSignal<Option<StudentMappingService>>,
     WriteSignal<Option<StudentMappingService>>,
 ) {
-    create_signal(None)
+    signal(None)
 }
 
-// Hook to use the mapping service
+// Hook to use the mapping service - FIX: Return the context properly
 pub fn use_student_mapping_service() -> (
     ReadSignal<Option<StudentMappingService>>,
     WriteSignal<Option<StudentMappingService>>,
 ) {
-    use_context::<(
+    expect_context::<(
         ReadSignal<Option<StudentMappingService>>,
         WriteSignal<Option<StudentMappingService>>,
     )>()
-    .expect("StudentMappingService context not found. Make sure to provide it in your app.")
 }
 
 // Enhanced Student struct with de-anonymization support
@@ -156,15 +155,14 @@ impl DeAnonymizedStudent {
 // Updated login form component
 #[component]
 pub fn EnhancedLoginForm() -> impl IntoView {
-    let (username, set_username) = create_signal("".to_string());
-    let (password, set_password) = create_signal("".to_string());
-    let (error, set_error) = create_signal::<Option<String>>(None);
-    let (student_mapping_file, set_student_mapping_file) = create_signal::<Option<String>>(None);
-    let (file_upload_status, set_file_upload_status) = create_signal::<Option<String>>(None);
-    let (is_submitting, set_is_submitting) = create_signal(false);
+    let (username, set_username) = signal("".to_string());
+    let (password, set_password) = signal("".to_string());
+    let (error, set_error) = signal::<Option<String>>(None);
+    let (student_mapping_file, set_student_mapping_file) = signal::<Option<String>>(None);
+    let (file_upload_status, set_file_upload_status) = signal::<Option<String>>(None);
+    let (is_submitting, set_is_submitting) = signal(false);
 
-    let set_current_user = use_context::<WriteSignal<Option<SessionUser>>>().unwrap();
-    let redirect_after_login = perform_post_login_redirect();
+    let set_current_user = expect_context::<WriteSignal<Option<SessionUser>>>();
 
     // Get the mapping service context
     let (_, set_student_mapping_service) = use_student_mapping_service();
@@ -339,7 +337,7 @@ pub fn EnhancedLoginForm() -> impl IntoView {
                                             "File loaded successfully ({} mappings)",
                                             mapping_data.mappings.len()
                                         )));
-                                        logging::log!(
+                                        log::info!(
                                             "Student mapping file loaded with {} mappings",
                                             mapping_data.mappings.len()
                                         );
@@ -349,7 +347,7 @@ pub fn EnhancedLoginForm() -> impl IntoView {
                                         set_file_upload_status
                                             .set(Some("Failed to load file".to_string()));
                                         set_student_mapping_file.set(None);
-                                        logging::log!("Invalid CSV in student mapping file: {}", e);
+                                        log::info!("Invalid CSV in student mapping file: {}", e);
                                     }
                                 }
                             }
@@ -378,7 +376,7 @@ pub fn EnhancedLoginForm() -> impl IntoView {
         set_file_upload_status.set(None);
     };
 
-    let handle_submit = create_action(move |_: &()| {
+    let handle_submit = Action::new(move |_: &()| {
         let username = username.get();
         let password = password.get();
         let mapping_data_content = student_mapping_file.get();
@@ -392,12 +390,12 @@ pub fn EnhancedLoginForm() -> impl IntoView {
                 return;
             }
 
-            logging::log!("Attempting login with username: {}", username);
+            log::info!("Attempting login with username: {}", username);
 
             match login(username, password).await {
                 Ok(response) => {
                     if response.success {
-                        logging::log!("Login successful, setting user");
+                        log::info!("Login successful, setting user");
                         set_current_user.set(response.user.clone());
 
                         // Set up mapping service only if a mapping file was provided
@@ -408,13 +406,13 @@ pub fn EnhancedLoginForm() -> impl IntoView {
                                         StudentMappingService::new(mapping_data.mappings);
                                     let mapping_count = mapping_service.get_mapping_count();
                                     set_student_mapping_service.set(Some(mapping_service));
-                                    logging::log!(
+                                    log::info!(
                                         "Student mapping service initialized with {} mappings",
                                         mapping_count
                                     );
                                 }
                                 Err(e) => {
-                                    logging::log!("Failed to parse student mapping data: {}", e);
+                                    log::info!("Failed to parse student mapping data: {}", e);
                                     set_error.set(Some(format!(
                                         "Failed to initialize mapping service: {}",
                                         e
@@ -425,7 +423,7 @@ pub fn EnhancedLoginForm() -> impl IntoView {
                             }
                         } else {
                             set_student_mapping_service.set(None);
-                            logging::log!(
+                            log::info!(
                                 "No student mapping file provided - de-anonymization disabled"
                             );
                         }
@@ -435,12 +433,12 @@ pub fn EnhancedLoginForm() -> impl IntoView {
                         // Use the redirect function from AuthProvider
                         perform_post_login_redirect();
                     } else {
-                        logging::log!("Login failed: {}", response.message);
+                        log::info!("Login failed: {}", response.message);
                         set_error.set(Some(response.message));
                     }
                 }
                 Err(err) => {
-                    logging::log!("Login error: {:?}", err);
+                    log::info!("Login error: {:?}", err);
                     set_error.set(Some(
                         "Login failed. Please check your credentials and try again.".to_string(),
                     ));
@@ -535,20 +533,20 @@ pub fn EnhancedLoginForm() -> impl IntoView {
                                                     </svg>
                                                     {status}" - De-anonymization enabled"
                                                 </div>
-                                            }.into_view()
+                                            }.into_any()
                                         } else {
                                             view! {
                                                 <p class="text-sm text-blue-600 mt-2">{status}</p>
-                                            }.into_view()
+                                            }.into_any()
                                         }
                                     } else {
-                                        view! { <span></span> }.into_view()
+                                        view! { <span></span> }.into_any()
                                     }
                                 }}
                             </div>
-                        }.into_view()
+                        }.into_any()
                     } else {
-                        view! { <span></span> }.into_view()
+                        view! { <span></span> }.into_any()
                     }
                 }}
 
@@ -567,9 +565,9 @@ pub fn EnhancedLoginForm() -> impl IntoView {
                                     </svg>
                                     "Logging in..."
                                 </div>
-                            }.into_view()
+                            }.into_any()
                         } else {
-                            view! { "Login" }.into_view()
+                            view! { "Login" }.into_any()
                         }
                     }}
                 </button>
@@ -592,9 +590,9 @@ pub fn EnhancedLoginForm() -> impl IntoView {
                                 "Without this file, students will be displayed with anonymized IDs."
                             </p>
                         </div>
-                    }.into_view()
+                    }.into_any()
                 } else {
-                    view! { <span></span> }.into_view()
+                    view! { <span></span> }.into_any()
                 }
             }}
         </div>

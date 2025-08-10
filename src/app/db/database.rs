@@ -1,5 +1,6 @@
 use crate::app::models::student::GradeEnum;
 use crate::app::models::EmployeeRole;
+use leptos::prelude::*;
 
 cfg_if::cfg_if! {
 
@@ -11,7 +12,6 @@ cfg_if::cfg_if! {
         use dotenvy::dotenv;
         use sqlx::{PgPool, Row};
         use std::env;
-        use leptos::*;
         use tokio::*;
         use std::sync::Once;
 

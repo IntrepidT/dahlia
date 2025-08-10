@@ -10,12 +10,13 @@ use crate::app::server_functions::scores::{delete_score, get_scores};
 use crate::app::server_functions::students::get_students;
 use crate::app::server_functions::tests::get_tests;
 use chrono::DateTime;
-use leptos::*;
+use leptos::prelude::*;
+use leptos_router::hooks::use_navigate;
 use std::rc::Rc;
 
 #[component]
 pub fn ScoresLedger() -> impl IntoView {
-    let navigate = leptos_router::use_navigate();
+    let navigate = use_navigate();
 
     // Get global settings for anonymization
     let (settings, _) = use_settings();
@@ -25,41 +26,35 @@ pub fn ScoresLedger() -> impl IntoView {
     let (student_mapping_service, _) = use_student_mapping_service();
 
     // Create resource for fetching scores from the database
-    let scores_resource = create_local_resource(
-        || (),
-        |_| async {
-            match get_scores().await {
-                Ok(mut scores) => {
-                    if scores.len() > 4 {
-                        scores.truncate(4);
-                        scores.reverse();
-                    }
-                    Ok(scores)
+    let scores_resource = LocalResource::new(|| async {
+        match get_scores().await {
+            Ok(mut scores) => {
+                if scores.len() > 4 {
+                    scores.truncate(4);
+                    scores.reverse();
                 }
-                Err(e) => {
-                    log::error!("Failed to load scores: {}", e);
-                    Err(ServerFnError::new("Failed to load scores"))
-                }
+                Ok(scores)
             }
-        },
-    );
+            Err(e) => {
+                log::error!("Failed to load scores: {}", e);
+                Err(ServerFnError::new("Failed to load scores"))
+            }
+        }
+    });
 
     // Create students resource
-    let students_resource = create_local_resource(
-        || (),
-        |_| async {
-            match get_students().await {
-                Ok(students) => Some(students),
-                Err(e) => {
-                    log::error!("Failed to load students: {}", e);
-                    None
-                }
+    let students_resource = LocalResource::new(|| async {
+        match get_students().await {
+            Ok(students) => Some(students),
+            Err(e) => {
+                log::error!("Failed to load students: {}", e);
+                None
             }
-        },
-    );
+        }
+    });
 
     // Create enhanced student data with de-anonymization info
-    let enhanced_students = create_memo(move |_| {
+    let enhanced_students = Memo::new(move |_| {
         let students_data = students_resource.get().unwrap_or(None).unwrap_or_default();
 
         if anonymization_enabled() {
@@ -81,20 +76,17 @@ pub fn ScoresLedger() -> impl IntoView {
         }
     });
 
-    let tests_resource = create_local_resource(
-        || (),
-        |_| async {
-            match get_tests().await {
-                Ok(mut tests) => Ok(tests),
-                Err(e) => {
-                    log::error!("Failed to load tests: {}", e);
-                    Err(ServerFnError::new("Failed to load tests"))
-                }
+    let tests_resource = LocalResource::new(|| async {
+        match get_tests().await {
+            Ok(mut tests) => Ok(tests),
+            Err(e) => {
+                log::error!("Failed to load tests: {}", e);
+                Err(ServerFnError::new("Failed to load tests"))
             }
-        },
-    );
+        }
+    });
 
-    let (expanded_view, set_expanded_view) = create_signal(false);
+    let (expanded_view, set_expanded_view) = signal(false);
 
     let toggle_expanded_view = move |_| {
         set_expanded_view.update(|val| *val = !*val);
@@ -178,7 +170,7 @@ pub fn ScoresLedger() -> impl IntoView {
                                                         </td>
                                                     </tr>
                                                 }
-                                                .into_view()
+                                                .into_any()
                                             } else {
                                                 scores.iter().rev().map(|score| {
                                                     let student_id = score.student_id;
@@ -240,7 +232,7 @@ pub fn ScoresLedger() -> impl IntoView {
                                                                 </span>
                                                             </td>
                                                             <td class="px-6 py-4 whitespace-nowrap text-sm text-[#2E3A59]">
-                                                                {&score.evaluator}
+                                                                {score.evaluator.clone()}
                                                             </td>
                                                             <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                                                 {
@@ -263,9 +255,9 @@ pub fn ScoresLedger() -> impl IntoView {
                                                                 }
                                                             </td>
                                                         </tr>
-                                                    }
+                                                    }.into_any()
                                                 })
-                                                .collect_view()
+                                                .collect_view().into_any()
                                             }
                                         }
                                         Err(_) => {
@@ -276,7 +268,7 @@ pub fn ScoresLedger() -> impl IntoView {
                                                     </td>
                                                 </tr>
                                             }
-                                            .into_view()
+                                            .into_any()
                                         }
                                     }
                                 }).unwrap_or_else(|| view! {
@@ -291,7 +283,7 @@ pub fn ScoresLedger() -> impl IntoView {
                                             </div>
                                         </td>
                                     </tr>
-                                }.into_view())
+                                }.into_any())
                             }}
                         </tbody>
                     </table>

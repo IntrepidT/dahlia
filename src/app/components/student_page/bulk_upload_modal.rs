@@ -1,7 +1,8 @@
 use crate::app::server_functions::bulk_enrollment::upload_bulk_enrollment;
 use crate::app::server_functions::bulk_students::upload_students_bulk;
 use leptos::ev::{Event, MouseEvent};
-use leptos::*;
+use leptos::prelude::*;
+use leptos::task::spawn_local;
 
 #[cfg(feature = "hydrate")]
 use js_sys::Array;
@@ -57,13 +58,13 @@ pub fn BulkUploadModal(
     set_show_modal: WriteSignal<bool>,
     set_refresh_trigger: WriteSignal<i32>,
 ) -> impl IntoView {
-    let (upload_status, set_upload_status) = create_signal(String::new());
-    let (is_uploading, set_is_uploading) = create_signal(false);
-    let (imported_count, set_imported_count) = create_signal(0);
-    let (import_type, set_import_type) = create_signal(ImportType::Students);
+    let (upload_status, set_upload_status) = signal(String::new());
+    let (is_uploading, set_is_uploading) = signal(false);
+    let (imported_count, set_imported_count) = signal(0);
+    let (import_type, set_import_type) = signal(ImportType::Students);
 
     #[cfg(feature = "hydrate")]
-    let (file, set_file) = create_signal::<Option<web_sys::File>>(None);
+    let (file, set_file) = signal_local(None::<web_sys::File>);
 
     let on_file_change = move |ev: Event| {
         #[cfg(feature = "hydrate")]
@@ -76,7 +77,7 @@ pub fn BulkUploadModal(
                 if let Some(files) = files {
                     if files.length() > 0 {
                         if let Some(first_file) = files.item(0) {
-                            set_file(Some(first_file));
+                            set_file.set(Some(first_file));
                         }
                     }
                 }
@@ -86,18 +87,18 @@ pub fn BulkUploadModal(
 
     #[cfg(feature = "hydrate")]
     let handle_upload = move |ev: MouseEvent| {
-        set_is_uploading(true);
-        set_upload_status(String::new());
-        set_imported_count(0);
+        set_is_uploading.set(true);
+        set_upload_status.set(String::new());
+        set_imported_count.set(0);
 
         #[cfg(feature = "hydrate")]
         {
-            if let Some(selected_file) = file() {
-                let current_import_type = import_type();
+            if let Some(selected_file) = file.get() {
+                let current_import_type = import_type.get();
                 spawn_local(async move {
                     match upload_file(selected_file, current_import_type).await {
                         Ok(count) => {
-                            set_upload_status(format!(
+                            set_upload_status.set(format!(
                                 "Successfully imported {} {}",
                                 count,
                                 if count == 1 {
@@ -106,25 +107,25 @@ pub fn BulkUploadModal(
                                     current_import_type.display_name()
                                 }
                             ));
-                            set_imported_count(count);
+                            set_imported_count.set(count);
                             set_refresh_trigger.update(|count| *count += 1);
-                            set_is_uploading(false);
+                            set_is_uploading.set(false);
 
                             // Auto-close modal after successful upload
-                            leptos::set_timeout(
-                                move || set_show_modal(false),
+                            set_timeout(
+                                move || set_show_modal.set(false),
                                 std::time::Duration::from_millis(2000),
                             );
                         }
                         Err(e) => {
-                            set_upload_status(format!("Upload failed: {}", e));
-                            set_is_uploading(false);
+                            set_upload_status.set(format!("Upload failed: {}", e));
+                            set_is_uploading.set(false);
                         }
                     }
                 });
             } else {
-                set_upload_status("Please select a file first".to_string());
-                set_is_uploading(false);
+                set_upload_status.set("Please select a file first".to_string());
+                set_is_uploading.set(false);
             }
         }
     };
@@ -132,7 +133,7 @@ pub fn BulkUploadModal(
     let download_template = move |_| {
         #[cfg(feature = "hydrate")]
         {
-            let current_type = import_type();
+            let current_type = import_type.get();
             let template_content = current_type.template_content();
             let filename = current_type.template_filename();
 
@@ -157,11 +158,11 @@ pub fn BulkUploadModal(
     };
 
     // Reset file when import type changes
-    create_effect(move |_| {
-        import_type();
+    Effect::new(move |_| {
+        import_type.get();
         #[cfg(feature = "hydrate")]
-        set_file(None);
-        set_upload_status(String::new());
+        set_file.set(None);
+        set_upload_status.set(String::new());
     });
 
     view! {
@@ -179,16 +180,16 @@ pub fn BulkUploadModal(
                         on:change=move |ev| {
                             let value = event_target_value(&ev);
                             match value.as_str() {
-                                "students" => set_import_type(ImportType::Students),
-                                "enrollments" => set_import_type(ImportType::Enrollments),
+                                "students" => set_import_type.set(ImportType::Students),
+                                "enrollments" => set_import_type.set(ImportType::Enrollments),
                                 _ => {}
                             }
                         }
                     >
-                        <option value="students" selected=move || import_type() == ImportType::Students>
+                        <option value="students" selected=move || import_type.get() == ImportType::Students>
                             "Students"
                         </option>
-                        <option value="enrollments" selected=move || import_type() == ImportType::Enrollments>
+                        <option value="enrollments" selected=move || import_type.get() == ImportType::Enrollments>
                             "Enrollments"
                         </option>
                     </select>
@@ -197,7 +198,7 @@ pub fn BulkUploadModal(
                 // Description
                 <div class="mb-4 p-3 bg-blue-50 rounded border-l-4 border-blue-400">
                     <p class="text-sm text-blue-800">
-                        {move || import_type().description()}
+                        {move || import_type.get().description()}
                     </p>
                 </div>
 
@@ -212,7 +213,7 @@ pub fn BulkUploadModal(
                 // Template download section
                 <div class="text-sm text-gray-600 mb-4 flex justify-between items-center">
                     <span>
-                        {move || format!("Expected CSV format for {} import", import_type().display_name().to_lowercase())}
+                        {move || format!("Expected CSV format for {} import", import_type.get().display_name().to_lowercase())}
                     </span>
                     <button
                         class="text-blue-500 hover:underline"
@@ -224,7 +225,7 @@ pub fn BulkUploadModal(
 
                 // Important notes based on import type
                 <div class="mb-4 text-xs text-gray-600 bg-gray-50 p-2 rounded">
-                    {move || match import_type() {
+                    {move || match import_type.get() {
                         ImportType::Students => view! {
                             <div>
                                 <strong>"Student Import Notes:"</strong>
@@ -252,8 +253,8 @@ pub fn BulkUploadModal(
 
                 // Status message
                 {move || {
-                    if !upload_status().is_empty() {
-                        let status_class = if upload_status().contains("failed") || upload_status().contains("error") {
+                    if !upload_status.get().is_empty() {
+                        let status_class = if upload_status.get().contains("failed") || upload_status.get().contains("error") {
                             "text-red-500"
                         } else {
                             "text-green-500"
@@ -261,9 +262,9 @@ pub fn BulkUploadModal(
 
                         Some(view! {
                             <div class={format!("mt-2 {}", status_class)}>
-                                {upload_status()}
-                                {move || if imported_count() > 0 {
-                                    format!(" ({} records)", imported_count())
+                                {upload_status.get()}
+                                {move || if imported_count.get() > 0 {
+                                    format!(" ({} records)", imported_count.get())
                                 } else {
                                     "".to_string()
                                 }}
@@ -279,7 +280,7 @@ pub fn BulkUploadModal(
                     <button
                         type="button"
                         class="px-4 py-2 text-white bg-[#F44336] rounded hover:bg-[#D32F2F]"
-                        on:click=move |_| set_show_modal(false)
+                        on:click=move |_| set_show_modal.set(false)
                     >
                         "Cancel"
                     </button>
@@ -291,13 +292,13 @@ pub fn BulkUploadModal(
                                 <button
                                     type="button"
                                     class="px-4 py-2 bg-[#4CAF50] text-white rounded hover:bg-[#388E3C] disabled:opacity-50 disabled:cursor-not-allowed"
-                                    disabled=move || file().is_none() || is_uploading()
+                                    disabled=move || file.get().is_none() || is_uploading.get()
                                     on:click=handle_upload
                                 >
-                                    {move || if is_uploading() {
-                                        format!("Uploading {}...", import_type().display_name())
+                                    {move || if is_uploading.get() {
+                                        format!("Uploading {}...", import_type.get().display_name())
                                     } else {
-                                        format!("Upload {}", import_type().display_name())
+                                        format!("Upload {}", import_type.get().display_name())
                                     }}
                                 </button>
                             }

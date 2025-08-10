@@ -1,15 +1,16 @@
+use leptos::prelude::*;
 use crate::app::components::data_processing::TestHistoryEntry;
 use crate::app::components::overview::overview_table::OverviewTable;
 use crate::app::components::overview::search_bar::SearchBar;
 use crate::app::components::overview::sort_selector::{SortOption, SortSelector};
 use crate::app::components::overview::time_frame_selector::{TimeFrame, TimeFrameSelector};
-use leptos::*;
+use leptos::prelude::*;
 
 #[component]
 pub fn OverviewTab(test_history: Vec<TestHistoryEntry>) -> impl IntoView {
-    let (search_query, set_search_query) = create_signal(String::new());
-    let (selected_timeframe, set_selected_timeframe) = create_signal(TimeFrame::AllTime);
-    let (selected_sort, set_selected_sort) = create_signal(SortOption::DateDesc);
+    let (search_query, set_search_query) = signal(String::new());
+    let (selected_timeframe, set_selected_timeframe) = signal(TimeFrame::AllTime);
+    let (selected_sort, set_selected_sort) = signal(SortOption::DateDesc);
 
     view! {
         <div class="space-y-6">

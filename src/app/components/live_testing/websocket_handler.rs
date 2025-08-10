@@ -3,7 +3,8 @@ use crate::app::models::question::Question;
 use crate::app::models::user::SessionUser;
 use crate::app::server_functions::websocket_sessions::cleanup_teacher_session_endpoint;
 use crate::app::websockets::lobby::AnonymousStudent;
-use leptos::*;
+use leptos::prelude::*;
+use leptos::task::spawn_local;
 use log;
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -48,10 +49,10 @@ pub fn use_websocket_connection(
     questions: Signal<Option<Vec<Question>>>,
 ) -> WebSocketActions {
     use gloo_timers::future::TimeoutFuture;
-    let (ws, set_ws) = create_signal::<Option<WebSocket>>(None);
+    let (ws, set_ws) = signal_local::<Option<WebSocket>>(None);
 
     // Connect to WebSocket when room_id changes
-    create_effect(move |_| {
+    Effect::new(move |_| {
         if let Some(session_id) = room_id.get() {
             spawn_local(async move {
                 //wait for any previous connection to close
@@ -78,7 +79,7 @@ pub fn use_websocket_connection(
 
     // Send message through WebSocket
     let send_ws_message = move |message: String| {
-        if let Some(socket) = ws.get() {
+        if let Some(socket) = ws.get_untracked() {
             match socket.send_with_str(&message) {
                 Ok(_) => log::debug!("Sent WebSocket message: {}", message),
                 Err(e) => log::error!("Failed to send WebSocket message: {:?}", e),
@@ -309,7 +310,7 @@ pub fn use_websocket_connection(
 
     // Cleanup on unmount
     on_cleanup(move || {
-        if let Some(socket) = ws.get() {
+        if let Some(socket) = ws.get_untracked() {
             let _ = socket.close();
         }
     });
@@ -331,7 +332,7 @@ pub fn use_websocket_connection(
 #[cfg(feature = "hydrate")]
 fn connect_to_session(
     session_id: Uuid,
-    set_ws: WriteSignal<Option<WebSocket>>,
+    set_ws: WriteSignal<Option<WebSocket>, LocalStorage>,
     user: Signal<Option<SessionUser>>,
     set_connection_status: WriteSignal<ConnectionStatus>,
     set_error_message: WriteSignal<Option<String>>,
@@ -342,7 +343,7 @@ fn connect_to_session(
     set_remaining_time: WriteSignal<Option<i32>>,
     set_is_test_active: WriteSignal<bool>,
     set_is_submitted: WriteSignal<bool>,
-    ws: ReadSignal<Option<WebSocket>>,
+    ws: ReadSignal<Option<WebSocket>, LocalStorage>,
 ) {
     spawn_local(async move {
         let protocol = if web_sys::window().unwrap().location().protocol().unwrap() == "https:" {
@@ -406,7 +407,7 @@ fn setup_websocket_handlers(
     set_remaining_time: WriteSignal<Option<i32>>,
     set_is_test_active: WriteSignal<bool>,
     set_is_submitted: WriteSignal<bool>,
-    ws: ReadSignal<Option<WebSocket>>,
+    ws: ReadSignal<Option<WebSocket>, LocalStorage>,
 ) {
     // Setup message handler
     let onmessage_callback = Closure::wrap(Box::new(move |e: MessageEvent| {
@@ -463,7 +464,7 @@ fn setup_websocket_handlers(
                         "is_reconnecting": true,
                     });
 
-                    if let Some(socket) = ws.get() {
+                    if let Some(socket) = ws.get_untracked() {
                         match socket.send_with_str(&user_info.to_string()) {
                             Ok(_) => {
                                 log::info!("✅ user_info sent successfully on attempt {}", attempt);

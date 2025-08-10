@@ -1,8 +1,8 @@
 use crate::app::components::data_processing::student_results_summary::StudentResultsSummary;
-use leptos::*;
+use leptos::prelude::*;
 use std::collections::HashMap;
 
-#[server(GetStudentResults, "/api", "GetJson")]
+#[server]
 pub async fn get_student_results_server(
     student_id: i32,
 ) -> Result<StudentResultsSummary, ServerFnError> {
@@ -22,7 +22,7 @@ pub async fn get_student_results_server(
     }
 }
 
-#[server(GetStudentResultsBatch, "/api")]
+#[server]
 pub async fn get_student_results_batch(
     student_ids: Vec<i32>,
 ) -> Result<HashMap<i32, StudentResultsSummary>, ServerFnError> {
@@ -72,7 +72,7 @@ pub async fn get_student_results_batch(
 }
 
 // OPTIMIZATION 5: Add a new endpoint for streaming large datasets
-#[server(GetStudentResultsStream, "/api")]
+#[server]
 pub async fn get_student_results_stream(
     offset: usize,
     limit: usize,
@@ -182,7 +182,7 @@ pub mod simple_cache {
 }
 
 // OPTIMIZATION 7: Enhanced batch function with caching
-#[server(GetStudentResultsBatchCached, "/api")]
+#[server]
 pub async fn get_student_results_batch_cached(
     student_ids: Vec<i32>,
 ) -> Result<HashMap<i32, StudentResultsSummary>, ServerFnError> {

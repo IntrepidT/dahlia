@@ -1,15 +1,16 @@
 use crate::app::models::assessment::RangeCategory;
-use leptos::*;
+use leptos::prelude::*;
+use leptos::prelude::*;
 
 #[component]
 pub fn BenchmarkSection(
     benchmarks: Signal<Option<Vec<RangeCategory>>>,
-    set_benchmarks: impl Fn(Option<Vec<RangeCategory>>) + 'static + Copy,
+    set_benchmarks: impl Fn(Option<Vec<RangeCategory>>) + 'static + Copy + Send,
     section_type: &'static str,
 ) -> impl IntoView {
-    let (benchmark_min, set_benchmark_min) = create_signal(0);
-    let (benchmark_max, set_benchmark_max) = create_signal(0);
-    let (benchmark_label, set_benchmark_label) = create_signal(String::new());
+    let (benchmark_min, set_benchmark_min) = signal(0);
+    let (benchmark_max, set_benchmark_max) = signal(0);
+    let (benchmark_label, set_benchmark_label) = signal(String::new());
 
     let add_benchmark = move |_| {
         let min = benchmark_min.get();

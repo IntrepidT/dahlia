@@ -1,7 +1,8 @@
 use crate::app::models::score::Score;
 use crate::app::models::test::Test;
 use leptos::html;
-use leptos::*;
+use leptos::prelude::*;
+use leptos::prelude::*;
 #[cfg(feature = "hydrate")]
 use {gloo_utils::format::JsValueSerdeExt, wasm_bindgen::prelude::*, wasm_bindgen::JsValue};
 
@@ -200,7 +201,7 @@ pub fn render_test_plot(
     let test_name_clone = test_name.clone();
 
     // Function to create the plot after component is mounted
-    create_effect(move |_| {
+    Effect::new(move |_| {
         // Extract score data for plotting
         let scores: Vec<i32> = score_data.iter().map(|(s, _)| s.get_total()).collect();
         let dates: Vec<String> = score_data
@@ -391,7 +392,7 @@ pub fn render_test_distribution(
     let plot_div_id_clone = plot_div_id.clone();
     let plot_div_ref = create_node_ref::<html::Div>();
 
-    create_effect(move |_| {
+    Effect::new(move |_| {
         // Group scores by test name
         let mut test_scores = std::collections::HashMap::new();
         for (score, test) in &scores {
@@ -575,7 +576,7 @@ pub fn render_overall_progress(scores: Vec<Score>) -> impl IntoView {
     let plot_div_id = "overall-progress-plot";
     let plot_div_ref = create_node_ref::<html::Div>();
 
-    create_effect(move |_| {
+    Effect::new(move |_| {
         if scores.is_empty() {
             return;
         }
@@ -786,7 +787,7 @@ pub fn render_score_distribution(scores: Vec<Score>) -> impl IntoView {
     let plot_div_id = "score-distribution-plot";
     let plot_div_ref = create_node_ref::<html::Div>();
 
-    create_effect(move |_| {
+    Effect::new(move |_| {
         if scores.is_empty() {
             return;
         }

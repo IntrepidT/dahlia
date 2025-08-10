@@ -1,10 +1,11 @@
+use leptos::prelude::*;
 /*
-use leptos::*;
+use leptos::prelude::*;
 use log::{error, info, warn};
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::rc::Rc;
-use uuid::Uuid;
+use uuid=:Uuid;
 
 #[cfg(feature = "hydrate")]
 use {
@@ -22,36 +23,36 @@ use crate::app::server_functions::websocket_sessions::{
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ChatMessage {
-    sender_id: String,
+    sender_id= String,
     content: String,
     timestamp: String,
 }
 
 #[component]
 pub fn Chat() -> impl IntoView {
-    let (messages, set_messages) = create_signal(Vec::<ChatMessage>::new());
-    let (current_message, set_current_message) = create_signal(String::new());
-    let (connected, set_connected) = create_signal(false);
-    let (user_id, set_user_id) = create_signal(String::new());
+    let (messages, set_messages) = signal(Vec::<ChatMessage>::new());
+    let (current_message, set_current_message) = signal(String::new());
+    let (connected, set_connected) = signal(false);
+    let (user_id, set_user_id) = signal(String::new());
 
     // Room joining/creation states
-    let (room_id, set_room_id) = create_signal(String::new());
-    let (join_room_id, set_join_room_id) = create_signal(String::new());
-    let (is_in_room, set_is_in_room) = create_signal(false);
-    let (room_name, set_room_name) = create_signal(String::new());
-    let (room_description, set_room_description) = create_signal(String::new());
-    let (max_users, set_max_users) = create_signal(0);
-    let (is_private, set_is_private) = create_signal(false);
-    let (room_password, set_room_password) = create_signal(String::new());
-    let (join_password, set_join_password) = create_signal(String::new());
-    let (error_message, set_error_message) = create_signal(String::new());
+    let (room_id, set_room_id) = signal(String::new());
+    let (join_room_id, set_join_room_id) = signal(String::new());
+    let (is_in_room, set_is_in_room) = signal(false);
+    let (room_name, set_room_name) = signal(String::new());
+    let (room_description, set_room_description) = signal(String::new());
+    let (max_users, set_max_users) = signal(0);
+    let (is_private, set_is_private) = signal(false);
+    let (room_password, set_room_password) = signal(String::new());
+    let (join_password, set_join_password) = signal(String::new());
+    let (error_message, set_error_message) = signal(String::new());
 
     // Active sessions
-    let (active_sessions, set_active_sessions) = create_signal(Vec::<SessionSummary>::new());
-    let (loading_sessions, set_loading_sessions) = create_signal(false);
+    let (active_sessions, set_active_sessions) = signal(Vec::<SessionSummary>::new());
+    let (loading_sessions, set_loading_sessions) = signal(false);
 
     // UI state
-    let (active_tab, set_active_tab) = create_signal("join"); // "join" or "create"
+    let (active_tab, set_active_tab) = signal("join"); // "join" or "create"
 
     // Create a shared reference to store the WebSocket
     #[cfg(feature = "hydrate")]
@@ -62,7 +63,7 @@ pub fn Chat() -> impl IntoView {
 
     // Define connect_to_websocket action before using it
     #[cfg(feature = "hydrate")]
-    let connect_to_websocket = create_action(move |room_id_str: &String| {
+    let connect_to_websocket = Action::new(move |room_id_str: &String| {
         let room_id_val = room_id_str.clone();
         let socket_ref_clone = Rc::clone(&socket_ref);
         let set_messages = set_messages.clone();
@@ -174,7 +175,7 @@ pub fn Chat() -> impl IntoView {
     });
 
     // Fetch active sessions
-    let fetch_sessions = create_action(move |_: &()| {
+    let fetch_sessions = Action::new(move |_: &()| {
         let set_active_sessions = set_active_sessions.clone();
         let set_loading_sessions = set_loading_sessions.clone();
         let set_error_message = set_error_message.clone();
@@ -197,7 +198,7 @@ pub fn Chat() -> impl IntoView {
     });
 
     // Create a new room using the server API
-    let create_new_room = create_action(move |_: &()| {
+    let create_new_room = Action::new(move |_: &()| {
         let room_name_val = room_name.get();
         let room_desc_val = room_description.get();
         let max_users_val = max_users.get();
@@ -234,7 +235,7 @@ pub fn Chat() -> impl IntoView {
                     Some(password_val)
                 },
                 session_type: Some(SessionType::Chat),
-                test_id: None,
+                test_id= None,
                 metadata: None,
             };
 
@@ -253,7 +254,7 @@ pub fn Chat() -> impl IntoView {
     });
 
     // Join existing room by ID
-    let join_room_by_id = create_action(move |_: &()| {
+    let join_room_by_id = Action::new(move |_: &()| {
         let room_id_val = join_room_id.get();
         let password_val = join_password.get();
         let set_error_message = set_error_message.clone();
@@ -267,7 +268,7 @@ pub fn Chat() -> impl IntoView {
                 return;
             }
 
-            if let Err(_) = Uuid::parse_str(&room_id_val) {
+            if let Err(_) = Uuid=:parse_str(&room_id_val) {
                 set_error_message.set("Invalid room ID format".into());
                 return;
             }
@@ -296,7 +297,7 @@ pub fn Chat() -> impl IntoView {
     });
 
     // Join from active sessions list
-    let join_from_list = create_action(move |session_id: &String| {
+    let join_from_list = Action::new(move |session_id= &String| {
         let room_id_val = session_id.clone();
         let password_val = join_password.get();
         let set_error_message = set_error_message.clone();
@@ -343,7 +344,7 @@ pub fn Chat() -> impl IntoView {
     };
 
     // Function to leave current room
-    let leave_room = create_action(move |_: &()| {
+    let leave_room = Action::new(move |_: &()| {
         let room_id_val = room_id.get();
         let socket_ref_for_leave = Rc::clone(&socket_ref_for_leave);
         let set_is_in_room = set_is_in_room.clone();
@@ -380,7 +381,7 @@ pub fn Chat() -> impl IntoView {
     );
 
     // Load active sessions on component mount
-    create_effect(move |_| {
+    Effect::new(move |_| {
         fetch_sessions.dispatch(());
     });
 
@@ -469,7 +470,7 @@ pub fn Chat() -> impl IntoView {
                                                                 <div class="text-center py-8">
                                                                     <p class="text-gray-500">Loading available rooms...</p>
                                                                 </div>
-                                                            }.into_view()
+                                                            }.into_any()
                                                         } else {
                                                             let sessions = active_sessions.get();
                                                             if sessions.is_empty() {
@@ -478,7 +479,7 @@ pub fn Chat() -> impl IntoView {
                                                                         <p class="text-gray-500">No active rooms found</p>
                                                                         <p class="text-sm text-gray-400 mt-1">Create a new room to get started</p>
                                                                     </div>
-                                                                }.into_view()
+                                                                }.into_any()
                                                             } else {
                                                                 view! {
                                                                     <div class="grid gap-3">
@@ -502,15 +503,15 @@ pub fn Chat() -> impl IntoView {
                                                                                                         <span class="flex items-center text-amber-600">
                                                                                                             <span class="mr-1">"🔒"</span> Password required
                                                                                                         </span>
-                                                                                                    }.into_view()
+                                                                                                    }.into_any()
                                                                                                 } else {
-                                                                                                    view! {}.into_view()
+                                                                                                    view! {}.into_any()
                                                                                                 }}
                                                                                             </div>
                                                                                             {if let Some(desc) = session.description {
-                                                                                                view! { <p class="text-sm mt-2 text-gray-600">{desc}</p> }.into_view()
+                                                                                                view! { <p class="text-sm mt-2 text-gray-600">{desc}</p> }.into_any()
                                                                                             } else {
-                                                                                                view! {}.into_view()
+                                                                                                view! {}.into_any()
                                                                                             }}
                                                                                             <div class="text-xs text-gray-500 mt-2">
                                                                                                 {"ID: "}{id.clone()}
@@ -536,7 +537,7 @@ pub fn Chat() -> impl IntoView {
                                                                                                         Join Room
                                                                                                     </button>
                                                                                                 </div>
-                                                                                            }.into_view()
+                                                                                            }.into_any()
                                                                                         } else {
                                                                                             let id_clone = id.clone();
                                                                                             view! {
@@ -546,14 +547,14 @@ pub fn Chat() -> impl IntoView {
                                                                                                 >
                                                                                                     Join Room
                                                                                                 </button>
-                                                                                            }.into_view()
+                                                                                            }.into_any()
                                                                                         }}
                                                                                     </div>
                                                                                 </div>
                                                                             }
                                                                         }).collect_view()}
                                                                     </div>
-                                                                }.into_view()
+                                                                }.into_any()
                                                             }
                                                         }
                                                     }}
@@ -842,7 +843,7 @@ where
 #[cfg(feature = "hydrate")]
 struct IntervalGuard {
     window: web_sys::Window,
-    interval_id: i32,
+    interval_id= i32,
 }
 
 #[cfg(feature = "hydrate")]

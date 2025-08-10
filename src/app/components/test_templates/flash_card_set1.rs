@@ -15,8 +15,10 @@ use crate::app::server_functions::students::get_students;
 use crate::app::server_functions::{
     questions::get_questions, scores::add_score, tests::get_tests, users::get_user,
 };
-use leptos::*;
-use leptos_router::*;
+use leptos::prelude::*;
+use leptos::prelude::*;
+use leptos_router::components::*;
+use leptos_router::hooks::*;
 use std::collections::HashMap;
 
 #[cfg(feature = "hydrate")]
@@ -42,15 +44,16 @@ impl QuestionResponse {
 pub fn FlashCardSet() -> impl IntoView {
     // Get test_id from URL parameters
     let params = use_params_map();
-    let test_id = move || params.with(|params| params.get("test_id").cloned().unwrap_or_default());
+    let test_id =
+        move || params.with(|params| params.get("test_id").unwrap_or("".to_string()).to_string());
     let user = use_context::<ReadSignal<Option<SessionUser>>>().expect("AuthProvider not Found");
     let (font_settings, set_font_settings) = use_font_settings();
 
     // Add state for collapsible sections
-    let (shortcuts_expanded, set_shortcuts_expanded) = create_signal(false);
-    let (instructions_expanded, set_instructions_expanded) = create_signal(false);
+    let (shortcuts_expanded, set_shortcuts_expanded) = signal(false);
+    let (instructions_expanded, set_instructions_expanded) = signal(false);
 
-    let user_data = create_resource(
+    let user_data = Resource::new(
         move || user.get().map(|u| u.id),
         move |id| async move {
             match id {
@@ -67,7 +70,7 @@ pub fn FlashCardSet() -> impl IntoView {
     );
 
     // Create resource to fetch test details
-    let test_details = create_resource(test_id.clone(), move |tid| async move {
+    let test_details = Resource::new(test_id.clone(), move |tid| async move {
         if tid.is_empty() {
             log::warn!("No test ID provided in URL");
             return None;
@@ -82,7 +85,7 @@ pub fn FlashCardSet() -> impl IntoView {
     });
 
     // Create resource that depends on the test_id from URL
-    let questions = create_resource(test_id, move |tid| async move {
+    let questions = Resource::new(test_id, move |tid| async move {
         if tid.is_empty() {
             log::warn!("No test ID provided in URL");
             return Vec::new();
@@ -101,15 +104,15 @@ pub fn FlashCardSet() -> impl IntoView {
     });
 
     // Store responses for each question with memo to prevent unnecessary re-renders
-    let (responses, set_responses) = create_signal(HashMap::<i32, QuestionResponse>::new());
-    let (selected_student_id, set_selected_student_id) = create_signal(None::<i32>);
+    let (responses, set_responses) = signal(HashMap::<i32, QuestionResponse>::new());
+    let (selected_student_id, set_selected_student_id) = signal(None::<i32>);
 
     // Flashcard state
-    let (current_card_index, set_current_card_index) = create_signal(0);
-    let (is_submitted, set_is_submitted) = create_signal(false);
+    let (current_card_index, set_current_card_index) = signal(0);
+    let (is_submitted, set_is_submitted) = signal(false);
 
     // Get evaluator ID
-    let evaluator_id = create_memo(move |_| match user.get() {
+    let evaluator_id = Memo::new(move |_| match user.get() {
         Some(user_data) => user_data.id.to_string(),
         None => "0".to_string(),
     });
@@ -151,7 +154,7 @@ pub fn FlashCardSet() -> impl IntoView {
 
     let go_to_previous_card = move |_ev| {
         set_current_card_index.update(|index| {
-            *index = index.saturating_sub(1);
+            *index = (*index).saturating_sub(1);
         });
     };
 
@@ -232,7 +235,7 @@ pub fn FlashCardSet() -> impl IntoView {
     };
 
     // Submit handler
-    let handle_submit = create_action(move |_: &()| async move {
+    let handle_submit = Action::new(move |_: &()| async move {
         let current_responses = responses.get();
         let current_test_id = test_id();
 
@@ -438,7 +441,7 @@ pub fn FlashCardSet() -> impl IntoView {
             }
         };
 
-        create_effect(move |_| {
+        Effect::new(move |_| {
             let window = web_sys::window().unwrap();
             let document = window.document().unwrap();
 
@@ -455,7 +458,7 @@ pub fn FlashCardSet() -> impl IntoView {
     }
 
     // Memoize the percentage calculation to avoid recalculating on every render
-    let calculate_answered_percentage = create_memo(move |_| {
+    let calculate_answered_percentage = Memo::new(move |_| {
         let answered_count = responses.with(|r| {
             questions
                 .get()
@@ -542,12 +545,12 @@ pub fn FlashCardSet() -> impl IntoView {
                                             </div>
                                         </Show>
                                     </div>
-                                }.into_view()
+                                }.into_any()
                             } else {
-                                view! { <div></div> }.into_view()
+                                view! { <div></div> }.into_any()
                             }
                         },
-                        _ => view! { <div></div> }.into_view()
+                        _ => view! { <div></div> }.into_any()
                     }}
                 </Suspense>
             </div>
@@ -599,7 +602,7 @@ pub fn FlashCardSet() -> impl IntoView {
                                     <p class="text-gray-500">"Loading..."</p>
                                 </div>
                             </div>
-                        }.into_view(),
+                        }.into_any(),
                         (Some(questions), _) if questions.is_empty() => {
                             view! {
                                 <div class="flex items-center justify-center h-96">
@@ -612,13 +615,13 @@ pub fn FlashCardSet() -> impl IntoView {
                                         <p class="text-gray-500">"No questions found for this test."</p>
                                     </div>
                                 </div>
-                            }.into_view()
+                            }.into_any()
                         },
                         (Some(questions), _) => {
                             let total_questions = questions.len();
 
                             // Create a memo to get the current question
-                            let current_question = create_memo(move |_| {
+                            let current_question = Memo::new(move |_| {
                                 questions.get(current_card_index.get()).cloned().unwrap_or_else(|| {
                                     log::warn!("Question index out of bounds");
                                     questions.first().cloned().unwrap_or_else(|| panic!("No questions available"))
@@ -692,7 +695,7 @@ pub fn FlashCardSet() -> impl IntoView {
                                                                         let option_value_clone = option_value.clone();
                                                                         let qnumber = q.qnumber;
                                                                         let choice_number = index + 1;
-                                                                        let is_checked = create_memo(move |_| {
+                                                                        let is_checked = Memo::new(move |_| {
                                                                             responses.with(|r| {
                                                                                 r.get(&qnumber)
                                                                                  .map(|resp| resp.answer == option_value_clone.clone())
@@ -738,7 +741,7 @@ pub fn FlashCardSet() -> impl IntoView {
                                                                         }
                                                                     }).collect_view()}
                                                                 </div>
-                                                            },
+                                                            }.into_any(),
                                                             QuestionType::WeightedMultipleChoice => {
                                                                 let qnumber = q.qnumber;
                                                                 let weighted_options = q.get_weighted_options();
@@ -758,7 +761,7 @@ pub fn FlashCardSet() -> impl IntoView {
                                                                                 let choice_number = index + 1;
                                                                                 let qnumber = q.qnumber;
 
-                                                                                let is_selected = create_memo(move |_| {
+                                                                                let is_selected = Memo::new(move |_| {
                                                                                     responses.with(|r| {
                                                                                         r.get(&qnumber)
                                                                                             .and_then(|resp| resp.selected_options.as_ref())
@@ -812,11 +815,11 @@ pub fn FlashCardSet() -> impl IntoView {
                                                                                                                 </svg>
                                                                                                             </Show>
                                                                                                         </div>
-                                                                                                    }.into_view()
+                                                                                                    }.into_any()
                                                                                                 } else {
                                                                                                     view! {
                                                                                                         <div class="w-5 h-5 rounded border-2 border-gray-300 bg-gray-100"></div>
-                                                                                                    }.into_view()
+                                                                                                    }.into_any()
                                                                                                 }}
                                                                                             </div>
                                                                                             <div class="flex items-start gap-3">
@@ -843,9 +846,9 @@ pub fn FlashCardSet() -> impl IntoView {
                                                                                             {if !option_clone.is_selectable {
                                                                                                 view! {
                                                                                                     <span class="text-xs text-gray-400 italic">"(info only)"</span>
-                                                                                                }.into_view()
+                                                                                                }.into_any()
                                                                                             } else {
-                                                                                                view! { <span></span> }.into_view()
+                                                                                                view! { <span></span> }.into_any()
                                                                                             }}
                                                                                         </div>
                                                                                     </div>
@@ -871,18 +874,18 @@ pub fn FlashCardSet() -> impl IntoView {
                                                                             </div>
                                                                         </div>
                                                                     </div>
-                                                                }
+                                                                }.into_any()
                                                             }
                                                             QuestionType::TrueFalse => {
                                                                 let qnumber = q.qnumber;
-                                                                let is_true = create_memo(move |_| {
+                                                                let is_true = Memo::new(move |_| {
                                                                     responses.with(|r| {
                                                                         r.get(&qnumber)
                                                                          .map(|resp| resp.answer == "true")
                                                                          .unwrap_or(false)
                                                                     })
                                                                 });
-                                                                let is_false = create_memo(move |_| {
+                                                                let is_false = Memo::new(move |_| {
                                                                     responses.with(|r| {
                                                                         r.get(&qnumber)
                                                                          .map(|resp| resp.answer == "false")
@@ -931,11 +934,11 @@ pub fn FlashCardSet() -> impl IntoView {
                                                                             </span>
                                                                         </button>
                                                                     </div>
-                                                                }
+                                                                }.into_any()
                                                             }
                                                             _ => {
                                                                 let qnumber = q.qnumber;
-                                                                let answer_value = create_memo(move |_| {
+                                                                let answer_value = Memo::new(move |_| {
                                                                     responses.with(|r| {
                                                                         r.get(&qnumber)
                                                                          .map(|resp| resp.answer.clone())
@@ -957,7 +960,7 @@ pub fn FlashCardSet() -> impl IntoView {
                                                                             rows="3"
                                                                         ></textarea>
                                                                     </div>
-                                                                }
+                                                                }.into_any()
                                                             }
                                                         }
                                                     }}
@@ -971,7 +974,7 @@ pub fn FlashCardSet() -> impl IntoView {
                                                             let qnumber = current_question().qnumber;
 
                                                             // Create a memo for the comment value to prevent unnecessary re-renders
-                                                            let comment_value = create_memo(move |_| {
+                                                            let comment_value = Memo::new(move |_| {
                                                                 responses.with(|r| {
                                                                     r.get(&qnumber)
                                                                      .map(|resp| resp.comment.clone())
@@ -1018,7 +1021,7 @@ pub fn FlashCardSet() -> impl IntoView {
                                                         <button
                                                             class="flex items-center gap-2 px-6 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
                                                             on:click=move |_| {
-                                                                let navigate=leptos_router::use_navigate();
+                                                                let navigate= use_navigate();
                                                                 navigate("/dashboard", Default::default());
                                                             }
                                                         >
@@ -1042,7 +1045,7 @@ pub fn FlashCardSet() -> impl IntoView {
                                                             </svg>
                                                         </button>
                                                     </Show>
-                                                }.into_view()
+                                                }.into_any()
                                             } else {
                                                 view! {
                                                     <button
@@ -1054,7 +1057,7 @@ pub fn FlashCardSet() -> impl IntoView {
                                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
                                                         </svg>
                                                     </button>
-                                                }.into_view()
+                                                }.into_any()
                                             }
                                         }}
                                     </div>
@@ -1071,7 +1074,7 @@ pub fn FlashCardSet() -> impl IntoView {
                                         </div>
                                     </Show>
                                 </div>
-                            }.into_view()
+                            }.into_any()
                         }
                     }}
                 </Suspense>
@@ -1091,7 +1094,7 @@ pub fn StudentSelect(set_selected_student_id: WriteSignal<Option<i32>>) -> impl 
     let (student_mapping_service, _) = use_student_mapping_service();
 
     // Fetch students from server
-    let get_students_action = create_action(|_: &()| async move {
+    let get_students_action = Action::new(|_: &()| async move {
         match get_students().await {
             Ok(fetched_students) => fetched_students,
             Err(e) => {
@@ -1102,7 +1105,7 @@ pub fn StudentSelect(set_selected_student_id: WriteSignal<Option<i32>>) -> impl 
     });
 
     // Create enhanced student data with de-anonymization info
-    let enhanced_students = create_memo(move |_| {
+    let enhanced_students = Memo::new(move |_| {
         let students_data = get_students_action
             .value()
             .get()
@@ -1131,7 +1134,7 @@ pub fn StudentSelect(set_selected_student_id: WriteSignal<Option<i32>>) -> impl 
     });
 
     // Dispatch action only once on component mount
-    create_effect(move |_| {
+    Effect::new(move |_| {
         get_students_action.dispatch(());
     });
 

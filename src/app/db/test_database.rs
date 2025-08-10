@@ -1,8 +1,8 @@
+use leptos::prelude::*;
 cfg_if::cfg_if! {
 
     if #[cfg(feature = "ssr")] {
 
-        use leptos::ServerFnError;
         use crate::app::models::assessment::ScopeEnum;
         use crate::app::models::student::GradeEnum;
         use crate::app::models::test::BenchmarkCategory;
@@ -11,7 +11,6 @@ cfg_if::cfg_if! {
         use uuid::Uuid;
         use sqlx::PgPool;
         use sqlx::types::Json;
-        use leptos::*;
         use sqlx::prelude::*;
 
         pub async fn get_all_tests(pool: &sqlx::PgPool) -> Result<Vec<Test>, ServerFnError>{
@@ -181,7 +180,7 @@ cfg_if::cfg_if! {
                 None => Json(Vec::new()),
             };
 
-            let row = sqlx::query("UPDATE tests SET name =$1, score =$2, instructions =$3, comments =$4, testarea =$5::testarea_enum, school_year =$6, benchmark_categories=$7, test_variant=$8, grade_level=$9, scope =$10, course_id=$11 WHERE test_id =$12 RETURNING name, score, instructions, comments, testarea, school_year, benchmark_categories, test_variant, grade_level, test_id::text, scope, course_id")
+            let row = sqlx::query("UPDATE tests SET name =$1, score =$2, instructions =$3, comments =$4, testarea =$5::testarea_enum, school_year =$6, benchmark_categories=$7, test_variant=$8, grade_level=$9, scope =$10, course_id:$11 WHERE test_id =$12 RETURNING name, score, instructions, comments, testarea, school_year, benchmark_categories, test_variant, grade_level, test_id::text, scope, course_id")
                 .bind(&test.name)
                 .bind(&test.score)
                 .bind(&test.instructions)

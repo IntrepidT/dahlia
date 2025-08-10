@@ -3,7 +3,8 @@ use crate::app::models::student::{AddStudentRequest, ESLEnum, GenderEnum, GradeE
 use crate::app::models::EmployeeRole;
 use chrono::NaiveDate;
 use leptos::ev::SubmitEvent;
-use leptos::*;
+use leptos::prelude::*;
+use leptos::task::spawn_local;
 use std::str::FromStr;
 use strum::IntoEnumIterator;
 use validator::Validate;
@@ -23,32 +24,32 @@ pub fn AddStudentForm(
     #[prop(into)] set_refresh_trigger: WriteSignal<i32>,
 ) -> impl IntoView {
     //Signals for error messaging
-    let (error_message, set_error_message) = create_signal(String::new());
-    let (if_error, set_if_error) = create_signal(false);
+    let (error_message, set_error_message) = signal(String::new());
+    let (if_error, set_if_error) = signal(false);
 
     //Signals for getting a new student
-    let (new_firstname, set_new_firstname) = create_signal(String::new());
-    let (new_lastname, set_new_lastname) = create_signal(String::new());
-    let (new_preferred, set_new_preferred) = create_signal(String::new());
-    let (new_student_gender, set_student_gender) = create_signal(String::new());
-    let (new_student_dob, set_student_dob) = create_signal(String::new());
-    let (new_student_id, set_new_student_id) = create_signal(String::new());
-    let (new_grade, set_new_grade) = create_signal(String::new());
-    let (new_teacher, set_new_teacher) = create_signal(String::new());
-    let (new_iep, set_new_iep) = create_signal(false);
-    let (new_bip, set_new_bip) = create_signal(false);
-    let (new_504, set_new_504) = create_signal(false);
-    let (yes_no_esl, set_yes_no_esl) = create_signal(false);
-    let (new_esl, set_new_esl) = create_signal(String::from("Not Applicable"));
-    let (new_gt, set_new_gt) = create_signal(false);
-    let (new_readplan, set_new_readplan) = create_signal(false);
-    let (new_intervention, set_new_intervention) = create_signal(String::new());
-    let (new_eye_glasses, set_new_eye_glasses) = create_signal(false);
-    let (new_notes, set_new_notes) = create_signal(String::new());
-    let (new_pin, set_new_pin) = create_signal(String::new());
+    let (new_firstname, set_new_firstname) = signal(String::new());
+    let (new_lastname, set_new_lastname) = signal(String::new());
+    let (new_preferred, set_new_preferred) = signal(String::new());
+    let (new_student_gender, set_student_gender) = signal(String::new());
+    let (new_student_dob, set_student_dob) = signal(String::new());
+    let (new_student_id, set_new_student_id) = signal(String::new());
+    let (new_grade, set_new_grade) = signal(String::new());
+    let (new_teacher, set_new_teacher) = signal(String::new());
+    let (new_iep, set_new_iep) = signal(false);
+    let (new_bip, set_new_bip) = signal(false);
+    let (new_504, set_new_504) = signal(false);
+    let (yes_no_esl, set_yes_no_esl) = signal(false);
+    let (new_esl, set_new_esl) = signal(String::from("Not Applicable"));
+    let (new_gt, set_new_gt) = signal(false);
+    let (new_readplan, set_new_readplan) = signal(false);
+    let (new_intervention, set_new_intervention) = signal(String::new());
+    let (new_eye_glasses, set_new_eye_glasses) = signal(false);
+    let (new_notes, set_new_notes) = signal(String::new());
+    let (new_pin, set_new_pin) = signal(String::new());
 
     // Create a resource to fetch teachers
-    let teachers = create_resource(
+    let teachers = Resource::new(
         || (),
         |_| async move {
             match crate::app::server_functions::get_teachers().await {
@@ -62,7 +63,7 @@ pub fn AddStudentForm(
     );
 
     // Create a derived signal for filtered teachers based on selected grade
-    let filtered_teachers = create_memo(move |_| {
+    let filtered_teachers = Memo::new(move |_| {
         let grade_str = new_grade();
         if grade_str.is_empty() {
             return Vec::new(); // Return empty if no grade selected yet
@@ -197,7 +198,7 @@ pub fn AddStudentForm(
                     //we get the result back and do something with it
                     match add_result {
                         Ok(_added_result) => {
-                            set_adding_student(false);
+                            set_adding_student.run(false);
                             set_refresh_trigger.update(|count| *count += 1);
                             log::info!("Student added successfully");
                         }
@@ -332,15 +333,15 @@ pub fn AddStudentForm(
                                     <option value="">"Please select a value"</option>
                                     {move || {
                                         if new_grade().is_empty() {
-                                            vec![view! { <option disabled>"First select a grade"</option> }].into_iter().collect_view()
+                                            vec![view! { <option disabled>"First select a grade"</option> }].into_iter().collect_view().into_any()
                                         } else {
                                             let filtered = filtered_teachers();
                                             if filtered.is_empty() {
-                                                vec![view! { <option disabled>"No teachers available for this grade"</option> }].into_iter().collect_view()
+                                                vec![view! { <option disabled>"No teachers available for this grade"</option> }].into_iter().collect_view().into_any()
                                             } else {
                                                 filtered.iter().map(|teacher| view! {
                                                     <option value=teacher.lastname.clone()>{teacher.lastname.clone()}</option>
-                                                }).collect_view()
+                                                }).collect_view().into_any()
                                             }
                                         }
                                     }}
@@ -395,7 +396,7 @@ pub fn AddStudentForm(
                                 <Show when=move || yes_no_esl()>
                                     <select class="p-3 rounded-lg mt-2 w-full"
                                         required
-                                        value=new_esl
+                                        prop:value=new_esl
                                         on:change=move |event| {
                                             set_new_esl(event_target_value(&event))
                                         }
@@ -480,7 +481,7 @@ pub fn AddStudentForm(
                     <button
                         type="button"
                         class="px-4 py-2 bg-gray-200 rounded-lg font-bold hover:bg-gray-300"
-                        on:click=move |_| set_adding_student(false)
+                        on:click=move |_| set_adding_student.run(false)
                     >
                         "Cancel"
                     </button>

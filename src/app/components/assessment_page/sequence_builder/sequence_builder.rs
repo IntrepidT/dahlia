@@ -1,19 +1,18 @@
 use crate::app::components::assessment_page::sequence_builder::{
-    test_add_panel::TestAddPanel,
-    sequence_flow::SequenceFlow,
+    sequence_flow::SequenceFlow, test_add_panel::TestAddPanel,
 };
 use crate::app::components::assessment_page::shared::{
-    types::AssessmentFormState,
     hooks::{use_sequence_builder, UseSequenceBuilder},
+    types::AssessmentFormState,
 };
 use crate::app::models::test::Test;
-use leptos::*;
+use leptos::prelude::*;
 
 #[component]
 pub fn SequenceBuilder(
     state: ReadSignal<AssessmentFormState>,
     set_state: WriteSignal<AssessmentFormState>,
-    tests_resource: Resource<(), Result<Vec<Test>, ServerFnError>>,
+    tests_resource: Resource<Result<Vec<Test>, ServerFnError>>,
 ) -> impl IntoView {
     let sequence_builder = use_sequence_builder();
 

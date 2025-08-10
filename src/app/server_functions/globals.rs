@@ -1,12 +1,12 @@
 use crate::app::db::global_database;
 use crate::app::models::global::{GlobalSetting, SettingsCache};
-use leptos::*;
+use leptos::prelude::*;
 #[cfg(feature = "ssr")]
 use sqlx::PgPool;
 use std::collections::HashMap;
 use std::env;
 
-#[server(GetGlobalSettings, "/api")]
+#[server]
 pub async fn get_global_setting() -> Result<Vec<GlobalSetting>, ServerFnError> {
     #[cfg(feature = "ssr")]
     {
@@ -31,7 +31,7 @@ pub async fn get_global_setting() -> Result<Vec<GlobalSetting>, ServerFnError> {
     }
 }
 
-#[server(GetAllGlobalSettings, "/api")]
+#[server]
 pub async fn get_global_settings() -> Result<SettingsCache, ServerFnError> {
     #[cfg(feature = "ssr")]
     {
@@ -56,7 +56,7 @@ pub async fn get_global_settings() -> Result<SettingsCache, ServerFnError> {
     }
 }
 
-#[server(GetSingleGlobalSetting, "/api")]
+#[server]
 pub async fn get_single_global_setting(
     key: String,
 ) -> Result<Option<GlobalSetting>, ServerFnError> {
@@ -83,7 +83,7 @@ pub async fn get_single_global_setting(
     }
 }
 
-#[server(UpdateGlobalSetting, "/api")]
+#[server]
 pub async fn update_global_setting_api(
     key: String,
     value: serde_json::Value,
@@ -125,7 +125,7 @@ pub async fn update_global_setting_api(
     }
 }
 
-#[server(ToggleStudentProtection, "/api")]
+#[server]
 pub async fn toggle_student_protection(
     enable: bool,
     mapping_key: Option<String>,
@@ -345,7 +345,7 @@ pub async fn toggle_student_protection(
     }
 }
 
-#[server(RestoreStudentIdsFromFile, "/api")]
+#[server]
 pub async fn restore_student_ids_from_file(file_content: String) -> Result<String, ServerFnError> {
     #[cfg(feature = "ssr")]
     {

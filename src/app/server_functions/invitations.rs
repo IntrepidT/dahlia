@@ -1,9 +1,10 @@
+use leptos::prelude::*;
 use crate::app::db::invitation_database;
 use crate::app::models::invitation::{
     normalize_phone_number, CreateInvitationRequest, Invitation, InvitationInfo, VerificationType,
 };
 use crate::app::models::user::SessionUser;
-use leptos::*;
+use leptos::prelude::*;
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "ssr")]
@@ -16,21 +17,21 @@ pub struct InvitationResponse {
     pub invitation: Option<Invitation>,
 }
 
-#[server(CreateInvitation, "/api")]
+#[server]
 pub async fn create_invitation(
     request: CreateInvitationRequest,
-) -> Result<InvitationResponse, ServerFnError> {
+) -> Result<InvitationResponse, leptos::ServerFnError> {
     #[cfg(feature = "ssr")]
     {
         use crate::app::middleware::authentication;
 
         let pool = extract::<web::Data<PgPool>>()
             .await
-            .map_err(|e| ServerFnError::new(format!("Failed to extract pool: {}", e)))?;
+            .map_err(|e| leptos::ServerFnError::new(format!("Failed to extract pool: {}", e)))?;
 
         let req = extract::<actix_web::HttpRequest>()
             .await
-            .map_err(|e| ServerFnError::new(format!("Failed to extract request: {}", e)))?;
+            .map_err(|e| leptos::ServerFnError::new(format!("Failed to extract request: {}", e)))?;
 
         // Check if user is admin
         let current_user = authentication::get_current_user_from_request(&req);
@@ -96,17 +97,17 @@ pub async fn create_invitation(
 
     #[cfg(not(feature = "ssr"))]
     {
-        Err(ServerFnError::ServerError("Not implemented".to_string()))
+        Err(leptos::ServerFnError::ServerError("Not implemented".to_string()))
     }
 }
 
-#[server(ValidateInvitation, "/api")]
-pub async fn validate_invitation(code: String) -> Result<Option<InvitationInfo>, ServerFnError> {
+#[server]
+pub async fn validate_invitation(code: String) -> Result<Option<InvitationInfo>, leptos::ServerFnError> {
     #[cfg(feature = "ssr")]
     {
         let pool = extract::<web::Data<PgPool>>()
             .await
-            .map_err(|e| ServerFnError::new(format!("Failed to extract pool: {}", e)))?;
+            .map_err(|e| leptos::ServerFnError::new(format!("Failed to extract pool: {}", e)))?;
 
         match invitation_database::get_invitation_by_code(&pool, &code).await {
             Ok(Some(invitation)) => {
@@ -125,14 +126,14 @@ pub async fn validate_invitation(code: String) -> Result<Option<InvitationInfo>,
             Ok(None) => Ok(None),
             Err(e) => {
                 log::error!("Failed to validate invitation: {:?}", e);
-                Err(ServerFnError::new("Database error".to_string()))
+                Err(leptos::ServerFnError::new("Database error".to_string()))
             }
         }
     }
 
     #[cfg(not(feature = "ssr"))]
     {
-        Err(ServerFnError::ServerError("Not implemented".to_string()))
+        Err(leptos::ServerFnError::ServerError("Not implemented".to_string()))
     }
 }
 
@@ -142,19 +143,19 @@ pub struct VerificationResponse {
     pub message: String,
 }
 
-#[server(SendVerificationCode, "/api")]
+#[server]
 pub async fn send_verification_code(
-    user_id: i64,
+    user_id= i64,
     verification_type: String,
-) -> Result<VerificationResponse, ServerFnError> {
+) -> Result<VerificationResponse, leptos::ServerFnError> {
     #[cfg(feature = "ssr")]
     {
         let pool = extract::<web::Data<PgPool>>()
             .await
-            .map_err(|e| ServerFnError::new(format!("Failed to extract pool: {}", e)))?;
+            .map_err(|e| leptos::ServerFnError::new(format!("Failed to extract pool: {}", e)))?;
 
         let v_type =
-            VerificationType::from_str(&verification_type).map_err(|e| ServerFnError::new(e))?;
+            VerificationType::from_str(&verification_type).map_err(|e| leptos::ServerFnError::new(e))?;
 
         // Rate limiting - max 3 codes per 15 minutes
         match invitation_database::count_recent_verification_codes(
@@ -252,24 +253,24 @@ pub async fn send_verification_code(
 
     #[cfg(not(feature = "ssr"))]
     {
-        Err(ServerFnError::ServerError("Not implemented".to_string()))
+        Err(leptos::ServerFnError::ServerError("Not implemented".to_string()))
     }
 }
 
-#[server(VerifyCode, "/api")]
+#[server]
 pub async fn verify_code(
-    user_id: i64,
+    user_id= i64,
     code: String,
     verification_type: String,
-) -> Result<VerificationResponse, ServerFnError> {
+) -> Result<VerificationResponse, leptos::ServerFnError> {
     #[cfg(feature = "ssr")]
     {
         let pool = extract::<web::Data<PgPool>>()
             .await
-            .map_err(|e| ServerFnError::new(format!("Failed to extract pool: {}", e)))?;
+            .map_err(|e| leptos::ServerFnError::new(format!("Failed to extract pool: {}", e)))?;
 
         let v_type =
-            VerificationType::from_str(&verification_type).map_err(|e| ServerFnError::new(e))?;
+            VerificationType::from_str(&verification_type).map_err(|e| leptos::ServerFnError::new(e))?;
 
         match invitation_database::validate_verification_code(&pool, user_id, &code, v_type).await {
             Ok(true) => Ok(VerificationResponse {
@@ -292,7 +293,7 @@ pub async fn verify_code(
 
     #[cfg(not(feature = "ssr"))]
     {
-        Err(ServerFnError::ServerError("Not implemented".to_string()))
+        Err(leptos::ServerFnError::ServerError("Not implemented".to_string()))
     }
 }
 
@@ -410,22 +411,22 @@ async fn send_sms_via_service(phone: &str, message: &str) -> Result<(), String> 
     }
 }
 
-#[server(GetInvitations, "/api")]
+#[server]
 pub async fn get_invitations(
     limit: Option<i64>,
     offset: Option<i64>,
-) -> Result<Vec<Invitation>, ServerFnError> {
+) -> Result<Vec<Invitation>, leptos::ServerFnError> {
     #[cfg(feature = "ssr")]
     {
         use crate::app::middleware::authentication;
 
         let pool = extract::<web::Data<PgPool>>()
             .await
-            .map_err(|e| ServerFnError::new(format!("Failed to extract pool: {}", e)))?;
+            .map_err(|e| leptos::ServerFnError::new(format!("Failed to extract pool: {}", e)))?;
 
         let req = extract::<actix_web::HttpRequest>()
             .await
-            .map_err(|e| ServerFnError::new(format!("Failed to extract request: {}", e)))?;
+            .map_err(|e| leptos::ServerFnError::new(format!("Failed to extract request: {}", e)))?;
 
         // Check if user is admin
         match authentication::get_current_user_from_request(&req) {
@@ -438,36 +439,36 @@ pub async fn get_invitations(
                     Ok(invitations) => Ok(invitations),
                     Err(e) => {
                         log::error!("Failed to get invitations: {:?}", e);
-                        Err(ServerFnError::new(
+                        Err(leptos::ServerFnError::new(
                             "Failed to fetch invitations".to_string(),
                         ))
                     }
                 }
             }
-            Some(_) => Err(ServerFnError::new("Admin access required".to_string())),
-            None => Err(ServerFnError::new("Authentication required".to_string())),
+            Some(_) => Err(leptos::ServerFnError::new("Admin access required".to_string())),
+            None => Err(leptos::ServerFnError::new("Authentication required".to_string())),
         }
     }
 
     #[cfg(not(feature = "ssr"))]
     {
-        Err(ServerFnError::ServerError("Not implemented".to_string()))
+        Err(leptos::ServerFnError::ServerError("Not implemented".to_string()))
     }
 }
 
-#[server(DeleteInvitation, "/api")]
-pub async fn delete_invitation(invitation_id: i64) -> Result<VerificationResponse, ServerFnError> {
+#[server]
+pub async fn delete_invitation(invitation_id= i64) -> Result<VerificationResponse, leptos::ServerFnError> {
     #[cfg(feature = "ssr")]
     {
         use crate::app::middleware::authentication;
 
         let pool = extract::<web::Data<PgPool>>()
             .await
-            .map_err(|e| ServerFnError::new(format!("Failed to extract pool: {}", e)))?;
+            .map_err(|e| leptos::ServerFnError::new(format!("Failed to extract pool: {}", e)))?;
 
         let req = extract::<actix_web::HttpRequest>()
             .await
-            .map_err(|e| ServerFnError::new(format!("Failed to extract request: {}", e)))?;
+            .map_err(|e| leptos::ServerFnError::new(format!("Failed to extract request: {}", e)))?;
 
         // Check if user is admin
         match authentication::get_current_user_from_request(&req) {
@@ -503,7 +504,7 @@ pub async fn delete_invitation(invitation_id: i64) -> Result<VerificationRespons
 
     #[cfg(not(feature = "ssr"))]
     {
-        Err(ServerFnError::ServerError("Not implemented".to_string()))
+        Err(leptos::ServerFnError::ServerError("Not implemented".to_string()))
     }
 }
 

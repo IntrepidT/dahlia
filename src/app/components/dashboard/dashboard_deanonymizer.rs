@@ -3,7 +3,8 @@ use crate::app::components::auth::enhanced_login_form::{
 };
 use crate::app::middleware::global_settings::use_settings;
 use icondata::BsKeyFill;
-use leptos::*;
+use leptos::prelude::*;
+use leptos::prelude::*;
 use leptos_icons::Icon;
 
 #[cfg(feature = "hydrate")]
@@ -14,7 +15,7 @@ pub fn DashboardDeanonymizer() -> impl IntoView {
     let (student_mapping_file, set_student_mapping_file) = create_signal::<Option<String>>(None);
     let (file_upload_status, set_file_upload_status) = create_signal::<Option<String>>(None);
     let (error, set_error) = create_signal::<Option<String>>(None);
-    let (is_expanded, set_is_expanded) = create_signal(false);
+    let (is_expanded, set_is_expanded) = signal(false);
 
     // Get settings and mapping service
     let (settings, _) = use_settings();
@@ -169,7 +170,7 @@ pub fn DashboardDeanonymizer() -> impl IntoView {
                                             "✓ De-anonymization active ({} mappings loaded)",
                                             count
                                         )));
-                                        logging::log!(
+                                        log::info!(
                                             "Student mapping service activated with {} mappings",
                                             count
                                         );
@@ -202,7 +203,7 @@ pub fn DashboardDeanonymizer() -> impl IntoView {
         set_student_mapping_service.set(None);
         set_file_upload_status.set(None);
         set_error.set(None);
-        logging::log!("Student mapping service cleared");
+        log::info!("Student mapping service cleared");
     };
 
     view! {
@@ -218,7 +219,7 @@ pub fn DashboardDeanonymizer() -> impl IntoView {
                                 <div class="flex items-center">
                                     <Icon
                                         icon=BsKeyFill
-                                        class="w-6 h-6 text-blue-600 mr-2"
+                                        attr:class="w-6 h-6 text-blue-600 mr-2"
                                     />
                                     <h3 class="text-lg font-semibold text-gray-800">
                                         "Student De-anonymization"
@@ -231,13 +232,13 @@ pub fn DashboardDeanonymizer() -> impl IntoView {
                                                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 mr-2">
                                                     "Active (" {mapping_count()} " mappings)"
                                                 </span>
-                                            }.into_view()
+                                            }.into_any()
                                         } else {
                                             view! {
                                                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 mr-2">
                                                     "Inactive"
                                                 </span>
-                                            }.into_view()
+                                            }.into_any()
                                         }
                                     }}
                                     <svg
@@ -285,7 +286,7 @@ pub fn DashboardDeanonymizer() -> impl IntoView {
                                                             </button>
                                                         </div>
                                                     </div>
-                                                }.into_view()
+                                                }.into_any()
                                             } else {
                                                 view! {
                                                     <div class="space-y-4">
@@ -308,9 +309,9 @@ pub fn DashboardDeanonymizer() -> impl IntoView {
                                                                 if let Some(status) = file_upload_status.get() {
                                                                     view! {
                                                                         <p class="text-sm text-blue-600 mt-2">{status}</p>
-                                                                    }.into_view()
+                                                                    }.into_any()
                                                                 } else {
-                                                                    view! { <span></span> }.into_view()
+                                                                    view! { <span></span> }.into_any()
                                                                 }
                                                             }}
                                                         </div>
@@ -324,19 +325,19 @@ pub fn DashboardDeanonymizer() -> impl IntoView {
                                                             </div>
                                                         </div>
                                                     </div>
-                                                }.into_view()
+                                                }.into_any()
                                             }
                                         }}
                                     </div>
-                                }.into_view()
+                                }.into_any()
                             } else {
-                                view! { <span></span> }.into_view()
+                                view! { <span></span> }.into_any()
                             }
                         }}
                     </div>
-                }.into_view()
+                }.into_any()
             } else {
-                view! { <span></span> }.into_view()
+                view! { <span></span> }.into_any()
             }
         }}
     }

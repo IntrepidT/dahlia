@@ -10,8 +10,12 @@ use crate::app::server_functions::{
     tests::{add_test, delete_test},
 };
 use leptos::callback::*;
-use leptos::*;
-use std::rc::Rc;
+use leptos::ev;
+use leptos::prelude::*;
+use leptos::task::spawn_local;
+use leptos_router::hooks::use_navigate;
+use leptos_router::path;
+use std::sync::Arc;
 
 // =============================================================================
 // TYPES AND ENUMS
@@ -147,9 +151,7 @@ fn is_variation_test(test: &Test) -> bool {
             || test.comments.to_lowercase().contains("variation:"))
 }
 
-async fn get_next_variant_number_for_base(
-    base_test_name: &str,
-) -> Result<i32, leptos::ServerFnError> {
+async fn get_next_variant_number_for_base(base_test_name: &str) -> Result<i32, ServerFnError> {
     let all_tests = get_tests().await?;
 
     // Find all tests related to this base test
@@ -210,7 +212,7 @@ fn StatsPanel(
                             <StatCard value=variations label="Variations" color="red" />
                         </div>
                     </div>
-                }
+                }.into_any()
             } else {
                 view! {
                     <div>
@@ -221,7 +223,7 @@ fn StatsPanel(
                             <span class="text-sm font-medium">Show Statistics</span>
                         </button>
                     </div>
-                }
+                }.into_any()
             }
         }}
     }
@@ -420,7 +422,7 @@ fn ActionButtons(
                 <button
                     class="px-4 py-2 bg-purple-600 text-white rounded-md font-medium text-sm shadow-sm hover:bg-purple-700 transition-all focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2"
                     on:click=move |_| {
-                        let navigate = leptos_router::use_navigate();
+                        let navigate = use_navigate();
                         navigate("/test-variations", Default::default());
                     }
                 >
@@ -499,7 +501,7 @@ fn TestGroupCard(
     let base_name_for_memo = base_name.clone();
     let has_variations = group.has_variations();
 
-    let is_expanded = create_memo(move |_| expanded_groups().contains(&base_name_for_memo));
+    let is_expanded = Memo::new(move |_| expanded_groups().contains(&base_name_for_memo));
 
     let (test_type_badge_class, test_type_label) = get_test_type_styling(&base_test.testarea);
 
@@ -535,9 +537,9 @@ fn TestGroupCard(
                                         <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 border border-red-300">
                                             "🗑️ Delete Mode"
                                         </span>
-                                    }.into_view()
+                                    }.into_any()
                                 } else {
-                                    view! { <span></span> }.into_view()
+                                    view! { <span></span> }.into_any()
                                 }
                             }}
                         </div>
@@ -554,9 +556,9 @@ fn TestGroupCard(
                                     <div class="flex items-center space-x-1 text-blue-600">
                                         <span>Test Variations: {variations.len()}</span>
                                     </div>
-                                }
+                                }.into_any()
                             } else {
-                                view! { <div></div> }
+                                view! { <div></div> }.into_any()
                             }}
                         </div>
                     </div>
@@ -582,9 +584,9 @@ fn TestGroupCard(
                                         }
                                     }}
                                 </button>
-                            }.into_view()
+                            }.into_any()
                         } else {
-                            view! { <span></span> }.into_view()
+                            view! { <span></span> }.into_any()
                         }}
                     </div>
                 </div>
@@ -615,9 +617,9 @@ fn TestGroupCard(
                                         <div class="text-sm text-red-600 font-medium">
                                             "⚠️ Click variation delete buttons below"
                                         </div>
-                                    }.into_view()
+                                    }.into_any()
                                 } else {
-                                    view! { <span></span> }.into_view()
+                                    view! { <span></span> }.into_any()
                                 }
                             }}
                         </div>
@@ -637,9 +639,9 @@ fn TestGroupCard(
                             />
                         </div>
                     </div>
-                }.into_view()
+                }.into_any()
             } else {
-                view! { <div class="hidden"></div> }.into_view()
+                view! { <div class="hidden"></div> }.into_any()
             }}
         </div>
     }
@@ -653,7 +655,7 @@ fn CompactListView(
     on_create_variation: Callback<Test>,
 ) -> impl IntoView {
     // Group tests by base name for compact display
-    let grouped_tests = create_memo(move |_| {
+    let grouped_tests = Memo::new(move |_| {
         let tests = all_tests.clone();
         let mut groups: std::collections::HashMap<String, (Test, Vec<Test>)> =
             std::collections::HashMap::new();
@@ -720,9 +722,9 @@ fn CompactListView(
                                         <span class="inline-flex px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded">
                                             {variation_count}" var"
                                         </span>
-                                    }.into_view()
+                                    }.into_any()
                                 } else {
-                                    view! { <span></span> }.into_view()
+                                    view! { <span></span> }.into_any()
                                 }}
                                 {move || {
                                     if if_show_delete() {
@@ -730,9 +732,9 @@ fn CompactListView(
                                             <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 border border-red-300">
                                                 "🗑️ Delete Mode"
                                             </span>
-                                        }.into_view()
+                                        }.into_any()
                                     } else {
-                                        view! { <span></span> }.into_view()
+                                        view! { <span></span> }.into_any()
                                     }
                                 }}
                             </div>
@@ -778,9 +780,9 @@ fn CompactListView(
                                                                         <span class="text-xs text-red-600 font-medium">
                                                                             "⚠️ Can delete"
                                                                         </span>
-                                                                    }.into_view()
+                                                                    }.into_any()
                                                                 } else {
-                                                                    view! { <span></span> }.into_view()
+                                                                    view! { <span></span> }.into_any()
                                                                 }
                                                             }}
                                                         </div>
@@ -797,9 +799,9 @@ fn CompactListView(
                                             }
                                         />
                                     </div>
-                                }.into_view()
+                                }.into_any()
                             } else {
-                                view! { <div></div> }.into_view()
+                                view! { <div></div> }.into_any()
                             }}
                         </div>
                     }
@@ -817,7 +819,7 @@ fn DenseTableView(
     on_create_variation: Callback<Test>,
 ) -> impl IntoView {
     // Sort tests: base tests first, then variations grouped under them
-    let sorted_tests = create_memo(move |_| {
+    let sorted_tests = Memo::new(move |_| {
         let tests = all_tests.clone();
 
         // Separate base tests and variations
@@ -987,11 +989,11 @@ fn CompactActions(
     let test_id_edit = test.test_id.clone();
     let test_id_use = test.test_id.clone();
     let test_id_delete = test.test_id.clone();
-    let test_for_modal = Rc::new(test.clone());
+    let test_for_modal = Arc::new(test.clone());
     let test_for_variation = test.clone();
 
     //Modal state for selecting a test
-    let (show_select_test_modal, set_show_select_test_modal) = create_signal(false);
+    let (show_select_test_modal, set_show_select_test_modal) = signal(false);
 
     view! {
         <div class="flex items-center space-x-1">
@@ -1000,7 +1002,7 @@ fn CompactActions(
                 class="p-1.5 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
                 title="Edit Test"
                 on:click=move |_| {
-                    let navigate = leptos_router::use_navigate();
+                    let navigate = use_navigate();
                     navigate(&format!("/testbuilder/{}", test_id_edit.clone()), Default::default());
                 }
             >
@@ -1024,13 +1026,13 @@ fn CompactActions(
                     <button
                         class="p-1.5 text-gray-600 hover:text-orange-600 hover:bg-orange-50 rounded transition-colors"
                         title="Create Variation"
-                        on:click=move |_| leptos::Callable::call(&callback, test_clone.clone())
+                        on:click=move |_| callback.run(test_clone.clone())
                     >
                         <span class="text-sm">"📝"</span>
                     </button>
-                }.into_view()
+                }.into_any()
             } else {
-                view! { <span></span> }.into_view()
+                view! { <span></span> }.into_any()
             }}
 
             // Delete button (only in delete mode)
@@ -1045,7 +1047,7 @@ fn CompactActions(
                         <button
                             class="p-1.5 text-red-600 hover:bg-red-100 rounded transition-colors"
                             title="Delete Test"
-                            on:click=move |_| leptos::Callable::call(&delete_cb, delete_id.clone())
+                            on:click=move |_| delete_cb.run(delete_id.clone())
                         >
                             <span class="text-sm">"🗑️"</span>
                         </button>
@@ -1075,13 +1077,13 @@ fn TestStatusBadges(test: Test) -> impl IntoView {
                     <span class=format!("inline-flex px-1.5 py-0.5 text-xs rounded {}", var_class)>
                         {var_label}
                     </span>
-                }.into_view()
+                }.into_any()
             } else {
                 view! {
                     <span class="inline-flex px-1.5 py-0.5 text-xs bg-gray-100 text-gray-800 rounded">
                         "Base"
                     </span>
-                }.into_view()
+                }.into_any()
             }}
 
             {if !test.comments.is_empty() {
@@ -1092,9 +1094,9 @@ fn TestStatusBadges(test: Test) -> impl IntoView {
                     >
                         "💬"
                     </span>
-                }.into_view()
+                }.into_any()
             } else {
-                view! { <span></span> }.into_view()
+                view! { <span></span> }.into_any()
             }}
         </div>
     }
@@ -1142,15 +1144,15 @@ fn VariationCard(
                                     class="px-2 py-1 bg-red-100 hover:bg-red-200 text-red-700 text-xs font-medium rounded-md transition-colors border border-red-300"
                                     on:click=move |_| {
                                         log::info!("Deleting variation: {}", variation_id.clone());
-                                        leptos::Callable::call(&on_delete_test, variation_id.clone());
+                                        on_delete_test.run(variation_id.clone());
                                     }
                                     title="Delete this variation"
                                 >
                                     "🗑️ Delete"
                                 </button>
-                            }.into_view()
+                            }.into_any()
                         } else {
-                            view! { <span></span> }.into_view()
+                            view! { <span></span> }.into_any()
                         }
                     }}
                 </div>
@@ -1163,9 +1165,9 @@ fn VariationCard(
                     {if !variation_comments.is_empty() {
                         view! {
                             <p class="text-xs text-gray-500 mt-1 line-clamp-2">{variation_comments}</p>
-                        }.into_view()
+                        }.into_any()
                     } else {
-                        view! { <span></span> }.into_view()
+                        view! { <span></span> }.into_any()
                     }}
                 </div>
 
@@ -1181,11 +1183,11 @@ fn TestActionButtons(test: Test, on_create_variation: Option<Callback<Test>>) ->
     let test_id_for_use = test.test_id.clone();
     let test_id_for_flash = test.test_id.clone();
     let test_for_variation = test.clone();
-    let test_for_modal = Rc::new(test.clone());
+    let test_for_modal = Arc::new(test.clone());
     let is_base_test = !is_variation_test(&test);
 
     //Modal state for selecting a test
-    let (show_select_test_modal, set_show_select_test_modal) = create_signal(false);
+    let (show_select_test_modal, set_show_select_test_modal) = signal(false);
 
     view! {
         <div class="flex space-x-2">
@@ -1193,7 +1195,7 @@ fn TestActionButtons(test: Test, on_create_variation: Option<Callback<Test>>) ->
                 class="flex-1 px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-medium rounded-md transition-colors"
                 on:click=move |_| {
                     let test_id = test_id_for_edit.clone();
-                    let navigate = leptos_router::use_navigate();
+                    let navigate = use_navigate();
                     navigate(&format!("/testbuilder/{}", test_id), Default::default());
                 }
             >
@@ -1212,14 +1214,14 @@ fn TestActionButtons(test: Test, on_create_variation: Option<Callback<Test>>) ->
                 view! {
                     <button
                         class="flex-1 px-3 py-2 bg-orange-50 hover:bg-orange-100 text-orange-700 text-xs font-medium rounded-md transition-colors"
-                        on:click=move |_| leptos::Callable::call(&create_variation_callback, test_for_variation.clone())
+                        on:click=move |_| create_variation_callback.run(test_for_variation.clone())
                         title="Create variation"
                     >
                         "New Variation"
                     </button>
-                }.into_view()
+                }.into_any()
             } else {
-                view! { <span></span> }.into_view()
+                view! { <span></span> }.into_any()
             }}
         </div>
 
@@ -1247,31 +1249,30 @@ pub fn UnifiedTestManager() -> impl IntoView {
 
 #[component]
 pub fn UnifiedTestManagerContent() -> impl IntoView {
-    let (selected_view, set_selected_view) = create_signal(SidebarSelected::AdministerTest);
+    let (selected_view, set_selected_view) = signal(SidebarSelected::AdministerTest);
 
     // State management
-    let (if_show_edit, set_if_show_edit) = create_signal(false);
-    let (if_show_delete, set_if_show_delete) = create_signal(false);
-    let (if_show_toast, set_if_show_toast) = create_signal(false);
-    let (toast_message, set_toast_message) = create_signal(ToastMessage::new());
-    let (search_term, set_search_term) = create_signal(String::new());
-    let (view_mode, set_view_mode) = create_signal(ViewMode::Cards);
-    let (test_filter, set_test_filter) = create_signal(TestFilter::All);
-    let (expanded_groups, set_expanded_groups) =
-        create_signal(std::collections::HashSet::<String>::new());
-    let (show_stats, set_show_stats) = create_signal(false);
+    let (if_show_edit, set_if_show_edit) = signal(false);
+    let (if_show_delete, set_if_show_delete) = signal(false);
+    let (if_show_toast, set_if_show_toast) = signal(false);
+    let (toast_message, set_toast_message) = signal(ToastMessage::new());
+    let (search_term, set_search_term) = signal(String::new());
+    let (view_mode, set_view_mode) = signal(ViewMode::Cards);
+    let (test_filter, set_test_filter) = signal(TestFilter::All);
+    let (expanded_groups, set_expanded_groups) = signal(std::collections::HashSet::<String>::new());
+    let (show_stats, set_show_stats) = signal(false);
 
     //Variation signals
-    let (show_create_variation_modal, set_show_create_variation_modal) = create_signal(false);
+    let (show_create_variation_modal, set_show_create_variation_modal) = signal(false);
     let (selected_base_test_for_variation, set_selected_base_test_for_variation) =
         create_signal::<Option<Test>>(None);
-    let (variation_type, set_variation_type) = create_signal(String::new());
-    let (is_creating_variation, set_is_creating_variation) = create_signal(false);
+    let (variation_type, set_variation_type) = signal(String::new());
+    let (is_creating_variation, set_is_creating_variation) = signal(false);
 
-    let get_tests_info = create_resource(|| (), |_| async move { get_tests().await });
+    let get_tests_info = Resource::new(|| (), |_| async move { get_tests().await });
 
     // Calculate statistics
-    let test_stats = create_memo(move |_| {
+    let test_stats = Memo::new(move |_| {
         let tests_result = get_tests_info.get().unwrap_or(Ok(Vec::new()));
         let tests = tests_result.unwrap_or_default();
 
@@ -1310,7 +1311,7 @@ pub fn UnifiedTestManagerContent() -> impl IntoView {
     });
 
     // Group tests and apply filters
-    let test_groups = create_memo(move |_| {
+    let test_groups = Memo::new(move |_| {
         let tests_result = get_tests_info.get().unwrap_or(Ok(Vec::new()));
         let tests = tests_result.unwrap_or_default();
 
@@ -1368,7 +1369,7 @@ pub fn UnifiedTestManagerContent() -> impl IntoView {
     });
 
     // Filter based on search and view mode
-    let filtered_display = create_memo(move |_| {
+    let filtered_display = Memo::new(move |_| {
         let groups = test_groups.get();
         let search = search_term.get().to_lowercase();
 
@@ -1473,7 +1474,7 @@ pub fn UnifiedTestManagerContent() -> impl IntoView {
                                         set_if_show_toast(true);
 
                                         // Navigate to test manager to view the completed randomized test
-                                        let navigate = leptos_router::use_navigate();
+                                        let navigate = use_navigate();
                                         navigate("/test-manager", Default::default());
                                     }
                                     Err(e) => {
@@ -1500,7 +1501,7 @@ pub fn UnifiedTestManagerContent() -> impl IntoView {
                                 set_if_show_toast(true);
 
                                 // Navigate to edit the new variation
-                                let navigate = leptos_router::use_navigate();
+                                let navigate = use_navigate();
                                 navigate(
                                     &format!("/testbuilder/{}", new_test.test_id),
                                     Default::default(),
@@ -1525,7 +1526,7 @@ pub fn UnifiedTestManagerContent() -> impl IntoView {
 
     // Event handlers
     let on_click_add = move |_| {
-        let navigate = leptos_router::use_navigate();
+        let navigate = use_navigate();
         navigate("/testbuilder", Default::default());
     };
 
@@ -1660,7 +1661,7 @@ pub fn UnifiedTestManagerContent() -> impl IntoView {
                                                 test_filter=test_filter
                                                 on_click_add=on_click_add
                                             />
-                                        }.into_view()
+                                        }.into_any()
                                     } else {
                                         view! {
                                             <DenseTableView
@@ -1669,7 +1670,7 @@ pub fn UnifiedTestManagerContent() -> impl IntoView {
                                                 on_delete_test=on_delete_test
                                                 on_create_variation=on_create_variation.clone()
                                             />
-                                        }.into_view()
+                                        }.into_any()
                                     }
                                 }
                                 ViewMode::Compact => {
@@ -1679,7 +1680,7 @@ pub fn UnifiedTestManagerContent() -> impl IntoView {
                                                 test_filter=test_filter
                                                 on_click_add=on_click_add
                                             />
-                                        }.into_view()
+                                        }.into_any()
                                     } else {
                                         view! {
                                             <CompactListView
@@ -1688,7 +1689,7 @@ pub fn UnifiedTestManagerContent() -> impl IntoView {
                                                 on_delete_test=on_delete_test
                                                 on_create_variation=on_create_variation.clone()
                                             />
-                                        }.into_view()
+                                        }.into_any()
                                     }
                                 }
                                 ViewMode::Cards => {
@@ -1699,7 +1700,7 @@ pub fn UnifiedTestManagerContent() -> impl IntoView {
                                                 test_filter=test_filter
                                                 on_click_add=on_click_add
                                             />
-                                        }.into_view()
+                                        }.into_any()
                                     } else {
                                         view! {
                                             <div class="space-y-6">
@@ -1720,7 +1721,7 @@ pub fn UnifiedTestManagerContent() -> impl IntoView {
                                                     }
                                                 />
                                             </div>
-                                        }.into_view()
+                                        }.into_any()
                                     }
                                 }
                             }
@@ -1846,9 +1847,9 @@ pub fn UnifiedTestManagerContent() -> impl IntoView {
                                 </div>
                             </div>
                         </div>
-                    }
+                    }.into_any()
                 } else {
-                    view! { <div></div> }
+                    view! { <div></div> }.into_any()
                 }
             }}
         </div>

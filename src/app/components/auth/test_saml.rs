@@ -1,14 +1,15 @@
 use crate::app::models::user::{SessionUser, UserRole};
 use crate::app::server_functions::saml_auth::{create_saml_config, get_saml_institutions};
-use leptos::*;
+use leptos::prelude::*;
+use leptos::task::spawn_local;
 
 #[component]
 pub fn SamlTestButton() -> impl IntoView {
-    let current_user = use_context::<ReadSignal<Option<SessionUser>>>().unwrap();
-    let (loading, set_loading) = create_signal(false);
+    let current_user = expect_context::<ReadSignal<Option<SessionUser>>>();
+    let (loading, set_loading) = signal(false);
     let (message, set_message) = create_signal::<Option<(String, bool)>>(None);
-    let (show_test_form, set_show_test_form) = create_signal(false);
-    let (test_step, set_test_step) = create_signal(0); // Track progress
+    let (show_test_form, set_show_test_form) = signal(false);
+    let (test_step, set_test_step) = signal(0); // Track progress
 
     // Check if user has admin privileges
     let is_admin = move || {
@@ -18,7 +19,7 @@ pub fn SamlTestButton() -> impl IntoView {
             .unwrap_or(false)
     };
 
-    let create_test_saml = create_action(move |_: &()| {
+    let create_test_saml = Action::new(move |_: &()| {
         async move {
             set_loading.set(true);
             set_message.set(None);
@@ -159,9 +160,9 @@ m0eo2USlSRTVl7QHRTuiuSThHpLKQQ==
                                                 <div class="flex items-center justify-between mb-2">
                                                     <h4 class="font-medium text-gray-900">"Step 1: Create SAML Config"</h4>
                                                     {move || if test_step.get() >= 2 {
-                                                        view! { <span class="text-green-600">"✅"</span> }
+                                                        view! { <span class="text-green-600">"✅"</span> }.into_any()
                                                     } else {
-                                                        view! { <span></span> }
+                                                        view! { <span></span> }.into_any()
                                                     }}
                                                 </div>
                                                 <button
@@ -255,13 +256,13 @@ m0eo2USlSRTVl7QHRTuiuSThHpLKQQ==
                                                                 "This will redirect to Mock SAML, then back to your app"
                                                             </p>
                                                         </div>
-                                                    }.into_view()
+                                                    }.into_any()
                                                 } else {
                                                     view! {
                                                         <p class="text-sm text-gray-500">
                                                             "Complete steps 1 and 2 first"
                                                         </p>
-                                                    }.into_view()
+                                                    }.into_any()
                                                 }}
                                             </div>
 
@@ -280,15 +281,15 @@ m0eo2USlSRTVl7QHRTuiuSThHpLKQQ==
                                             </div>
                                         </div>
                                     </div>
-                                }.into_view()
+                                }.into_any()
                             } else {
-                                view! { <div></div> }.into_view()
+                                view! { <div></div> }.into_any()
                             }
                         }}
                     </div>
-                }.into_view()
+                }.into_any()
             } else {
-                view! { <div></div> }.into_view()
+                view! { <div></div> }.into_any()
             }
         }}
     }

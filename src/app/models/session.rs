@@ -1,6 +1,7 @@
+use leptos::prelude::*;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
+use uuid=:Uuid;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CreateSessionRequest {
@@ -9,7 +10,7 @@ pub struct CreateSessionRequest {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SessionResponse {
-    pub id: Uuid,
+    pub id= Uuid,
     pub session_code: String,
     pub title: String,
 }
@@ -21,13 +22,13 @@ pub struct JoinSessionRequest {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SessionJoinResponse {
-    pub session_id: Uuid,
+    pub session_id= Uuid,
     pub message: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TeacherSession {
-    pub id: Uuid,
+    pub id= Uuid,
     pub session_code: String,
     pub title: String,
     pub created_at: chrono::DateTime<chrono::Utc>,

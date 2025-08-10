@@ -1,3 +1,4 @@
+use leptos::prelude::*;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "ssr")]
 use sqlx::FromRow;

@@ -1,12 +1,13 @@
 use crate::app::components::data_processing::{AssessmentSummary, TestDetail};
 use crate::app::components::student_report::assessments::test_card::TestCard;
 use crate::app::models::test::Test;
-use leptos::*;
+use leptos::prelude::*;
+use leptos::prelude::*;
 
 #[component]
 pub fn ExpandedTestList(
     assessment: AssessmentSummary,
-    tests_resource: Resource<(), Option<Vec<Test>>>,
+    tests_resource: Resource<Option<Vec<Test>>>,
     #[prop(default = false)] show_detailed_test_info: bool,
 ) -> impl IntoView {
     let test_details = assessment.test_details.clone();
@@ -44,7 +45,7 @@ pub fn ExpandedTestList(
                         <h3 class="text-lg font-medium text-gray-900 mb-1">No tests completed</h3>
                         <p class="text-gray-500">Tests for this assessment will appear here once completed.</p>
                     </div>
-                }
+                }.into_any()
             } else {
                 view! {
                     <div class="space-y-3">
@@ -130,7 +131,7 @@ pub fn ExpandedTestList(
                             </div>
                         </div>
                     </div>
-                }
+                }.into_any()
             }}
         </div>
     }

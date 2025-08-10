@@ -4,14 +4,14 @@ use crate::app::models::student::{
 };
 use chrono::NaiveDate;
 use csv::ReaderBuilder;
-use leptos::*;
+use leptos::prelude::*;
 use std::str::FromStr;
 use validator::Validate;
 
 #[cfg(feature = "ssr")]
 use {crate::app::db::student_database, sqlx::PgPool};
 
-#[server(UploadStudentsBulk, "/api")]
+#[server]
 pub async fn upload_students_bulk(file_contents: String) -> Result<usize, ServerFnError> {
     #[cfg(feature = "ssr")]
     {

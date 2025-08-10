@@ -1,7 +1,7 @@
 use crate::app::server_functions::bulk_enrollment::upload_bulk_enrollment;
-
 use leptos::ev::Event;
-use leptos::*;
+use leptos::prelude::*;
+use leptos::task::spawn_local;
 use std::sync::mpsc;
 
 #[cfg(feature = "hydrate")]
@@ -16,15 +16,15 @@ pub fn BulkUploadModal(
     set_show_modal: WriteSignal<bool>,
     set_refresh_trigger: WriteSignal<i32>,
 ) -> impl IntoView {
-    let (upload_status, set_upload_status) = create_signal(String::new());
-    let (is_uploading, set_is_uploading) = create_signal(false);
-    let (imported_count, set_imported_count) = create_signal(0);
+    let (upload_status, set_upload_status) = signal(String::new());
+    let (is_uploading, set_is_uploading) = signal(false);
+    let (imported_count, set_imported_count) = signal(0);
 
     // Define these signals and handlers for all feature configurations
-    let (file_selected, set_file_selected) = create_signal(false);
+    let (file_selected, set_file_selected) = signal(false);
 
     #[cfg(feature = "hydrate")]
-    let (file, set_file) = create_signal::<Option<web_sys::File>>(None);
+    let (file, set_file) = signal_local::<Option<web_sys::File>>(None);
 
     // Create the event handlers - they need to exist in all configurations
     let on_file_change = {
@@ -144,11 +144,11 @@ pub fn BulkUploadModal(
                                     >
                                         "Download Template"
                                     </button>
-                                }.into_view()
+                                }.into_any()
                             } else {
                                 view! {
                                     <span class="text-gray-400">"Download Template (unavailable)"</span>
-                                }.into_view()
+                                }.into_any()
                             }
                         }
                     }}
@@ -199,7 +199,7 @@ pub fn BulkUploadModal(
                                     >
                                         {move || if is_uploading() { "Uploading..." } else { "Upload" }}
                                     </button>
-                                }.into_view()
+                                }.into_any()
                             } else {
                                 view! {
                                     <button
@@ -209,7 +209,7 @@ pub fn BulkUploadModal(
                                     >
                                         "Upload (unavailable)"
                                     </button>
-                                }.into_view()
+                                }.into_any()
                             }
                         }
                     }}

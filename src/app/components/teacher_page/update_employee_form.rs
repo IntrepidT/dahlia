@@ -2,10 +2,11 @@ use crate::app::models::employee::{Employee, EmployeeRole, StatusEnum, UpdateEmp
 use crate::app::models::student::GradeEnum;
 use crate::app::server_functions::employees::edit_employee;
 use leptos::ev::SubmitEvent;
-use leptos::*;
+use leptos::prelude::*;
+use leptos::task::spawn_local;
 use log::info;
-use std::rc::Rc;
 use std::str::FromStr;
+use std::sync::Arc;
 use strum::IntoEnumIterator;
 use validator::Validate;
 
@@ -24,31 +25,31 @@ const BUTTON_SECONDARY_STYLE: &str = "px-4 py-2 bg-gray-200 rounded-lg font-bold
 
 #[component]
 pub fn UpdateEmployeeForm(
-    employee: Rc<Employee>,
+    employee: Arc<Employee>,
     #[prop(into)] on_cancel: Callback<()>,
     #[prop(into)] on_save: Callback<()>,
 ) -> impl IntoView {
-    let (id, set_new_id) = create_signal(employee.id.clone());
-    let (new_firstname, set_new_firstname) = create_signal(employee.firstname.clone());
-    let (new_lastname, set_new_lastname) = create_signal(employee.lastname.clone());
-    let (new_status, set_new_status) = create_signal(employee.status.to_string().clone());
-    let (new_role, set_new_role) = create_signal(employee.role.to_string());
+    let (id, set_new_id) = signal(employee.id.clone());
+    let (new_firstname, set_new_firstname) = signal(employee.firstname.clone());
+    let (new_lastname, set_new_lastname) = signal(employee.lastname.clone());
+    let (new_status, set_new_status) = signal(employee.status.to_string().clone());
+    let (new_role, set_new_role) = signal(employee.role.to_string());
 
     let (yes_no_grade, set_yes_no_grade) = if new_role() == "Teacher" {
-        create_signal(true)
+        signal(true)
     } else {
-        create_signal(false)
+        signal(false)
     };
 
     let (new_grade, set_new_grade) = match &employee.role {
         EmployeeRole::Teacher { grade } => {
-            create_signal(grade.clone().expect("Some value received").to_string())
+            signal(grade.clone().expect("Some value received").to_string())
         }
-        _ => create_signal(String::from("None")),
+        _ => signal(String::from("None")),
     };
 
-    let (error_message, set_error_message) = create_signal(String::new());
-    let (if_error, set_if_error) = create_signal(false);
+    let (error_message, set_error_message) = signal(String::new());
+    let (if_error, set_if_error) = signal(false);
 
     let handle_submit_update_employee = move |ev: SubmitEvent| {
         ev.prevent_default();
@@ -102,7 +103,7 @@ pub fn UpdateEmployeeForm(
             match edit_employee(update_employee_request).await {
                 Ok(_) => {
                     log::info!("Successfully updated employee");
-                    on_save(());
+                    on_save.run(());
                 }
                 Err(e) => {
                     set_if_error(true);
@@ -205,7 +206,7 @@ pub fn UpdateEmployeeForm(
                     <button
                         type="button"
                         class=BUTTON_SECONDARY_STYLE
-                        on:click=move |_| on_cancel(())
+                        on:click=move |_| on_cancel.run(())
                     >
                         "Cancel"
                     </button>

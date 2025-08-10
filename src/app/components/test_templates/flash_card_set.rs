@@ -1,11 +1,13 @@
+use leptos::prelude::*;
 use crate::app::components::flash_cards::*;
 use crate::app::models::score::CreateScoreRequest;
 use crate::app::models::user::SessionUser;
 use crate::app::server_functions::{
     questions::get_questions, scores::add_score, tests::get_tests, users::get_user,
 };
-use leptos::*;
-use leptos_router::*;
+use leptos::prelude::*;
+use leptos_router::components::*;
+use leptos_router::hooks::*;
 use log;
 use std::collections::HashMap;
 
@@ -14,10 +16,10 @@ pub fn FlashCardSet() -> impl IntoView {
     // Get test_id from URL parameters
     let params = use_params_map();
     let test_id = move || params.with(|params| params.get("test_id").cloned().unwrap_or_default());
-    let user = use_context::<ReadSignal<Option<SessionUser>>>().expect("AuthProvider not Found");
+    let user = context::expect_context::<ReadSignal<Option<SessionUser>>>().expect("AuthProvider not Found");
 
     // Create resource to fetch test details
-    let test_details = create_resource(test_id.clone(), move |tid| async move {
+    let test_details = Resource::new(test_id.clone(), move |tid| async move {
         if tid.is_empty() {
             log::warn!("No test ID provided in URL");
             return None;
@@ -32,7 +34,7 @@ pub fn FlashCardSet() -> impl IntoView {
     });
 
     // Create resource that depends on the test_id from URL
-    let questions = create_resource(test_id, move |tid| async move {
+    let questions = Resource::new(test_id, move |tid| async move {
         if tid.is_empty() {
             log::warn!("No test ID provided in URL");
             return Vec::new();
@@ -51,7 +53,7 @@ pub fn FlashCardSet() -> impl IntoView {
     });
 
     // Get evaluator ID
-    let evaluator_id = create_memo(move |_| match user.get() {
+    let evaluator_id = Memo::new(move |_| match user.get() {
         Some(user_data) => user_data.id.to_string(),
         None => "0".to_string(),
     });
@@ -82,7 +84,7 @@ pub fn FlashCardSet() -> impl IntoView {
                             <p class="text-gray-500">"Loading..."</p>
                         </div>
                     </div>
-                }.into_view(),
+                }.into_any(),
                 (Some(questions_vec), _) if questions_vec.is_empty() => {
                     view! {
                         <div class="flex items-center justify-center h-96">
@@ -95,7 +97,7 @@ pub fn FlashCardSet() -> impl IntoView {
                                 <p class="text-gray-500">"No questions found for this test."</p>
                             </div>
                         </div>
-                    }.into_view()
+                    }.into_any()
                 },
                 (Some(questions_vec), test_data) => {
                     view! {
@@ -107,7 +109,7 @@ pub fn FlashCardSet() -> impl IntoView {
                                 submission_action.dispatch(data);
                             })
                         />
-                    }.into_view()
+                    }.into_any()
                 }
             }}
         </Suspense>

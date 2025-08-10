@@ -1,27 +1,39 @@
 use super::types::ConnectionStatus;
-use leptos::*;
+use leptos::prelude::*;
 
 #[component]
 pub fn ConnectionStatusIndicator(
     #[prop(into)] connection_status: Signal<ConnectionStatus>,
     #[prop(into)] error_message: Signal<Option<String>>,
 ) -> impl IntoView {
+    // Combined class computation for the main status div
+    let status_div_class = move || {
+        let base_classes = "flex items-center space-x-2 px-3 py-1 rounded-full text-sm";
+        match connection_status.get() {
+            ConnectionStatus::Connected => format!("{} bg-green-100 text-green-800", base_classes),
+            ConnectionStatus::Connecting => {
+                format!("{} bg-yellow-100 text-yellow-800", base_classes)
+            }
+            ConnectionStatus::Error => format!("{} bg-red-100 text-red-800", base_classes),
+            ConnectionStatus::Disconnected => format!("{} bg-gray-100 text-gray-800", base_classes),
+        }
+    };
+
+    // Combined class computation for the status dot
+    let status_dot_class = move || {
+        let base_class = "w-2 h-2 rounded-full";
+        match connection_status.get() {
+            ConnectionStatus::Connected => format!("{} bg-green-500", base_class),
+            ConnectionStatus::Connecting => format!("{} bg-yellow-500", base_class),
+            ConnectionStatus::Error => format!("{} bg-red-500", base_class),
+            ConnectionStatus::Disconnected => format!("{} bg-gray-500", base_class),
+        }
+    };
+
     view! {
         <div class="flex justify-center mb-4">
-            <div class="flex items-center space-x-2 px-3 py-1 rounded-full text-sm"
-                 class:bg-green-100={move || matches!(connection_status.get(), ConnectionStatus::Connected)}
-                 class:text-green-800={move || matches!(connection_status.get(), ConnectionStatus::Connected)}
-                 class:bg-yellow-100={move || matches!(connection_status.get(), ConnectionStatus::Connecting)}
-                 class:text-yellow-800={move || matches!(connection_status.get(), ConnectionStatus::Connecting)}
-                 class:bg-red-100={move || matches!(connection_status.get(), ConnectionStatus::Error)}
-                 class:text-red-800={move || matches!(connection_status.get(), ConnectionStatus::Error)}
-                 class:bg-gray-100={move || matches!(connection_status.get(), ConnectionStatus::Disconnected)}
-                 class:text-gray-800={move || matches!(connection_status.get(), ConnectionStatus::Disconnected)}>
-                <div class="w-2 h-2 rounded-full"
-                     class:bg-green-500={move || matches!(connection_status.get(), ConnectionStatus::Connected)}
-                     class:bg-yellow-500={move || matches!(connection_status.get(), ConnectionStatus::Connecting)}
-                     class:bg-red-500={move || matches!(connection_status.get(), ConnectionStatus::Error)}
-                     class:bg-gray-500={move || matches!(connection_status.get(), ConnectionStatus::Disconnected)}></div>
+            <div class=status_div_class>
+                <div class=status_dot_class></div>
                 <span>{move || match connection_status.get() {
                     ConnectionStatus::Connected => "Connected",
                     ConnectionStatus::Connecting => "Connecting...",

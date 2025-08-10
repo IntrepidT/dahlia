@@ -1,9 +1,11 @@
 use crate::app::components::{ShowTestModal, ToastMessage};
 use crate::app::models::{Test, TestType};
-use leptos::*;
-use leptos_router::*;
+use leptos::prelude::*;
+use leptos_router::components::*;
+use leptos_router::hooks::use_navigate;
+use leptos_router::hooks::*;
 use std::cell::RefCell;
-use std::rc::Rc;
+use std::sync::Arc;
 
 const DISPLAY_TEST_STYLE: &str = "group block w-full overflow-hidden border border-gray-200 rounded-lg bg-white shadow-sm hover:shadow-md transition-all duration-300";
 const DISPLAY_TEST_EDIT_STYLE: &str = "group block w-full overflow-hidden rounded-lg bg-[#F44336] bg-opacity-40 hover:scale-105 hover:-translate-y-1 transition-all duration-300";
@@ -16,8 +18,8 @@ const SCORE_STYLE: &str = "text-md font-semibold text-[#2E3A59]";
 
 #[component]
 pub fn MathTestDisplay(
-    test: Rc<Test>,
-    test_resource: Resource<(), Result<Vec<Test>, ServerFnError>>,
+    test: Arc<Test>,
+    test_resource: Resource<Result<Vec<Test>, ServerFnError>>,
     set_if_show_toast: WriteSignal<bool>,
     set_toast_message: WriteSignal<ToastMessage>,
     editing_mode: ReadSignal<bool>,
@@ -27,8 +29,8 @@ pub fn MathTestDisplay(
     all_tests: Option<ReadSignal<Vec<Test>>>,
 ) -> impl IntoView {
     let edit_test = test.clone();
-    let (show_options_modal, set_show_options_modal) = create_signal(false);
-    let (show_variations_panel, set_show_variations_panel) = create_signal(false);
+    let (show_options_modal, set_show_options_modal) = signal(false);
+    let (show_variations_panel, set_show_variations_panel) = signal(false);
 
     // Determine if this is a variation
     let is_variation = test.name.contains(" - ")
@@ -53,7 +55,7 @@ pub fn MathTestDisplay(
     };
 
     // Find related variations if all_tests is provided
-    let related_variations = create_memo({
+    let related_variations = Memo::new({
         let test_clone = test.clone();
         let base_name_clone = base_name.clone();
         let test_id_clone = test.test_id.clone();
@@ -88,7 +90,7 @@ pub fn MathTestDisplay(
         if editing_mode() {
             // In editing mode, navigate directly to test builder
             let test_id = edit_test.test_id.clone();
-            let navigate = leptos_router::use_navigate();
+            let navigate = use_navigate();
             navigate(&format!("/testbuilder/{}", test_id), Default::default());
         } else {
             // Show options modal in normal mode
@@ -154,21 +156,21 @@ pub fn MathTestDisplay(
 
     let on_realtime_click = move |_| {
         let test_id = realtime_test.test_id.clone();
-        let navigate = leptos_router::use_navigate();
+        let navigate = use_navigate();
         navigate(&format!("/test-session/{}", test_id), Default::default());
         set_modal.set(false);
     };
 
     let on_individual_click = move |_| {
         let test_id = individual_test.test_id.clone();
-        let navigate = leptos_router::use_navigate();
+        let navigate = use_navigate();
         navigate(&format!("/flashcardset/{}", test_id), Default::default());
         set_modal.set(false);
     };
 
     let on_grid_test_click = move |_| {
         let test_id = grid_test.test_id.clone();
-        let navigate = leptos_router::use_navigate();
+        let navigate = use_navigate();
         navigate(&format!("/gridtest/{}", test_id), Default::default());
         set_modal.set(false);
     };
@@ -202,9 +204,9 @@ pub fn MathTestDisplay(
                                         <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                                             {variation_type.clone()}
                                         </span>
-                                    }
+                                    }.into_any()
                                 } else {
-                                    view! { <span></span> }
+                                    view! { <span></span> }.into_any()
                                 }}
                             </div>
                             <div class="mt-2 space-y-1">
@@ -225,9 +227,9 @@ pub fn MathTestDisplay(
                                                     "Notes: " {comments_content()}
                                                 </p>
                                             </div>
-                                        }
+                                        }.into_any()
                                     } else {
-                                        view! { <div></div> }
+                                        view! { <div></div> }.into_any()
                                     }
                                 }}
                                 <p class="text-xs text-gray-500 italic mt-1">
@@ -250,9 +252,9 @@ pub fn MathTestDisplay(
                                                     {format!("{} variation(s)", variations.len())}
                                                 </button>
                                             </div>
-                                        }
+                                        }.into_any()
                                     } else {
-                                        view! { <div></div> }
+                                        view! { <div></div> }.into_any()
                                     }
                                 }}
                             </div>
@@ -302,7 +304,7 @@ pub fn MathTestDisplay(
                                                         on:click=move |e| {
                                                             e.stop_propagation();
                                                             let test_id = var_clone.test_id.clone();
-                                                            let navigate = leptos_router::use_navigate();
+                                                            let navigate = use_navigate();
                                                             navigate(&format!("/testbuilder/{}", test_id), Default::default());
                                                         }
                                                     >
@@ -314,7 +316,7 @@ pub fn MathTestDisplay(
                                                             e.stop_propagation();
                                                             // Navigate to test taking interface
                                                             let test_id = variation.test_id.clone();
-                                                            let navigate = leptos_router::use_navigate();
+                                                            let navigate = use_navigate();
                                                             navigate(&format!("/test-session/{}", test_id), Default::default());
                                                         }
                                                     >
@@ -331,7 +333,7 @@ pub fn MathTestDisplay(
                                     class="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded transition-colors"
                                     on:click=move |e| {
                                         e.stop_propagation();
-                                        let navigate = leptos_router::use_navigate();
+                                        let navigate = use_navigate();
                                         navigate("/test-variations", Default::default());
                                     }
                                 >
@@ -339,9 +341,9 @@ pub fn MathTestDisplay(
                                 </button>
                             </div>
                         </div>
-                    }
+                    }.into_any()
                 } else {
-                    view! { <div></div> }
+                    view! { <div></div> }.into_any()
                 }
             }}
 
@@ -361,9 +363,9 @@ pub fn MathTestDisplay(
                                                 "Using " <strong>{variation_type.clone()}</strong> " version of " <strong>{base_name.clone()}</strong>
                                             </p>
                                         </div>
-                                    }
+                                    }.into_any()
                                 } else {
-                                    view! { <div></div> }
+                                    view! { <div></div> }.into_any()
                                 }}
 
                                 <div class="space-y-4">
@@ -410,9 +412,9 @@ pub fn MathTestDisplay(
                                 </div>
                             </div>
                         </div>
-                    }
+                    }.into_any()
                 } else {
-                    view! { <div></div> }
+                    view! { <div></div> }.into_any()
                 }
             }}
 
@@ -423,7 +425,7 @@ pub fn MathTestDisplay(
 
                     let delete_action = move |_| {
                         if let Some(delete_fn) = on_delete.clone() {
-                            delete_fn(test_id.clone());
+                            delete_fn.run(test_id.clone());
                         }
                     };
 
@@ -438,9 +440,9 @@ pub fn MathTestDisplay(
                                 </svg>
                             </button>
                         </div>
-                    }
+                    }.into_any()
                 } else {
-                    view! { <div></div> }
+                    view! { <div></div> }.into_any()
                 }
             }}
         </div>

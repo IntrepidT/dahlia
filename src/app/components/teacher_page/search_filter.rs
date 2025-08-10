@@ -1,5 +1,6 @@
 use crate::app::models::employee::EmployeeRole;
-use leptos::*;
+use leptos::prelude::*;
+use leptos::prelude::*;
 use strum::IntoEnumIterator;
 
 const SEARCH_CONTAINER_STYLE: &str = "flex flex-wrap gap-4 items-end mb-8 mt-20";
@@ -58,7 +59,7 @@ pub fn SearchFilter(
                 <button
                     type="button"
                     class=BUTTON_STYLE
-                    on:click=move |_| on_clear_filters.call(())
+                    on:click=move |_| on_clear_filters.run(())
                 >
                     "Clear Filters"
                 </button>

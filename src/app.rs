@@ -1,6 +1,7 @@
-use leptos::*;
+use leptos::prelude::*;
 use leptos_meta::*;
-use leptos_router::*;
+use leptos_router::components::*;
+use leptos_router::hooks::*;
 
 // Core modules - organized alphabetically
 pub mod components;
@@ -37,34 +38,10 @@ pub fn App() -> impl IntoView {
     provide_context(student_mapping_context);
 
     view! {
-        <Stylesheet id="leptos" href="/pkg/dahlia.css"/>
-        <link data-trunk rel="tailwind-css" href="/style/input.css" />
-        <link rel="icon" href="/assets/favicon.ico" />
-        <Title text="Teapot Testing"/>
-        <Script>
-            {r#"
-            if (typeof window !== 'undefined' && !window.Chart) {
-                const script = document.createElement('script');
-                script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js';
-                script.onload = function() {
-                    console.log('Chart.js loaded successfully');
-                    window.dispatchEvent(new Event('chartjs-loaded'));
-                };
-                script.onerror = function() {
-                    console.error('Failed to load Chart.js');
-                };
-                document.head.appendChild(script);
-            }
-            "#}
-        </Script>
-
         <AuthProvider>
             <SettingsProvider>
                 <Router>
-                    <main>
-                        <Body />
-                        <AppRoutes />
-                    </main>
+                    <AppRoutes />
                 </Router>
             </SettingsProvider>
         </AuthProvider>

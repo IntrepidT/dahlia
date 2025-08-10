@@ -1,4 +1,5 @@
 use crate::app::models::student::GradeEnum;
+use leptos::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Debug};
 use std::str::FromStr;

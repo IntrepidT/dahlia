@@ -1,3 +1,4 @@
+use leptos::prelude::*;
 // All email functionality is only available on the server side
 #[cfg(feature = "ssr")]
 use lettre::{

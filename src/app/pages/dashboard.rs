@@ -6,8 +6,11 @@ use crate::app::components::dashboard_sidebar::{DashboardSidebar, SidebarSelecte
 use crate::app::components::header::Header;
 use crate::app::models::user::{SessionUser, UserRole};
 use crate::app::server_functions::saml_auth::{create_saml_config, get_saml_institutions};
-use leptos::*;
-use leptos_router::*;
+use leptos::prelude::*;
+use leptos::prelude::*;
+use leptos_router::components::*;
+use leptos_router::hooks::*;
+use leptos_router::path;
 
 #[component]
 pub fn Dashboard() -> impl IntoView {
@@ -20,10 +23,10 @@ pub fn Dashboard() -> impl IntoView {
 
 #[component]
 fn DashboardContent() -> impl IntoView {
-    let (selected_view, set_selected_view) = create_signal(SidebarSelected::Overview);
+    let (selected_view, set_selected_view) = signal(SidebarSelected::Overview);
     let location = use_location();
 
-    create_effect(move |_| {
+    Effect::new(move |_| {
         let path = location.pathname.get();
         if path.starts_with("/dashboard") {
             set_selected_view(SidebarSelected::Overview);
@@ -88,12 +91,12 @@ fn DashboardContent() -> impl IntoView {
                                     </div>
                                 </div>
                             </div>
-                        },
+                        }.into_any(),
                         _ => view! {
                             <div class="text-2xl font-bold text-[#2E3A59]">
                                 "Admin-only content"
                             </div>
-                        }
+                        }.into_any()
                     }}
                 </main>
             </div>

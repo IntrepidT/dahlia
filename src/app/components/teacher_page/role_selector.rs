@@ -1,6 +1,7 @@
 use crate::app::models::user::{User, UserRole};
 use crate::app::server_functions::users::update_user_permissions;
-use leptos::*;
+use leptos::prelude::*;
+use leptos::prelude::*;
 
 #[component]
 pub fn RoleSelector(
@@ -9,8 +10,8 @@ pub fn RoleSelector(
     current_user_id: i64,
     #[prop(into)] on_role_updated: Callback<()>,
 ) -> impl IntoView {
-    let (is_open, set_is_open) = create_signal(false);
-    let (is_updating, set_is_updating) = create_signal(false);
+    let (is_open, set_is_open) = signal(false);
+    let (is_updating, set_is_updating) = signal(false);
 
     // Check if this is the current user (to prevent self-demotion)
     let is_current_user = user.id == current_user_id;
@@ -60,7 +61,7 @@ pub fn RoleSelector(
     let can_manage_roles =
         move || -> bool { matches!(current_user_role, UserRole::Admin | UserRole::SuperAdmin) };
 
-    let update_role = create_action(move |new_role: &UserRole| {
+    let update_role = Action::new(move |new_role: &UserRole| {
         let new_role = *new_role;
         let user_id = user.id;
 
@@ -70,8 +71,8 @@ pub fn RoleSelector(
             match update_user_permissions(user_id, new_role).await {
                 Ok(_) => {
                     log::info!("Successfully updated user role");
-                    on_role_updated(());
-                    set_is_open(false);
+                    on_role_updated.run(());
+                    set_is_open.set(false);
                 }
                 Err(e) => {
                     log::error!("Failed to update user role: {:?}", e);
@@ -166,9 +167,9 @@ pub fn RoleSelector(
                                                 )></span>
                                                 <span>{role_display}</span>
                                                 {if is_current {
-                                                    view! { <span class="text-gray-500 ml-auto">"✓"</span> }.into_view()
+                                                    view! { <span class="text-gray-500 ml-auto">"✓"</span> }.into_any()
                                                 } else {
-                                                    view! {}.into_view()
+                                                    view! {}.into_any()
                                                 }}
                                             </button>
                                         }
@@ -177,19 +178,19 @@ pub fn RoleSelector(
                             </div>
                         </Show>
                     </div>
-                }.into_view()
+                }.into_any()
             } else {
                 // Non-admin users or users viewing themselves (non-superadmin) see a static badge
                 view! {
                     <span class=role_badge_style(&user.role)>
                         {user.role.to_string()}
                         {if is_current_user && can_manage_roles() {
-                            view! { <span class="ml-1 text-xs opacity-60">"(you)"</span> }.into_view()
+                            view! { <span class="ml-1 text-xs opacity-60">"(you)"</span> }.into_any()
                         } else {
-                            view! {}.into_view()
+                            view! {}.into_any()
                         }}
                     </span>
-                }.into_view()
+                }.into_any()
             }}
 
             // Click outside to close dropdown

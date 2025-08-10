@@ -1,7 +1,8 @@
+use leptos::prelude::*;
 use crate::app::models::assessment::Assessment;
 use crate::app::models::course::Course;
 use crate::app::models::student::GradeEnum;
-use leptos::*;
+use leptos::prelude::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -70,7 +71,7 @@ pub fn GradebookFilters(
     #[prop(into)] class_sections: Signal<Vec<String>>,
     #[prop(into)] student_count: Signal<usize>,
 ) -> impl IntoView {
-    let (show_more_filters, set_show_more_filters) = create_signal(false);
+    let (show_more_filters, set_show_more_filters) = signal(false);
 
     view! {
         <div class="bg-white border border-gray-200 rounded-md mb-4">
@@ -481,7 +482,7 @@ impl SimpleGradebookFilters {
 
         if !self.search_term.is_empty() {
             conditions.push(
-                "(firstname ILIKE $? OR lastname ILIKE $? OR student_id::text ILIKE $?)"
+                "(firstname ILIKE $? OR lastname ILIKE $? OR student_id=:text ILIKE $?)"
                     .to_string(),
             );
             let search_param = format!("%{}%", self.search_term);

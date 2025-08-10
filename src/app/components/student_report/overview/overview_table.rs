@@ -6,7 +6,8 @@ use crate::app::components::overview::time_frame_selector::TimeFrame;
 use crate::app::models::test::Test;
 use crate::app::server_functions::tests::get_tests;
 use chrono::{DateTime, NaiveDate, Utc};
-use leptos::*;
+use leptos::prelude::*;
+use leptos::prelude::*;
 
 #[component]
 pub fn OverviewTable(
@@ -16,20 +17,17 @@ pub fn OverviewTable(
     #[prop(into)] selected_sort: ReadSignal<SortOption>,
 ) -> impl IntoView {
     // Add resource to fetch test data for benchmark categories
-    let tests_resource = create_local_resource(
-        || (),
-        |_| async {
-            match get_tests().await {
-                Ok(tests) => Some(tests),
-                Err(e) => {
-                    log::error!("Failed to load tests: {}", e);
-                    None
-                }
+    let tests_resource = LocalResource::new(move || async move {
+        match get_tests().await {
+            Ok(tests) => Some(tests),
+            Err(e) => {
+                log::error!("Failed to load tests: {}", e);
+                None
             }
-        },
-    );
+        }
+    });
 
-    let filtered_and_sorted_tests = create_memo(move |_| {
+    let filtered_and_sorted_tests = Memo::new(move |_| {
         let mut tests = test_history.clone();
         let query = search_query.get().to_lowercase();
         let timeframe = selected_timeframe.get();
@@ -112,7 +110,7 @@ pub fn OverviewTable(
                                 <p class="text-gray-500 text-sm">"Try adjusting your search or time frame filters."</p>
                             </div>
                         </div>
-                    }
+                    }.into_any()
                 } else {
                     view! {
                         <div>
@@ -234,7 +232,7 @@ pub fn OverviewTable(
                                 </div>
                             </div>
                         </div>
-                    }
+                    }.into_any()
                 }
             }}
         </div>

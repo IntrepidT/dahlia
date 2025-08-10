@@ -1,6 +1,7 @@
 use super::types::*;
 use crate::app::models::assessment::Assessment;
-use leptos::*;
+use leptos::prelude::*;
+use leptos::prelude::*;
 use uuid::Uuid;
 
 #[derive(Clone)]
@@ -16,8 +17,8 @@ pub struct UseAssessmentForm {
 }
 
 pub fn use_assessment_form() -> UseAssessmentForm {
-    let (state, set_state) = create_signal(AssessmentFormState::default());
-    let (editing, set_editing) = create_signal(false);
+    let (state, set_state) = signal(AssessmentFormState::default());
+    let (editing, set_editing) = signal(false);
     let (selected_assessment_id, set_selected_assessment_id) = create_signal::<Option<Uuid>>(None);
 
     let reset_form = Callback::new(move |_: ()| {
@@ -27,7 +28,7 @@ pub fn use_assessment_form() -> UseAssessmentForm {
     });
 
     let load_assessment = Callback::new(move |assessment: Assessment| {
-        logging::log!("Loading assessment for editing: {:?}", assessment.name);
+        log::info!("Loading assessment for editing: {:?}", assessment.name);
 
         // Start with default state to ensure all fields are properly initialized
         let mut new_state = AssessmentFormState {
@@ -49,7 +50,7 @@ pub fn use_assessment_form() -> UseAssessmentForm {
         if let Some(sequence) = assessment.test_sequence.clone() {
             if !sequence.is_empty() {
                 // Assessment uses sequences
-                logging::log!(
+                log::info!(
                     "Loading assessment with sequences: {} items",
                     sequence.len()
                 );
@@ -58,7 +59,7 @@ pub fn use_assessment_form() -> UseAssessmentForm {
                 new_state.selected_tests = vec![]; // Clear simple test selection
             } else {
                 // Assessment has empty sequence, use simple test selection
-                logging::log!(
+                log::info!(
                     "Loading assessment with empty sequence, using simple tests: {} items",
                     assessment.tests.len()
                 );
@@ -68,7 +69,7 @@ pub fn use_assessment_form() -> UseAssessmentForm {
             }
         } else {
             // No sequence data, definitely using simple test selection
-            logging::log!(
+            log::info!(
                 "Loading assessment with simple tests: {} items",
                 assessment.tests.len()
             );
@@ -77,7 +78,7 @@ pub fn use_assessment_form() -> UseAssessmentForm {
             new_state.selected_tests = assessment.tests.clone();
         }
 
-        logging::log!(
+        log::info!(
             "Final state - use_sequences: {}, selected_tests: {:?}, test_sequence: {:?}",
             new_state.use_sequences,
             new_state.selected_tests,
@@ -131,7 +132,7 @@ pub struct UseSequenceBuilder {
 }
 
 pub fn use_sequence_builder() -> UseSequenceBuilder {
-    let (state, set_state) = create_signal(SequenceBuilderState::default());
+    let (state, set_state) = signal(SequenceBuilderState::default());
 
     let add_test_to_sequence = Callback::new(
         move |(test_id, current_sequence): (

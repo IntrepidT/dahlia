@@ -1,3 +1,4 @@
+use leptos::prelude::*;
 cfg_if::cfg_if! {
     if #[cfg(feature = "ssr")] {
         use crate::app::models::invitation::{
@@ -11,7 +12,7 @@ cfg_if::cfg_if! {
         pub async fn create_invitation(
             pool: &PgPool,
             request: CreateInvitationRequest,
-            invited_by_user_id: Option<i64>,
+            invited_by_user_id= Option<i64>,
         ) -> Result<Invitation, sqlx::Error> {
             let code = generate_invitation_code();
             let expires_at = if request.expires_in_days > 0 {
@@ -37,10 +38,10 @@ cfg_if::cfg_if! {
             .await?;
 
             Ok(Invitation {
-                id: row.get("id"),
+                id= row.get("id"),
                 code: row.get("code"),
                 school_name: row.get("school_name"),
-                invited_by_user_id: row.get("invited_by_user_id"),
+                invited_by_user_id= row.get("invited_by_user_id"),
                 role: row.get("role"),
                 max_uses: row.get("max_uses"),
                 current_uses: row.get("current_uses"),
@@ -61,10 +62,10 @@ cfg_if::cfg_if! {
             .await?;
 
             Ok(row.map(|r| Invitation {
-                id: r.get("id"),
+                id= r.get("id"),
                 code: r.get("code"),
                 school_name: r.get("school_name"),
-                invited_by_user_id: r.get("invited_by_user_id"),
+                invited_by_user_id= r.get("invited_by_user_id"),
                 role: r.get("role"),
                 max_uses: r.get("max_uses"),
                 current_uses: r.get("current_uses"),
@@ -92,7 +93,7 @@ cfg_if::cfg_if! {
 
         pub async fn get_invitations_by_user(
             pool: &PgPool,
-            user_id: i64,
+            user_id= i64,
         ) -> Result<Vec<Invitation>, sqlx::Error> {
             let rows = sqlx::query(
                 r#"
@@ -109,10 +110,10 @@ cfg_if::cfg_if! {
             Ok(rows
                 .into_iter()
                 .map(|r| Invitation {
-                    id: r.get("id"),
+                    id= r.get("id"),
                     code: r.get("code"),
                     school_name: r.get("school_name"),
-                    invited_by_user_id: r.get("invited_by_user_id"),
+                    invited_by_user_id= r.get("invited_by_user_id"),
                     role: r.get("role"),
                     max_uses: r.get("max_uses"),
                     current_uses: r.get("current_uses"),
@@ -124,7 +125,7 @@ cfg_if::cfg_if! {
 
         pub async fn create_verification_code(
             pool: &PgPool,
-            user_id: i64,
+            user_id= i64,
             verification_type: VerificationType,
         ) -> Result<VerificationCode, sqlx::Error> {
             let code = generate_verification_code();
@@ -154,8 +155,8 @@ cfg_if::cfg_if! {
             .await?;
 
             Ok(VerificationCode {
-                id: row.get("id"),
-                user_id: row.get("user_id"),
+                id= row.get("id"),
+                user_id= row.get("user_id"),
                 code: row.get("code"),
                 verification_type: VerificationType::from_str(row.get("type")).unwrap(),
                 expires_at: row.get("expires_at"),
@@ -166,7 +167,7 @@ cfg_if::cfg_if! {
 
         pub async fn validate_verification_code(
             pool: &PgPool,
-            user_id: i64,
+            user_id= i64,
             code: &str,
             verification_type: VerificationType,
         ) -> Result<bool, sqlx::Error> {
@@ -197,14 +198,14 @@ cfg_if::cfg_if! {
                             .bind(user_id)
                             .execute(pool)
                             .await?;
-                        info!("Email verified for user_id: {}", user_id);
+                        info!("Email verified for user_id= {}", user_id);
                     }
                     VerificationType::Phone => {
                         sqlx::query("UPDATE users SET phone_verified = true WHERE id = $1")
                             .bind(user_id)
                             .execute(pool)
                             .await?;
-                        info!("Phone verified for user_id: {}", user_id);
+                        info!("Phone verified for user_id= {}", user_id);
                     }
                 }
             }
@@ -226,7 +227,7 @@ cfg_if::cfg_if! {
 
         pub async fn update_user_phone_number(
             pool: &PgPool,
-            user_id: i64,
+            user_id= i64,
             phone_number: &str,
         ) -> Result<(), sqlx::Error> {
             sqlx::query("UPDATE users SET phone_number = $1 WHERE id = $2")
@@ -240,7 +241,7 @@ cfg_if::cfg_if! {
 
         pub async fn get_user_verification_status(
             pool: &PgPool,
-            user_id: i64,
+            user_id= i64,
         ) -> Result<Option<(bool, bool)>, sqlx::Error> {
             let row = sqlx::query("SELECT email_verified, phone_verified FROM users WHERE id = $1")
                 .bind(user_id)
@@ -255,7 +256,7 @@ cfg_if::cfg_if! {
             }))
         }
 
-        pub async fn is_user_fully_verified(pool: &PgPool, user_id: i64) -> Result<bool, sqlx::Error> {
+        pub async fn is_user_fully_verified(pool: &PgPool, user_id= i64) -> Result<bool, sqlx::Error> {
             let row = sqlx::query("SELECT email_verified, phone_verified FROM users WHERE id = $1")
                 .bind(user_id)
                 .fetch_optional(pool)
@@ -293,10 +294,10 @@ cfg_if::cfg_if! {
             Ok(rows
                 .into_iter()
                 .map(|r| Invitation {
-                    id: r.get("id"),
+                    id= r.get("id"),
                     code: r.get("code"),
                     school_name: r.get("school_name"),
-                    invited_by_user_id: r.get("invited_by_user_id"),
+                    invited_by_user_id= r.get("invited_by_user_id"),
                     role: r.get("role"),
                     max_uses: r.get("max_uses"),
                     current_uses: r.get("current_uses"),
@@ -306,7 +307,7 @@ cfg_if::cfg_if! {
                 .collect())
         }
 
-        pub async fn delete_invitation(pool: &PgPool, invitation_id: i64) -> Result<bool, sqlx::Error> {
+        pub async fn delete_invitation(pool: &PgPool, invitation_id= i64) -> Result<bool, sqlx::Error> {
             let result = sqlx::query("DELETE FROM invitations WHERE id = $1")
                 .bind(invitation_id)
                 .execute(pool)
@@ -317,7 +318,7 @@ cfg_if::cfg_if! {
 
         pub async fn count_recent_verification_codes(
             pool: &PgPool,
-            user_id: i64,
+            user_id= i64,
             verification_type: VerificationType,
             minutes: i32,
         ) -> Result<i64, sqlx::Error> {

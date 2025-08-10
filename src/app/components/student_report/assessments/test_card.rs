@@ -2,12 +2,13 @@ use crate::app::components::dashboard::color_utils::ColorUtils;
 use crate::app::components::dashboard::scores_ledger::ScoreUtils;
 use crate::app::components::data_processing::TestDetail;
 use crate::app::models::test::Test;
-use leptos::*;
+use leptos::prelude::*;
+use leptos::prelude::*;
 
 #[component]
 pub fn TestCard(
     test_detail: TestDetail,
-    tests_resource: Resource<(), Option<Vec<Test>>>,
+    tests_resource: Resource<Option<Vec<Test>>>,
     #[prop(default = false)] show_detailed_info: bool,
 ) -> impl IntoView {
     let test_name = test_detail.test_name.clone();
@@ -163,9 +164,9 @@ pub fn TestCard(
                                 </button>
                             </div>
                         </div>
-                    }
+                    }.into_any()
                 } else {
-                    view! { <div></div> }
+                    view! { <div></div> }.into_any()
                 }}
             </div>
         </div>

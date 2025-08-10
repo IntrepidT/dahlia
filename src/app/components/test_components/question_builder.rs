@@ -1,5 +1,6 @@
 use crate::app::models::{Question, QuestionType, WeightedOption};
-use leptos::*;
+use leptos::html;
+use leptos::prelude::*;
 use std::rc::Rc;
 use std::str::FromStr;
 
@@ -22,15 +23,15 @@ pub fn BuildingQuestion(
     should_auto_focus: Memo<bool>,   // Changed from ReadSignal to Memo
     on_focus_complete: Callback<()>, // New callback to clear auto-focus
 ) -> impl IntoView {
-    let (question_data, set_question_data) = create_signal(initial_question.clone());
-    let question_input_ref = create_node_ref::<html::Textarea>();
+    let (question_data, set_question_data) = signal(initial_question.clone());
+    let question_input_ref = NodeRef::<html::Textarea>::new();
 
     // Store initial_question for use in different closures
     let initial_question_clone = initial_question.clone();
     let initial_question_for_header = initial_question.clone();
 
     // Effect to update question_data when initial_question changes (for edit mode)
-    create_effect(move |_| {
+    Effect::new(move |_| {
         let current_initial = initial_question_clone.clone();
         set_question_data.update(|q| {
             // Only update if the question actually changed to avoid infinite loops
@@ -44,7 +45,7 @@ pub fn BuildingQuestion(
     });
 
     // Improved auto-focus mechanism with cleanup
-    create_effect(move |_| {
+    Effect::new(move |_| {
         if should_auto_focus() {
             if let Some(input) = question_input_ref.get() {
                 #[cfg(feature = "hydrate")]
@@ -53,14 +54,14 @@ pub fn BuildingQuestion(
                         let focus_result = input.focus();
                         if focus_result.is_ok() {
                             // Call the completion callback after successful focus
-                            on_focus_complete(());
+                            on_focus_complete.run(());
                         }
                     });
                 }
                 #[cfg(not(feature = "hydrate"))]
                 {
                     // On server side, just call the completion callback immediately
-                    on_focus_complete(());
+                    on_focus_complete.run(());
                 }
             }
         }
@@ -129,7 +130,7 @@ pub fn BuildingQuestion(
             }
             _ => {}
         });
-        on_update(question_data());
+        on_update.run(question_data());
     };
 
     let handle_options_update = move |(options, correct_answer): (Vec<String>, String)| {
@@ -137,7 +138,7 @@ pub fn BuildingQuestion(
             q.options = options;
             q.correct_answer = correct_answer;
         });
-        on_update(question_data());
+        on_update.run(question_data());
     };
 
     let handle_weighted_options_update = move |weighted_options: Vec<WeightedOption>| {
@@ -154,7 +155,7 @@ pub fn BuildingQuestion(
                 .collect();
             q.correct_answer = serde_json::to_string(&selectable_options).unwrap_or_default();
         });
-        on_update(question_data());
+        on_update.run(question_data());
     };
 
     let question_type_to_value = move |question_type: &QuestionType| -> String {
@@ -181,20 +182,20 @@ pub fn BuildingQuestion(
                                 <button
                                     type="button"
                                     class="px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
-                                    on:click=move |_| duplicate_callback(question_data())
+                                    on:click=move |_| duplicate_callback.run(question_data.get())
                                     title="Duplicate this question"
                                 >
                                     "Duplicate"
                                 </button>
-                            }.into_view()
+                            }.into_any()
                         } else {
-                            view! { <div></div> }.into_view()
+                            view! { <div></div> }.into_any()
                         }
                     }}
                     <button
                         type="button"
                         class="px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors"
-                        on:click=move |_| on_remove(())
+                        on:click=move |_| on_remove.run(())
                         title="Remove this question"
                     >
                         "Remove"
@@ -273,7 +274,7 @@ pub fn BuildingQuestion(
                                 designated_answer=correct_answer
                                 on_change=Callback::new(handle_options_update)
                             />
-                        }.into_view()
+                        }.into_any()
                     },
                     QuestionType::TrueFalse => {
                         let designated_answer = question_data.with(|q| q.correct_answer.clone());
@@ -282,7 +283,7 @@ pub fn BuildingQuestion(
                                 designated_answer=designated_answer
                                 on_change=Callback::new(handle_options_update)
                             />
-                        }.into_view()
+                        }.into_any()
                     },
                     QuestionType::WeightedMultipleChoice => {
                         let weighted_options = question_data.with(|q| q.get_weighted_options());
@@ -293,13 +294,13 @@ pub fn BuildingQuestion(
                                 max_points=max_points
                                 on_change=Callback::new(handle_weighted_options_update)
                             />
-                        }.into_view()
+                        }.into_any()
                     },
                     _ => view! {
                         <div class="bg-gray-50 border border-gray-200 rounded p-4 text-center text-gray-500">
                             "Please select a question type to continue"
                         </div>
-                    }.into_view(),
+                    }.into_any(),
                 }}
             </div>
         </div>
@@ -326,10 +327,10 @@ pub fn WeightedMultipleChoice(
         .map(|opt| (get_next_id(), opt))
         .collect::<Vec<_>>();
 
-    let (option_items, set_option_items) = create_signal(initial_options);
+    let (option_items, set_option_items) = signal(initial_options);
 
     // Calculate total assigned points
-    let total_assigned_points = create_memo(move |_| {
+    let total_assigned_points = Memo::new(move |_| {
         option_items.with(|items| {
             items
                 .iter()
@@ -343,7 +344,7 @@ pub fn WeightedMultipleChoice(
     let debounced_update = store_value(move || {
         let options =
             option_items.with(|items| items.iter().map(|(_, opt)| opt.clone()).collect::<Vec<_>>());
-        on_change(options);
+        on_change.run(options);
     });
 
     // Add a new option
@@ -536,9 +537,9 @@ pub fn WeightedMultipleChoice(
                         <div class="bg-yellow-50 border border-yellow-200 rounded p-3 text-sm text-yellow-800">
                             <p><strong>"Warning:"</strong> " Total selectable points exceed the question's maximum value. Student scores will be capped at " {max_points} " points."</p>
                         </div>
-                    }.into_view()
+                    }.into_any()
                 } else {
-                    view! { <div></div> }.into_view()
+                    view! { <div></div> }.into_any()
                 }
             }}
         </div>
@@ -563,8 +564,8 @@ pub fn MultipleChoice(
         .map(|value| (get_next_id(), value))
         .collect::<Vec<_>>();
 
-    let (option_items, set_option_items) = create_signal(initial_options);
-    let (correct_answer, set_correct_answer) = create_signal(if designated_answer.is_empty() {
+    let (option_items, set_option_items) = signal(initial_options);
+    let (correct_answer, set_correct_answer) = signal(if designated_answer.is_empty() {
         option_items.with(|items| items.first().map(|(_, v)| v.clone()).unwrap_or_default())
     } else {
         designated_answer
@@ -573,7 +574,7 @@ pub fn MultipleChoice(
     let notify_parent = move || {
         let values =
             option_items.with(|items| items.iter().map(|(_, v)| v.clone()).collect::<Vec<_>>());
-        on_change((values, correct_answer()));
+        on_change.run((values, correct_answer()));
     };
 
     let add_option = move |_| {
@@ -668,7 +669,7 @@ pub fn MultipleChoice(
                     let option_value_for_memo = value.clone();
                     let option_value_for_input = value.clone();
 
-                    let is_correct = create_memo(move |_| correct_answer() == option_value_for_memo);
+                    let is_correct = Memo::new(move |_| correct_answer() == option_value_for_memo);
 
                     view! {
                         <div class=move || {
@@ -738,7 +739,7 @@ pub fn MultipleChoice(
 
 #[component]
 pub fn SelectionQuestion() -> impl IntoView {
-    let (options_number, set_options_number) = create_signal(2);
+    let (options_number, set_options_number) = signal(2);
     let on_click_add = move |_| {
         set_options_number(options_number() + 1);
     };
@@ -757,7 +758,7 @@ pub fn TrueFalse(
     on_change: Callback<(Vec<String>, String)>,
 ) -> impl IntoView {
     let options = store_value(vec!["true".to_string(), "false".to_string()]);
-    let (selected_answer, set_selected_answer) = create_signal(if designated_answer.is_empty() {
+    let (selected_answer, set_selected_answer) = signal(if designated_answer.is_empty() {
         "true".to_string()
     } else {
         designated_answer
@@ -765,7 +766,7 @@ pub fn TrueFalse(
 
     let update_answer = move |answer: String| {
         set_selected_answer.set(answer.clone());
-        on_change((options.get_value(), answer));
+        on_change.run((options.get_value(), answer));
     };
 
     view! {

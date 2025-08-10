@@ -1,5 +1,6 @@
 use crate::app::components::data_processing::{AssessmentSummary, Progress, TestDetail};
-use leptos::*;
+use leptos::prelude::*;
+use leptos::prelude::*;
 
 #[component]
 pub fn StripeProgressBar(
@@ -149,9 +150,9 @@ pub fn StripeProgressBar(
                                     {if index < test_details.len() - 1 {
                                         view! {
                                             <div class="absolute top-1/2 left-10 w-6 h-0.5 bg-slate-300 transform -translate-y-1/2 z-0"></div>
-                                        }
+                                        }.into_any()
                                     } else {
-                                        view! { <div></div> }
+                                        view! { <div></div> }.into_any()
                                     }}
 
                                     // Tooltip on hover
@@ -165,9 +166,9 @@ pub fn StripeProgressBar(
                                                         <div>{test.score} "/" {test.total_possible}</div>
                                                         <div class="text-xs">{performance_class.clone()}</div>
                                                     </div>
-                                                }
+                                                }.into_any()
                                             } else {
-                                                view! { <div class="text-slate-300">"Not started"</div> }
+                                                view! { <div class="text-slate-300">"Not started"</div> }.into_any()
                                             }}
                                         </div>
                                         // Tooltip arrow

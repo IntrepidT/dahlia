@@ -1,9 +1,10 @@
 use crate::app::models::student::{ESLEnum, GenderEnum, GradeEnum, InterventionEnum, Student};
 use crate::app::models::UpdateStudentRequest;
 use crate::app::server_functions::students::edit_student;
-use leptos::*;
-use std::rc::Rc;
+use leptos::prelude::*;
+use leptos::task::spawn_local;
 use std::str::FromStr;
+use std::sync::Arc;
 use strum::IntoEnumIterator;
 
 // Styles - matching add form for consistency
@@ -17,53 +18,53 @@ const BUTTON_CONTAINER_STYLE: &str =
 
 #[component]
 pub fn UpdateStudent(
-    #[prop()] student: Rc<Student>,
+    #[prop()] student: Arc<Student>,
     #[prop(optional)] on_cancel: Option<Callback<()>>,
     #[prop(optional)] on_update_success: Option<Callback<Student>>,
 ) -> impl IntoView {
     // Create signals for each field - FIXED: Handle None values safely
     let (firstname, set_firstname) =
-        create_signal(student.firstname.clone().unwrap_or_else(|| "".to_string()));
+        signal(student.firstname.clone().unwrap_or_else(|| "".to_string()));
     let (lastname, set_lastname) =
-        create_signal(student.lastname.clone().unwrap_or_else(|| "".to_string()));
-    let (preferred, set_preferred) = create_signal(student.preferred.clone());
-    let (gender, set_gender) = create_signal(student.gender.clone().to_string());
-    let (date_of_birth, set_date_of_birth) = create_signal(student.date_of_birth);
-    let (student_id, set_student_id) = create_signal(student.student_id.clone().to_string());
+        signal(student.lastname.clone().unwrap_or_else(|| "".to_string()));
+    let (preferred, set_preferred) = signal(student.preferred.clone());
+    let (gender, set_gender) = signal(student.gender.clone().to_string());
+    let (date_of_birth, set_date_of_birth) = signal(student.date_of_birth);
+    let (student_id, set_student_id) = signal(student.student_id.clone().to_string());
     let (current_grade_level, set_current_grade_level) =
-        create_signal(student.current_grade_level.clone().to_string());
-    let (teacher, set_teacher) = create_signal(student.teacher.clone());
+        signal(student.current_grade_level.clone().to_string());
+    let (teacher, set_teacher) = signal(student.teacher.clone());
     let (yes_no_esl, set_yes_no_esl) = if student.esl.to_string() == "Not Applicable" {
-        create_signal(false)
+        signal(false)
     } else {
-        create_signal(true)
+        signal(true)
     };
 
-    let (esl, set_esl) = create_signal(student.esl.to_string());
+    let (esl, set_esl) = signal(student.esl.to_string());
 
-    let (iep, set_iep) = create_signal(student.iep);
-    let (bip, set_bip) = create_signal(student.bip);
-    let (student_504, set_student_504) = create_signal(student.student_504);
-    let (readplan, set_readplan) = create_signal(student.readplan);
-    let (gt, set_gt) = create_signal(student.gt);
+    let (iep, set_iep) = signal(student.iep);
+    let (bip, set_bip) = signal(student.bip);
+    let (student_504, set_student_504) = signal(student.student_504);
+    let (readplan, set_readplan) = signal(student.readplan);
+    let (gt, set_gt) = signal(student.gt);
     let (intervention_selection, set_intervention_selection) =
-        create_signal(match &student.intervention {
+        signal(match &student.intervention {
             Some(intervention) => intervention.to_string(),
             None => "None".to_string(),
         });
 
     // Additional information - FIXED: Handle None pin value safely
-    let (eye_glasses, set_eye_glasses) = create_signal(student.eye_glasses);
-    let (notes, set_notes) = create_signal(student.notes.clone());
-    let (pin, set_pin) = create_signal(student.pin.unwrap_or(0).to_string());
+    let (eye_glasses, set_eye_glasses) = signal(student.eye_glasses);
+    let (notes, set_notes) = signal(student.notes.clone());
+    let (pin, set_pin) = signal(student.pin.unwrap_or(0).to_string());
 
     // For handling form submission
-    let (is_submitting, set_is_submitting) = create_signal(false);
-    let (error_message, set_error_message) = create_signal(String::new());
-    let (if_error, set_if_error) = create_signal(false);
+    let (is_submitting, set_is_submitting) = signal(false);
+    let (error_message, set_error_message) = signal(String::new());
+    let (if_error, set_if_error) = signal(false);
 
     // Create a resource to fetch teachers (similar to add form)
-    let teachers = create_resource(
+    let teachers = Resource::new(
         || (),
         |_| async move {
             match crate::app::server_functions::get_teachers().await {
@@ -77,7 +78,7 @@ pub fn UpdateStudent(
     );
 
     // Create a derived signal for filtered teachers based on selected grade
-    let filtered_teachers = create_memo(move |_| {
+    let filtered_teachers = Memo::new(move |_| {
         let grade_str = current_grade_level();
         if grade_str.is_empty() {
             return Vec::new(); // Return empty if no grade selected yet
@@ -228,7 +229,7 @@ pub fn UpdateStudent(
                 Ok(updated_student) => {
                     set_is_submitting(false);
                     if let Some(callback) = on_update_success {
-                        callback.call(updated_student);
+                        callback.run(updated_student);
                     }
                 }
                 Err(e) => {
@@ -242,7 +243,7 @@ pub fn UpdateStudent(
 
     let handle_cancel = move |_| {
         if let Some(callback) = on_cancel {
-            callback.call(());
+            callback.run(());
         }
     };
 
@@ -379,18 +380,18 @@ pub fn UpdateStudent(
                                     <option value="">"Please select a value"</option>
                                     {move || {
                                         if current_grade_level().is_empty() {
-                                            vec![view! { <option disabled>"First select a grade"</option> }].into_iter().collect_view()
+                                            vec![view! { <option disabled>"First select a grade"</option> }].into_iter().collect_view().into_any()
                                         } else {
                                             let filtered = filtered_teachers();
                                             if filtered.is_empty() {
-                                                vec![view! { <option disabled>"No teachers available for this grade"</option> }].into_iter().collect_view()
+                                                vec![view! { <option disabled>"No teachers available for this grade"</option> }].into_iter().collect_view().into_any()
                                             } else {
                                                 let current_teacher = teacher();
                                                 filtered.iter().map(|t| view! {
                                                     <option value=t.lastname.clone() selected=t.lastname == current_teacher>
                                                         {t.lastname.clone()}
                                                     </option>
-                                                }).collect_view()
+                                                }).collect_view().into_any()
                                             }
                                         }
                                     }}

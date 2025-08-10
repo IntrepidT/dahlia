@@ -9,6 +9,7 @@ use crate::app::server_functions::{
 };
 use chrono::prelude::*;
 use futures::join;
+use leptos::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt::{self, Debug};

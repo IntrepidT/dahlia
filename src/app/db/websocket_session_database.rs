@@ -1,4 +1,4 @@
-use leptos::ServerFnError;
+use leptos::prelude::*;
 use uuid::Uuid;
 
 use crate::app::{models::websocket_session::SessionType, server_functions::tests::update_test};
@@ -9,7 +9,7 @@ cfg_if::cfg_if! {
         use crate::app::models::websocket_session::SessionStatus;
         use log::{debug, error, info, warn};
         use chrono::{DateTime, Utc};
-        use leptos::*;
+        use leptos::prelude::*;
         use sqlx::PgPool;
         use sqlx::prelude::*;
         use sqlx::types::JsonValue;

@@ -2,14 +2,14 @@ use super::sequence_node::SequenceNode;
 use crate::app::components::assessment_page::shared::hooks::UseSequenceBuilder;
 use crate::app::models::assessment_sequences::TestSequenceItem;
 use crate::app::models::test::Test;
-use leptos::*;
+use leptos::prelude::*;
 
 #[component]
 pub fn SequenceFlow(
     sequence: Signal<Vec<TestSequenceItem>>,
-    tests_resource: Resource<(), Result<Vec<Test>, ServerFnError>>,
+    tests_resource: Resource<Result<Vec<Test>, ServerFnError>>,
     sequence_builder: UseSequenceBuilder,
-    on_sequence_change: impl Fn(Vec<TestSequenceItem>) + 'static + Copy,
+    on_sequence_change: impl Fn(Vec<TestSequenceItem>) + 'static + Copy + Send,
 ) -> impl IntoView {
     view! {
         <div class="sequence-flow-container bg-white border-2 border-dashed border-gray-300 rounded-lg p-6 min-h-96">
@@ -34,7 +34,7 @@ pub fn SequenceFlow(
                                 <div class="text-gray-400">"Add tests above to build your assessment flow"</div>
                             </div>
                         </div>
-                    }.into_view()
+                    }.into_any()
                 } else {
                     let all_tests = tests_resource.get().map(|r| r.ok()).flatten().unwrap_or_default();
 
@@ -65,7 +65,7 @@ pub fn SequenceFlow(
                                                             </svg>
                                                         </div>
                                                     </div>
-                                                }.into_view()
+                                                }.into_any()
                                             } else {
                                                 view! {
                                                     <div class="flex items-center justify-center h-20 mx-4 mt-16">
@@ -73,7 +73,7 @@ pub fn SequenceFlow(
                                                             "🎯 COMPLETE"
                                                         </div>
                                                     </div>
-                                                }.into_view()
+                                                }.into_any()
                                             }}
                                         </div>
                                     }
@@ -82,7 +82,7 @@ pub fn SequenceFlow(
                         </div>
 
                         <SequenceFlowLegend />
-                    }.into_view()
+                    }.into_any()
                 }
             }}
         </div>

@@ -11,7 +11,8 @@ use crate::app::server_functions::globals::{
 use crate::app::server_functions::user_settings::{
     get_user_settings, update_dark_mode, update_pinned_sidebar,
 };
-use leptos::*;
+use leptos::prelude::*;
+use leptos::prelude::*;
 #[cfg(feature = "hydrate")]
 use {
     wasm_bindgen::closure::Closure,
@@ -25,10 +26,10 @@ pub fn SettingsModal(
     #[prop(into)] on_close: Callback<()>,
     #[prop(into)] user_id: i64,
 ) -> impl IntoView {
-    let (selected_tab, set_selected_tab) = create_signal("General".to_string());
+    let (selected_tab, set_selected_tab) = signal("General".to_string());
 
     // Load user settings
-    let user_settings_resource = create_resource(
+    let user_settings_resource = Resource::new(
         move || user_id,
         |user_id| async move { get_user_settings(user_id).await },
     );
@@ -47,7 +48,7 @@ pub fn SettingsModal(
                             <h2 class="text-lg font-semibold text-gray-100">"Settings"</h2>
                             <button
                                 class="text-gray-400 hover:text-gray-200 text-xl leading-none"
-                                on:click=move |_| on_close.call(())
+                                on:click=move |_| on_close.run(())
                             >
                                 "×"
                             </button>
@@ -153,10 +154,10 @@ pub fn SettingsModal(
                                                     user_settings=settings
                                                     user_id=user_id
                                                 />
-                                            }.into_view(),
+                                            }.into_any(),
                                             Err(_) => view! {
                                                 <div class="text-red-400">"Error loading settings"</div>
-                                            }.into_view()
+                                            }.into_any()
                                         }
                                     })
                                 }}
@@ -193,7 +194,7 @@ fn SettingsNavButton(
                 move |_| on_select.set(label.clone())
             }
         >
-            {label}
+            {label.clone()}
         </button>
     }
 }
@@ -205,15 +206,15 @@ fn SettingsContent(
     user_id: i64,
 ) -> impl IntoView {
     let user = use_context::<ReadSignal<Option<SessionUser>>>().expect("AuthProvider not Found");
-    let (show_bulk_upload_modal, set_show_bulk_upload_modal) = create_signal(false);
-    let (refresh_trigger, set_refresh_trigger) = create_signal(0);
+    let (show_bulk_upload_modal, set_show_bulk_upload_modal) = signal(false);
+    let (refresh_trigger, set_refresh_trigger) = signal(0);
 
     // Create reactive signals for settings that sync with server
-    let (dark_mode, set_dark_mode) = create_signal(user_settings.ui.dark_mode);
-    let (pin_sidebar, set_pin_sidebar) = create_signal(user_settings.ui.pinned_sidebar);
+    let (dark_mode, set_dark_mode) = signal(user_settings.ui.dark_mode);
+    let (pin_sidebar, set_pin_sidebar) = signal(user_settings.ui.pinned_sidebar);
 
     // Server actions for updating settings
-    let update_dark_mode_action = create_action(move |&new_value: &bool| async move {
+    let update_dark_mode_action = Action::new(move |&new_value: &bool| async move {
         match update_dark_mode(user_id, new_value).await {
             Ok(_) => {
                 set_dark_mode.set(new_value);
@@ -226,7 +227,7 @@ fn SettingsContent(
         }
     });
 
-    let update_pin_sidebar_action = create_action(move |&new_value: &bool| async move {
+    let update_pin_sidebar_action = Action::new(move |&new_value: &bool| async move {
         match update_pinned_sidebar(user_id, new_value).await {
             Ok(_) => {
                 set_pin_sidebar.set(new_value);
@@ -264,7 +265,7 @@ fn SettingsContent(
                             />
                         </SettingsSection>
                     </div>
-                }.into_view(),
+                }.into_any(),
 
                 "Editor" => view! {
                     <div class="space-y-4">
@@ -278,7 +279,7 @@ fn SettingsContent(
                             <SettingsButton label="Vim key bindings" />
                         </SettingsSection>
                     </div>
-                }.into_view(),
+                }.into_any(),
 
                 "Files & Links" => view! {
                     <div class="space-y-4">
@@ -292,7 +293,7 @@ fn SettingsContent(
                             <SettingsButton label="Automatically update internal links" />
                         </SettingsSection>
                     </div>
-                }.into_view(),
+                }.into_any(),
 
                 "Appearance" => view! {
                     <div class="space-y-4">
@@ -313,7 +314,7 @@ fn SettingsContent(
                             <SettingsButton label="Show status bar" />
                         </SettingsSection>
                     </div>
-                }.into_view(),
+                }.into_any(),
 
                 "Promote Students" => view! {
                     <div class="space-y-4">
@@ -333,7 +334,7 @@ fn SettingsContent(
                             />
                         </Show>
                     </div>
-                }.into_view(),
+                }.into_any(),
 
                 "Developer Settings" => view! {
                     <div class="space-y-4">
@@ -343,7 +344,7 @@ fn SettingsContent(
                             </Show>
                         </SettingsSection>
                     </div>
-                }.into_view(),
+                }.into_any(),
 
                 "SAML Configuration" => view! {
                     <div class="space-y-4">
@@ -356,7 +357,7 @@ fn SettingsContent(
                             </div>
                         </Show>
                     </div>
-                }.into_view(),
+                }.into_any(),
 
                 _ => view! {
                     <div class="space-y-4">
@@ -366,7 +367,7 @@ fn SettingsContent(
                             <SettingsButton label="Option 3" />
                         </SettingsSection>
                     </div>
-                }.into_view(),
+                }.into_any(),
             }}
         </div>
     }
@@ -397,9 +398,9 @@ fn SettingsButton(
                     <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
                     </svg>
-                }.into_view()
+                }.into_any()
             } else {
-                view! {}.into_view()
+                view! {}.into_any()
             }}
         </button>
     }
@@ -425,7 +426,7 @@ fn ToggleSwitch(
                 class=move || format!(
                     "relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-700 {}", if checked.get() { "bg-blue-600" } else { "bg-gray-500"}
                 )
-                on:click=move |_| on_toggle.call(!checked.get())
+                on:click=move |_| on_toggle.run(!checked.get())
             >
                 <span
                     class=move || format!(
@@ -440,23 +441,22 @@ fn ToggleSwitch(
 
 #[component]
 fn StudentProtectionToggleInner(settings: ReadSignal<SettingsCache>) -> impl IntoView {
-    let (show_key_modal, set_show_key_modal) = create_signal(false);
-    let (show_file_modal, set_show_file_modal) = create_signal(false); // NEW
-    let (mapping_key, set_mapping_key) = create_signal(String::new());
-    let (selected_file, set_selected_file) = create_signal(Option::<String>::None); // NEW
-    let (is_processing, set_is_processing) = create_signal(false);
-    let (status_message, set_status_message) = create_signal(Option::<String>::None);
+    let (show_key_modal, set_show_key_modal) = signal(false);
+    let (show_file_modal, set_show_file_modal) = signal(false); // NEW
+    let (mapping_key, set_mapping_key) = signal(String::new());
+    let (selected_file, set_selected_file) = signal(Option::<String>::None); // NEW
+    let (is_processing, set_is_processing) = signal(false);
+    let (status_message, set_status_message) = signal(Option::<String>::None);
 
     // Create a local signal to track the toggle state that can be updated
-    let (protection_enabled, set_protection_enabled) =
-        create_signal(settings.get().student_protections);
+    let (protection_enabled, set_protection_enabled) = signal(settings.get().student_protections);
 
     // Update local state when settings change
-    create_effect(move |_| {
+    Effect::new(move |_| {
         set_protection_enabled.set(settings.get().student_protections);
     });
 
-    let toggle_protection_action = create_action(move |(enable, key): &(bool, Option<String>)| {
+    let toggle_protection_action = Action::new(move |(enable, key): &(bool, Option<String>)| {
         let enable = *enable;
         let key = key.clone();
         async move {
@@ -484,7 +484,7 @@ fn StudentProtectionToggleInner(settings: ReadSignal<SettingsCache>) -> impl Int
     });
 
     // NEW: File upload action
-    let restore_from_file_action = create_action(move |file_content: &String| {
+    let restore_from_file_action = Action::new(move |file_content: &String| {
         let file_content = file_content.clone();
         async move {
             set_is_processing.set(true);
@@ -719,20 +719,20 @@ fn StudentProtectionToggleSafe() -> impl IntoView {
                 if loading.get() {
                     view! {
                         <div class="text-gray-400">"Loading protection settings..."</div>
-                    }.into_view()
+                    }.into_any()
                 } else {
                     view! {
                         <StudentProtectionToggleInner settings=settings />
-                    }.into_view()
+                    }.into_any()
                 }
             }}
         }
-        .into_view(),
+        .into_any(),
         _ => view! {
             <div class="text-red-400">
                 "Settings context not available. Make sure SettingsProvider wraps this component."
             </div>
         }
-        .into_view(),
+        .into_any(),
     }
 }

@@ -1,6 +1,4 @@
-// src/app/components/test_components/font_controls.rs
-
-use leptos::*;
+use leptos::prelude::*;
 
 // Font configuration constants
 pub const DEFAULT_QUESTION_FONT_SIZE: &str = "text-4xl";
@@ -83,7 +81,7 @@ impl FontSettings {
 
 // Hook for managing font settings
 pub fn use_font_settings() -> (ReadSignal<FontSettings>, WriteSignal<FontSettings>) {
-    create_signal(FontSettings::default())
+    signal(FontSettings::default())
 }
 
 // Main font controls component
@@ -92,7 +90,7 @@ pub fn FontControls(
     font_settings: ReadSignal<FontSettings>,
     set_font_settings: WriteSignal<FontSettings>,
 ) -> impl IntoView {
-    let (is_open, set_is_open) = create_signal(false);
+    let (is_open, set_is_open) = signal(false);
 
     view! {
         <div class="relative">
@@ -224,11 +222,11 @@ fn FontControlsPanel(
 #[component]
 fn FontSizeSelector<F>(
     label: &'static str,
-    current_value: impl Fn() -> String + 'static,
+    current_value: impl Fn() -> String + 'static + Send,
     on_change: F,
 ) -> impl IntoView
 where
-    F: Fn(String) + 'static,
+    F: Fn(String) + 'static + Send,
 {
     view! {
         <div>
@@ -255,11 +253,11 @@ where
 #[component]
 fn FontFamilySelector<F>(
     label: &'static str,
-    current_value: impl Fn() -> String + 'static,
+    current_value: impl Fn() -> String + 'static + Send,
     on_change: F,
 ) -> impl IntoView
 where
-    F: Fn(String) + 'static,
+    F: Fn(String) + 'static + Send,
 {
     view! {
         <div>
@@ -304,11 +302,11 @@ fn CloseIcon() -> impl IntoView {
 #[component]
 fn BoldToggle<F>(
     label: &'static str,
-    current_value: impl Fn() -> bool + 'static + Clone,
+    current_value: impl Fn() -> bool + 'static + Clone + Send,
     on_change: F,
 ) -> impl IntoView
 where
-    F: Fn(bool) + 'static + Clone,
+    F: Fn(bool) + 'static + Clone + Send,
 {
     let current_value_clone = current_value.clone();
     let on_change_clone = on_change.clone();

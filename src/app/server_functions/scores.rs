@@ -1,5 +1,5 @@
 use crate::app::models::score::*;
-use leptos::*;
+use leptos::prelude::*;
 use uuid::Uuid;
 
 #[cfg(feature = "ssr")]
@@ -8,7 +8,7 @@ use {
     std::error::Error,
 };
 
-#[server(GetScores, "/api")]
+#[server]
 pub async fn get_scores() -> Result<Vec<Score>, ServerFnError> {
     #[cfg(feature = "ssr")]
     {
@@ -37,7 +37,7 @@ pub async fn get_scores() -> Result<Vec<Score>, ServerFnError> {
     }
 }
 
-#[server(GetScoresByTest, "/api")]
+#[server]
 pub async fn get_scores_by_test(test_ids: Vec<Uuid>) -> Result<Vec<Score>, ServerFnError> {
     #[cfg(feature = "ssr")]
     {
@@ -62,7 +62,7 @@ pub async fn get_scores_by_test(test_ids: Vec<Uuid>) -> Result<Vec<Score>, Serve
     }
 }
 
-#[server(GetScore, "/api")]
+#[server]
 pub async fn get_score(
     student_id: i32,
     test_id: String,
@@ -92,7 +92,7 @@ pub async fn get_score(
     }
 }
 
-#[server(GetStudentScores, "/api")]
+#[server]
 pub async fn get_student_scores(student_id: i32) -> Result<Vec<Score>, ServerFnError> {
     #[cfg(feature = "ssr")]
     {
@@ -123,7 +123,7 @@ pub async fn get_student_scores(student_id: i32) -> Result<Vec<Score>, ServerFnE
     }
 }
 
-#[server(AddScore, "/api")]
+#[server]
 pub async fn add_score(add_score_request: CreateScoreRequest) -> Result<Score, ServerFnError> {
     #[cfg(feature = "ssr")]
     {
@@ -153,7 +153,7 @@ pub async fn add_score(add_score_request: CreateScoreRequest) -> Result<Score, S
     }
 }
 
-#[server(DeleteScore, "/api")]
+#[server]
 pub async fn delete_score(
     delete_score_request: DeleteScoreRequest,
 ) -> Result<Score, ServerFnError> {
@@ -184,7 +184,7 @@ pub async fn delete_score(
     }
 }
 /*
-#[server(EditQuestion, "/api")]
+#[server]
 pub async fn edit_question(
     test_id: String,
     edit_question_request: UpdateQuestionRequest,

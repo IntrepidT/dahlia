@@ -1,3 +1,4 @@
+use leptos::prelude::*;
 pub mod lobby;
 pub mod messages;
 pub mod start_connection;

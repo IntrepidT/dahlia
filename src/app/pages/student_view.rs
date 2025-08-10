@@ -13,9 +13,11 @@ use crate::app::models::user::SessionUser;
 use crate::app::server_functions::students::{delete_student, get_students};
 use crate::app::server_functions::teachers::get_teachers;
 use leptos::ev::SubmitEvent;
-use leptos::*;
+use leptos::prelude::*;
+use leptos::task::spawn_local;
+use leptos_router::path;
 use log::{debug, error, info};
-use std::rc::Rc;
+use std::sync::Arc;
 
 // Side panel styles - Updated for responsiveness and toggle behavior
 const SIDE_PANEL_STYLE: &str = "lg:w-[30%] w-full h-[calc(100vh-2rem)] fixed lg:right-0 right-0 top-0 mt-10 p-5 lg:p-10 z-20 lg:z-10 transform transition-all duration-300 ease-in-out duration-300";
@@ -42,12 +44,12 @@ pub fn StudentViewContent() -> impl IntoView {
     let user = use_context::<ReadSignal<Option<SessionUser>>>().expect("AuthProvider not found");
 
     // Signals for gathering data from existing students
-    let (refresh_trigger, set_refresh_trigger) = create_signal(0);
-    let (selected_view, set_selected_view) = create_signal(SidebarSelected::StudentView);
+    let (refresh_trigger, set_refresh_trigger) = signal(0);
+    let (selected_view, set_selected_view) = signal(SidebarSelected::StudentView);
 
-    // Resource for fetching students
-    let students = create_local_resource(
-        move || refresh_trigger(),
+    // Fix: Use Resource::new instead of LocalResource with dependency pattern
+    let students = Resource::new(
+        move || refresh_trigger.get(),
         |_| async move {
             match get_students().await {
                 Ok(students) => Some(students),
@@ -59,9 +61,9 @@ pub fn StudentViewContent() -> impl IntoView {
         },
     );
 
-    // Resource for fetching teachers
-    let teachers = create_local_resource(
-        move || refresh_trigger(),
+    // Fix: Use Resource::new instead of LocalResource with dependency pattern
+    let teachers = Resource::new(
+        move || refresh_trigger.get(),
         |_| async move {
             match get_teachers().await {
                 Ok(teachers) => {
@@ -77,51 +79,51 @@ pub fn StudentViewContent() -> impl IntoView {
     );
 
     // Selected student state
-    let (selected_student, set_selected_student) = create_signal(None::<Rc<Student>>);
+    let (selected_student, set_selected_student) = signal(None::<Arc<Student>>);
 
     // Editing state
-    let (editing, set_editing) = create_signal(false);
+    let (editing, set_editing) = signal(false);
 
     // Filter state signals
-    let (search_term, set_search_term) = create_signal(String::new());
-    let (grade_filter, set_grade_filter) = create_signal(String::from("all"));
-    let (iep_filter, set_iep_filter) = create_signal(false);
-    let (esl_filter, set_esl_filter) = create_signal(false);
-    let (intervention_filter, set_intervention_filter) = create_signal(String::from("all"));
-    let (teacher_filter, set_teacher_filter) = create_signal(String::from("all"));
+    let (search_term, set_search_term) = signal(String::new());
+    let (grade_filter, set_grade_filter) = signal(String::from("all"));
+    let (iep_filter, set_iep_filter) = signal(false);
+    let (esl_filter, set_esl_filter) = signal(false);
+    let (intervention_filter, set_intervention_filter) = signal(String::from("all"));
+    let (teacher_filter, set_teacher_filter) = signal(String::from("all"));
 
     // Additional filter signals
-    let (student_504_filter, set_student_504_filter) = create_signal(false);
-    let (readplan_filter, set_readplan_filter) = create_signal(false);
-    let (gt_filter, set_gt_filter) = create_signal(false);
-    let (bip_filter, set_bip_filter) = create_signal(false);
+    let (student_504_filter, set_student_504_filter) = signal(false);
+    let (readplan_filter, set_readplan_filter) = signal(false);
+    let (gt_filter, set_gt_filter) = signal(false);
+    let (bip_filter, set_bip_filter) = signal(false);
 
     // Adding student state
-    let (adding_student, set_adding_student) = create_signal(false);
+    let (adding_student, set_adding_student) = signal(false);
 
     // Delete student confirmation state
-    let (confirm_delete_one, set_confirm_delete_one) = create_signal(false);
-    let (confirm_delete_two, set_confirm_delete_two) = create_signal(String::new());
+    let (confirm_delete_one, set_confirm_delete_one) = signal(false);
+    let (confirm_delete_two, set_confirm_delete_two) = signal(String::new());
 
     // Signal for showing bulk upload modal
-    let (show_bulk_upload_modal, set_show_bulk_upload_modal) = create_signal(false);
+    let (show_bulk_upload_modal, set_show_bulk_upload_modal) = signal(false);
 
     // Panel visibility control
-    let (show_side_panel, set_show_side_panel) = create_signal(true);
+    let (show_side_panel, set_show_side_panel) = signal(true);
 
     // Panel toggle for desktop view
-    let (panel_expanded, set_panel_expanded) = create_signal(false);
+    let (panel_expanded, set_panel_expanded) = signal(false);
 
     // Watch for selected student changes to show panel on mobile
-    create_effect(move |_| {
-        if selected_student().is_some() || adding_student() || editing() {
-            set_show_side_panel(true);
-            set_panel_expanded(true);
+    Effect::new(move |_| {
+        if selected_student.get().is_some() || adding_student.get() || editing.get() {
+            set_show_side_panel.set(true);
+            set_panel_expanded.set(true);
         }
     });
 
     // Extract teacher names for the filter dropdown
-    let teacher_names = create_memo(move |_| {
+    let teacher_names = Memo::new(move |_| {
         if let Some(Some(teacher_list)) = teachers.get() {
             teacher_list
                 .iter()
@@ -135,8 +137,8 @@ pub fn StudentViewContent() -> impl IntoView {
     // Handle student deletion
     let handle_delete_student = move |ev: SubmitEvent| {
         ev.prevent_default();
-        let student_to_be_deleted = selected_student().unwrap();
-        match confirm_delete_two().parse::<i32>() {
+        let student_to_be_deleted = selected_student.get().unwrap();
+        match confirm_delete_two.get().parse::<i32>() {
             Ok(validated_delete_two) => {
                 if validated_delete_two == student_to_be_deleted.student_id {
                     let delete_student_request = DeleteStudentRequest::new(
@@ -149,66 +151,66 @@ pub fn StudentViewContent() -> impl IntoView {
                         match delete_student(delete_student_request).await {
                             Ok(_) => {
                                 set_refresh_trigger.update(|count| *count += 1);
-                                set_selected_student(None);
-                                set_confirm_delete_one(false);
-                                set_show_side_panel(false); // Close panel on mobile after deletion
+                                set_selected_student.set(None);
+                                set_confirm_delete_one.set(false);
+                                set_show_side_panel.set(false); // Close panel on mobile after deletion
                             }
                             Err(e) => {
                                 log::error!("Error deleting student: {:?}", e);
-                                set_confirm_delete_one(false);
+                                set_confirm_delete_one.set(false);
                             }
                         };
                     });
                 } else {
-                    set_confirm_delete_one(false);
+                    set_confirm_delete_one.set(false);
                     log::info!("Delete was cancelled - ID mismatch");
                 }
             }
             Err(e) => {
                 log::error!("Invalid student ID entered: {:?}", e);
-                set_confirm_delete_one(false);
+                set_confirm_delete_one.set(false);
             }
         }
     };
 
     // Handle adding a new student
     let handle_add_student = move |_| {
-        set_selected_student(None);
-        set_adding_student(true);
-        set_editing(false);
-        set_show_side_panel(true); // Show panel on mobile when adding
-        set_panel_expanded(true); // Ensure panel is expanded
+        set_selected_student.set(None);
+        set_adding_student.set(true);
+        set_editing.set(false);
+        set_show_side_panel.set(true); // Show panel on mobile when adding
+        set_panel_expanded.set(true); // Ensure panel is expanded
     };
 
     // Handle clearing all filters
     let handle_clear_filters = move |_| {
-        set_search_term(String::new());
-        set_grade_filter(String::from("all"));
-        set_teacher_filter(String::from("all"));
-        set_iep_filter(false);
-        set_esl_filter(false);
-        set_intervention_filter(String::from("all"));
-        set_student_504_filter(false);
-        set_readplan_filter(false);
-        set_gt_filter(false);
-        set_bip_filter(false);
+        set_search_term.set(String::new());
+        set_grade_filter.set(String::from("all"));
+        set_teacher_filter.set(String::from("all"));
+        set_iep_filter.set(false);
+        set_esl_filter.set(false);
+        set_intervention_filter.set(String::from("all"));
+        set_student_504_filter.set(false);
+        set_readplan_filter.set(false);
+        set_gt_filter.set(false);
+        set_bip_filter.set(false);
     };
 
     // Grade filter transformer (converts "all" to empty string for matching logic)
-    let transformed_grade_filter = create_memo(move |_| {
-        if grade_filter() == "all" {
+    let transformed_grade_filter = Memo::new(move |_| {
+        if grade_filter.get() == "all" {
             String::new()
         } else {
-            grade_filter()
+            grade_filter.get()
         }
     });
 
     // Intervention filter transformer (converts "all" to empty string for matching logic)
-    let transformed_intervention_filter = create_memo(move |_| {
-        if intervention_filter() == "all" {
+    let transformed_intervention_filter = Memo::new(move |_| {
+        if intervention_filter.get() == "all" {
             String::new()
         } else {
-            intervention_filter()
+            intervention_filter.get()
         }
     });
 
@@ -221,27 +223,27 @@ pub fn StudentViewContent() -> impl IntoView {
             />
 
             // Delete confirmation modal
-            <Show when=move || confirm_delete_one() && selected_student().is_some()>
+            <Show when=move || confirm_delete_one.get() && selected_student.get().is_some()>
                 <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                     <div class="bg-white p-4 md:p-6 rounded-lg shadow-xl max-w-md w-full mx-4">
                         <h3 class="text-xl font-bold mb-4">"Confirm Delete"</h3>
                         <p class="mb-4">
                             "To confirm deletion, please enter the student ID number: "
-                            {selected_student().unwrap().student_id}
+                            {move || selected_student.get().unwrap().student_id}
                         </p>
                         <form on:submit=handle_delete_student>
                             <input
                                 type="text"
                                 class="w-full p-2 border rounded mb-4"
                                 placeholder="Enter student ID"
-                                on:input=move |ev| set_confirm_delete_two(event_target_value(&ev))
+                                on:input=move |ev| set_confirm_delete_two.set(event_target_value(&ev))
                                 required
                             />
                             <div class="flex justify-end gap-2">
                                 <button
                                     type="button"
                                     class="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
-                                    on:click=move |_| set_confirm_delete_one(false)
+                                    on:click=move |_| set_confirm_delete_one.set(false)
                                 >
                                     "Cancel"
                                 </button>
@@ -258,7 +260,7 @@ pub fn StudentViewContent() -> impl IntoView {
             </Show>
 
             {/* Bulk Upload Modal */}
-            <Show when=move || show_bulk_upload_modal()>
+            <Show when=move || show_bulk_upload_modal.get()>
                 <BulkUploadModal
                     set_show_modal=set_show_bulk_upload_modal
                     set_refresh_trigger=set_refresh_trigger
@@ -267,7 +269,7 @@ pub fn StudentViewContent() -> impl IntoView {
 
             // Main content area with dynamic width based on panel state
             <div class=move || {
-                if panel_expanded() {
+                if panel_expanded.get() {
                     TABLE_CONTAINER_STYLE_DEFAULT.to_string()
                 } else {
                     TABLE_CONTAINER_STYLE_EXPANDED.to_string()
@@ -276,37 +278,37 @@ pub fn StudentViewContent() -> impl IntoView {
                 // Search and filter component
                 <div class="flex-shrink-0">
                     <SearchFilter
-                        set_search_term=set_search_term
-                        set_grade_filter=set_grade_filter
-                        set_teacher_filter=set_teacher_filter
-                        set_iep_filter=set_iep_filter
-                        set_esl_filter=set_esl_filter
-                        set_intervention_filter=set_intervention_filter
-                        set_student_504_filter=set_student_504_filter
-                        set_readplan_filter=set_readplan_filter
-                        set_gt_filter=set_gt_filter
-                        set_bip_filter=set_bip_filter
+                        set_search_term=Callback::new(move |value: String| set_search_term.set(value))
+                        set_grade_filter=Callback::new(move |value: String| set_grade_filter.set(value))
+                        set_teacher_filter=Callback::new(move |value: String| set_teacher_filter.set(value))
+                        set_iep_filter=Callback::new(move |value: bool| set_iep_filter.set(value))
+                        set_esl_filter=Callback::new(move |value: bool| set_esl_filter.set(value))
+                        set_intervention_filter=Callback::new(move |value: String| set_intervention_filter.set(value))
+                        set_student_504_filter=Callback::new(move |value: bool| set_student_504_filter.set(value))
+                        set_readplan_filter=Callback::new(move |value: bool| set_readplan_filter.set(value))
+                        set_gt_filter=Callback::new(move |value: bool| set_gt_filter.set(value))
+                        set_bip_filter=Callback::new(move |value: bool| set_bip_filter.set(value))
                         search_term=search_term
-                        teachers=Signal::derive(move || teacher_names())
+                        teachers=Signal::derive(move || teacher_names.get())
                         on_clear_filters=Callback::new(handle_clear_filters)
-                        is_panel_expanded=Signal::derive(move || panel_expanded())
+                        is_panel_expanded=Signal::derive(move || panel_expanded.get())
                     />
                 </div>
 
                 // Student table component
                 <StudentTable
-                    students=students
+                    students=Resource::from(ArcResource::from(students))
                     search_term=search_term
-                    grade_filter=Signal::derive(move || transformed_grade_filter())
+                    grade_filter=Signal::derive(move || transformed_grade_filter.get())
                     teacher_filter=teacher_filter
                     iep_filter=iep_filter
                     esl_filter=esl_filter
-                    intervention_filter=Signal::derive(move || transformed_intervention_filter())
+                    intervention_filter=Signal::derive(move || transformed_intervention_filter.get())
                     student_504_filter=student_504_filter
                     readplan_filter=readplan_filter
                     gt_filter=gt_filter
                     bip_filter=bip_filter
-                    is_panel_expanded=Signal::derive(move || panel_expanded())
+                    is_panel_expanded=Signal::derive(move || panel_expanded.get())
                     selected_student=selected_student
                     set_selected_student=set_selected_student
                 />
@@ -316,17 +318,17 @@ pub fn StudentViewContent() -> impl IntoView {
                 <div class="flex-shrink-0 mt-4 pt-2 flex flex-wrap gap-2 justify-end sticky bottom-0 bg-[#F9F9F8] border-t border-[#DADADA]">
                     <button
                         class="px-3 md:px-4 py-2 bg-[#F9F9F8] hover:bg-[#DADADA] hover:bg-opacity-30 font-bold text-[#2E3A59] border-[#DADADA] rounded-md border transition-colors text-sm md:text-base"
-                        on:click=move |_| set_show_bulk_upload_modal(true)
+                        on:click=move |_| set_show_bulk_upload_modal.set(true)
                     >
                         "Bulk Upload"
                     </button>
                     <button
                         class="inline-flex items-center justify-center px-3 md:px-4 py-2 bg-[#F44336] text-white rounded-md font-semibold hover:bg-[#D32F2F] focus:outline-none focus:ring-2 focus:ring-[#F44336]/50 transition-colors duration-200 shadow-sm hover:shadow-md text-sm md:text-base"
-                        class:opacity-50=move || selected_student().is_none()
-                        class:cursor-not-allowed=move || selected_student().is_none()
+                        class=("opacity-50", move || selected_student.get().is_none())
+                        class=("cursor-not-allowed", move || selected_student.get().is_none())
                         on:click=move |_| {
-                            if selected_student().is_some() {
-                                set_confirm_delete_one(true)
+                            if selected_student.get().is_some() {
+                                set_confirm_delete_one.set(true)
                             }
                         }
                     >
@@ -343,9 +345,9 @@ pub fn StudentViewContent() -> impl IntoView {
 
             // Student Detail Side Panel - modified for responsive behavior with toggle capability
             <div class=move || {
-                if show_side_panel() && panel_expanded() {
+                if show_side_panel.get() && panel_expanded.get() {
                     format!("{} {}", SIDE_PANEL_STYLE, "translate-x-0")
-                } else if !panel_expanded() {
+                } else if !panel_expanded.get() {
                     SIDE_PANEL_STYLE_HIDDEN.to_string()
                 } else {
                     format!("{} {}", SIDE_PANEL_STYLE, "translate-x-full lg:translate-x-0")
@@ -355,11 +357,11 @@ pub fn StudentViewContent() -> impl IntoView {
                 <div class="flex justify-between items-center mb-4">
                     <h2 class="text-lg font-bold text-[#2E3A59]">
                         {move || {
-                            if adding_student() {
+                            if adding_student.get() {
                                 "Add New Student"
-                            } else if editing() {
+                            } else if editing.get() {
                                 "Edit Student"
-                            } else if selected_student().is_some() {
+                            } else if selected_student.get().is_some() {
                                 "Student Details"
                             } else {
                                 "Details"
@@ -371,7 +373,7 @@ pub fn StudentViewContent() -> impl IntoView {
                         <button
                             class="hidden lg:block text-[#2E3A59] p-1 rounded hover:bg-[#DADADA] transition-colors"
                             on:click=move |_| {
-                                set_panel_expanded(false);
+                                set_panel_expanded.set(false);
                             }
                             title="Collapse panel"
                         >
@@ -383,7 +385,7 @@ pub fn StudentViewContent() -> impl IntoView {
                         // Mobile close button
                         <button
                             class="lg:hidden rounded p-1 hover:bg-[#DADADA] text-[#2E3A59]"
-                            on:click=move |_| set_show_side_panel(false)
+                            on:click=move |_| set_show_side_panel.set(false)
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -393,7 +395,7 @@ pub fn StudentViewContent() -> impl IntoView {
                 </div>
 
                 <Show
-                    when=move || selected_student().is_some() || adding_student() || editing()
+                    when=move || selected_student.get().is_some() || adding_student.get() || editing.get()
                     fallback=|| view! {
                         <div class="hidden lg:flex items-center justify-center border-t-8 border-[#2E3A59] h-[95%] text-gray-500 rounded-lg shadow-lg bg-[#F9F9F8]">
                             <span>"Select a student to view details"</span>
@@ -401,61 +403,61 @@ pub fn StudentViewContent() -> impl IntoView {
                     }
                 >
                     {move || {
-                        if adding_student() {
+                        if adding_student.get() {
                             view! {
                                 <div class="h-full">
                                     <AddStudentForm
-                                        set_adding_student=set_adding_student
+                                        set_adding_student=Callback::new(move|value: bool| set_adding_student.set(value))
                                         set_refresh_trigger=set_refresh_trigger
                                     />
                                 </div>
-                            }
-                        } else if editing() {
+                            }.into_any()
+                        } else if editing.get() {
                             view!{
                                 <div class="h-full">
                                     <UpdateStudent
-                                        student=selected_student().expect("A student struct")
+                                        student=selected_student.get().expect("A student struct")
                                         on_cancel=Callback::new(move |_| {
-                                            set_editing(false);
-                                            set_show_side_panel(false); // Close panel on mobile
+                                            set_editing.set(false);
+                                            set_show_side_panel.set(false); // Close panel on mobile
                                         })
                                         on_update_success=Callback::new(move |updated| {
-                                            set_selected_student(Some(Rc::new(updated)));
-                                            set_editing(false);
+                                            set_selected_student.set(Some(Arc::new(updated)));
+                                            set_editing.set(false);
                                             set_refresh_trigger.update(|count| *count +=1);
                                         })
                                     />
                                 </div>
-                            }
-                        } else if let Some(student) = selected_student() {
+                            }.into_any()
+                        } else if let Some(student) = selected_student.get() {
                             view! {
                                 <div class="h-full">
                                     <StudentDetails
                                         student=student
                                         on_edit_student=Callback::new(move |_| {
-                                            set_adding_student(false);
-                                            set_editing(true);
+                                            set_adding_student.set(false);
+                                            set_editing.set(true);
                                         })
                                     />
                                 </div>
-                            }
+                            }.into_any()
                         } else {
                             view! {
                                 <div>"An error has occurred"</div>
-                            }
+                            }.into_any()
                         }
                     }}
                 </Show>
             </div>
 
             // Global Panel toggle button for when panel is fully collapsed
-            <Show when=move || !panel_expanded()>
+            <Show when=move || !panel_expanded.get()>
                 <button
                     class="fixed right-4 top-16 lg:right-8 lg:top-20 bg-[#2E3A59] text-white p-2 rounded-full shadow-lg z-20"
                     on:click=move |_| {
-                        set_panel_expanded(true);
-                        if selected_student().is_some() || adding_student() || editing() {
-                            set_show_side_panel(true);
+                        set_panel_expanded.set(true);
+                        if selected_student.get().is_some() || adding_student.get() || editing.get() {
+                            set_show_side_panel.set(true);
                         }
                     }
                     title="Expand panel"

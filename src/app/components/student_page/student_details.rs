@@ -1,9 +1,10 @@
+use leptos::prelude::*;
 use crate::app::models::student::Student;
 use crate::app::middleware::global_settings::use_settings;
 use crate::app::components::auth::enhanced_login_form::{use_student_mapping_service, DeAnonymizedStudent};
-use leptos::*;
-use leptos_router::*;
-use std::rc::Rc;
+use leptos_router::components::*;
+use leptos_router::hooks::*;
+use std::sync::Arc;
 
 // Updated color scheme to match the palette
 const THEME_PRIMARY: &str = "#2E3A59"; // Navy blue
@@ -29,7 +30,7 @@ const BUTTON_ACCENT: &str =
 
 #[component]
 pub fn StudentDetails(
-    #[prop()] student: Rc<Student>,
+    #[prop()] student: Arc<Student>,
     #[prop(optional)] on_edit_student: Option<Callback<()>>,
 ) -> impl IntoView {
     // Get global settings
@@ -39,12 +40,12 @@ pub fn StudentDetails(
     // Get the mapping service
     let (student_mapping_service, _) = use_student_mapping_service();
     
-    // Clone the student Rc for use in closures
+    // Clone the student Arc for use in closures
     let student_for_deanonymization = student.clone();
     let student_for_memo = student.clone();
     
     // Create a memo for the de-anonymized student info
-    let de_anonymized_student = create_memo(move |_| {
+    let de_anonymized_student = Memo::new(move |_| {
         let mapping_service = student_mapping_service.get();
         DeAnonymizedStudent::from_student_with_mapping(
             &student_for_deanonymization.as_ref(), 
@@ -53,7 +54,7 @@ pub fn StudentDetails(
     });
     
     // Create a memo for the student to ensure stable references
-    let student_memo = create_memo(move |_| student_for_memo.clone());
+    let student_memo = Memo::new(move |_| student_for_memo.clone());
 
     // Function to get display name based on anonymization settings
     let get_display_name = move || {
@@ -62,8 +63,8 @@ pub fn StudentDetails(
         } else {
             format!(
                 "{} {}", 
-                student_memo().firstname.as_ref().unwrap_or(&"Unknown".to_string()), 
-                student_memo().lastname.as_ref().unwrap_or(&"Unknown".to_string())
+                student_memo.get().firstname.as_ref().unwrap_or(&"Unknown".to_string()), 
+                student_memo.get().lastname.as_ref().unwrap_or(&"Unknown".to_string())
             )
         }
     };
@@ -73,7 +74,7 @@ pub fn StudentDetails(
         if anonymization_enabled() {
             de_anonymized_student.get().display_id
         } else {
-            student_memo().student_id.to_string()
+            student_memo.get().student_id.to_string()
         }
     };
 
@@ -81,20 +82,20 @@ pub fn StudentDetails(
     let get_student_pin = move || {
         if anonymization_enabled() {
             if let Some(mapping_service) = student_mapping_service.get() {
-                if let Some(mapping) = mapping_service.get_original_student_info(student_memo().student_id) {
+                if let Some(mapping) = mapping_service.get_original_student_info(student_memo.get().student_id) {
                     return mapping.pin.clone();
                 }
             }
             // Fallback to anonymized display
             "****".to_string()
         } else {
-            student_memo().pin.unwrap_or(0).to_string()
+            student_memo.get().pin.unwrap_or(0).to_string()
         }
     };
 
     // Function to create support services view that doesn't borrow student directly
     let support_services_view = move || {
-        let student = student_memo();
+        let student = student_memo.get();
         let mut services = Vec::new();
 
         // Function to create consistent service status item
@@ -109,13 +110,13 @@ pub fn StudentDetails(
                                     <div class="h-3 w-3 sm:h-4 sm:w-4 rounded-full bg-green-600 mr-1 sm:mr-2"></div>
                                     <span class="text-xs sm:text-sm text-green-700 font-medium">"Active"</span>
                                 </div>
-                            }
+                            }.into_any()
                         } else {
-                            view! { <div><span class="text-xs sm:text-sm text-[#2E3A59] text-opacity-50 font-medium">"Inactive"</span></div> }
+                            view! { <div><span class="text-xs sm:text-sm text-[#2E3A59] text-opacity-50 font-medium">"Inactive"</span></div> }.into_any()
                         }}
                     </div>
                 </div>
-            }
+            }.into_any()
         };
 
         if student.iep {
@@ -149,17 +150,17 @@ pub fn StudentDetails(
                                     <span class="px-1 sm:px-2 py-0.5 sm:py-1 bg-[#2E3A59] bg-opacity-10 text-[#2E3A59] rounded-md text-xs font-medium">
                                         {intervention.to_string()}
                                     </span>
-                                }
+                                }.into_any()
                             },
                             None => {
                                 view! {
                                     <span class="text-xs sm:text-sm text-[#2E3A59] text-opacity-50 font-medium">"None"</span>
-                                }
+                                }.into_any()
                             }
                         }}
                 </div>
                 </div>
-            });
+            }.into_any());
         }
 
         if student.eye_glasses {
@@ -176,7 +177,7 @@ pub fn StudentDetails(
                         </span>
                     </div>
                 </div>
-            });
+            }.into_any());
         }
 
         services
@@ -189,7 +190,7 @@ pub fn StudentDetails(
                     {get_display_name}
                 </h2>
                 <div class="px-2 sm:px-3 py-0.5 sm:py-1 rounded-full bg-[#2E3A59] text-white text-xs font-medium">
-                    {move || student_memo().current_grade_level.to_string()}
+                    {move || student_memo.get().current_grade_level.to_string()}
                 </div>
             </div>
 
@@ -197,7 +198,7 @@ pub fn StudentDetails(
             {move || {
                 if anonymization_enabled() {
                     let has_mapping = student_mapping_service.get()
-                        .map(|service| service.has_mapping_for_app_id(student_memo().student_id))
+                        .map(|service| service.has_mapping_for_app_id(student_memo.get().student_id))
                         .unwrap_or(false);
                     
                     view! {
@@ -232,7 +233,7 @@ pub fn StudentDetails(
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-6">
                             <div class=INFO_GROUP>
                                 <div class=INFO_TITLE>"Preferred Name"</div>
-                                <div class=INFO_VALUE>{move || student_memo().preferred.clone()}</div>
+                                <div class=INFO_VALUE>{move || student_memo.get().preferred.clone()}</div>
                             </div>
 
                             <div class=INFO_GROUP>
@@ -246,7 +247,7 @@ pub fn StudentDetails(
 
                             <div class=INFO_GROUP>
                                 <div class=INFO_TITLE>"Teacher"</div>
-                                <div class=INFO_VALUE>{move || student_memo().teacher.clone()}</div>
+                                <div class=INFO_VALUE>{move || student_memo.get().teacher.clone()}</div>
                             </div>
 
                             <div class=INFO_GROUP>
@@ -255,15 +256,15 @@ pub fn StudentDetails(
                                     {move || {
                                         if anonymization_enabled() {
                                             let has_mapping = student_mapping_service.get()
-                                                .map(|service| service.has_mapping_for_app_id(student_memo().student_id))
+                                                .map(|service| service.has_mapping_for_app_id(student_memo.get().student_id))
                                                 .unwrap_or(false);
                                             if has_mapping {
-                                                format!("{}", student_memo().date_of_birth.format("%m-%d-%Y"))
+                                                format!("{}", student_memo.get().date_of_birth.format("%m-%d-%Y"))
                                             } else {
                                                 "Protected".to_string()
                                             }
                                         } else {
-                                            format!("{}", student_memo().date_of_birth.format("%m-%d-%Y"))
+                                            format!("{}", student_memo.get().date_of_birth.format("%m-%d-%Y"))
                                         }
                                     }}
                                 </div>
@@ -295,11 +296,11 @@ pub fn StudentDetails(
                             <div class=INFO_TITLE>"Student Notes"</div>
                             <div class="mt-2 whitespace-pre-wrap text-[#2E3A59] bg-white p-2 sm:p-3 rounded border border-[#DADADA] min-h-10 sm:min-h-12 text-xs sm:text-sm">
                                 {move || {
-                                    let notes = student_memo().notes.clone();
+                                    let notes = student_memo.get().notes.clone();
                                     if notes.is_empty() {
-                                        view! { <span class="text-[#2E3A59] text-opacity-40 italic">"No notes available"</span> }
+                                        view! { <span class="text-[#2E3A59] text-opacity-40 italic">"No notes available"</span> }.into_any()
                                     } else {
-                                        view! { <span>{notes}</span> }
+                                        view! { <span>{notes}</span> }.into_any()
                                     }
                                 }}
                             </div>
@@ -313,14 +314,14 @@ pub fn StudentDetails(
                 <button class=BUTTON_ACCENT
                     on:click=move |_| {
                         if let Some(callback) = on_edit_student {
-                            callback.call(());
+                            callback.run(());
                         }
                     }
                 >
                     "Edit Student"
                 </button>
                 <button class=BUTTON_PRIMARY>
-                    <a href=format!("/studentview/{}/results", &student_memo().student_id)>
+                    <a href=format!("/studentview/{}/results", &student_memo.get().student_id)>
                         "Test Results"
                     </a>
                 </button>

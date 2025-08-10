@@ -18,8 +18,10 @@ use crate::app::server_functions::websocket_sessions::cleanup_teacher_session_en
 use crate::app::server_functions::{
     questions::get_questions, scores::add_score, tests::get_tests, websocket_sessions,
 };
-use leptos::*;
-use leptos_router::*;
+use leptos::prelude::*;
+use leptos::task::spawn_local;
+use leptos_router::components::*;
+use leptos_router::hooks::*;
 use log;
 use serde_json::json;
 use std::collections::HashMap;
@@ -69,34 +71,34 @@ async fn create_new_session_with_existing_function(
 pub fn RealtimeTestSession() -> impl IntoView {
     // Get test_id from URL parameters
     let params = use_params_map();
-    let test_id_memo = create_memo(move |_| {
-        params.with(|params| params.get("test_id").cloned().unwrap_or_default())
+    let test_id_memo = Memo::new(move |_| {
+        params.with(|params| params.get("test_id").unwrap_or("".to_string()).to_string())
     });
 
     let user = use_context::<ReadSignal<Option<SessionUser>>>().expect("AuthProvider not Found");
 
     // Initialize state
     let (room_id, set_room_id) = create_signal::<Option<Uuid>>(None);
-    let (role, set_role) = create_signal(Role::Student);
+    let (role, set_role) = signal(Role::Student);
     let (connected_students, set_connected_students) =
         create_signal::<Vec<ConnectedStudent>>(Vec::new());
-    let (connection_status, set_connection_status) = create_signal(ConnectionStatus::Disconnected);
-    let (error_message, set_error_message) = create_signal(None::<String>);
-    let (current_card_index, set_current_card_index) = create_signal(0);
-    let (responses, set_responses) = create_signal(HashMap::<i32, QuestionResponse>::new());
-    let (selected_student_id, set_selected_student_id) = create_signal(None::<i32>);
-    let (is_test_active, set_is_test_active) = create_signal(false);
-    let (is_submitted, set_is_submitted) = create_signal(false);
+    let (connection_status, set_connection_status) = signal(ConnectionStatus::Disconnected);
+    let (error_message, set_error_message) = signal(None::<String>);
+    let (current_card_index, set_current_card_index) = signal(0);
+    let (responses, set_responses) = signal(HashMap::<i32, QuestionResponse>::new());
+    let (selected_student_id, set_selected_student_id) = signal(None::<i32>);
+    let (is_test_active, set_is_test_active) = signal(false);
+    let (is_submitted, set_is_submitted) = signal(false);
     let (remaining_time, set_remaining_time) = create_signal::<Option<i32>>(None);
-    let (should_disable_inputs, set_should_disable_inputs) = create_signal(true);
-    let (show_participants, set_show_participants) = create_signal(false);
+    let (should_disable_inputs, set_should_disable_inputs) = signal(true);
+    let (show_participants, set_show_participants) = signal(false);
     let (font_settings, set_font_settings) = use_font_settings();
-    let (show_celebration, set_show_celebration) = create_signal(false);
-    let (shortcuts_expanded, set_shortcuts_expanded) = create_signal(false);
-    let (instructions_expanded, set_instructions_expanded) = create_signal(false);
+    let (show_celebration, set_show_celebration) = signal(false);
+    let (shortcuts_expanded, set_shortcuts_expanded) = signal(false);
+    let (instructions_expanded, set_instructions_expanded) = signal(false);
 
     // Initialize role based on user
-    create_effect(move |_| {
+    Effect::new(move |_| {
         log::info!("=== Role Assignment Effect Triggered ===");
 
         if let Some(current_user) = user() {
@@ -126,7 +128,7 @@ pub fn RealtimeTestSession() -> impl IntoView {
     });
 
     // Enhanced role effect with input disable logic
-    create_effect(move |_| {
+    Effect::new(move |_| {
         let current_role = role.get();
         let should_disable = matches!(current_role, Role::Student | Role::Unknown);
 
@@ -139,7 +141,7 @@ pub fn RealtimeTestSession() -> impl IntoView {
     });
 
     // Fetch test details and questions
-    let test_details = create_resource(test_id_memo, move |tid| async move {
+    let test_details = Resource::new(test_id_memo, move |tid| async move {
         if tid.is_empty() {
             log::warn!("No test ID provided in the URL");
             return None;
@@ -153,7 +155,7 @@ pub fn RealtimeTestSession() -> impl IntoView {
         }
     });
 
-    let questions = create_resource(test_id_memo, move |tid| async move {
+    let questions = Resource::new(test_id_memo, move |tid| async move {
         if tid.is_empty() {
             log::warn!("No test ID provided in the URL");
             return Vec::new();
@@ -187,26 +189,27 @@ pub fn RealtimeTestSession() -> impl IntoView {
         set_is_submitted,
         test_id_memo.into(),
         room_id.into(),
-        questions.into(),
+        Signal::derive(move || questions.get()),
     );
 
     // Heartbeat system
     #[cfg(feature = "hydrate")]
     {
-        create_effect(move |_| {
+        Effect::new(move |_| {
             if matches!(connection_status.get(), ConnectionStatus::Connected) {
                 let send_heartbeat = ws_actions.send_heartbeat.clone();
-                let interval_handle = super::utils::set_interval_with_handle(
-                    move || {
-                        send_heartbeat.call(());
-                    },
-                    std::time::Duration::from_secs(30),
-                );
+                let (should_stop, set_should_stop) = create_signal(false);
 
-                on_cleanup(move || {
-                    if let Ok(handle) = interval_handle {
-                        handle.clear();
+                spawn_local(async move {
+                    while !should_stop.get_untracked() {
+                        send_heartbeat.run(());
+                        gloo_timers::future::TimeoutFuture::new(30000).await; // 30 seconds
                     }
+                });
+
+                // Stop the heartbeat when the effect is cleaned up
+                on_cleanup(move || {
+                    set_should_stop.set(true);
                 });
             }
         });
@@ -217,7 +220,7 @@ pub fn RealtimeTestSession() -> impl IntoView {
     {
         use wasm_bindgen::prelude::*;
 
-        create_effect(move |_| {
+        Effect::new(move |_| {
             if matches!(role.get(), Role::Teacher) {
                 let user_for_cleanup = user.clone();
 
@@ -251,7 +254,7 @@ pub fn RealtimeTestSession() -> impl IntoView {
     }
 
     // Submit handler with weighted multiple choice support
-    let handle_submit = create_action(move |_: &()| async move {
+    let handle_submit = Action::new(move |_: &()| async move {
         let current_responses = responses.get();
         let current_test_id = test_id_memo.get();
         let student_id = selected_student_id.get().unwrap_or(0);
@@ -315,7 +318,7 @@ pub fn RealtimeTestSession() -> impl IntoView {
                 set_is_submitted.set(true);
 
                 #[cfg(feature = "hydrate")]
-                ws_actions.end_test.call(());
+                ws_actions.end_test.run(());
                 Ok(())
             }
             Err(e) => {
@@ -326,9 +329,9 @@ pub fn RealtimeTestSession() -> impl IntoView {
     });
 
     // Create or join session
-    create_effect(move |_| {
+    Effect::new(move |_| {
         let tid = test_id_memo.get();
-        let test_name = match &test_details() {
+        let test_name = match &test_details.get() {
             Some(Some(test)) => test.name.clone(),
             _ => "Unknown Test".to_string(),
         };
@@ -430,12 +433,12 @@ pub fn RealtimeTestSession() -> impl IntoView {
                 "ArrowRight" | "n" | "N" => {
                     ev.prevent_default();
                     #[cfg(feature = "hydrate")]
-                    ws_actions.go_to_next_card.call(());
+                    ws_actions.go_to_next_card.run(());
                 }
                 "ArrowLeft" | "p" | "P" => {
                     ev.prevent_default();
                     #[cfg(feature = "hydrate")]
-                    ws_actions.go_to_previous_card.call(());
+                    ws_actions.go_to_previous_card.run(());
                 }
                 "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" => {
                     if !ev.ctrl_key() && !ev.alt_key() && !ev.meta_key() {
@@ -451,7 +454,7 @@ pub fn RealtimeTestSession() -> impl IntoView {
                                             #[cfg(feature = "hydrate")]
                                             ws_actions
                                                 .handle_answer_change
-                                                .call((current_question.qnumber, option));
+                                                .run((current_question.qnumber, option));
                                         }
                                     }
                                     QuestionType::WeightedMultipleChoice => {
@@ -479,20 +482,20 @@ pub fn RealtimeTestSession() -> impl IntoView {
                                                 #[cfg(feature = "hydrate")]
                                                 ws_actions
                                                     .handle_weighted_selection
-                                                    .call((current_question.qnumber, new_selected));
+                                                    .run((current_question.qnumber, new_selected));
                                             }
                                         }
                                     }
                                     QuestionType::TrueFalse => {
                                         if num == 1 {
                                             #[cfg(feature = "hydrate")]
-                                            ws_actions.handle_answer_change.call((
+                                            ws_actions.handle_answer_change.run((
                                                 current_question.qnumber,
                                                 "true".to_string(),
                                             ));
                                         } else if num == 2 {
                                             #[cfg(feature = "hydrate")]
-                                            ws_actions.handle_answer_change.call((
+                                            ws_actions.handle_answer_change.run((
                                                 current_question.qnumber,
                                                 "false".to_string(),
                                             ));
@@ -540,7 +543,7 @@ pub fn RealtimeTestSession() -> impl IntoView {
                                 }
                             } else {
                                 #[cfg(feature = "hydrate")]
-                                ws_actions.go_to_next_card.call(());
+                                ws_actions.go_to_next_card.run(());
                             }
                         }
                     }
@@ -549,7 +552,7 @@ pub fn RealtimeTestSession() -> impl IntoView {
             }
         };
 
-        create_effect(move |_| {
+        Effect::new(move |_| {
             let window = web_sys::window().unwrap();
             let document = window.document().unwrap();
 
@@ -577,7 +580,7 @@ pub fn RealtimeTestSession() -> impl IntoView {
     };
 
     // Calculate percentage of answered questions
-    let calculate_answered_percentage = create_memo(move |_| {
+    let calculate_answered_percentage = Memo::new(move |_| {
         let answered_count = responses.with(|r| {
             questions
                 .get()
@@ -695,12 +698,12 @@ pub fn RealtimeTestSession() -> impl IntoView {
                                             </div>
                                         </Show>
                                     </div>
-                                }.into_view()
+                                }.into_any()
                             } else {
-                                view! { <div></div> }.into_view()
+                                view! { <div></div> }.into_any()
                             }
                         },
-                        _ => view! { <div></div> }.into_view()
+                        _ => view! { <div></div> }.into_any()
                     }}
                 </Suspense>
 
@@ -808,7 +811,7 @@ pub fn RealtimeTestSession() -> impl IntoView {
                         {move || match questions.get() {
                             None => view! {
                                 <div class="text-center py-8">"Loading..."</div>
-                            }.into_view(),
+                            }.into_any(),
                             Some(questions_vec) if questions_vec.is_empty() => {
                                 view! {
                                     <div class="flex items-center justify-center h-96">
@@ -821,11 +824,11 @@ pub fn RealtimeTestSession() -> impl IntoView {
                                             <p class="text-gray-500">"No questions found for this test."</p>
                                         </div>
                                     </div>
-                                }.into_view()
+                                }.into_any()
                             },
                             Some(questions_vec) => {
                                 let total_questions = questions_vec.len();
-                                let current_question = create_memo(move |_| {
+                                let current_question = Memo::new(move |_| {
                                     questions_vec.get(current_card_index.get()).cloned().unwrap_or_else(|| {
                                         questions_vec.first().cloned().unwrap()
                                     })
@@ -906,7 +909,9 @@ pub fn RealtimeTestSession() -> impl IntoView {
                                                 #[cfg(not(feature = "hydrate"))]
                                                 {Callback::new(|_| {})}
                                             }
-                                            on_submit=Callback::new(move |_| handle_submit.dispatch(()))
+                                            on_submit=Callback::new(move |_| {
+                                                let _ = handle_submit.dispatch(());
+                                            })
                                         />
 
                                         {/* Submission Status */}
@@ -922,7 +927,7 @@ pub fn RealtimeTestSession() -> impl IntoView {
                                                     <button
                                                         class="px-5 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-colors"
                                                         on:click=move |_| {
-                                                            let navigate = leptos_router::use_navigate();
+                                                            let navigate = use_navigate();
                                                             navigate("/dashboard", Default::default());
                                                         }
                                                     >
@@ -932,7 +937,7 @@ pub fn RealtimeTestSession() -> impl IntoView {
                                             </div>
                                         </Show>
                                     </div>
-                                }.into_view()
+                                }.into_any()
                             }
                         }}
                     </Suspense>

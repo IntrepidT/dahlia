@@ -1,5 +1,5 @@
 use super::types::Role;
-use leptos::*;
+use leptos::prelude::*;
 
 #[component]
 pub fn NavigationControls(
@@ -20,7 +20,7 @@ pub fn NavigationControls(
                 <button
                     class="flex items-center justify-center px-5 py-2 bg-white border border-gray-200 rounded-lg shadow-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     disabled=move || (current_card_index.get() == 0 || should_disable_inputs())
-                    on:click=move |_| on_previous.call(())
+                    on:click=move |_| on_previous.run(())
                 >
                     <span class="mr-1">"←"</span>
                     "Previous"
@@ -33,26 +33,26 @@ pub fn NavigationControls(
                         view! {
                             <button
                                 class="flex items-center justify-center px-5 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg shadow-sm hover:from-blue-700 hover:to-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                on:click=move |_| on_submit.call(())
+                                on:click=move |_| on_submit.run(())
                                 disabled=move || (selected_student_id.get().is_none() || should_disable_inputs())
                             >
                                 "Submit Assessment"
                                 <span class="ml-1">"✓"</span>
                             </button>
-                        }.into_view()
+                        }.into_any()
                     } else if !is_last {
                         view! {
                             <button
                                 class="flex items-center justify-center px-5 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg shadow-sm hover:from-blue-700 hover:to-purple-700 transition-colors"
-                                on:click=move |_| on_next.call(())
+                                on:click=move |_| on_next.run(())
                                 disabled=move || should_disable_inputs()
                             >
                                 "Next"
                                 <span class="ml-1">"→"</span>
                             </button>
-                        }.into_view()
+                        }.into_any()
                     } else {
-                        view! { <div></div> }.into_view()
+                        view! { <div></div> }.into_any()
                     }
                 }}
             </div>

@@ -1,6 +1,6 @@
 use crate::app::models::employee::Employee;
-use leptos::*;
-use std::rc::Rc;
+use leptos::prelude::*;
+use std::sync::Arc;
 
 const TABLE_CONTAINER_STYLE: &str =
     "bg-[#F9F9F8] rounded-lg shadow-sm border border-[#DADADA] overflow-hidden";
@@ -16,14 +16,14 @@ const SELECTED_ROW_STYLE: &str =
 
 #[component]
 pub fn EmployeeTable(
-    #[prop(into)] employees: Resource<i32, Option<Vec<Employee>>>,
+    #[prop(into)] employees: Resource<Option<Vec<Employee>>>,
     #[prop(into)] search_term: Signal<String>,
     #[prop(into)] role_filter: Signal<String>,
-    #[prop(into)] selected_employee: Signal<Option<Rc<Employee>>>,
-    #[prop(into)] set_selected_employee: WriteSignal<Option<Rc<Employee>>>,
+    #[prop(into)] selected_employee: Signal<Option<Arc<Employee>>>,
+    #[prop(into)] set_selected_employee: WriteSignal<Option<Arc<Employee>>>,
     #[prop(into)] is_panel_expanded: Signal<bool>,
 ) -> impl IntoView {
-    let filtered_employees = create_memo(move |_| {
+    let filtered_employees = Memo::new(move |_| {
         let search = search_term().trim().to_lowercase();
         let role = role_filter();
 
@@ -47,7 +47,7 @@ pub fn EmployeeTable(
     });
 
     // Create a derived class for the container based on panel expansion state
-    let container_class = create_memo(move |_| {
+    let container_class = Memo::new(move |_| {
         if is_panel_expanded() {
             // Less width when panel is expanded
             format!(
@@ -104,11 +104,11 @@ pub fn EmployeeTable(
                                                 "No employees match your search criteria"
                                             </td>
                                         </tr>
-                                    }.into_view()
+                                    }.into_any()
                                 } else {
                                     employees.into_iter().map(|employee| {
-                                        let employee_rc = Rc::new(employee.clone());
-                                        let employee_cmp = Rc::new(employee.clone());
+                                        let employee_rc = Arc::new(employee.clone());
+                                        let employee_cmp = Arc::new(employee.clone());
                                         let is_selected = move || selected_employee() == Some(employee_cmp.clone());
                                         view! {
                                             <tr
@@ -120,8 +120,9 @@ pub fn EmployeeTable(
                                                 on:click=move |_| set_selected_employee(Some(employee_rc.clone()))
                                             >
                                                 <td class=format!("{} {}", CELL_STYLE, "text-[#2E3A59]")>{employee.id}</td>
-                                                <td class=format!("{} {}", CELL_STYLE, "font-medium text-[#2E3A59]")>{&employee.firstname}</td>
-                                                <td class=format!("{} {}", CELL_STYLE, "font-medium text-[#2E3A59]")>{&employee.lastname}</td>
+                                                // FIX 1: Clone the strings instead of borrowing
+                                                <td class=format!("{} {}", CELL_STYLE, "font-medium text-[#2E3A59]")>{employee.firstname.clone()}</td>
+                                                <td class=format!("{} {}", CELL_STYLE, "font-medium text-[#2E3A59]")>{employee.lastname.clone()}</td>
                                                 <td class=CELL_STYLE>
                                                     <span class=format!("px-2 py-1 text-xs font-medium rounded-full {}",
                                                         if employee.status.to_string() == "Active" {
@@ -135,7 +136,7 @@ pub fn EmployeeTable(
                                                 <td class=format!("{} {}", CELL_STYLE, "text-[#2E3A59] text-opacity-70")>{employee.role.to_string()}</td>
                                             </tr>
                                         }
-                                    }).collect_view()
+                                    }).collect_view().into_any() // FIX 2: Add .into_any() after collect_view()
                                 }
                             }}
                         </tbody>

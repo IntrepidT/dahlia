@@ -1,6 +1,7 @@
 use crate::app::components::teacher_page::role_selector::RoleSelector;
 use crate::app::models::user::{User, UserRole};
-use leptos::*;
+use leptos::prelude::*;
+use leptos::prelude::*;
 
 const TABLE_CONTAINER_STYLE: &str =
     "bg-[#F9F9F8] rounded-lg shadow-sm border border-[#DADADA] overflow-hidden";
@@ -14,14 +15,14 @@ const CELL_STYLE: &str = "px-6 py-4 whitespace-nowrap text-sm bg-[#F9F9F8]";
 
 #[component]
 pub fn UserTable(
-    #[prop(into)] users: Resource<i32, Option<Vec<User>>>,
+    #[prop(into)] users: Resource<Option<Vec<User>>>,
     #[prop(into)] search_term: Signal<String>,
     #[prop(into)] is_panel_expanded: Signal<bool>,
     #[prop(into)] current_user_role: Signal<UserRole>, // Add this prop
     #[prop(into)] current_user_id: Signal<i64>,
     set_refresh_trigger: WriteSignal<i32>,
 ) -> impl IntoView {
-    let filtered_users = create_memo(move |_| {
+    let filtered_users = Memo::new(move |_| {
         let search = search_term().trim().to_lowercase();
 
         users
@@ -55,7 +56,7 @@ pub fn UserTable(
             .collect::<Vec<_>>()
     });
 
-    let container_class = create_memo(move |_| {
+    let container_class = Memo::new(move |_| {
         format!(
             "{} transition-all duration-300 ease-in-out",
             TABLE_CONTAINER_STYLE
@@ -105,7 +106,7 @@ pub fn UserTable(
                                                 "No users match your search criteria"
                                             </td>
                                         </tr>
-                                    }.into_view()
+                                    }.into_any()
                                 } else {
                                     users.into_iter().map(|user| {
                                         let username = user.username.clone();
@@ -137,7 +138,7 @@ pub fn UserTable(
                                                 </td>
                                             </tr>
                                         }
-                                    }).collect_view()
+                                    }).collect_view().into_any()
                                 }
                             }}
                         </tbody>

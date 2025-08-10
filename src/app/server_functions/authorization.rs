@@ -1,5 +1,5 @@
 use crate::app::models::user::{SessionUser, UserRole};
-use leptos::*;
+use leptos::prelude::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -10,7 +10,7 @@ pub struct AuthorizationCheck {
     pub redirect_url: Option<String>,
 }
 
-#[server(CheckAuthorization, "/api")]
+#[server]
 pub async fn check_authorization(
     required_role: Option<String>,
     required_roles: Option<Vec<String>>,
@@ -76,7 +76,7 @@ pub async fn check_authorization(
     }
 }
 
-#[server(CheckPageAuthorization, "/api")]
+#[server]
 pub async fn check_page_authorization(
     page_path: String,
 ) -> Result<AuthorizationCheck, ServerFnError> {

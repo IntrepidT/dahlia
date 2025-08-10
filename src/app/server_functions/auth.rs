@@ -2,7 +2,7 @@ use crate::app::db::user_database;
 use crate::app::models::user::{SessionUser, UserRole};
 #[cfg(feature = "ssr")]
 use actix_web::{cookie::Cookie, http::header, HttpRequest, HttpResponse};
-use leptos::*;
+use leptos::prelude::*;
 #[cfg(feature = "ssr")]
 use leptos_actix::{extract, ResponseOptions};
 use log::{debug, error, info};
@@ -17,7 +17,7 @@ pub struct AuthResponse {
     pub user: Option<SessionUser>,
 }
 
-#[server(Login, "/api")]
+#[server]
 pub async fn login(username: String, password: String) -> Result<AuthResponse, ServerFnError> {
     #[cfg(feature = "ssr")]
     {
@@ -107,7 +107,7 @@ pub async fn login(username: String, password: String) -> Result<AuthResponse, S
     }
 }
 
-#[server(Logout, "/api")]
+#[server]
 pub async fn logout() -> Result<AuthResponse, ServerFnError> {
     #[cfg(feature = "ssr")]
     {
@@ -171,7 +171,7 @@ pub async fn logout() -> Result<AuthResponse, ServerFnError> {
     }
 }
 
-#[server(GetCurrentUser, "/api")]
+#[server]
 pub async fn get_current_user() -> Result<Option<SessionUser>, ServerFnError> {
     #[cfg(feature = "ssr")]
     {
@@ -220,7 +220,7 @@ pub async fn get_current_user() -> Result<Option<SessionUser>, ServerFnError> {
     }
 }
 
-#[server(Register, "/api")]
+#[server]
 pub async fn register(
     username: String,
     email: String,
@@ -326,7 +326,7 @@ pub async fn register(
 }
 
 // Keep password reset functions as they are - they're well implemented
-#[server(RequestPasswordReset, "/api")]
+#[server]
 pub async fn request_password_reset(email: String) -> Result<AuthResponse, ServerFnError> {
     #[cfg(feature = "ssr")]
     {
@@ -334,7 +334,7 @@ pub async fn request_password_reset(email: String) -> Result<AuthResponse, Serve
         use actix_web::web;
         use chrono::{Duration, Utc};
         use leptos_actix::extract;
-        use rand::{distributions::Alphanumeric, Rng};
+        use rand::{distr::Alphanumeric, Rng};
 
         log::info!("Password reset requested for email: {}", email);
 
@@ -404,7 +404,7 @@ pub async fn request_password_reset(email: String) -> Result<AuthResponse, Serve
     }
 }
 
-#[server(ValidateResetToken, "/api")]
+#[server]
 pub async fn validate_reset_token(token: String) -> Result<bool, ServerFnError> {
     #[cfg(feature = "ssr")]
     {
@@ -430,7 +430,7 @@ pub async fn validate_reset_token(token: String) -> Result<bool, ServerFnError> 
     }
 }
 
-#[server(ResetPassword, "/api")]
+#[server]
 pub async fn reset_password(
     token: String,
     new_password: String,

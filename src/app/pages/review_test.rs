@@ -8,8 +8,9 @@ use crate::app::server_functions::questions::get_questions;
 use crate::app::server_functions::scores::get_score;
 use crate::app::server_functions::students::get_student;
 use crate::app::server_functions::tests::get_test;
-use leptos::*;
-use leptos_router::*;
+use leptos::prelude::*;
+use leptos_router::components::*;
+use leptos_router::hooks::*;
 
 #[derive(Clone, PartialEq)]
 enum ReviewTab {
@@ -20,11 +21,10 @@ enum ReviewTab {
 #[component]
 pub fn ReviewTest() -> impl IntoView {
     let params = use_params_map();
-    let test_id = move || params().get("test_id").cloned().unwrap_or_default();
+    let test_id = move || params().get("test_id").unwrap_or_default();
     let student_id = move || {
         params()
             .get("student_id")
-            .cloned()
             .unwrap_or_default()
             .parse::<i32>()
             .unwrap()
@@ -32,7 +32,6 @@ pub fn ReviewTest() -> impl IntoView {
     let test_variant = move || {
         params()
             .get("test_variant")
-            .cloned()
             .unwrap_or_default()
             .parse::<i32>()
             .unwrap()
@@ -40,17 +39,16 @@ pub fn ReviewTest() -> impl IntoView {
     let attempt = move || {
         params()
             .get("attempt")
-            .cloned()
             .unwrap_or_default()
             .parse::<i32>()
             .unwrap()
     };
 
     // Active tab state
-    let (active_tab, set_active_tab) = create_signal(ReviewTab::Detailed);
+    let (active_tab, set_active_tab) = signal(ReviewTab::Detailed);
 
     //Create resources for fetching score, test, and questions
-    let score = create_resource(
+    let score = Resource::new(
         move || (student_id(), test_id(), test_variant(), attempt()),
         |(student_id, test_id, test_variant, attempt)| async move {
             match get_score(student_id, test_id, test_variant, attempt).await {
@@ -62,7 +60,7 @@ pub fn ReviewTest() -> impl IntoView {
             }
         },
     );
-    let test = create_resource(
+    let test = Resource::new(
         move || test_id(),
         |test_id| async move {
             match get_test(test_id).await {
@@ -74,7 +72,7 @@ pub fn ReviewTest() -> impl IntoView {
             }
         },
     );
-    let questions = create_resource(
+    let questions = Resource::new(
         move || test_id(),
         |test_id| async move {
             match get_questions(test_id).await {
@@ -86,7 +84,7 @@ pub fn ReviewTest() -> impl IntoView {
             }
         },
     );
-    let student = create_resource(
+    let student = Resource::new(
         move || student_id(),
         |student_id| async move {
             match get_student(student_id).await {
@@ -119,7 +117,7 @@ pub fn ReviewTest() -> impl IntoView {
     );
 
     // Signal to determine if all questions are true/false
-    let all_true_false = create_memo(move |_| {
+    let all_true_false = Memo::new(move |_| {
         questions
             .get()
             .map(|qs| {
@@ -144,7 +142,7 @@ pub fn ReviewTest() -> impl IntoView {
                                     view! {
                                         <div class="mt-2 flex justify-between items-center">
                                             <div>
-                                                <h1 class="text-3xl font-bold text-gray-900">{&test.name}</h1>
+                                                <h1 class="text-3xl font-bold text-gray-900">{test.name.clone()}</h1>
                                                 {move || {
                                                     student.get().map(|student_data| {
                                                         let firstname = match &student_data.firstname {
@@ -164,21 +162,21 @@ pub fn ReviewTest() -> impl IntoView {
                                                 }}
                                                 <p class="text-gray-600">Test Type: {test.testarea.to_string()}</p>
                                                 {match &test.school_year {
-                                                    Some(year) => view! { <p class="text-gray-600">School Year: {year}</p> },
-                                                    None => view! { <p class="text-gray-600">School Year: Not specified</p> }
+                                                    Some(year) => view! { <p class="text-gray-600">School Year: {year.clone()}</p> }.into_any(),
+                                                    None => view! { <p class="text-gray-600">School Year: Not specified</p> }.into_any()
                                                 }}
                                             </div>
                                             <div class="bg-white shadow rounded-lg p-4 text-center">
                                                 <p class="text-sm text-gray-500">Test Variant</p>
-                                                <p class="text-2xl font-semibold">{test.test_variant}</p>
+                                                <p class="text-2xl font-semibold">{test.test_variant.clone()}</p>
                                             </div>
                                         </div>
-                                    }
+                                    }.into_any()
                                 },
                                 Err(_) => {
                                     view! { <div class="bg-red-50 p-4 rounded-md">
                                         <p class="text-red-700">Failed to load test information.</p>
-                                    </div> }
+                                    </div> }.into_any()
                                 }
                             }
                         })
@@ -193,7 +191,7 @@ pub fn ReviewTest() -> impl IntoView {
                                 match score_result {
                                     Ok(score) => {
                                         // Calculate total correct answers
-                                        let total_correct = create_memo(move |_| {
+                                        let total_correct = Memo::new(move |_| {
                                             if let Some(qs) = questions.get() {
                                                 qs.iter().enumerate().filter(|(i, q)| {
                                                     *i < score.test_scores.len() && score.test_scores[*i] == q.point_value
@@ -228,7 +226,7 @@ pub fn ReviewTest() -> impl IntoView {
                                                 </div>
                                                 <div class="pl-6">
                                                     <h3 class="text-sm font-medium text-gray-500">Evaluator</h3>
-                                                    <p class="text-2xl font-semibold">{&score.evaluator}</p>
+                                                    <p class="text-2xl font-semibold">{score.evaluator.clone()}</p>
                                                 </div>
                                             </div>
                                             <div class="mt-6 pt-6 border-t">
@@ -248,14 +246,14 @@ pub fn ReviewTest() -> impl IntoView {
                                                     <div class="bg-indigo-600 h-2.5 rounded-full" style={move || format!("width: {}%", percentage())}></div>
                                                 </div>
                                             </div>
-                                        }.into_view()
+                                        }.into_any()
                                     },
                                     Err(_) => {
                                         view! {
                                             <div class="bg-red-50 p-4 rounded-md">
                                                 <p class="text-red-700">Failed to load score information.</p>
                                             </div>
-                                        }.into_view()
+                                        }.into_any()
                                     }
                                 }
                             })
@@ -272,14 +270,14 @@ pub fn ReviewTest() -> impl IntoView {
                                             score=score_data.clone()
                                             test=test_data.clone()
                                         />
-                                    }.into_view()
+                                    }.into_any()
                                 },
                                 _ => {
                                     view! {
                                         <div class="bg-white shadow rounded-lg p-6 h-64 flex items-center justify-center">
                                             <p class="text-gray-500">Loading chart...</p>
                                         </div>
-                                    }.into_view()
+                                    }.into_any()
                                 }
                             }
                         }}
@@ -289,18 +287,54 @@ pub fn ReviewTest() -> impl IntoView {
                 // Tab selection - Only show Grid tab if all questions are true/false
                 <div class="border-b border-gray-200 mb-6">
                     <nav class="-mb-px flex space-x-6">
-                        <button
-                            class="py-4 px-1 border-b-2 font-medium text-sm"
-                            class:border-indigo-500=move || active_tab.get() == ReviewTab::Detailed
-                            class:text-indigo-600=move || active_tab.get() == ReviewTab::Detailed
-                            class:border-transparent=move || active_tab.get() != ReviewTab::Detailed
-                            class:text-gray-500=move || active_tab.get() != ReviewTab::Detailed
-                            class:hover:text-gray-700=move || active_tab.get() != ReviewTab::Detailed
-                            class:hover:border-gray-300=move || active_tab.get() != ReviewTab::Detailed
-                            on:click=move |_| set_active_tab.set(ReviewTab::Detailed)
-                        >
-                            "Detailed View"
-                        </button>
+                        {
+                            let detailed_tab_class = move || {
+                                let base = "py-4 px-1 border-b-2 font-medium text-sm";
+                                if active_tab.get() == ReviewTab::Detailed {
+                                    format!("{} border-indigo-500 text-indigo-600", base)
+                                } else {
+                                    format!("{} border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300", base)
+                                }
+                            };
+
+                            let grid_tab_class = move || {
+                                let base = "py-4 px-1 border-b-2 font-medium text-sm";
+                                if active_tab.get() == ReviewTab::Grid {
+                                    format!("{} border-indigo-500 text-indigo-600", base)
+                                } else {
+                                    format!("{} border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300", base)
+                                }
+                            };
+
+                            view! {
+                                <div class="border-b border-gray-200 mb-6">
+                                    <nav class="-mb-px flex space-x-6">
+                                        <button
+                                            class=detailed_tab_class
+                                            on:click=move |_| set_active_tab.set(ReviewTab::Detailed)
+                                        >
+                                            "Detailed View"
+                                        </button>
+
+                                        // Only show Grid tab if all questions are true/false
+                                        {move || {
+                                            if all_true_false.get() {
+                                                view! {
+                                                    <button
+                                                        class=grid_tab_class
+                                                        on:click=move |_| set_active_tab.set(ReviewTab::Grid)
+                                                    >
+                                                        "Grid View"
+                                                    </button>
+                                                }.into_any()
+                                            } else {
+                                                view! {}.into_any()
+                                            }
+                                        }}
+                                    </nav>
+                                </div>
+                            }
+                        }
 
                         // Only show Grid tab if all questions are true/false
                         {move || {
@@ -308,19 +342,19 @@ pub fn ReviewTest() -> impl IntoView {
                                 view! {
                                     <button
                                         class="py-4 px-1 border-b-2 font-medium text-sm"
-                                        class:border-indigo-500=move || active_tab.get() == ReviewTab::Grid
-                                        class:text-indigo-600=move || active_tab.get() == ReviewTab::Grid
-                                        class:border-transparent=move || active_tab.get() != ReviewTab::Grid
-                                        class:text-gray-500=move || active_tab.get() != ReviewTab::Grid
-                                        class:hover:text-gray-700=move || active_tab.get() != ReviewTab::Grid
-                                        class:hover:border-gray-300=move || active_tab.get() != ReviewTab::Grid
+                                        class=("border-indigo-500", move || active_tab.get() == ReviewTab::Grid)
+                                        class=("text-indigo-600", move || active_tab.get() == ReviewTab::Grid)
+                                        class=("border-transparent", move || active_tab.get() != ReviewTab::Grid)
+                                        class=("text-gray-500", move || active_tab.get() != ReviewTab::Grid)
+                                        class=("hover:text-gray-700", move || active_tab.get() != ReviewTab::Grid)
+                                        class=("hover:border-gray-300", move || active_tab.get() != ReviewTab::Grid)
                                         on:click=move |_| set_active_tab.set(ReviewTab::Grid)
                                     >
                                         "Grid View"
                                     </button>
-                                }.into_view()
+                                }.into_any()
                             } else {
-                                view! {}.into_view()
+                                view! {}.into_any()
                             }
                         }}
                     </nav>
@@ -334,13 +368,13 @@ pub fn ReviewTest() -> impl IntoView {
                                 questions=questions.clone()
                                 score=score.clone()
                             />
-                        }.into_view(),
+                        }.into_any(),
                         ReviewTab::Grid => view! {
                             <GridView
                                 questions=questions.clone()
                                 score=score.clone()
                             />
-                        }.into_view()
+                        }.into_any()
                     }
                 }}
             </main>
@@ -351,8 +385,8 @@ pub fn ReviewTest() -> impl IntoView {
 // Separate component for the detailed view (original content)
 #[component]
 fn DetailedView(
-    questions: Resource<String, Vec<crate::app::models::question::Question>>,
-    score: Resource<(i32, String, i32, i32), Result<Score, ServerFnError>>,
+    questions: Resource<Vec<crate::app::models::question::Question>>,
+    score: Resource<Result<Score, ServerFnError>>,
 ) -> impl IntoView {
     view! {
         <div class="bg-white shadow rounded-lg p-6">
@@ -389,7 +423,7 @@ fn DetailedView(
                                                                 if is_correct { "bg-green-100 text-green-600" } else { "bg-red-100 text-red-600" }}>
                                                                 {if is_correct { "✓" } else { "✗" }}
                                                             </span>
-                                                            <span class="ml-3 font-medium">Question {question.qnumber}: {&question.word_problem}</span>
+                                                            <span class="ml-3 font-medium">Question {question.qnumber}: {question.word_problem.clone()}</span>
                                                         </div>
                                                         <div class="flex items-baseline">
                                                             <span class={"font-semibold ".to_string() + if is_correct { "text-green-600" } else { "text-red-600" }}>
@@ -407,7 +441,7 @@ fn DetailedView(
                                                             </div>
                                                             <div>
                                                                 <h4 class="text-sm font-medium text-gray-500 mb-2">Correct Answer</h4>
-                                                                <p>{&question.correct_answer}</p>
+                                                                <p>{question.correct_answer.clone()}</p>
                                                             </div>
                                                         </div>
 
@@ -422,15 +456,15 @@ fn DetailedView(
                                                                                 <div class={"p-2 rounded ".to_string() +
                                                                                     if is_correct_option { "bg-green-100 border border-green-200" }
                                                                                     else { "bg-gray-50 border border-gray-200" }}>
-                                                                                    {option}
+                                                                                    {option.clone()}
                                                                                 </div>
                                                                             }
                                                                         }).collect::<Vec<_>>()}
                                                                     </div>
                                                                 </div>
-                                                            }
+                                                            }.into_any()
                                                         } else {
-                                                            view! { <div></div> }
+                                                            view! { <div></div> }.into_any()
                                                         }}
 
                                                         {if !student_comment.is_empty() {
@@ -439,21 +473,21 @@ fn DetailedView(
                                                                     <h4 class="text-sm font-medium text-gray-500 mb-2">Evaluator Comment</h4>
                                                                     <p class="bg-gray-50 p-3 rounded border border-gray-200">{student_comment}</p>
                                                                 </div>
-                                                            }
+                                                            }.into_any()
                                                         } else {
-                                                            view! { <div></div> }
+                                                            view! { <div></div> }.into_any()
                                                         }}
                                                     </div>
                                                 </div>
                                             }
                                         }).collect::<Vec<_>>()}
                                     </div>
-                                }
+                                }.into_any()
                             },
                             Err(_) => {
                                 view! { <div class="bg-red-50 p-4 rounded-md">
                                     <p class="text-red-700">Failed to load score data.</p>
-                                </div> }
+                                </div> }.into_any()
                             }
                         }
                     })
@@ -466,11 +500,11 @@ fn DetailedView(
 // New component for grid view
 #[component]
 fn GridView(
-    questions: Resource<String, Vec<crate::app::models::question::Question>>,
-    score: Resource<(i32, String, i32, i32), Result<Score, ServerFnError>>,
+    questions: Resource<Vec<crate::app::models::question::Question>>,
+    score: Resource<Result<Score, ServerFnError>>,
 ) -> impl IntoView {
     // Calculate square grid dimensions
-    let grid_dimensions = create_memo(move |_| {
+    let grid_dimensions = Memo::new(move |_| {
         if let Some(questions_list) = questions.get() {
             let count = questions_list.len();
             if count == 0 {
@@ -488,7 +522,7 @@ fn GridView(
     });
 
     // Calculate cell size based on question count
-    let cell_size_class = create_memo(move |_| {
+    let cell_size_class = Memo::new(move |_| {
         if let Some(questions_list) = questions.get() {
             let count = questions_list.len();
             // Determine appropriate cell size based on question count
@@ -511,7 +545,7 @@ fn GridView(
     });
 
     // Currently selected question for details
-    let (selected_question, set_selected_question) = create_signal(None::<i32>);
+    let (selected_question, set_selected_question) = signal(None::<i32>);
 
     view! {
         <div class="bg-white shadow rounded-lg p-6">
@@ -549,42 +583,58 @@ fn GridView(
 
                                                     // Fixed: A student answer is correct if it equals the point value
                                                     let is_correct = student_answer == question.point_value;
-                                                    let is_selected = create_memo(move |_| {
+                                                    let is_selected = Memo::new(move |_| {
                                                         selected_question.get() == Some(qnumber)
                                                     });
 
                                                     let current_cell_size = cell_size_class();
 
                                                     view! {
-                                                        <div
-                                                            class="flex items-center justify-center cursor-pointer transition-all relative"
-                                                            class:bg-green-100=move || is_correct
-                                                            class:bg-red-100=move || !is_correct
-                                                            class:ring-2=move || is_selected()
-                                                            class:ring-blue-500=move || is_selected()
-                                                            on:click=move |_| {
-                                                                if selected_question.get() == Some(qnumber) {
-                                                                    set_selected_question.set(None);
+                                                        {
+                                                            let grid_cell_class = move || {
+                                                                let mut classes = vec!["flex items-center justify-center cursor-pointer transition-all relative"];
+
+                                                                if is_correct {
+                                                                    classes.push("bg-green-100");
                                                                 } else {
-                                                                    set_selected_question.set(Some(qnumber));
+                                                                    classes.push("bg-red-100");
                                                                 }
+
+                                                                if is_selected() {
+                                                                    classes.extend(&["ring-2", "ring-blue-500"]);
+                                                                }
+
+                                                                classes.join(" ")
+                                                            };
+
+                                                            view! {
+                                                                <div
+                                                                    class=grid_cell_class
+                                                                    on:click=move |_| {
+                                                                        if selected_question.get() == Some(qnumber) {
+                                                                            set_selected_question.set(None);
+                                                                        } else {
+                                                                            set_selected_question.set(Some(qnumber));
+                                                                        }
+                                                                    }
+                                                                >
+                                                                    <span class=format!("select-none font-bold {} px-0.5 py-0.5 text-center", current_cell_size)>{display_text}</span>
+                                                                    {move || if !is_correct {
+                                                                        view! {
+                                                                            <span class="absolute top-0 right-0 text-xs bg-red-500 text-white rounded-full w-3 h-3 flex items-center justify-center">
+                                                                                "×"
+                                                                            </span>
+                                                                        }.into_any()
+                                                                    } else {
+                                                                        view! { <span></span> }.into_any()
+                                                                    }}
+                                                                </div>
                                                             }
-                                                        >
-                                                            <span class=format!("select-none font-bold {} px-0.5 py-0.5 text-center", current_cell_size)>{display_text}</span>
-                                                            {move || if !is_correct {
-                                                                view! {
-                                                                    <span class="absolute top-0 right-0 text-xs bg-red-500 text-white rounded-full w-3 h-3 flex items-center justify-center">
-                                                                        "×"
-                                                                    </span>
-                                                                }.into_view()
-                                                            } else {
-                                                                view! { <span></span> }.into_view()
-                                                            }}
-                                                        </div>
+                                                        }
                                                     }
-                                                }).collect_view()
+                                                }).collect_view().into_any()
                                             },
-                                            _ => view! { <div>Loading...</div> }.into_view()
+                                            _ => view! { <div>Loading...</div> }.into_any()
                                         }
                                     }}
                                 </div>
@@ -623,11 +673,11 @@ fn GridView(
 
                                         view! {
                                             <div class="bg-gray-100 rounded-lg p-4">
-                                                <h3 class="text-lg font-semibold mb-2">Question {q.qnumber}: {&q.word_problem}</h3>
+                                                <h3 class="text-lg font-semibold mb-2">Question {q.qnumber.clone()}: {q.word_problem.clone()}</h3>
                                                 <div class="grid grid-cols-2 gap-4 mb-3">
                                                     <div>
                                                         <h4 class="text-sm font-medium text-gray-500 mb-1">Correct Answer</h4>
-                                                        <p>{&q.correct_answer}</p>
+                                                        <p>{q.correct_answer.clone()}</p>
                                                     </div>
                                                     <div>
                                                         <h4 class="text-sm font-medium text-gray-500 mb-1">"Student's Result"</h4>
@@ -643,24 +693,24 @@ fn GridView(
                                                             <h4 class="text-sm font-medium text-gray-500 mb-1">Evaluator Comment</h4>
                                                             <p class="bg-white p-3 rounded border">{student_comment}</p>
                                                         </div>
-                                                    }.into_view()
+                                                    }.into_any()
                                                 } else {
-                                                    view! {}.into_view()
+                                                    view! {}.into_any()
                                                 }}
                                             </div>
-                                        }.into_view()
+                                        }.into_any()
                                     },
                                     None => view! {
                                         <div class="text-gray-500 italic">Question not found.</div>
-                                    }.into_view()
+                                    }.into_any()
                                 }
                             },
                             (_, _, Some(_)) => view! {
                                 <div class="text-gray-500 italic">Loading question details...</div>
-                            }.into_view(),
+                            }.into_any(),
                             _ => view! {
                                 <div class="text-gray-500 italic">Click on any grid cell to view question details.</div>
-                            }.into_view()
+                            }.into_any()
                         }
                     }}
                 </div>

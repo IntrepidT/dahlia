@@ -14,8 +14,10 @@ use crate::app::server_functions::tests::get_tests;
 use crate::app::server_functions::tests::{add_test, get_test, score_overrider, update_test};
 use crate::app::utils::BenchmarkUtils;
 use leptos::prelude::*;
-use leptos::*;
-use leptos_router::*;
+use leptos::task::spawn_local;
+use leptos_router::components::*;
+use leptos_router::hooks::*;
+use leptos_router::path;
 use std::str::FromStr;
 use strum::IntoEnumIterator;
 
@@ -31,9 +33,7 @@ pub fn TestBuilder() -> impl IntoView {
     }
 }
 
-async fn get_next_variant_number_for_new_test(
-    test_name: &str,
-) -> Result<i32, leptos::ServerFnError> {
+async fn get_next_variant_number_for_new_test(test_name: &str) -> Result<i32, ServerFnError> {
     let all_tests = get_tests().await?;
 
     // Find all tests with the same name (exact match or base name match)
@@ -68,12 +68,12 @@ pub fn TestBuilderContent() -> impl IntoView {
     const DROPDOWN_STYLE: &str = "w-40 h-12 border-[#00356b] border pr-4 pl-6 py-2 text-[#00356b] rounded transition-all duration-1000 ease-in-out";
 
     let params = use_params_map();
-    let maybe_id = params.with(|params| params.get("test_id").cloned());
+    let maybe_id = params.with(|params| params.get("test_id"));
 
     // Signal to track if we're in edit mode
-    let (is_edit_mode, set_is_edit_mode) = create_signal(false);
+    let (is_edit_mode, set_is_edit_mode) = signal(false);
 
-    let test_resource = create_resource(
+    let test_resource = Resource::new(
         move || maybe_id.clone(),
         |id| async move {
             match id {
@@ -83,7 +83,7 @@ pub fn TestBuilderContent() -> impl IntoView {
         },
     );
 
-    let courses_resource = create_resource(
+    let courses_resource = Resource::new(
         || (),
         |_| async move {
             match get_courses().await {
@@ -96,17 +96,17 @@ pub fn TestBuilderContent() -> impl IntoView {
         },
     );
 
-    let (selected_tab, set_selected_tab) = create_signal(0);
-    let (test_title, set_test_title) = create_signal(String::new());
-    let (test_instructions, set_test_instructions) = create_signal(String::new());
-    let (test_area, set_test_area) = create_signal(String::new());
-    let (school_year, set_school_year) = create_signal(String::new());
+    let (selected_tab, set_selected_tab) = signal(0);
+    let (test_title, set_test_title) = signal(String::new());
+    let (test_instructions, set_test_instructions) = signal(String::new());
+    let (test_area, set_test_area) = signal(String::new());
+    let (school_year, set_school_year) = signal(String::new());
     let (grade_level, set_grade_level) = create_signal::<Option<GradeEnum>>(None);
     let (benchmark_categories, set_benchmark_categories) =
         create_signal::<Vec<(i32, i32, i32, String, String)>>(Vec::new());
-    let (test_variant, set_test_variant) = create_signal(0);
-    let (test_comments, set_test_comments) = create_signal(String::new());
-    let (test_id, set_test_id) = create_signal(String::new());
+    let (test_variant, set_test_variant) = signal(0);
+    let (test_comments, set_test_comments) = signal(String::new());
+    let (test_id, set_test_id) = signal(String::new());
     let (scope, set_scope) = create_signal::<Option<ScopeEnum>>(None);
     let (course_id, set_course_id) = create_signal::<Option<i32>>(None);
 
@@ -117,21 +117,21 @@ pub fn TestBuilderContent() -> impl IntoView {
         create_signal::<Option<QuestionType>>(None);
 
     //Signals for TestVariation Management
-    let (is_variation, set_is_variation) = create_signal(false);
-    let (base_test_name, set_base_test_name) = create_signal(String::new());
-    let (variation_type_display, set_variation_type_display) = create_signal(String::new());
-    let (related_variations, set_related_variations) = create_signal(Vec::<Test>::new());
+    let (is_variation, set_is_variation) = signal(false);
+    let (base_test_name, set_base_test_name) = signal(String::new());
+    let (variation_type_display, set_variation_type_display) = signal(String::new());
+    let (related_variations, set_related_variations) = signal(Vec::<Test>::new());
 
-    let (error_message, set_error_message) = create_signal(String::new());
-    let (show_error, set_show_error) = create_signal(false);
-    let (is_submitting, set_is_submitting) = create_signal(false);
+    let (error_message, set_error_message) = signal(String::new());
+    let (show_error, set_show_error) = signal(false);
+    let (is_submitting, set_is_submitting) = signal(false);
 
-    let (questions, set_questions) = create_signal(Vec::<Question>::new());
+    let (questions, set_questions) = signal(Vec::<Question>::new());
 
-    let (force_update_key, set_force_update_key) = create_signal(0);
+    let (force_update_key, set_force_update_key) = signal(0);
 
     // Resource to load questions when in edit mode
-    let questions_resource = create_resource(
+    let questions_resource = Resource::new(
         move || test_id.get(),
         |tid| async move {
             if tid.is_empty() {
@@ -237,7 +237,7 @@ pub fn TestBuilderContent() -> impl IntoView {
     };
 
     //Load related variations in edit mode
-    let related_variations_resource = create_resource(
+    let related_variations_resource = Resource::new(
         move || (test_id.get(), is_edit_mode()),
         |(current_test_id, is_editing)| async move {
             if !is_editing || current_test_id.is_empty() {
@@ -297,7 +297,7 @@ pub fn TestBuilderContent() -> impl IntoView {
     };
 
     // Effect to load test data when a test_id is available
-    create_effect(move |_| {
+    Effect::new(move |_| {
         if let Some(Some(test)) = test_resource.get() {
             set_is_edit_mode(true);
             set_test_id(test.test_id.clone());
@@ -319,7 +319,7 @@ pub fn TestBuilderContent() -> impl IntoView {
     });
 
     // Effect to load questions when questions_resource updates
-    create_effect(move |_| {
+    Effect::new(move |_| {
         if let Some(loaded_questions) = questions_resource.get() {
             if !loaded_questions.is_empty() {
                 // Sort questions by question number
@@ -337,14 +337,14 @@ pub fn TestBuilderContent() -> impl IntoView {
     });
 
     //Loading related variations when in edit mode
-    create_effect(move |_| {
+    Effect::new(move |_| {
         if let Some(variations) = related_variations_resource.get() {
             set_related_variations(variations);
         }
     });
 
     // For editing a variation
-    create_effect(move |_| {
+    Effect::new(move |_| {
         if let Some(Some(test)) = test_resource.get() {
             let is_var = test.name.contains(" - ")
                 && (test.name.to_lowercase().contains("randomized")
@@ -365,47 +365,23 @@ pub fn TestBuilderContent() -> impl IntoView {
         }
     });
 
-    create_effect(move |_| {
-        #[cfg(feature = "hydrate")]
-        {
-            use wasm_bindgen::prelude::*;
-            use wasm_bindgen::JsCast;
-            use web_sys::KeyboardEvent;
+    #[cfg(feature = "hydrate")]
+    {
+        use leptos::ev::keydown;
+        use leptos_use::{use_document, use_event_listener};
+        use web_sys::KeyboardEvent;
 
-            let handle_keydown = Closure::wrap(Box::new(move |event: KeyboardEvent| {
-                // Check if we're on the questions tab (tab 1)
-                if selected_tab() == 1 {
-                    // Check for Ctrl++ (Ctrl + Plus/Equal key)
-                    if event.ctrl_key() && (event.key() == "+" || event.key() == "=") {
-                        event.prevent_default();
-                        add_new_question(());
-                    }
+        let _cleanup = use_event_listener(use_document(), keydown, move |event: KeyboardEvent| {
+            // Check if we're on the questions tab (tab 1)
+            if selected_tab() == 1 {
+                // Check for Ctrl++ (Ctrl + Plus/Equal key)
+                if event.ctrl_key() && (event.key() == "+" || event.key() == "=") {
+                    event.prevent_default();
+                    add_new_question(());
                 }
-            }) as Box<dyn FnMut(KeyboardEvent)>);
-
-            let window = web_sys::window().unwrap();
-
-            // Convert the closure to a Function - use into() instead of unchecked_into on reference
-            let function = handle_keydown.as_ref().unchecked_ref::<js_sys::Function>();
-            window
-                .add_event_listener_with_callback("keydown", function)
-                .unwrap();
-
-            // Store the closure
-            let stored_closure = store_value(handle_keydown);
-
-            // Cleanup function
-            on_cleanup(move || {
-                let window = web_sys::window().unwrap();
-                stored_closure.with_value(|closure| {
-                    let function = closure.as_ref().unchecked_ref::<js_sys::Function>();
-                    window
-                        .remove_event_listener_with_callback("keydown", function)
-                        .unwrap();
-                });
-            });
-        }
-    });
+            }
+        });
+    }
 
     let validate_test_form = move || -> Result<(), String> {
         // Input validation
@@ -709,7 +685,7 @@ pub fn TestBuilderContent() -> impl IntoView {
             set_is_submitting(false);
 
             // Navigate to the test list page only after all questions are processed
-            let navigate = leptos_router::use_navigate();
+            let navigate = use_navigate();
             navigate("/test-manager", Default::default());
         });
     };
@@ -780,16 +756,16 @@ pub fn TestBuilderContent() -> impl IntoView {
                                                 <p class="mt-2 text-xs bg-yellow-100 text-yellow-800 p-2 rounded border border-yellow-200">
                                                     {warning}
                                                 </p>
-                                            }.into_view()
+                                            }.into_any()
                                         } else {
-                                            view! { <div></div> }.into_view()
+                                            view! { <div></div> }.into_any()
                                         }}
                                         <div class="mt-3">
                                             <div class="flex items-center space-x-4">
                                                 <button
                                                     class="text-sm bg-blue-100 hover:bg-blue-200 text-blue-800 px-3 py-1 rounded-md transition-colors"
                                                     on:click=move |_| {
-                                                        let navigate = leptos_router::use_navigate();
+                                                        let navigate = use_navigate();
                                                         navigate("/test-variations", Default::default());
                                                     }
                                                 >
@@ -811,9 +787,9 @@ pub fn TestBuilderContent() -> impl IntoView {
                                 </div>
                             </div>
                         </div>
-                    }
+                    }.into_any()
                 } else {
-                    view! { <div></div> }
+                    view! { <div></div> }.into_any()
                 }
             }}
 
@@ -972,7 +948,7 @@ pub fn TestBuilderContent() -> impl IntoView {
                                                     {test_variant().to_string()}
                                                     <span class="text-sm text-gray-500 ml-2">"(Auto-assigned)"</span>
                                                 </div>
-                                            }.into_view()
+                                            }.into_any()
                                         } else {
                                             // In create mode, show that it will be auto-assigned
                                             view! {
@@ -980,7 +956,7 @@ pub fn TestBuilderContent() -> impl IntoView {
                                                     "Will be auto-assigned"
                                                     <span class="text-sm text-gray-500 ml-2">"(Next available number)"</span>
                                                 </div>
-                                            }.into_view()
+                                            }.into_any()
                                         }
                                     }}
                                 </div>
@@ -1068,7 +1044,7 @@ pub fn TestBuilderContent() -> impl IntoView {
                                         key=|(id, _, _, _, _)| *id
                                         children=move |(id, min_score, max_score, label, color): (i32, i32, i32, String, String)| {
                                             let id_clone = id;
-                                            let (is_single_value, set_is_single_value) = create_signal(min_score == max_score);
+                                            let (is_single_value, set_is_single_value) = signal(min_score == max_score);
 
                                             view! {
                                                 <div class="flex items-center space-x-3">
@@ -1076,7 +1052,7 @@ pub fn TestBuilderContent() -> impl IntoView {
                                                     <BenchmarkColorSelector
                                                         current_color={
                                                             let id_for_color = id;
-                                                            create_memo(move |_| {
+                                                            Memo::new(move |_| {
                                                                 benchmark_categories()
                                                                     .iter()
                                                                     .find(|(cid, _, _, _, _)| *cid == id_for_color)
@@ -1166,7 +1142,7 @@ pub fn TestBuilderContent() -> impl IntoView {
                                                                             }
                                                                         />
                                                                     </div>
-                                                                }.into_view()
+                                                                }.into_any()
                                                             } else {
                                                                 // Range inputs
                                                                 view! {
@@ -1210,7 +1186,7 @@ pub fn TestBuilderContent() -> impl IntoView {
                                                                             }
                                                                         />
                                                                     </div>
-                                                                }.into_view()
+                                                                }.into_any()
                                                             }
                                                         }}
                                                     </div>
@@ -1312,7 +1288,7 @@ pub fn TestBuilderContent() -> impl IntoView {
                                                     type="button"
                                                     class="text-sm bg-blue-100 hover:bg-blue-200 text-blue-800 px-3 py-2 rounded-md transition-colors"
                                                     on:click=move |_| {
-                                                        let navigate = leptos_router::use_navigate();
+                                                        let navigate = use_navigate();
                                                         navigate("/test-variations", Default::default());
                                                     }
                                                 >
@@ -1320,9 +1296,9 @@ pub fn TestBuilderContent() -> impl IntoView {
                                                 </button>
                                             </div>
                                         </div>
-                                    }
+                                    }.into_any()
                                 } else {
-                                    view! { <div></div> }
+                                    view! { <div></div> }.into_any()
                                 }
                             }}
 
@@ -1410,9 +1386,9 @@ pub fn TestBuilderContent() -> impl IntoView {
                                                     <span class="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded whitespace-nowrap">
                                                         "New: " {points} " pts"
                                                     </span>
-                                                }.into_view()
+                                                }.into_any()
                                             } else {
-                                                view! { <div></div> }.into_view()
+                                                view! { <div></div> }.into_any()
                                             }
                                         }}
                                     </div>
@@ -1464,9 +1440,9 @@ pub fn TestBuilderContent() -> impl IntoView {
                                                     <span class="text-xs text-green-600 bg-green-50 px-2 py-1 rounded whitespace-nowrap">
                                                         "New: " {display_name}
                                                     </span>
-                                                }.into_view()
+                                                }.into_any()
                                             } else {
-                                                view! { <div></div> }.into_view()
+                                                view! { <div></div> }.into_any()
                                             }
                                         }}
                                     </div>
@@ -1557,7 +1533,7 @@ pub fn TestBuilderContent() -> impl IntoView {
                                                         on_duplicate=Some(Callback::new(duplicate_question))
                                                         should_auto_focus={
                                                             let current_question_number = question.qnumber;
-                                                            create_memo(move |_| auto_focus_question() == Some(current_question_number))
+                                                            Memo::new(move |_| auto_focus_question() == Some(current_question_number))
                                                         }
                                                         on_focus_complete=Callback::new(move |_| clear_auto_focus(question.qnumber))
                                                     />
@@ -1656,7 +1632,7 @@ pub fn TestBuilderContent() -> impl IntoView {
                                                 </svg>
                                                 "Submitting..."
                                             </>
-                                        }.into_view()
+                                        }.into_any()
                                     } else {
                                         view! {
                                             <>
@@ -1665,7 +1641,7 @@ pub fn TestBuilderContent() -> impl IntoView {
                                                 </svg>
                                                 "Submit Test & Questions"
                                             </>
-                                        }.into_view()
+                                        }.into_any()
                                     }}
                                 </button>
                             </div>

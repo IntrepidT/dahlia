@@ -1,13 +1,13 @@
-use leptos::*;
+use leptos::prelude::*;
 
 #[component]
 pub fn TestInstructions(instructions: Option<String>) -> impl IntoView {
-    let (is_expanded, set_is_expanded) = create_signal(false);
+    let (is_expanded, set_is_expanded) = signal(false);
     
     let has_instructions = instructions.as_ref().map(|i| !i.trim().is_empty()).unwrap_or(false);
     
     if !has_instructions {
-        return view! { <div></div> }.into_view();
+        return view! { <div></div> }.into_any();
     }
     
     let instructions_text = instructions.unwrap_or_default();
@@ -15,6 +15,16 @@ pub fn TestInstructions(instructions: Option<String>) -> impl IntoView {
     // Create a separate handler function
     let toggle_expanded = move |_| {
         set_is_expanded.update(|expanded| *expanded = !*expanded);
+    };
+
+    // Combined SVG class computation
+    let svg_class = move || {
+        let base = "w-4 h-4 text-blue-600 transition-transform duration-200";
+        if is_expanded() {
+            format!("{} rotate-180", base)
+        } else {
+            base.to_string()
+        }
     };
     
     view! {
@@ -36,8 +46,7 @@ pub fn TestInstructions(instructions: Option<String>) -> impl IntoView {
                                 {move || if is_expanded() { "Hide" } else { "Show" }}
                             </span>
                             <svg 
-                                class="w-4 h-4 text-blue-600 transition-transform duration-200"
-                                class:rotate-180=move || is_expanded()
+                                class=svg_class
                                 fill="none" 
                                 stroke="currentColor" 
                                 viewBox="0 0 24 24"
@@ -59,5 +68,5 @@ pub fn TestInstructions(instructions: Option<String>) -> impl IntoView {
                 </Show>
             </div>
         </div>
-    }.into_view()
+    }.into_any()
 }

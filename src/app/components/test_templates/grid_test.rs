@@ -12,8 +12,9 @@ use crate::app::server_functions::students::get_students;
 use crate::app::server_functions::{
     questions::get_questions, scores::add_score, tests::get_tests, users::get_user,
 };
-use leptos::*;
-use leptos_router::*;
+use leptos::prelude::*;
+use leptos_router::components::*;
+use leptos_router::hooks::*;
 use std::collections::HashMap;
 
 #[cfg(feature = "hydrate")]
@@ -29,25 +30,34 @@ struct QuestionResponse {
 pub fn GridTest() -> impl IntoView {
     // Get test_id from URL parameters
     let params = use_params_map();
-    let test_id = move || params.with(|params| params.get("test_id").cloned().unwrap_or_default());
+    let test_id =
+        move || params.with(|params| params.get("test_id").unwrap_or("".to_string()).to_string());
     let user = use_context::<ReadSignal<Option<SessionUser>>>().expect("AuthProvider not Found");
-    let user_resource = create_local_resource(
-        move || user.get().map(|u| u.id),
-        move |id| async move {
-            match id {
-                Some(user_id) => match get_user(user_id).await {
+
+    // Fix: Use Resource instead of LocalResource and parse string to i64
+    let user_resource = Resource::new(test_id, |tid| async move {
+        if !tid.is_empty() {
+            // Fix: Parse string to i64 for get_user function
+            match tid.parse::<i64>() {
+                Ok(id) => match get_user(id).await {
                     Ok(user) => Some(user),
                     Err(e) => {
                         log::error!("Failed to fetch user from database: {}", e);
                         None
                     }
                 },
-                None => None,
+                Err(e) => {
+                    log::error!("Invalid user ID format: {}", e);
+                    None
+                }
             }
-        },
-    );
+        } else {
+            None
+        }
+    });
+
     // Create resource to fetch test details
-    let test_details = create_resource(test_id.clone(), move |tid| async move {
+    let test_details = Resource::new(test_id, |tid| async move {
         if tid.is_empty() {
             log::warn!("No test ID provided in URL");
             return None;
@@ -62,7 +72,7 @@ pub fn GridTest() -> impl IntoView {
     });
 
     // Create resource for questions
-    let questions = create_resource(test_id, move |tid| async move {
+    let questions = Resource::new(test_id, |tid| async move {
         if tid.is_empty() {
             log::warn!("No test ID provided in URL");
             return Vec::new();
@@ -73,7 +83,7 @@ pub fn GridTest() -> impl IntoView {
                 for q in &questions {
                     if q.question_type != QuestionType::TrueFalse {
                         log::error!("GridTest requires all questions to be TrueFalse type. Found question {} with type {:?}", 
-                            q.qnumber, q.question_type);
+                                    q.qnumber, q.question_type);
                     }
                 }
                 questions
@@ -86,17 +96,17 @@ pub fn GridTest() -> impl IntoView {
     });
 
     // Store responses for each question
-    let (responses, set_responses) = create_signal(HashMap::<i32, QuestionResponse>::new());
-    let (selected_student_id, set_selected_student_id) = create_signal(None::<i32>);
+    let (responses, set_responses) = signal(HashMap::<i32, QuestionResponse>::new());
+    let (selected_student_id, set_selected_student_id) = signal(None::<i32>);
 
     // Track if test is submitted
-    let (is_submitted, set_is_submitted) = create_signal(false);
+    let (is_submitted, set_is_submitted) = signal(false);
 
     // Currently selected question for commenting
-    let (selected_question, set_selected_question) = create_signal(None::<i32>);
+    let (selected_question, set_selected_question) = signal(None::<i32>);
 
     // Get evaluator ID
-    let evaluator_id = create_memo(move |_| match user.get() {
+    let evaluator_id = Memo::new(move |_| match user.get() {
         Some(user_data) => user_data.id.to_string(),
         None => "0".to_string(),
     });
@@ -134,7 +144,7 @@ pub fn GridTest() -> impl IntoView {
     };
 
     // Submit handler
-    let handle_submit = create_action(move |_: &()| async move {
+    let handle_submit = Action::new(move |_: &()| async move {
         let current_responses = responses.get();
         let current_test_id = test_id();
 
@@ -201,7 +211,7 @@ pub fn GridTest() -> impl IntoView {
     });
 
     // Calculate square grid dimensions
-    let grid_dimensions = create_memo(move |_| {
+    let grid_dimensions = Memo::new(move |_| {
         if let Some(questions_list) = questions.get() {
             let count = questions_list.len();
             if count == 0 {
@@ -219,7 +229,7 @@ pub fn GridTest() -> impl IntoView {
     });
 
     // Calculate cell size based on question count
-    let cell_size_class = create_memo(move |_| {
+    let cell_size_class = Memo::new(move |_| {
         if let Some(questions_list) = questions.get() {
             let count = questions_list.len();
             // Determine appropriate cell size based on question count
@@ -242,7 +252,7 @@ pub fn GridTest() -> impl IntoView {
     });
 
     // Create a memo for the currently selected question's comment
-    let selected_comment = create_memo(move |_| {
+    let selected_comment = Memo::new(move |_| {
         if let Some(qnumber) = selected_question.get() {
             responses.with(|r| {
                 r.get(&qnumber)
@@ -289,15 +299,17 @@ pub fn GridTest() -> impl IntoView {
                         <div class="mt-2 h-1 w-20 bg-gradient-to-r from-indigo-400 to-purple-400 rounded-full mx-auto"></div>
                     </div>
 
-                    {/* Test Instructions */}
+                    {/* Test Instructions - Fix: Use .into_any() for type compatibility */}
                     <Suspense fallback=move || view! { <div></div> }>
                         {move || match test_details.get() {
                             Some(Some(test)) => view! {
                                 <div class="max-w-7xl mx-auto px-6 mb-6">
                                     <TestInstructions instructions=test.instructions.clone() />
                                 </div>
-                            }.into_view(),
-                            _ => view! { <div></div> }.into_view()
+                            }.into_any(),
+                            _ => view! {
+                                <div class="max-w-7xl mx-auto px-6 mb-6"></div>
+                            }.into_any()
                         }}
                     </Suspense>
                 </div>
@@ -327,7 +339,7 @@ pub fn GridTest() -> impl IntoView {
                                     </div>
                                 </div>
                             </div>
-                        }.into_view(),
+                        }.into_any(),
                         (Some(questions), _) if questions.is_empty() => {
                             view! {
                                 <div class="flex justify-center items-center min-h-[60vh]">
@@ -340,7 +352,7 @@ pub fn GridTest() -> impl IntoView {
                                         </div>
                                     </div>
                                 </div>
-                            }.into_view()
+                            }.into_any()
                         },
                         (Some(questions), _) => {
                             // Check if all questions are TrueFalse type
@@ -360,12 +372,12 @@ pub fn GridTest() -> impl IntoView {
                                             </div>
                                         </div>
                                     </div>
-                                }.into_view()
+                                }.into_any()
                             } else {
                                 let (rows, cols) = grid_dimensions();
                                 let questions_clone = questions.clone();
                                 let questions_count = questions.len();
-                                let sorted_questions = create_memo(move |_| {
+                                let sorted_questions = Memo::new(move |_| {
                                     let mut sorted = questions_clone.clone();
                                     sorted.sort_by_key(|q| q.qnumber);
                                     sorted
@@ -399,7 +411,7 @@ pub fn GridTest() -> impl IntoView {
                                                                 let qnumber = question.qnumber;
                                                                 let display_text = question.word_problem.clone();
 
-                                                                let is_correct = create_memo(move |_| {
+                                                                let is_correct = Memo::new(move |_| {
                                                                     responses.with(|r| {
                                                                         r.get(&qnumber)
                                                                          .map(|resp| resp.answer == "true")
@@ -407,11 +419,11 @@ pub fn GridTest() -> impl IntoView {
                                                                     })
                                                                 });
 
-                                                                let is_selected = create_memo(move |_| {
+                                                                let is_selected = Memo::new(move |_| {
                                                                     selected_question.get() == Some(qnumber)
                                                                 });
 
-                                                                let has_comment = create_memo(move |_| {
+                                                                let has_comment = Memo::new(move |_| {
                                                                     responses.with(|r| {
                                                                         r.get(&qnumber)
                                                                          .map(|resp| !resp.comment.is_empty())
@@ -419,37 +431,74 @@ pub fn GridTest() -> impl IntoView {
                                                                     })
                                                                 });
 
+                                                                // Combined class computation for grid cell
+                                                                let grid_cell_class = move || {
+                                                                    let mut classes = vec![
+                                                                        "relative flex items-center justify-center cursor-pointer transition-all duration-200 rounded-lg min-h-[50px] group hover:shadow-md border-2"
+                                                                    ];
+
+                                                                    // Background and gradient classes
+                                                                    if is_correct() {
+                                                                        classes.extend(&[
+                                                                            "bg-gradient-to-br",
+                                                                            "from-emerald-50",
+                                                                            "to-green-100",
+                                                                            "border-green-300"
+                                                                        ]);
+                                                                    } else {
+                                                                        classes.extend(&[
+                                                                            "bg-red-300",
+                                                                            "border-red-400"
+                                                                        ]);
+                                                                    }
+
+                                                                    // Selection state classes
+                                                                    if is_selected() {
+                                                                        classes.extend(&[
+                                                                            "ring-3",
+                                                                            "ring-indigo-400",
+                                                                            "shadow-lg",
+                                                                            "scale-105"
+                                                                        ]);
+                                                                    }
+
+                                                                    classes.join(" ")
+                                                                };
+
+                                                                // Combined class computation for span text
+                                                                let span_text_class = move || {
+                                                                    let base_class = format!(
+                                                                        "select-none font-bold px-2 py-2 text-center {} group-hover:scale-110 transition-transform",
+                                                                        current_cell_size
+                                                                    );
+
+                                                                    if is_correct() {
+                                                                        format!("{} text-gray-700", base_class)
+                                                                    } else {
+                                                                        format!("{} text-white", base_class)
+                                                                    }
+                                                                };
+
                                                                 view! {
                                                                     <div
-                                                                        class="relative flex items-center justify-center cursor-pointer transition-all duration-200 rounded-lg min-h-[50px] group hover:shadow-md border-2"
-                                                                        class:bg-gradient-to-br=move || is_correct()
-                                                                        class:from-emerald-50=move || is_correct()
-                                                                        class:to-green-100=move || is_correct()
-                                                                        class:ring-3=move || is_selected()
-                                                                        class:ring-indigo-400=move || is_selected()
-                                                                        class:shadow-lg=move || is_selected()
-                                                                        class:scale-105=move || is_selected()
-                                                                        class:border-green-300=move || is_correct()
-                                                                        class:border-red-400=move || !is_correct()
-                                                                        class:bg-red-300=move || !is_correct()
+                                                                        class=grid_cell_class
                                                                         on:click=move |_| toggle_answer(qnumber)
                                                                     >
-                                                                        <span class=format!("select-none font-bold text-gray-700 px-2 py-2 text-center {} group-hover:scale-110 transition-transform", current_cell_size)
-                                                                    //class:text-white=move || !is_correct()
-                                                                    class:text-gray-700=move || is_correct()
-                                                                    >
+                                                                        <span class=span_text_class>
                                                                             {display_text}
                                                                         </span>
 
-                                                                        {/* Comment indicator */}
+                                                                        {/* Comment indicator - Fix: Use .into_any() for type compatibility */}
                                                                         {move || if has_comment() {
                                                                             view! {
                                                                                 <div class="absolute -bottom-1 -right-1 w-4 h-4 bg-gradient-to-br from-blue-500 to-indigo-600 text-white rounded-full flex items-center justify-center shadow-sm">
                                                                                     <span class="text-xs">"💬"</span>
                                                                                 </div>
-                                                                            }.into_view()
+                                                                            }.into_any()
                                                                         } else {
-                                                                            view! { <div></div> }.into_view()
+                                                                            view! {
+                                                                                <div class="absolute -bottom-1 -right-1 w-4 h-4"></div>
+                                                                            }.into_any()
                                                                         }}
                                                                     </div>
                                                                 }
@@ -503,7 +552,7 @@ pub fn GridTest() -> impl IntoView {
                                                                     ></textarea>
                                                                 </div>
                                                             </div>
-                                                        }.into_view()
+                                                        }.into_any()
                                                     },
                                                     None => view! {
                                                         <div class="text-center py-8">
@@ -514,7 +563,7 @@ pub fn GridTest() -> impl IntoView {
                                                                 "Click any grid cell to select it and add comments"
                                                             </p>
                                                         </div>
-                                                    }.into_view()
+                                                    }.into_any()
                                                 }}
                                             </div>
 
@@ -540,17 +589,20 @@ pub fn GridTest() -> impl IntoView {
                                                                 <span class="text-lg">"✓"</span>
                                                             </button>
 
+                                                            {/* Fix: Use .into_any() for type compatibility */}
                                                             {move || if selected_student_id.get().is_none() {
                                                                 view! {
                                                                     <p class="text-xs text-amber-600 text-center bg-amber-50 px-3 py-2 rounded-lg border border-amber-200">
                                                                         "Please select a student before submitting"
                                                                     </p>
-                                                                }.into_view()
+                                                                }.into_any()
                                                             } else {
-                                                                view! { <div></div> }.into_view()
+                                                                view! {
+                                                                    <p class="text-xs text-center"></p>
+                                                                }.into_any()
                                                             }}
                                                         </div>
-                                                    }.into_view()
+                                                    }.into_any()
                                                 } else {
                                                     view! {
                                                         <div class="text-center space-y-4">
@@ -570,7 +622,7 @@ pub fn GridTest() -> impl IntoView {
                                                             <button
                                                                 class="w-full flex items-center justify-center gap-3 px-6 py-4 bg-gradient-to-r from-gray-700 to-gray-800 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 active:scale-95"
                                                                 on:click=move |_| {
-                                                                    let navigate=leptos_router::use_navigate();
+                                                                    let navigate= use_navigate();
                                                                     navigate("/dashboard", Default::default());
                                                                 }
                                                             >
@@ -578,12 +630,12 @@ pub fn GridTest() -> impl IntoView {
                                                                 <span class="font-semibold">"Return to Dashboard"</span>
                                                             </button>
                                                         </div>
-                                                    }.into_view()
+                                                    }.into_any()
                                                 }}
                                             </div>
                                         </div>
                                     </div>
-                                }.into_view()
+                                }.into_any()
                             }
                         }
                     }}
@@ -604,7 +656,7 @@ pub fn StudentSelect(set_selected_student_id: WriteSignal<Option<i32>>) -> impl 
     let (student_mapping_service, _) = use_student_mapping_service();
 
     // Fetch students from server
-    let get_students_action = create_action(|_: &()| async move {
+    let get_students_action = Action::new(|_: &()| async move {
         match get_students().await {
             Ok(fetched_students) => fetched_students,
             Err(e) => {
@@ -615,7 +667,7 @@ pub fn StudentSelect(set_selected_student_id: WriteSignal<Option<i32>>) -> impl 
     });
 
     // Create enhanced student data with de-anonymization info
-    let enhanced_students = create_memo(move |_| {
+    let enhanced_students = Memo::new(move |_| {
         let students_data = get_students_action
             .value()
             .get()
@@ -644,7 +696,7 @@ pub fn StudentSelect(set_selected_student_id: WriteSignal<Option<i32>>) -> impl 
     });
 
     // Dispatch action only once on component mount
-    create_effect(move |_| {
+    Effect::new(move |_| {
         get_students_action.dispatch(());
     });
 

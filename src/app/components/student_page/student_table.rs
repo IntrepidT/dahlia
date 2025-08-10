@@ -4,8 +4,9 @@ use crate::app::components::enhanced_login_form::{
 use crate::app::middleware::global_settings::use_settings;
 use crate::app::models::student::ESLEnum;
 use crate::app::models::student::Student;
-use leptos::*;
-use std::rc::Rc;
+use leptos::prelude::*;
+use leptos::prelude::*;
+use std::sync::Arc;
 
 // Base colors
 const COLOR_PRIMARY: &str = "#2E3A59"; // Navy blue
@@ -36,7 +37,7 @@ const SELECTED_ROW_STYLE: &str =
 
 #[component]
 pub fn StudentTable(
-    #[prop(into)] students: Resource<i32, Option<Vec<Student>>>,
+    #[prop(into)] students: Resource<Option<Vec<Student>>>,
     #[prop(into)] search_term: Signal<String>,
     #[prop(into)] grade_filter: Signal<String>,
     #[prop(into)] teacher_filter: Signal<String>,
@@ -48,8 +49,8 @@ pub fn StudentTable(
     #[prop(into)] gt_filter: Signal<bool>,
     #[prop(into)] bip_filter: Signal<bool>,
     #[prop(into)] is_panel_expanded: Signal<bool>,
-    #[prop(into)] selected_student: Signal<Option<Rc<Student>>>,
-    #[prop(into)] set_selected_student: WriteSignal<Option<Rc<Student>>>,
+    #[prop(into)] selected_student: Signal<Option<Arc<Student>>>,
+    #[prop(into)] set_selected_student: WriteSignal<Option<Arc<Student>>>,
 ) -> impl IntoView {
     //get settings
     let (settings, _) = use_settings();
@@ -59,7 +60,7 @@ pub fn StudentTable(
     let (mapping_service, _) = use_student_mapping_service();
 
     // Create enhanced student data with de-anonymization info
-    let enhanced_students = create_memo(move |_| {
+    let enhanced_students = Memo::new(move |_| {
         let students_data = students.get().unwrap_or(None).unwrap_or_default();
 
         if anonymization_enabled() {
@@ -81,7 +82,7 @@ pub fn StudentTable(
         }
     });
 
-    let filtered_students = create_memo(move |_| {
+    let filtered_students = Memo::new(move |_| {
         let search = search_term().trim().to_lowercase();
         let current_grade_level = grade_filter();
         let teacher = teacher_filter();
@@ -223,11 +224,11 @@ pub fn StudentTable(
                                                 "No students match your search criteria"
                                             </td>
                                         </tr>
-                                    }.into_view()
+                                    }.into_any()
                                 } else {
                                     students.into_iter().map(|(student, de_anon_opt)| {
-                                        let student_rc = Rc::new(student.clone());
-                                        let student_cmp = Rc::new(student.clone());
+                                        let student_rc = Arc::new(student.clone());
+                                        let student_cmp = Arc::new(student.clone());
                                         let is_selected = move || selected_student() == Some(student_cmp.clone());
 
                                         // Determine display values based on anonymization status
@@ -261,8 +262,8 @@ pub fn StudentTable(
                                                 <td class=format!("{} {}", CELL_STYLE, "font-medium text-[#2E3A59]")>{display_first}</td>
                                                 <td class=format!("{} {}", CELL_STYLE, "font-medium text-[#2E3A59]")>{display_last}</td>
                                                 <td class=format!("{} {}", CELL_STYLE, "text-[#2E3A59] text-opacity-70")>{display_id}</td>
-                                                <td class=format!("{} {}", CELL_STYLE, "text-[#2E3A59] text-opacity-70")>{&student.current_grade_level.to_string()}</td>
-                                                <td class=format!("{} {}", CELL_STYLE, "text-[#2E3A59] text-opacity-70")>{&student.teacher.to_string()}</td>
+                                                <td class=format!("{} {}", CELL_STYLE, "text-[#2E3A59] text-opacity-70")>{student.current_grade_level.clone().to_string()}</td>
+                                                <td class=format!("{} {}", CELL_STYLE, "text-[#2E3A59] text-opacity-70")>{student.teacher.clone().to_string()}</td>
 
                                                 // IEP Column
                                                 <td class=CELL_STYLE>
@@ -271,13 +272,13 @@ pub fn StudentTable(
                                                             <span class="px-2 py-1 text-sm font-medium rounded-full bg-[#4CAF50] bg-opacity-40 text-[#2E3A59]">
                                                                 "IEP"
                                                             </span>
-                                                        }
+                                                        }.into_any()
                                                     } else {
                                                         view! {
                                                             <span class="px-2 py-1 text-sm font-medium rounded-full bg-opacity-40 text-[#2E3A59]">
                                                                 "-"
                                                             </span>
-                                                        }
+                                                        }.into_any()
                                                     }}
                                                 </td>
 
@@ -288,13 +289,13 @@ pub fn StudentTable(
                                                             <span class="px-2 py-1 text-sm font-medium rounded-full bg-[#4CAF50] bg-opacity-40 text-[#2E3A59]">
                                                                 {student.esl.to_string()}
                                                             </span>
-                                                        }
+                                                        }.into_any()
                                                     } else {
                                                         view! {
                                                             <span class="px-2 py-1 text-sm font-medium rounded-full  bg-opacity-40 text-[#2E3A59]">
                                                                 "-"
                                                             </span>
-                                                        }
+                                                        }.into_any()
                                                     }}
                                                 </td>
 
@@ -305,13 +306,13 @@ pub fn StudentTable(
                                                             <span class="px-2 py-1 text-sm font-medium rounded-full bg-[#4CAF50] bg-opacity-40 text-[#2E3A59]">
                                                                 {intervention.to_string()}
                                                             </span>
-                                                        }
+                                                        }.into_any()
                                                     } else {
                                                         view! {
                                                             <span class="px-2 py-1 text-sm font-medium rounded-full bg-opacity-40 text-[#2E3A59]">
                                                                 "-"
                                                             </span>
-                                                        }
+                                                        }.into_any()
                                                     }}
                                                 </td>
 
@@ -322,13 +323,13 @@ pub fn StudentTable(
                                                             <span class="px-2 py-1 text-sm font-medium rounded-full bg-[#4CAF50] bg-opacity-40 text-[#2E3A59]">
                                                                 "504"
                                                             </span>
-                                                        }
+                                                        }.into_any()
                                                     } else {
                                                         view! {
                                                             <span class="px-2 py-1 text-sm font-medium rounded-full bg-opacity-40 text-[#2E3A59]">
                                                                 "-"
                                                             </span>
-                                                        }
+                                                        }.into_any()
                                                     }}
                                                 </td>
 
@@ -339,13 +340,13 @@ pub fn StudentTable(
                                                             <span class="px-2 py-1 text-sm font-medium rounded-full bg-[#4CAF50] bg-opacity-40 text-[#2E3A59]">
                                                                 "Read Plan"
                                                             </span>
-                                                        }
+                                                        }.into_any()
                                                     } else {
                                                         view! {
                                                             <span class="px-2 py-1 text-sm font-medium rounded-full bg-opacity-40 text-[#2E3A59]">
                                                                 "-"
                                                             </span>
-                                                        }
+                                                        }.into_any()
                                                     }}
                                                 </td>
 
@@ -356,13 +357,13 @@ pub fn StudentTable(
                                                             <span class="px-2 py-1 text-sm font-medium rounded-full bg-[#4CAF50] bg-opacity-40 text-[#2E3A59]">
                                                                 "GT"
                                                             </span>
-                                                        }
+                                                        }.into_any()
                                                     } else {
                                                         view! {
                                                             <span class="px-2 py-1 text-sm font-medium rounded-full bg-opacity-40 text-[#2E3A59]">
                                                                 "-"
                                                             </span>
-                                                        }
+                                                        }.into_any()
                                                     }}
                                                 </td>
 
@@ -373,18 +374,18 @@ pub fn StudentTable(
                                                             <span class="px-2 py-1 text-sm font-medium rounded-full bg-[#4CAF50] bg-opacity-40 text-[#2E3A59]">
                                                                 "BEH"
                                                             </span>
-                                                      }
+                                                      }.into_any()
                                                     } else {
                                                         view! {
                                                             <span class="px-2 py-1 text-sm font-medium rounded-full bg-opacity-40 text-[#2E3A59]">
                                                                 "-"
                                                             </span>
-                                                        }
+                                                        }.into_any()
                                                     }}
                                                 </td>
                                             </tr>
                                         }
-                                    }).collect_view()
+                                    }).collect_view().into_any()
                                 }
                             }}
                         </tbody>

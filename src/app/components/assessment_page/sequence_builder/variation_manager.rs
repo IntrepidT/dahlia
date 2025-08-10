@@ -1,12 +1,12 @@
 use crate::app::components::assessment_page::shared::types::is_variation_test;
 use crate::app::models::assessment_sequences::{TestSequenceItem, VariationLevel};
 use crate::app::models::test::Test;
-use leptos::*;
+use leptos::prelude::*;
 use uuid::Uuid;
 
 #[component]
 pub fn VariationManager(
-    tests_resource: Resource<(), Result<Vec<Test>, ServerFnError>>,
+    tests_resource: Resource<Result<Vec<Test>, ServerFnError>>,
     current_sequence: Signal<Vec<TestSequenceItem>>,
     variations: ReadSignal<Vec<VariationLevel>>,
     set_variations: WriteSignal<Vec<VariationLevel>>,
@@ -17,11 +17,11 @@ pub fn VariationManager(
 
     // Form fields for adding/editing variations
     let (var_test_id, set_var_test_id) = create_signal::<Option<Uuid>>(None);
-    let (var_level, set_var_level) = create_signal(1);
-    let (var_description, set_var_description) = create_signal(String::new());
-    let (var_required_score, set_var_required_score) = create_signal(60);
-    let (var_max_attempts, set_var_max_attempts) = create_signal(2);
-    let (use_same_test, set_use_same_test) = create_signal(true);
+    let (var_level, set_var_level) = signal(1);
+    let (var_description, set_var_description) = signal(String::new());
+    let (var_required_score, set_var_required_score) = signal(60);
+    let (var_max_attempts, set_var_max_attempts) = signal(2);
+    let (use_same_test, set_use_same_test) = signal(true);
 
     // Get available variation tests
     let get_available_variation_tests = move || -> Vec<Test> {
@@ -312,10 +312,10 @@ pub fn VariationManager(
 #[component]
 fn VariationStackDisplay(
     variations: ReadSignal<Vec<VariationLevel>>,
-    tests_resource: Resource<(), Result<Vec<Test>, ServerFnError>>,
+    tests_resource: Resource<Result<Vec<Test>, ServerFnError>>,
     main_test_id: Option<Uuid>,
-    on_edit: impl Fn(usize) + 'static + Copy,
-    on_remove: impl Fn(usize) + 'static + Copy,
+    on_edit: impl Fn(usize) + 'static + Copy + Send,
+    on_remove: impl Fn(usize) + 'static + Copy + Send,
 ) -> impl IntoView {
     view! {
         <div class="mb-4">
@@ -330,7 +330,7 @@ fn VariationStackDisplay(
                                     <div class="text-xs">"No variations added yet"</div>
                                     <div class="text-xs text-gray-400">"Add up to 3 levels below"</div>
                                 </div>
-                            }.into_view()
+                            }.into_any()
                         } else {
                             let all_tests = tests_resource.get().map(|r| r.ok()).flatten().unwrap_or_default();
 
@@ -402,9 +402,9 @@ fn VariationStackDisplay(
                                                             <path d="M8 18l-4-4h3V2h2v12h3l-4 4z"/>
                                                         </svg>
                                                     </div>
-                                                }.into_view()
+                                                }.into_any()
                                             } else {
-                                                view! {}.into_view()
+                                                view! {}.into_any()
                                             }}
                                         }
                                     }).collect_view()}
@@ -414,12 +414,12 @@ fn VariationStackDisplay(
                                             <div class="mt-2 px-3 py-1 bg-gray-100 rounded-full">
                                                 <div class="text-xs text-gray-600">"Teacher Intervention"</div>
                                             </div>
-                                        }.into_view()
+                                        }.into_any()
                                     } else {
-                                        view! {}.into_view()
+                                        view! {}.into_any()
                                     }}
                                 </div>
-                            }.into_view()
+                            }.into_any()
                         }
                     })
                 }}

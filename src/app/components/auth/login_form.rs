@@ -1,8 +1,9 @@
 use crate::app::components::authorization_components::perform_post_login_redirect;
 use crate::app::models::user::SessionUser;
 use crate::app::server_functions::auth::{get_current_user, login, logout, register};
-use leptos::*;
-use leptos_router::use_navigate;
+use leptos::prelude::*;
+use leptos::prelude::*;
+use leptos_router::hooks::use_navigate;
 use log::{debug, error, log};
 use serde::Serialize;
 #[cfg(feature = "ssr")]
@@ -13,12 +14,12 @@ use {
 
 #[component]
 pub fn LoginForm() -> impl IntoView {
-    let (username, set_username) = create_signal("".to_string());
-    let (password, set_password) = create_signal("".to_string());
-    let (error, set_error) = create_signal::<Option<String>>(None);
-    let set_current_user = use_context::<WriteSignal<Option<SessionUser>>>().unwrap();
+    let (username, set_username) = signal("".to_string());
+    let (password, set_password) = signal("".to_string());
+    let (error, set_error) = signal::<Option<String>>(None);
+    let set_current_user = expect_context::<WriteSignal<Option<SessionUser>>>();
 
-    let handle_submit = create_action(move |_: &()| {
+    let handle_submit = Action::new(move |_: &()| {
         let username = username.get();
         let password = password.get();
 
@@ -30,12 +31,12 @@ pub fn LoginForm() -> impl IntoView {
             }
 
             // Debug log
-            logging::log!("Attempting login with username: {}", username);
+            log::info!("Attempting login with username: {}", username);
 
             match login(username, password).await {
                 Ok(response) => {
                     // Debug log the response
-                    logging::log!(
+                    log::info!(
                         "Login response: success={}, message={}, user={:?}",
                         response.success,
                         response.message,
@@ -43,19 +44,19 @@ pub fn LoginForm() -> impl IntoView {
                     );
 
                     if response.success {
-                        logging::log!("Login successful, setting user");
+                        log::info!("Login successful, setting user");
                         set_current_user.set(response.user);
                         set_error.set(None);
 
                         // Use the simple redirect function
                         perform_post_login_redirect();
                     } else {
-                        logging::log!("Login failed: {}", response.message);
+                        log::info!("Login failed: {}", response.message);
                         set_error.set(Some(response.message));
                     }
                 }
                 Err(err) => {
-                    logging::log!("Login error: {:?}", err);
+                    log::info!("Login error: {:?}", err);
                     set_error.set(Some(
                         "Login failed. Please check your credentials and try again.".to_string(),
                     ));
@@ -126,14 +127,14 @@ pub fn LoginForm() -> impl IntoView {
 
 #[component]
 pub fn RegisterForm() -> impl IntoView {
-    let (username, set_username) = create_signal("".to_string());
-    let (email, set_email) = create_signal("".to_string());
-    let (password, set_password) = create_signal("".to_string());
-    let (confirm_password, set_confirm_password) = create_signal("".to_string());
+    let (username, set_username) = signal("".to_string());
+    let (email, set_email) = signal("".to_string());
+    let (password, set_password) = signal("".to_string());
+    let (confirm_password, set_confirm_password) = signal("".to_string());
     let (error, set_error) = create_signal::<Option<String>>(None);
-    let set_current_user = use_context::<WriteSignal<Option<SessionUser>>>().unwrap();
+    let set_current_user = expect_context::<WriteSignal<Option<SessionUser>>>();
 
-    let handle_submit = create_action(move |_: &()| {
+    let handle_submit = Action::new(move |_: &()| {
         let username = username.get();
         let email = email.get();
         let password = password.get();
@@ -254,9 +255,9 @@ pub fn RegisterForm() -> impl IntoView {
 
 #[component]
 pub fn LogoutButton() -> impl IntoView {
-    let set_current_user = use_context::<WriteSignal<Option<SessionUser>>>().unwrap();
+    let set_current_user = expect_context::<WriteSignal<Option<SessionUser>>>();
 
-    let handle_logout = create_action(move |_: &()| {
+    let handle_logout = Action::new(move |_: &()| {
         async move {
             match logout().await {
                 Ok(_) => {

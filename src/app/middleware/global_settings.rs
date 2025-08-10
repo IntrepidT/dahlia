@@ -1,24 +1,25 @@
 use crate::app::models::global::SettingsCache;
 use crate::app::server_functions::globals::get_global_settings;
-use leptos::*;
+use leptos::prelude::*;
+use leptos::task::spawn_local;
 
 #[component]
-pub fn SettingsProvider(children: Children) -> impl IntoView {
-    let (settings, set_settings) = create_signal(SettingsCache::default());
-    let (loading, set_loading) = create_signal(true);
+pub fn SettingsProvider(children: ChildrenFn) -> impl IntoView {
+    let (settings, set_settings) = signal(SettingsCache::default());
+    let (loading, set_loading) = signal(true);
 
     // Load settings on mount
-    create_effect(move |_| {
+    Effect::new(move |_| {
         set_loading.set(true);
 
         spawn_local(async move {
             match get_global_settings().await {
                 Ok(settings_data) => {
-                    logging::log!("Settings loaded: {:?}", settings_data);
+                    log::info!("Settings loaded: {:?}", settings_data);
                     set_settings.set(settings_data);
                 }
                 Err(err) => {
-                    logging::log!("Error loading settings: {:?}", err);
+                    log::info!("Error loading settings: {:?}", err);
                     // Keep default settings on error
                 }
             }
@@ -37,23 +38,19 @@ pub fn SettingsProvider(children: Children) -> impl IntoView {
 #[component]
 pub fn ConditionalRender(
     #[prop(default = false)] student_protections_required: bool,
-    children: Children,
-    #[prop(optional)] fallback: Option<Children>,
+    children: ChildrenFn,
+    #[prop(optional)] fallback: Option<ChildrenFn>,
 ) -> impl IntoView {
     let (settings, _) = use_settings();
     let loading = use_settings_loading();
 
     view! {
-        {
-            let children_view = children();
-            move || {
-                if loading.get() {
-                    view! { <div>"Loading settings..."</div> }
-                } else {
-                    view! { <div>{children_view.clone()}</div> }
-                }
-            }
-        }
+        <Show
+            when=move || !loading.get()
+            fallback=move || view! { <div>"Loading settings..."</div> }
+        >
+            {children()}
+        </Show>
     }
 }
 
@@ -98,39 +95,40 @@ pub fn use_student_protections() -> bool {
     match try_use_settings() {
         Some((settings, _)) => settings.get().student_protections,
         None => {
-            logging::log!(
-                "Settings context not available, defaulting student_protections to false"
-            );
+            log::info!("Settings context not available, defaulting student_protections to false");
             false
         }
     }
 }
 
-// Component wrapper that ensures settings are loaded
+// Component wrapper that ensures settings are loaded - FIXED
 #[component]
-pub fn WithSettings<F>(children: F) -> impl IntoView
-where
-    F: Fn() -> View + 'static,
-{
+pub fn WithSettings(children: ChildrenFn) -> impl IntoView {
     let loading = use_context::<ReadSignal<bool>>();
     let settings_context = try_use_settings();
 
     view! {
-        {move || {
-            match (loading, settings_context) {
-                (Some(loading), Some(_)) if !loading.get() => {
-                    // Settings are loaded and ready
-                    children()
-                }
-                (Some(_), Some(_)) => {
-                    // Settings context exists but still loading
-                    view! { <div class="text-gray-400">"Loading settings..."</div> }.into_view()
-                }
-                _ => {
-                    // Settings context not available
-                    view! { <div class="text-red-400">"Settings not available"</div> }.into_view()
+        <Show
+            when=move || {
+                match (loading, settings_context) {
+                    (Some(loading), Some(_)) if !loading.get() => true,
+                    _ => false,
                 }
             }
-        }}
+            fallback=move || {
+                match (loading, settings_context) {
+                    (Some(_), Some(_)) => {
+                        // Settings context exists but still loading
+                        view! { <div class="text-gray-400">"Loading settings..."</div> }.into_any()
+                    }
+                    _ => {
+                        // Settings context not available
+                        view! { <div class="text-red-400">"Settings not available"</div> }.into_any()
+                    }
+                }
+            }
+        >
+            {children()}
+        </Show>
     }
 }

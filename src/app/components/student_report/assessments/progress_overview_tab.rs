@@ -2,12 +2,13 @@ use crate::app::components::data_processing::{AssessmentSummary, Progress};
 use crate::app::components::student_report::assessments::assessment_card::AssessmentCard;
 use crate::app::components::student_report::assessments::expanded_test_list::ExpandedTestList;
 use crate::app::models::test::Test;
-use leptos::*;
+use leptos::prelude::*;
+use leptos::prelude::*;
 
 #[component]
 pub fn ProgressOverviewTab(
     assessments: Vec<AssessmentSummary>,
-    tests_resource: Resource<(), Option<Vec<Test>>>,
+    tests_resource: Resource<Option<Vec<Test>>>,
 ) -> impl IntoView {
     // State for expanded assessment
     let (expanded_assessment, set_expanded_assessment) = create_signal::<Option<String>>(None);
@@ -31,7 +32,7 @@ pub fn ProgressOverviewTab(
     let assessments_for_subjects = assessments.clone();
 
     // Filter and sort assessments
-    let filtered_and_sorted_assessments = create_memo(move |_| {
+    let filtered_and_sorted_assessments = Memo::new(move |_| {
         let mut filtered_assessments = assessments_clone.clone();
 
         // Apply progress filter
@@ -83,7 +84,7 @@ pub fn ProgressOverviewTab(
     });
 
     // Get unique subjects for filter dropdown
-    let unique_subjects = create_memo(move |_| {
+    let unique_subjects = Memo::new(move |_| {
         let mut subjects: Vec<String> = assessments_for_subjects
             .iter()
             .map(|assessment| assessment.subject.clone())
@@ -95,7 +96,7 @@ pub fn ProgressOverviewTab(
     });
 
     // Calculate summary statistics
-    let summary_stats = create_memo(move |_| {
+    let summary_stats = Memo::new(move |_| {
         let filtered = filtered_and_sorted_assessments.get();
         let total_assessments = filtered.len();
         let completed = filtered
@@ -249,7 +250,7 @@ pub fn ProgressOverviewTab(
                             <option value="">"All Subjects"</option>
                             {move || unique_subjects.get().into_iter().map(|subject| {
                                 view! {
-                                    <option value={subject.clone()}>{subject}</option>
+                                    <option value={subject.clone()}>{subject.clone()}</option>
                                 }
                             }).collect::<Vec<_>>()}
                         </select>
@@ -302,7 +303,7 @@ pub fn ProgressOverviewTab(
                                 <h3 class="text-lg font-medium text-gray-900 mb-1">"No assessments found"</h3>
                                 <p class="text-gray-500">"Try adjusting your filters or check back later for new assessments."</p>
                             </div>
-                        }
+                        }.into_any()
                     } else {
                         view! {
                             <div class="space-y-6">
@@ -330,16 +331,16 @@ pub fn ProgressOverviewTab(
                                                                 show_detailed_test_info=true
                                                             />
                                                         </div>
-                                                    }
+                                                    }.into_any()
                                                 } else {
-                                                    view! { <div></div> }
+                                                    view! { <div></div> }.into_any()
                                                 }
                                             }}
                                         </div>
                                     }
                                 }).collect::<Vec<_>>()}
                             </div>
-                        }
+                        }.into_any()
                     }
                 }}
             </div>

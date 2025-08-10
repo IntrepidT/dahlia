@@ -1,7 +1,9 @@
+use leptos::prelude::*;
 use log::*;
 use crate::app::components::{Toast, ToastMessage, ToastMessageType};
-use leptos::*;
-use leptos_router::*;
+use leptos::prelude::*;
+use leptos_router::components::*;
+use leptos_router::hooks::*;
 use std::rc::Rc;
 
 const MODAL_STYLE: &str = 
@@ -46,14 +48,14 @@ pub fn ShowAdministerTestModal(set_if_show_modal: WriteSignal<bool>) -> impl Int
             </div>
             
             <div class="grid grid-cols-2 gap-4">
-                <A href="/mathtesting" class=CARD_STYLE on:click=close_modal>
+                <A href="/mathtesting" attr:class=CARD_STYLE on:click=close_modal>
                     <div class=ICON_STYLE>
                         <img src="/assets/calculator.png" class="h-6 w-6" />
                     </div>
                     <span class=BUTTON_TEXT_STYLE>Math</span>
                 </A>
                 
-                <A href="/readingtesting" class=CARD_STYLE on:click=close_modal>
+                <A href="/readingtesting" attr:class=CARD_STYLE on:click=close_modal>
                     <div class=ICON_STYLE>
                         <img src="/assets/reading.png" class="h-6 w-6" />
                     </div>

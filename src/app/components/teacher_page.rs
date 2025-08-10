@@ -1,3 +1,4 @@
+use leptos::prelude::*;
 pub mod add_employee_form;
 pub mod delete_confirmation;
 pub mod employee_details;

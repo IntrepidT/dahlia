@@ -1,3 +1,4 @@
+use leptos::prelude::*;
 pub mod add_student_form;
 pub mod bulk_upload_modal;
 pub mod delete_student_confirmation;

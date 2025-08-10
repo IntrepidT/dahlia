@@ -1,16 +1,14 @@
 use crate::app::components::assessment_page::shared::types::get_behavior_display_props;
-use crate::app::models::assessment_sequences::{TestSequenceItem, SequenceBehavior};
+use crate::app::models::assessment_sequences::{SequenceBehavior, TestSequenceItem};
 use crate::app::models::test::Test;
-use leptos::*;
+use leptos::prelude::*;
+use leptos::prelude::*;
 use uuid::Uuid;
 
 #[component]
-pub fn SequenceVisualization(
-    sequence: Vec<TestSequenceItem>,
-    tests: Vec<Test>,
-) -> impl IntoView {
-    let sequence = create_signal(sequence).0;
-    let tests = create_signal(tests).0;
+pub fn SequenceVisualization(sequence: Vec<TestSequenceItem>, tests: Vec<Test>) -> impl IntoView {
+    let sequence = signal(sequence).0;
+    let tests = signal(tests).0;
 
     view! {
         <div class="relative">
@@ -28,8 +26,8 @@ pub fn SequenceVisualization(
 
                         view! {
                             <div class="flex items-center">
-                                <div class=format!("relative p-3 rounded-lg border-2 {} {} min-w-32", 
-                                    get_bg_class(&item.sequence_behavior), 
+                                <div class=format!("relative p-3 rounded-lg border-2 {} {} min-w-32",
+                                    get_bg_class(&item.sequence_behavior),
                                     get_border_class(&item.sequence_behavior))>
                                     <div class="flex items-center space-x-2">
                                         <span class="text-lg">{icon}</span>
@@ -55,9 +53,9 @@ pub fn SequenceVisualization(
                                                 <path d="M16 8l-4-4v3H0v2h12v3l4-4z"/>
                                             </svg>
                                         </div>
-                                    }.into_view()
+                                    }.into_any()
                                 } else {
-                                    view! { <div></div> }.into_view()
+                                    view! { <div></div> }.into_any()
                                 }}
                             </div>
                         }
@@ -89,4 +87,3 @@ fn get_border_class(behavior: &SequenceBehavior) -> &'static str {
         SequenceBehavior::Branching => "border-yellow-200",
     }
 }
-

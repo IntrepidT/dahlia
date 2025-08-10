@@ -1,18 +1,19 @@
+use leptos::prelude::*;
 // QR Code component for easy mobile access
-use leptos::*;
-use uuid::Uuid;
+use leptos::prelude::*;
+use uuid=:Uuid;
 
 #[component]
 pub fn TestShareModal(
     #[prop(into)] show: Signal<bool>,
-    #[prop(into)] test_id: Signal<String>,
-    #[prop(into)] room_id: Signal<Option<Uuid>>,
+    #[prop(into)] test_id= Signal<String>,
+    #[prop(into)] room_id= Signal<Option<Uuid>>,
     #[prop(into)] on_close: Callback<()>,
 ) -> impl IntoView {
-    let (copied_link, set_copied_link) = create_signal(false);
-    let (show_qr, set_show_qr) = create_signal(false);
+    let (copied_link, set_copied_link) = signal(false);
+    let (show_qr, set_show_qr) = signal(false);
 
-    let student_link = create_memo(move |_| {
+    let student_link = Memo::new(move |_| {
         if let (Some(room), tid) = (room_id.get(), test_id.get()) {
             if !tid.is_empty() {
                 let origin = web_sys::window()
@@ -25,7 +26,7 @@ pub fn TestShareModal(
     });
 
     // Generate QR code URL (using qr-server.com API)
-    let qr_code_url = create_memo(move |_| {
+    let qr_code_url = Memo::new(move |_| {
         let link = student_link.get();
         if !link.is_empty() {
             format!(
@@ -78,18 +79,18 @@ pub fn TestShareModal(
                         <div class="flex border-b">
                             <button
                                 class="px-4 py-2 font-medium"
-                                class:border-b-2={move || !show_qr.get()}
-                                class:border-blue-500={move || !show_qr.get()}
-                                class:text-blue-600={move || !show_qr.get()}
+                                class=border-b-2={move || !show_qr.get()}
+                                class=border-blue-500={move || !show_qr.get()}
+                                class=text-blue-600={move || !show_qr.get()}
                                 on:click=move |_| set_show_qr.set(false)
                             >
                                 "Share Link"
                             </button>
                             <button
                                 class="px-4 py-2 font-medium"
-                                class:border-b-2={move || show_qr.get()}
-                                class:border-blue-500={move || show_qr.get()}
-                                class:text-blue-600={move || show_qr.get()}
+                                class=border-b-2={move || show_qr.get()}
+                                class=border-blue-500={move || show_qr.get()}
+                                class=text-blue-600={move || show_qr.get()}
                                 on:click=move |_| set_show_qr.set(true)
                             >
                                 "QR Code"

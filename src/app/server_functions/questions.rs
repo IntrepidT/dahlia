@@ -4,14 +4,14 @@ use crate::app::models::{
     question::{Question, QuestionType},
     CreateNewQuestionRequest, DeleteQuestionRequest, UpdateQuestionRequest,
 };
-use leptos::*;
+use leptos::prelude::*;
 #[cfg(feature = "ssr")]
 use {
     crate::app::db::database, actix_web::web, rand::seq::SliceRandom, rand::thread_rng,
     sqlx::PgPool, std::error::Error, uuid::Uuid,
 };
 
-#[server(GetQuestions, "/api")]
+#[server]
 pub async fn get_questions(test_id: String) -> Result<Vec<Question>, ServerFnError> {
     #[cfg(feature = "ssr")]
     {
@@ -35,7 +35,7 @@ pub async fn get_questions(test_id: String) -> Result<Vec<Question>, ServerFnErr
     }
 }
 
-#[server(DeleteQuestions, "/api")]
+#[server]
 pub async fn delete_questions(test_id: String) -> Result<Vec<Question>, ServerFnError> {
     #[cfg(feature = "ssr")]
     {
@@ -59,7 +59,7 @@ pub async fn delete_questions(test_id: String) -> Result<Vec<Question>, ServerFn
     }
 }
 
-#[server(AddQuestion, "/api")]
+#[server]
 pub async fn add_question(
     test_id: String,
     add_question_request: CreateNewQuestionRequest,
@@ -120,7 +120,7 @@ pub async fn add_question(
     }
 }
 
-#[server(DeleteQuestion, "/api")]
+#[server]
 pub async fn delete_question(
     delete_question_request: DeleteQuestionRequest,
 ) -> Result<Question, ServerFnError> {
@@ -149,7 +149,7 @@ pub async fn delete_question(
     }
 }
 
-#[server(EditQuestion, "/api")]
+#[server]
 pub async fn edit_question(
     test_id: String,
     edit_question_request: UpdateQuestionRequest,
@@ -187,7 +187,7 @@ pub async fn edit_question(
     }
 }
 
-#[server(DuplicateAndRandomizeQuestions, "/api")]
+#[server]
 pub async fn duplicate_and_randomize_questions(
     source_test_id: String,
     target_test_id: String,
@@ -271,7 +271,7 @@ pub async fn duplicate_and_randomize_questions(
     }
 }
 
-#[server(GenerateRandomizedTest, "/api")]
+#[server]
 pub async fn generate_randomized_test(
     base_test_id: String,
     variation_name: String,
@@ -326,7 +326,7 @@ pub async fn generate_randomized_test(
     }
 }
 
-#[server(ShuffleQuestionOptions, "/api")]
+#[server]
 pub async fn shuffle_question_options(
     qnumber: i32,
     test_id: String,
@@ -379,7 +379,7 @@ pub async fn shuffle_question_options(
     }
 }
 
-#[server(ValidateTestForRandomization, "/api")]
+#[server]
 pub async fn validate_test_for_randomization(
     test_id: String,
 ) -> Result<(bool, String), ServerFnError> {

@@ -1,7 +1,7 @@
+use leptos::prelude::*;
 cfg_if::cfg_if! {
     if #[cfg(feature = "ssr")] {
         use sqlx::PgPool;
-        use leptos::*;
         use crate::app::models::global::{GlobalSetting, SettingsCache};
         use sqlx::Row;
 

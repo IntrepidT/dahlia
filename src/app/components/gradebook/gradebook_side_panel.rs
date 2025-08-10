@@ -12,9 +12,11 @@ use icondata::{
     BiXCircleRegular, HiUserCircleOutlineLg, RiArrowRightSArrowsLine, RiBookmarkBusinessLine,
     RiFilePaper2DocumentLine,
 };
-use leptos::*;
+use leptos::prelude::*;
+use leptos::prelude::*;
 use leptos_icons::Icon;
-use leptos_router::*;
+use leptos_router::components::*;
+use leptos_router::hooks::*;
 
 #[derive(Clone, PartialEq)]
 pub enum ScorePanelType {
@@ -94,7 +96,7 @@ pub fn StudentScorePanel(
 
     // Close panel function
     let close_panel = move |_| {
-        set_show.call(false);
+        set_show.run(false);
     };
 
     view! {
@@ -116,14 +118,14 @@ pub fn StudentScorePanel(
                     class="text-gray-500 hover:text-gray-700 focus:outline-none"
                     on:click=close_panel
                 >
-                    <Icon icon=BiXCircleRegular class="w-6 h-6" />
+                    <Icon icon=BiXCircleRegular attr:class="w-6 h-6" />
                 </button>
             </div>
 
             <div class="p-4 overflow-y-auto flex-grow">
                 {move || {
                     if !show.get() {
-                        view! { <div></div> }.into_view()
+                        view! { <div></div> }.into_any()
                     } else {
                         // Student info section with de-anonymization support
                         let student_info = view! {
@@ -131,7 +133,7 @@ pub fn StudentScorePanel(
                                 <div class="flex items-center mb-3">
                                     <Icon
                                         icon=HiUserCircleOutlineLg
-                                        class="w-12 h-12 text-[#2E3A59] mr-3"
+                                        attr:class="w-12 h-12 text-[#2E3A59] mr-3"
                                     />
                                     <div>
                                         <h3 class="text-lg font-semibold text-[#2E3A59]">
@@ -164,16 +166,16 @@ pub fn StudentScorePanel(
                                                             <p class="text-green-600 text-xs mt-1">
                                                                 "✓ De-anonymized data"
                                                             </p>
-                                                        }.into_view()
+                                                        }.into_any()
                                                     } else {
                                                         view! {
                                                             <p class="text-yellow-600 text-xs mt-1">
                                                                 "⚠ Anonymized data"
                                                             </p>
-                                                        }.into_view()
+                                                        }.into_any()
                                                     }
                                                 } else {
-                                                    view! { <span></span> }.into_view()
+                                                    view! { <span></span> }.into_any()
                                                 }
                                             }}
                                         </div>
@@ -193,7 +195,7 @@ pub fn StudentScorePanel(
                                         // Assessment Details
                                         <div class="mb-6">
                                             <h3 class="text-md font-bold mb-2 flex items-center">
-                                                <Icon icon=RiBookmarkBusinessLine class="w-5 h-5 mr-2" />
+                                                <Icon icon=RiBookmarkBusinessLine attr:class="w-5 h-5 mr-2" />
                                                 {assessment.assessment_name}
                                             </h3>
                                             <div class="bg-[#F9F9F8] p-4 rounded-lg shadow-sm">
@@ -260,7 +262,7 @@ pub fn StudentScorePanel(
                                                                             href="#"
                                                                             class="text-indigo-600 hover:text-indigo-800 font-medium"
                                                                         >
-                                                                            {&test.test_name}
+                                                                            {test.test_name.clone()}
                                                                         </a>
                                                                     </td>
                                                                     <td class="py-2 text-right">
@@ -294,24 +296,24 @@ pub fn StudentScorePanel(
                                                                 <GenericTestModal test_id=next_test_id test_name=next_test_name.clone()>
                                                                     <div class="w-full bg-blue-600 text-white px-4 py-2 rounded flex items-center justify-center font-medium hover:bg-blue-700">
                                                                         <span>{next_test_name}</span>
-                                                                        <Icon icon=RiArrowRightSArrowsLine class="w-5 h-5 ml-2" />
+                                                                        <Icon icon=RiArrowRightSArrowsLine attr:class="w-5 h-5 ml-2" />
                                                                     </div>
                                                                 </GenericTestModal>
                                                             </div>
-                                                        }.into_view()
+                                                        }.into_any()
                                                     } else {
                                                         view! {
                                                             <div class="bg-gray-100 p-4 rounded-lg text-gray-700 text-sm">
                                                                 {"No additional tests are available at this time."}
                                                             </div>
-                                                        }.into_view()
+                                                        }.into_any()
                                                     }
                                                 } else {
                                                     view! {
                                                         <div class="bg-green-50 p-4 rounded-lg text-green-700 text-sm border border-green-200">
                                                             {"All tests in this assessment have been completed."}
                                                         </div>
-                                                    }.into_view()
+                                                    }.into_any()
                                                 }
                                             }}
                                         </div>
@@ -322,7 +324,7 @@ pub fn StudentScorePanel(
                                                 href=format!("/studentview/{}/results",
                                                     student.get().unwrap().student_id
                                                 )
-                                                class="flex-1 bg-indigo-600 text-white px-4 py-2 rounded text-center font-medium hover:bg-indigo-700"
+                                                attr:class="flex-1 bg-indigo-600 text-white px-4 py-2 rounded text-center font-medium hover:bg-indigo-700"
                                             >
                                                 {"View Full Report"}
                                             </A>
@@ -333,13 +335,13 @@ pub fn StudentScorePanel(
                                                 {"Close"}
                                             </button>
                                         </div>
-                                    }.into_view()
+                                    }.into_any()
                                 } else {
                                     view! {
                                         <div class="text-center py-8">
                                             <p class="text-gray-500">{"Assessment data not available"}</p>
                                         </div>
-                                    }.into_view()
+                                    }.into_any()
                                 }
                             },
                             ScorePanelType::TestScore(_, _, _) => {
@@ -352,7 +354,7 @@ pub fn StudentScorePanel(
                                         // Test Details
                                         <div class="mb-6">
                                             <h3 class="text-md font-bold mb-2 flex items-center">
-                                                <Icon icon=RiFilePaper2DocumentLine class="w-5 h-5 mr-2" />
+                                                <Icon icon=RiFilePaper2DocumentLine attr:class="w-5 h-5 mr-2" />
                                                 {test.test_name}
                                             </h3>
                                             <div class="bg-[#F9F9F8] p-4 rounded-lg shadow-sm">
@@ -408,7 +410,7 @@ pub fn StudentScorePanel(
                                                     test.test_variant,
                                                     test.attempt,
                                                 )
-                                                class="w-full bg-indigo-600 text-white px-4 py-2 rounded text-center font-medium hover:bg-indigo-700"
+                                                attr:class="w-full bg-indigo-600 text-white px-4 py-2 rounded text-center font-medium hover:bg-indigo-700"
                                             >
                                                 {"Review Test Responses"}
                                             </A>
@@ -417,7 +419,7 @@ pub fn StudentScorePanel(
                                                     // Use de-anonymized ID for student view navigation
                                                     student.get().map(|s| get_student_display_id(&s)).unwrap_or_default()
                                                 )
-                                                class="w-full bg-blue-600 text-white px-4 py-2 rounded text-center font-medium hover:bg-blue-700"
+                                                attr:class="w-full bg-blue-600 text-white px-4 py-2 rounded text-center font-medium hover:bg-blue-700"
                                             >
                                                 {"View Student"}
                                             </A>
@@ -428,13 +430,13 @@ pub fn StudentScorePanel(
                                                 {"Close"}
                                             </button>
                                         </div>
-                                    }.into_view()
+                                    }.into_any()
                                 } else {
                                     view! {
                                         <div class="text-center py-8">
                                             <p class="text-gray-500">{"Test data not available"}</p>
                                         </div>
-                                    }.into_view()
+                                    }.into_any()
                                 }
                             },
                             ScorePanelType::None => {
@@ -442,7 +444,7 @@ pub fn StudentScorePanel(
                                     <div class="text-center py-8">
                                         <p class="text-gray-500">{"Select a score to view details"}</p>
                                     </div>
-                                }.into_view()
+                                }.into_any()
                             }
                         }
                     }
@@ -463,7 +465,7 @@ pub fn StudentScorePanel(
                                                 // Use de-anonymized ID for student view navigation
                                                 student.get().map(|s| get_student_display_id(&s)).unwrap_or_default()
                                             )
-                                            class="flex-1 bg-indigo-600 text-white px-4 py-2 rounded text-center font-medium hover:bg-indigo-700"
+                                            attr:class="flex-1 bg-indigo-600 text-white px-4 py-2 rounded text-center font-medium hover:bg-indigo-700"
                                         >
                                             {"View Student"}
                                         </A>
@@ -474,7 +476,7 @@ pub fn StudentScorePanel(
                                             {"Close"}
                                         </button>
                                     </div>
-                                }.into_view()
+                                }.into_any()
                             } else {
                                 view! {
                                     <button
@@ -483,10 +485,10 @@ pub fn StudentScorePanel(
                                     >
                                         {"Close"}
                                     </button>
-                                }.into_view()
+                                }.into_any()
                             }
                         },
-                        _ => view! { <div></div> }.into_view(),
+                        _ => view! { <div></div> }.into_any(),
                     }
                 }}
             </div>

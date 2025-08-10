@@ -1,13 +1,15 @@
-use crate::app::components::assessment_page::shared::types::{AssessmentFormState, is_variation_test};
+use crate::app::components::assessment_page::shared::types::{
+    is_variation_test, AssessmentFormState,
+};
 use crate::app::models::test::Test;
-use leptos::*;
+use leptos::prelude::*;
 use uuid::Uuid;
 
 #[component]
 pub fn TestSelectionSection(
     state: ReadSignal<AssessmentFormState>,
     set_state: WriteSignal<AssessmentFormState>,
-    tests_resource: Resource<(), Result<Vec<Test>, ServerFnError>>,
+    tests_resource: Resource<Result<Vec<Test>, ServerFnError>>,
 ) -> impl IntoView {
     view! {
         <div class="bg-white p-4 rounded-lg">
@@ -25,7 +27,7 @@ pub fn TestSelectionSection(
                                 {main_tests.into_iter().map(|test| {
                                     let test_id = Uuid::parse_str(&test.test_id).expect("Did not convert uuid to string");
                                     let test_name = test.name.clone();
-                                    
+
                                     view! {
                                         <TestCheckbox
                                             test_id=test_id
@@ -44,13 +46,13 @@ pub fn TestSelectionSection(
                                     }
                                 }).collect_view()}
                             </div>
-                        }
+                        }.into_any()
                     },
                     Err(e) => view! {
                         <div class="p-4 bg-red-50 text-red-700 rounded border border-red-200">
                             "Error loading tests: " {e.to_string()}
                         </div>
-                    }
+                    }.into_any()
                 }
             })}
         </div>

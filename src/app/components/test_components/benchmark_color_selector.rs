@@ -1,4 +1,5 @@
-use leptos::*;
+use leptos::prelude::*;
+use leptos::prelude::*;
 
 //this component is used to allow a user to select a benchmark category and display its color
 
@@ -17,7 +18,7 @@ pub fn BenchmarkColorSelector(
     #[prop(into)] current_color: Signal<String>,
     on_color_change: Callback<String>,
 ) -> impl IntoView {
-    let (show_palette, set_show_palette) = create_signal(false);
+    let (show_palette, set_show_palette) = signal(false);
 
     view! {
         <button
@@ -41,7 +42,7 @@ pub fn BenchmarkColorSelector(
                                     let color_to_set = color_value.to_string();
                                     move |_| {
                                         set_show_palette.set(false);
-                                        on_color_change.call(color_to_set.clone());
+                                        on_color_change.run(color_to_set.clone());
                                     }
                                 }
                             ></button>
